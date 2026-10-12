@@ -71,6 +71,33 @@ export function extractSheetDate(csvText: string): string | null {
   return null;
 }
 
+export interface CsvHeaderMetadata {
+  cellA1: string;
+  cellB2: string;
+  cellC1: string;
+  combinedTitle: string;
+  subtitle: string;
+}
+
+/**
+ * Extracts Title (combined A1 and B2) and Subtitle (cell C1) directly from CSV
+ */
+export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
+  const rows = parseCsvRows(csvText.slice(0, 2000));
+  const cellA1 = (rows[0]?.[0] || 'Chatbots with Image-Input for Science').trim();
+  const rawB2 = (rows[1]?.[1] || 'Paid Chat💲\nFree Chat+API 🌐').trim();
+  const cellB2 = rawB2.replace(/[\r\n]+/g, ' | ').replace(/\s+/g, ' ');
+  const cellC1 = (rows[0]?.[2] || 'How To Read: Scroll down').trim();
+  const combinedTitle = cellA1 && cellB2 ? `${cellA1} | ${cellB2}` : cellA1 || cellB2;
+  return {
+    cellA1,
+    cellB2,
+    cellC1,
+    combinedTitle,
+    subtitle: cellC1,
+  };
+}
+
 /**
  * Parse numeric string safely, supporting European commas like "81,6" or "-40"
  */

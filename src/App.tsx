@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent } from './types';
 import { FALLBACK_CSV_CONTENT, SHEET_HTML_URL, CHART_HTML_URL, GITHUB_REPO_URL } from './data/rawCsvFallback';
-import { extractSheetDate, parseModelDataset } from './utils/csvParser';
+import { extractSheetDate, extractHeaderMetadata, parseModelDataset } from './utils/csvParser';
 import { LoadedDatasets, loadModelsData } from './services/dataService';
 import { BENCHMARK_COMPONENTS } from './data/benchmarks';
 import { ExplodedBarChart } from './components/ExplodedBarChart';
@@ -20,7 +20,7 @@ export default function App() {
   const [lang, setLang] = useState<Language>('en');
   const t = TRANSLATIONS[lang];
 
-  // Score-Modus: 'new' (Spalte M, 8 Benchmarks) vs 'old' (Spalte L, 5 Benchmarks)
+  // Score-Modus: 'new' (8 Benchmarks) vs 'old' (5 Benchmarks)
   const [scoreMode, setScoreMode] = useState<ScoreMode>('new');
 
   // Schalter: 'current' (nur noch verfügbare Chatbots) vs 'all' (alle Chatbots der CSV)
@@ -39,6 +39,7 @@ export default function App() {
     lastSyncedAt: new Date(),
     isLive: false,
     error: null,
+    headerMeta: extractHeaderMetadata(FALLBACK_CSV_CONTENT),
   }));
 
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -194,26 +195,13 @@ export default function App() {
     return () => clearInterval(timer);
   }, [refreshData]);
 
-  const formatDateTime = (d: Date | null) => {
+  const formatSyncDate = (d: Date | null) => {
     if (!d) return '';
-    return d.toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', {
+    return d.toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
     });
-  };
-
-  const formatSheetDate = (isoDate: string | null) => {
-    if (!isoDate) return null;
-    const parts = isoDate.split('-');
-    if (parts.length === 3) {
-      if (lang === 'de') return `${parts[2]}.${parts[1]}.${parts[0]}`;
-      return `${parts[1]}/${parts[2]}/${parts[0]}`;
-    }
-    return isoDate;
   };
 
   return (
@@ -221,13 +209,13 @@ export default function App() {
       {/* Clean top bar */}
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs px-4 sm:px-6 py-2.5">
         <div className="w-full max-w-[1720px] mx-auto flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-          {/* Title & Subtitle: Begrenzt auf maximal 2 Zeilen für optimale Lesbarkeit */}
+          {/* Title & Subtitle directly from CSV cells: combined A1 and B2, and subtitle from C1 */}
           <div className="min-w-0 flex-1">
             <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2">
-              {t.title}
+              {loadedData.headerMeta?.combinedTitle || t.title}
             </h1>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal font-sans line-clamp-2">
-              {t.subtitle}
+              {loadedData.headerMeta?.subtitle || t.subtitle}
             </p>
           </div>
 
@@ -261,105 +249,20 @@ export default function App() {
               </button>
             </div>
 
-            {/* Schalter: NEW Score vs. OLD Score sauber getrennt */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => setScoreMode('new')}
-                className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                  scoreMode === 'new'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={lang === 'de' ? 'NEW Score: Spalte M (8 Benchmarks)' : 'NEW Score: Column M (8 benchmarks)'}
-              >
-                NEW Score
-              </button>
-              <button
-                type="button"
-                onClick={() => setScoreMode('old')}
-                className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                  scoreMode === 'old'
-                    ? 'bg-amber-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={lang === 'de' ? 'OLD Score: Spalte L (5 Benchmarks, bis zu 224 Modelle)' : 'OLD Score: Column L (5 benchmarks, up to 224 models)'}
-              >
-                OLD Score
-              </button>
-            </div>
-
-            {/* Schalter: Current (nur noch verfügbare Chatbots) vs All (alle Chatbots der CSV) */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => setModelScope('current')}
-                className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                  modelScope === 'current'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={t.scopeCurrentDesc}
-              >
-                {t.scopeCurrent}
-              </button>
-              <button
-                type="button"
-                onClick={() => setModelScope('all')}
-                className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                  modelScope === 'all'
-                    ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={t.scopeAllDesc}
-              >
-                {t.scopeAll}
-              </button>
-            </div>
-
-            {/* Toggle: Volle Explosion ON / OFF */}
-            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg px-2 py-1">
-              <span className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
-                {t.fullExplosionToggle}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={fullExplosionEnabled}
-                onClick={() => {
-                  setFullExplosionEnabled((prev) => !prev);
-                }}
-                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  fullExplosionEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
-                }`}
-                title={fullExplosionEnabled ? (lang === 'de' ? 'Volle Explosion deaktivieren' : 'Disable full explosion') : (lang === 'de' ? 'Alle Balken gleichzeitig vollständig explodieren' : 'Explode all bars simultaneously')}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                    fullExplosionEnabled ? 'translate-x-3' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                {fullExplosionEnabled ? t.on : t.off}
-              </span>
-            </div>
-
-            {/* Synchronisieren-Button mit Popup für Datum und Zeitpunkt der letzten Aktualisierung */}
+            {/* Synchronisieren-Button mit Popup für Datum der letzten Synchronisierung */}
             <div className="relative group">
               <button
                 onClick={refreshData}
                 disabled={isSyncing}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer disabled:opacity-50"
-                title={`${t.syncButtonTitle}\n${t.sheetOriginalDate} ${formatSheetDate(loadedData.sheetFileDate) || '–'}\n${t.lastSync} ${formatDateTime(lastSyncedAt)}`}
+                title={`${t.syncButtonTitle}\n${t.lastSync} ${formatSyncDate(lastSyncedAt)}`}
               >
                 <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-blue-500' : ''}`} />
                 <span>{t.sync}</span>
               </button>
 
-              {/* Hover-Popup mit Datum der originalen Google-Sheets-Datei & Zeitpunkt des letzten Abrufs */}
-              <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 min-w-[250px] p-2.5 bg-slate-900/95 text-white dark:bg-slate-800/95 backdrop-blur-xs border border-slate-700/80 rounded-lg shadow-xl text-[11px] z-50 pointer-events-none transition-all">
+              {/* Hover-Popup mit Datum der letzten Synchronisierung */}
+              <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 min-w-[220px] p-2.5 bg-slate-900/95 text-white dark:bg-slate-800/95 backdrop-blur-xs border border-slate-700/80 rounded-lg shadow-xl text-[11px] z-50 pointer-events-none transition-all">
                 <div className="flex items-center justify-between gap-2 border-b border-slate-700/60 pb-1.5">
                   <span className="font-semibold text-slate-200 flex items-center gap-1">
                     <RefreshCw className="w-3 h-3 text-emerald-400" />
@@ -370,23 +273,13 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* Datum der originalen Google Sheets Datei */}
+                {/* Datum der letzten Synchronisierung (nur Datum ohne Uhrzeit) */}
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                    {t.originalSheetFile}
+                    {t.lastSync}
                   </span>
                   <span className="font-mono text-emerald-300 font-bold text-[11.5px]">
-                    {formatSheetDate(loadedData.sheetFileDate) || t.dateNotInFile}
-                  </span>
-                </div>
-
-                {/* Zeitpunkt der letzten Synchronisierung */}
-                <div className="flex flex-col gap-0.5 border-t border-slate-800/80 pt-1">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                    {t.lastSyncFetch}
-                  </span>
-                  <span className="font-mono text-slate-200 text-[11px]">
-                    {formatDateTime(lastSyncedAt)}
+                    {formatSyncDate(lastSyncedAt)}
                   </span>
                 </div>
 
@@ -396,10 +289,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* Datum der Google-Sheets Datei & letzter Sync auch direkt sichtbar auf XL-Bildschirmen */}
+            {/* Letzter Sync direkt sichtbar auf XL-Bildschirmen (nur Datum) */}
             <span className="hidden xl:inline text-slate-500 dark:text-slate-400 text-[11px] font-mono">
-              {formatSheetDate(loadedData.sheetFileDate) ? `${t.sheetOriginalDate} ${formatSheetDate(loadedData.sheetFileDate)} · ` : ''}
-              {t.lastSync} {formatDateTime(lastSyncedAt)}
+              {t.lastSync} {formatSyncDate(lastSyncedAt)}
             </span>
 
             {/* Statisches Diagramm als Icon neben Google Sheets & GitHub */}
@@ -438,7 +330,7 @@ export default function App() {
 
       {/* Main Bar Chart Container */}
       <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-3 sm:py-3.5 flex flex-col space-y-3.5">
-        {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategoriebuttons (Alles oder 1 der 8 Kategorien), 5er-Schritt-Slider und alphabetischen Schnellfiltern */}
+        {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategorie-Slider, 5er-Schritt-Slider, NEW/OLD Score, Current/All Scope, Volle Explosion und alphabetischen Hersteller-Filtern */}
         <SearchBar
           value={searchFilter}
           onChange={setSearchFilter}
@@ -463,6 +355,12 @@ export default function App() {
             }
           }}
           onHoverCategory={setCategoryInfoComp}
+          scoreMode={scoreMode}
+          onScoreModeChange={setScoreMode}
+          modelScope={modelScope}
+          onModelScopeChange={setModelScope}
+          fullExplosionEnabled={fullExplosionEnabled}
+          onFullExplosionToggle={() => setFullExplosionEnabled((prev) => !prev)}
         />
 
         {/* Balkendiagramm: Breit dargestellt, die volle Containerbreite nutzend */}

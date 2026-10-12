@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ModelRecord, BenchmarkComponent } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
@@ -49,6 +49,16 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   // Index of hovered bar
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [hoveredSegment, setHoveredSegment] = useState<HoveredSegmentInfo | null>(null);
+
+  // Persistent model & segment detail to keep showing the info even after the mouse leaves the bar
+  const [persistentModel, setPersistentModel] = useState<ModelRecord | null>(null);
+  const [persistentSegment, setPersistentSegment] = useState<HoveredSegmentInfo | null>(null);
+
+  // Reset persistent bar info when switching categories
+  useEffect(() => {
+    setPersistentModel(null);
+    setPersistentSegment(null);
+  }, [activeCategoryIndex, hoveredCategoryComp]);
 
   // Dynamic Y-axis scale based on single category (0-100%) or overall score (e.g. 74 in OLD mode, 69 in NEW mode)
   const maxScoreInPlot = activeComp
@@ -114,25 +124,38 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   };
 
   const handleMouseEnter = (index: number) => {
-    if (hoveredIndex !== index) {
-      setHoveredIndex(index);
+    setHoveredIndex(index);
+    const m = models[index];
+    if (m) {
+      setPersistentModel(m);
       if (activeComp) {
-        const m = models[index];
-        if (m) {
-          const raw = m.rawScores[activeComp.key] ?? 0;
-          const breakdown = m.breakdown.find((b) => b.id === activeComp.id);
-          const pts = breakdown?.pointsContribution ?? (activeComp.transform(raw) / 8);
-          setHoveredSegment({
-            comp: activeComp,
+        const raw = m.rawScores[activeComp.key] ?? 0;
+        const breakdown = m.breakdown.find((b) => b.id === activeComp.id);
+        const pts = breakdown?.pointsContribution ?? (activeComp.transform(raw) / 8);
+        const segInfo: HoveredSegmentInfo = {
+          comp: activeComp,
+          model: m,
+          points: pts,
+          raw,
+        };
+        setHoveredSegment(segInfo);
+        setPersistentSegment(segInfo);
+      } else {
+        // Multi-Kategorie Modus: Falls bereits ein Segment vorgewählt war, auf das neue Modell übertragen
+        if (persistentSegment) {
+          const comp = persistentSegment.comp;
+          const raw = m.rawScores[comp.key] ?? 0;
+          const breakdown = m.breakdown.find((b) => b.id === comp.id);
+          const pts = breakdown?.pointsContribution ?? (comp.transform(raw) / 8);
+          const segInfo: HoveredSegmentInfo = {
+            comp,
             model: m,
             points: pts,
             raw,
-          });
-        } else {
-          setHoveredSegment(null);
+          };
+          setHoveredSegment(segInfo);
+          setPersistentSegment(segInfo);
         }
-      } else {
-        setHoveredSegment(null);
       }
     }
     if (onExplosionStateChange) onExplosionStateChange(true);
@@ -141,12 +164,37 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const handleMouseLeave = () => {
     setHoveredIndex(null);
     setHoveredSegment(null);
+    // Behalte persistentModel und persistentSegment bei, damit die Kriterien-Beschreibung und Quellenlinks sichtbar bleiben!
+    // Verschwindet erst, wenn ein anderes Balkenelement gehovert oder eine Kategorie oben gewählt wird.
     if (onExplosionStateChange) {
       onExplosionStateChange(fullExplosionEnabled);
     }
   };
 
+  // Wenn die Kategorie über den Schieberegler geändert wird, Beschreibung anpassen
+  useEffect(() => {
+    if (activeCategoryIndex > 0) {
+      const comp = BENCHMARK_COMPONENTS[activeCategoryIndex - 1];
+      if (comp && persistentModel) {
+        const raw = persistentModel.rawScores[comp.key] ?? 0;
+        const breakdown = persistentModel.breakdown.find((b) => b.id === comp.id);
+        const pts = breakdown?.pointsContribution ?? (comp.transform(raw) / 8);
+        setPersistentSegment({
+          comp,
+          model: persistentModel,
+          points: pts,
+          raw,
+        });
+      }
+    } else {
+      // Zurück auf 'Alles': Einzelnes Segment zurücksetzen
+      setPersistentSegment(null);
+    }
+  }, [activeCategoryIndex]);
+
   const hoveredModel = hoveredIndex !== null ? models[hoveredIndex] : null;
+  const displayedModel = hoveredModel || persistentModel;
+  const displayedSegment = hoveredSegment || persistentSegment;
 
   // Grid tick lines: if single category (0-100%), ticks: 0, 20, 40, 60, 80, 100
   const yTicks = activeComp
@@ -211,25 +259,25 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
       {/* Non-intrusive Info Bar above chart: dynamically displays model & hovered segment information */}
       <div className="flex flex-col justify-between gap-1.5 min-h-[64px] pb-2.5 mb-2 border-b border-slate-100 dark:border-slate-800 text-xs">
-        {hoveredModel ? (
+        {displayedModel ? (
           <div className="flex flex-col gap-1 w-full">
             {/* Row 1: Model Identification + Hovered Segment or Summary Score */}
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-700 dark:text-slate-300 min-h-[24px]">
               {/* Model Name & Favicon (Clickable link if modelUrl is available) */}
-              {hoveredModel.modelUrl ? (
+              {displayedModel.modelUrl ? (
                 <a
-                  href={hoveredModel.modelUrl}
+                  href={displayedModel.modelUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors group cursor-pointer"
-                  title={`${hoveredModel.displayName} · ${t.openChatbotApp}`}
+                  title={`${displayedModel.displayName} · ${t.openChatbotApp}`}
                 >
                   <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
                     <img
-                      src={hoveredModel.faviconUrl}
+                      src={displayedModel.faviconUrl}
                       alt=""
                       className={`w-full h-full object-contain ${
-                        isZoomedCompany(hoveredModel) ? 'scale-145' : 'scale-110'
+                        isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
                       }`}
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = 'none';
@@ -237,7 +285,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     />
                   </span>
                   <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 group-hover:decoration-blue-500">
-                    {hoveredModel.displayName}
+                    {displayedModel.displayName}
                   </span>
                   <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
                 </a>
@@ -245,70 +293,70 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
                     <img
-                      src={hoveredModel.faviconUrl}
+                      src={displayedModel.faviconUrl}
                       alt=""
                       className={`w-full h-full object-contain ${
-                        isZoomedCompany(hoveredModel) ? 'scale-145' : 'scale-110'
+                        isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
                       }`}
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = 'none';
                       }}
                     />
                   </span>
-                  {hoveredModel.displayName}
+                  {displayedModel.displayName}
                 </span>
               )}
 
               <span className="text-slate-400">·</span>
               <span className="font-mono text-slate-600 dark:text-slate-400">
-                {t.company} <strong>{hoveredModel.companyName}</strong>
+                {t.company} <strong>{displayedModel.companyName}</strong>
               </span>
 
-              {hoveredModel.releaseDate && (
+              {displayedModel.releaseDate && (
                 <>
                   <span className="text-slate-400">·</span>
                   <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
                     <span className="opacity-75">📅</span>
-                    <span>{hoveredModel.releaseDate}</span>
+                    <span>{displayedModel.releaseDate}</span>
                   </span>
                 </>
               )}
 
               {/* Specific segment info if hovered, else summary score */}
-              {hoveredSegment ? (
+              {displayedSegment ? (
                 <>
                   <span className="text-slate-400">·</span>
                   <div className="flex items-center gap-1.5 font-bold">
                     <span
                       className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
-                      style={{ backgroundColor: hoveredSegment.comp.color }}
+                      style={{ backgroundColor: displayedSegment.comp.color }}
                     />
-                    <span style={{ color: hoveredSegment.comp.color }}>
-                      {lang === 'en' ? hoveredSegment.comp.nameEn : hoveredSegment.comp.nameDe}
+                    <span style={{ color: displayedSegment.comp.color }}>
+                      {lang === 'en' ? displayedSegment.comp.nameEn : displayedSegment.comp.nameDe}
                     </span>
                     <span className="font-mono text-slate-900 dark:text-white font-bold">
-                      {Math.round(hoveredSegment.raw)}%
+                      {Math.round(displayedSegment.raw)}%
                     </span>
                     <span className="font-mono text-slate-500 dark:text-slate-400 font-normal">
-                      (+{hoveredSegment.points.toFixed(1)} {t.points})
+                      (+{displayedSegment.points.toFixed(1)} {t.points})
                     </span>
                   </div>
 
                   <span className="text-slate-400">·</span>
-                  {hoveredSegment.comp.sourceUrl ? (
+                  {displayedSegment.comp.sourceUrl ? (
                     <a
-                      href={hoveredSegment.comp.sourceUrl}
+                      href={displayedSegment.comp.sourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-mono text-[11px] font-semibold transition-colors cursor-pointer shadow-2xs hover:shadow-xs"
-                      title={`${hoveredSegment.comp.sourceName} ${t.openWebsite} (${hoveredSegment.comp.sourceUrl})`}
+                      title={`${displayedSegment.comp.sourceName} ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
                     >
                       <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                      <span>{t.sourceLabel} <strong>{hoveredSegment.comp.sourceName}</strong></span>
+                      <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
                     </a>
                   ) : (
                     <span className="font-mono text-[11px] text-slate-400">
-                      {t.sourceLabel} {hoveredSegment.comp.sourceName}
+                      {t.sourceLabel} {displayedSegment.comp.sourceName}
                     </span>
                   )}
                 </>
@@ -316,41 +364,27 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 <>
                   <span className="text-slate-400">·</span>
                   <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                    {t.score}: {hoveredModel.scoreNewReported ?? hoveredModel.scoreNewCalculated} {t.points} ({t.rank} #{hoveredModel.rank})
+                    {t.score}: {displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated} {t.points} ({t.rank} #{displayedModel.rank})
                   </span>
                   <span className="text-slate-400">·</span>
                   <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                    {t.nonHallucinationLabel}: {hoveredModel.rawScores.nonHallucination}% (+{(hoveredModel.rawScores.nonHallucination / 8).toFixed(1)} {t.points})
+                    {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / 8).toFixed(1)} {t.points})
                   </span>
                 </>
               )}
             </div>
 
             {/* Row 2: Always present to guarantee rock-solid zero-shift height */}
-            <div className="text-[11.5px] rounded px-2.5 py-1 border flex items-center justify-between gap-2.5 leading-relaxed min-h-[30px] transition-colors bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60">
-              {hoveredSegment ? (
-                <>
-                  <div className="flex items-center gap-2 flex-1">
-                    <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
-                      {t.criterionLabel}
-                    </span>
-                    <span className="text-slate-600 dark:text-slate-300">
-                      {lang === 'en' ? hoveredSegment.comp.descriptionEn : hoveredSegment.comp.descriptionDe}
-                    </span>
-                  </div>
-                  {hoveredSegment.comp.sourceUrl && (
-                    <a
-                      href={hoveredSegment.comp.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-mono text-[11px] font-semibold shrink-0 cursor-pointer shadow-2xs transition-all hover:shadow-xs"
-                      title={`${hoveredSegment.comp.sourceName} ${t.openWebsite}`}
-                    >
-                      <span>{t.sourceLink}</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
-                  )}
-                </>
+            <div className="text-[11.5px] rounded px-2.5 py-1 border flex items-center gap-2.5 leading-relaxed min-h-[30px] transition-colors bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60">
+              {displayedSegment ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
+                    {t.criterionLabel}
+                  </span>
+                  <span className="text-slate-600 dark:text-slate-300">
+                    {lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
+                  </span>
+                </div>
               ) : (
                 <span className="text-slate-500 dark:text-slate-400">
                   {t.hoverBarPrompt}
@@ -390,10 +424,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 </span>
               )}
 
-              <span className="text-slate-400">·</span>
-              <span className="font-mono text-slate-500 dark:text-slate-400 text-xs">
-                {models.length} {t.modelsCount}
-              </span>
               {sortBy === 'date' && (
                 <>
                   <span className="text-slate-400">·</span>
@@ -405,8 +435,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               )}
             </div>
 
-            {/* Category Row 2: Full description & direkt anklickbarer Button zur Quelle */}
-            <div className="text-[11.5px] text-slate-700 dark:text-slate-200 rounded px-2.5 py-1 border border-slate-200/80 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/60 flex items-center justify-between gap-2.5 leading-relaxed min-h-[30px]">
+            {/* Category Row 2: Full description (Quelle bereits oben verlinkt) */}
+            <div className="text-[11.5px] text-slate-700 dark:text-slate-200 rounded px-2.5 py-1 border border-slate-200/80 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/60 flex items-center gap-2.5 leading-relaxed min-h-[30px]">
               <div className="flex items-center gap-2 flex-1">
                 <span className="font-semibold text-slate-800 dark:text-slate-100 shrink-0">
                   {t.criterionLabel}
@@ -415,18 +445,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
                 </span>
               </div>
-              {displayedCategoryComp.sourceUrl && (
-                <a
-                  href={displayedCategoryComp.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-mono text-xs font-semibold shrink-0 cursor-pointer shadow-2xs transition-all hover:shadow-xs"
-                  title={`${displayedCategoryComp.sourceName} (${displayedCategoryComp.sourceUrl})`}
-                >
-                  <span>{t.sourceLink}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              )}
             </div>
           </div>
         ) : (
@@ -434,24 +452,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             {/* Idle Row 1 */}
             <div className="flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-300 min-h-[24px]">
               <span className="font-bold text-slate-900 dark:text-white">AI-Top30 Ranking</span>
-              <span className="text-slate-400">·</span>
-              <span className="font-mono text-slate-600 dark:text-slate-400">
-                {models.length} {t.modelsCount}
-              </span>
               {sortBy === 'date' && (
                 <>
                   <span className="text-slate-400">·</span>
                   <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1">
                     <span>📅</span>
                     <span>{t.sortedByDateLabel}</span>
-                  </span>
-                </>
-              )}
-              {hasActiveHighlight && (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-mono">
-                    {t.highlightActive} {models.filter(isModelHighlighted).length} {t.ofModelsMatch}
                   </span>
                 </>
               )}
@@ -629,14 +635,15 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   fill="transparent"
                   onMouseEnter={() => {
                     if (activeComp) {
-                      setHoveredSegment({
+                      const segInfo: HoveredSegmentInfo = {
                         comp: activeComp,
                         model,
                         points: catPoints,
                         raw: catRaw,
-                      });
-                    } else {
-                      setHoveredSegment(null);
+                      };
+                      setHoveredSegment(segInfo);
+                      setPersistentSegment(segInfo);
+                      setPersistentModel(model);
                     }
                   }}
                 />
@@ -725,12 +732,15 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                             fill="transparent"
                             className="cursor-pointer"
                             onMouseEnter={() => {
-                              setHoveredSegment({
+                              const segInfo: HoveredSegmentInfo = {
                                 comp: benchMeta,
                                 model,
                                 points: seg.comp.pointsContribution,
                                 raw: seg.comp.rawValue,
-                              });
+                              };
+                              setHoveredSegment(segInfo);
+                              setPersistentSegment(segInfo);
+                              setPersistentModel(model);
                             }}
                           />
                         )}

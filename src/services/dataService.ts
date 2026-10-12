@@ -1,6 +1,6 @@
 import { FALLBACK_CSV_CONTENT, RAW_CSV_URL } from '../data/rawCsvFallback';
 import { ModelRecord } from '../types';
-import { extractSheetDate, parseModelDataset } from '../utils/csvParser';
+import { extractHeaderMetadata, extractSheetDate, parseModelDataset, CsvHeaderMetadata } from '../utils/csvParser';
 
 export interface SyncState {
   isSyncing: boolean;
@@ -21,6 +21,7 @@ export interface LoadedDatasets {
   lastSyncedAt: Date;
   isLive: boolean;
   error: string | null;
+  headerMeta: CsvHeaderMetadata;
 }
 
 /**
@@ -79,6 +80,8 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
     const oldModels = parseModelDataset(csvText, 'old');
     const sheetFileDate = extractSheetDate(csvText);
 
+    const headerMeta = extractHeaderMetadata(csvText);
+
     if (newModels.length === 0 && oldModels.length === 0) {
       throw new Error('Keine Datensätze gefunden');
     }
@@ -91,11 +94,13 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
       lastSyncedAt: now,
       isLive,
       error: null,
+      headerMeta,
     };
   } catch (err) {
     const fallbackNew = parseModelDataset(FALLBACK_CSV_CONTENT, 'new');
     const fallbackOld = parseModelDataset(FALLBACK_CSV_CONTENT, 'old');
     const sheetFileDate = extractSheetDate(FALLBACK_CSV_CONTENT);
+    const headerMeta = extractHeaderMetadata(FALLBACK_CSV_CONTENT);
 
     return {
       models: fallbackNew,
@@ -106,6 +111,7 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
       lastSyncedAt: now,
       isLive: false,
       error: err instanceof Error ? err.message : 'Parser-Fehler',
+      headerMeta,
     };
   }
 }

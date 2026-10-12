@@ -2,7 +2,7 @@ import React from 'react';
 import { Search, X, Plus, Minus, BarChart2, Calendar } from 'lucide-react';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
-import { SortField, BenchmarkComponent } from '../types';
+import { SortField, ModelScope, ScoreMode, BenchmarkComponent } from '../types';
 
 interface SearchBarProps {
   value: string;
@@ -21,9 +21,15 @@ interface SearchBarProps {
   selectedCategoryIndex: number;
   onCategoryIndexChange: (idx: number) => void;
   onHoverCategory?: (comp: BenchmarkComponent | null) => void;
+  scoreMode: ScoreMode;
+  onScoreModeChange: (mode: ScoreMode) => void;
+  modelScope: ModelScope;
+  onModelScopeChange: (scope: ModelScope) => void;
+  fullExplosionEnabled: boolean;
+  onFullExplosionToggle: () => void;
 }
 
-// Alphabetisch sortiert: ChatGPT, Claude, DeepSeek, Gemini, GLM, Grok, Kimi, Ling, MiMo, MiniMax, Mistral, Muse, Qwen
+// 12 alphabetische Hersteller-Familien (ohne 'Ling')
 const ALPHABETICAL_FAMILIES = [
   'ChatGPT',
   'Claude',
@@ -32,7 +38,6 @@ const ALPHABETICAL_FAMILIES = [
   'GLM',
   'Grok',
   'Kimi',
-  'Ling',
   'MiMo',
   'MiniMax',
   'Mistral',
@@ -49,239 +54,339 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   topCount,
   onTopCountChange,
   maxAvailableModels,
-  matchCount,
-  totalCount,
   lang,
   sortBy,
   onSortByChange,
   selectedCategoryIndex,
   onCategoryIndexChange,
   onHoverCategory,
+  scoreMode,
+  onScoreModeChange,
+  modelScope,
+  onModelScopeChange,
+  fullExplosionEnabled,
+  onFullExplosionToggle,
 }) => {
   const t = TRANSLATIONS[lang];
 
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Chatbot-Count Slider Handlers
+  const handleTopSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
     if (!isNaN(val)) {
       onTopCountChange(val);
     }
   };
 
-  const handleStep = (step: number) => {
+  const handleTopStep = (step: number) => {
     const nextVal = Math.max(5, Math.min(maxAvailableModels, topCount + step));
     onTopCountChange(nextVal);
   };
 
-  const hasFilterActive = value.trim().length > 0 || selectedFamilies.length > 0;
+  // Category Slider Handlers (0 = Alles, 1..8 = Einzelkategorie)
+  const handleCategorySliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const idx = parseInt(e.target.value, 10);
+    if (!isNaN(idx)) {
+      onCategoryIndexChange(idx);
+      if (idx > 0) {
+        onHoverCategory?.(BENCHMARK_COMPONENTS[idx - 1]);
+      } else {
+        onHoverCategory?.(null);
+      }
+    }
+  };
+
+  const handleCategoryStep = (step: number) => {
+    const nextIdx = Math.max(0, Math.min(BENCHMARK_COMPONENTS.length, selectedCategoryIndex + step));
+    onCategoryIndexChange(nextIdx);
+    if (nextIdx > 0) {
+      onHoverCategory?.(BENCHMARK_COMPONENTS[nextIdx - 1]);
+    } else {
+      onHoverCategory?.(null);
+    }
+  };
+
+  const activeCategoryComp =
+    selectedCategoryIndex > 0 ? BENCHMARK_COMPONENTS[selectedCategoryIndex - 1] : null;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 sm:p-3.5 shadow-2xs flex flex-col gap-2.5">
-      {/* Zeile 1: Suchfeld + Sortier-Buttons (Datum oder Punktzahl) + Scope-Knopf (Current vs All) + Modellanzahl Slider */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2">
+      {/* ZEILE 1: Suchfeld + Chatbot-Anzahl-Regler + Kategorie-Regler (kompakt, harmonisch) */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         {/* Suchfeld */}
-        <div className="relative flex-1 flex items-center min-w-[200px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-2.5 pointer-events-none" />
+        <div className="relative flex-1 min-w-[200px] sm:max-w-xs md:max-w-sm flex items-center">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
           <input
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={t.searchPlaceholder}
-            className="w-full pl-8.5 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
+            className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
           />
           {value && (
             <button
               type="button"
               onClick={() => onChange('')}
-              className="absolute right-2.5 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               title={t.reset}
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3 h-3" />
             </button>
           )}
         </div>
 
-        {/* Button zum Sortieren der Balken nach: Punktzahl oder Datum (Spalte Y) */}
-        <div className="flex items-center gap-1.5 shrink-0 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-1">
-          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono font-medium pl-1 hidden sm:inline">
-            {t.sortByLabel}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => onSortByChange('score')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-semibold rounded-md transition-all cursor-pointer ${
-                sortBy === 'score'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
-              }`}
-              title={lang === 'de' ? 'Nach Punktzahl absteigend sortieren' : 'Sort descending by score'}
-            >
-              <BarChart2 className="w-3.5 h-3.5" />
-              <span>{t.sortScore}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSortByChange('date')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-semibold rounded-md transition-all cursor-pointer ${
-                sortBy === 'date'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
-              }`}
-              title={lang === 'de' ? 'Nach Veröffentlichungsdatum aus Spalte Y sortieren (neueste zuerst)' : 'Sort by release date in Column Y (newest first)'}
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>{t.sortDateShort}</span>
-              <span className="text-[10px] opacity-75 font-normal hidden md:inline">{t.colYShort}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 5er-Schritt-Slider für Chatbot-Anzahl (Standard: 15) */}
-        <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1 shrink-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">
-              {t.topSliderTop}: {Math.min(topCount, maxAvailableModels)}
+        {/* Die beiden Slider nebeneinander: Chatbot Count & Kategorie */}
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          {/* Chatbot Count Slider */}
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
+            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+              {t.topSliderTop}:
             </span>
-          </div>
-
-          <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => handleStep(-5)}
+              onClick={() => handleTopStep(-5)}
               disabled={topCount <= 5}
-              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
               title={t.stepMinusChatbots}
             >
               <Minus className="w-3 h-3" />
             </button>
-
             <input
               type="range"
               min={5}
               max={Math.max(5, maxAvailableModels)}
               step={5}
               value={Math.min(topCount, maxAvailableModels)}
-              onChange={handleSliderChange}
-              className="w-18 sm:w-22 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+              onChange={handleTopSliderChange}
+              className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
             />
-
             <button
               type="button"
-              onClick={() => handleStep(5)}
+              onClick={() => handleTopStep(5)}
               disabled={topCount >= maxAvailableModels}
-              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
               title={t.stepPlusChatbots}
             >
               <Plus className="w-3 h-3" />
             </button>
+            <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right">
+              {Math.min(topCount, maxAvailableModels)}
+            </span>
           </div>
-          <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
-            ({t.maxLabel} {maxAvailableModels})
-          </span>
+
+          {/* Kategorie Slider */}
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
+            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+              {t.categorySliderLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleCategoryStep(-1)}
+              disabled={selectedCategoryIndex <= 0}
+              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+              title={t.categoryStepMinus}
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={BENCHMARK_COMPONENTS.length}
+              step={1}
+              value={selectedCategoryIndex}
+              onChange={handleCategorySliderChange}
+              className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+            />
+            <button
+              type="button"
+              onClick={() => handleCategoryStep(1)}
+              disabled={selectedCategoryIndex >= BENCHMARK_COMPONENTS.length}
+              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+              title={t.categoryStepPlus}
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+
+            {/* Badge der aktiven Kategorie */}
+            <div className="flex items-center min-w-[70px] sm:min-w-[100px]">
+              {activeCategoryComp ? (
+                <span
+                  className="text-[10px] sm:text-[11px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate max-w-[130px] sm:max-w-[170px]"
+                  style={{ backgroundColor: activeCategoryComp.color }}
+                  title={`${lang === 'en' ? activeCategoryComp.nameEn : activeCategoryComp.nameDe} (${activeCategoryComp.sourceName})`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">
+                    {lang === 'en' ? activeCategoryComp.nameEn : activeCategoryComp.nameDe}
+                  </span>
+                </span>
+              ) : (
+                <span
+                  className="text-[10px] sm:text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100"
+                  title={t.allBenchmarksOverall}
+                >
+                  {t.categoryAllShort}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Zeile 2: Nur die Auswahlknöpfe für Kategorien (alles links entfernt) */}
-      <div className="flex flex-wrap items-center justify-end gap-1 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-        <button
-          type="button"
-          onClick={() => {
-            onCategoryIndexChange(0);
-            onHoverCategory?.(null);
-          }}
-          className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
-            selectedCategoryIndex === 0
-              ? 'bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 font-bold shadow-2xs ring-1 ring-slate-400'
-              : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-          title={t.allBenchmarksOverall}
-        >
-          {t.categoryAllShort}
-        </button>
-
-        {BENCHMARK_COMPONENTS.map((comp, idx) => {
-          const isCatActive = selectedCategoryIndex === idx + 1;
-          return (
+      {/* ZEILE 2: Modus-Schalter, Sortierung & Hersteller-Filter (übersichtlich gegliedert) */}
+      <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+        {/* Linker Block: Score-Modus + Chatbots-Umfang + Explosion + Sortierung */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* NEW vs OLD Score */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
             <button
-              key={comp.id}
               type="button"
-              onMouseEnter={() => {
-                onHoverCategory?.(comp);
-              }}
-              onClick={() => {
-                onCategoryIndexChange(idx + 1);
-                onHoverCategory?.(comp);
-              }}
-              className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer flex items-center gap-1.5 ${
-                isCatActive
-                  ? 'font-bold shadow-2xs ring-1'
-                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              onClick={() => onScoreModeChange('new')}
+              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                scoreMode === 'new'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
-              style={
-                isCatActive
-                  ? {
-                      backgroundColor: comp.color,
-                      color: '#FFFFFF',
-                      borderColor: comp.color,
-                    }
-                  : {}
-              }
-              title={`${lang === 'en' ? comp.nameEn : comp.nameDe} (${comp.sourceName}) · ${t.categoryFilterHint}`}
+              title={t.scoreModeNewDesc}
+            >
+              {t.scoreModeNew}
+            </button>
+            <button
+              type="button"
+              onClick={() => onScoreModeChange('old')}
+              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                scoreMode === 'old'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.scoreModeOldDesc}
+            >
+              {t.scoreModeOld}
+            </button>
+          </div>
+
+          {/* Current vs All Chatbots */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => onModelScopeChange('current')}
+              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                modelScope === 'current'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.scopeCurrentDesc}
+            >
+              {t.scopeCurrent}
+            </button>
+            <button
+              type="button"
+              onClick={() => onModelScopeChange('all')}
+              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                modelScope === 'all'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.scopeAllDesc}
+            >
+              {t.scopeAll}
+            </button>
+          </div>
+
+          {/* Volle Explosion Schalter */}
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg px-2 py-0.5">
+            <span className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-mono font-medium">
+              {t.explosionToggle}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={fullExplosionEnabled}
+              onClick={onFullExplosionToggle}
+              className={`relative inline-flex h-3.5 w-6.5 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                fullExplosionEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
+              }`}
+              title={fullExplosionEnabled ? t.fullExplosionOnDesc : t.fullExplosionOffDesc}
             >
               <span
-                className="w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ backgroundColor: isCatActive ? '#FFFFFF' : comp.color }}
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                  fullExplosionEnabled ? 'translate-x-3' : 'translate-x-0.5'
+                }`}
               />
-              <span>{lang === 'en' ? comp.nameEn.split(' ')[0] : comp.nameDe.split(' ')[0]}</span>
             </button>
-          );
-        })}
-      </div>
+            <span className="text-[9.5px] font-bold font-mono text-slate-500 dark:text-slate-400">
+              {fullExplosionEnabled ? t.on : t.off}
+            </span>
+          </div>
 
-      {/* Zeile 3: Schnellfilter (Alphabetisch, Mehrfachauswahl >1 Kategorie möglich) */}
-      <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
-        <span className="text-[11px] text-slate-400 font-mono font-medium shrink-0 mr-1">
-          {t.quickFilters}
-        </span>
+          {/* Trenner */}
+          <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
 
-        {/* 'Alle' Button: deaktiviert alle Filter */}
-        <button
-          type="button"
-          onClick={onClearFamilies}
-          className={`text-[11px] px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
-            selectedFamilies.length === 0
-              ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
-              : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          {t.all}
-        </button>
-
-        {/* Die 13 alphabetischen Schnellfilter-Buttons (Mehrfachauswahl) */}
-        {ALPHABETICAL_FAMILIES.map((family) => {
-          const isSelected = selectedFamilies.includes(family);
-          return (
+          {/* Sortierung (Score vs Datum) */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
             <button
-              key={family}
               type="button"
-              onClick={() => onToggleFamily(family)}
-              className={`text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
-                isSelected
-                  ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
-                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              onClick={() => onSortByChange('score')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                sortBy === 'score'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
+              title={t.sortScoreDesc}
             >
-              {family}
+              <BarChart2 className="w-3 h-3" />
+              <span>{t.sortScore}</span>
             </button>
-          );
-        })}
+            <button
+              type="button"
+              onClick={() => onSortByChange('date')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                sortBy === 'date'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.sortDateDesc}
+            >
+              <Calendar className="w-3 h-3" />
+              <span>{t.sortDate}</span>
+            </button>
+          </div>
+        </div>
 
-        {hasFilterActive && matchCount !== undefined && (
-          <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold ml-auto shrink-0">
-            ({matchCount} {t.modelsCount})
-          </span>
-        )}
+        {/* Rechter Block: Hersteller-Filter (kompakt) */}
+        <div className="flex flex-wrap items-center gap-1">
+          {/* 'Alle' Button */}
+          <button
+            type="button"
+            onClick={onClearFamilies}
+            className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+              selectedFamilies.length === 0
+                ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
+                : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            {t.all}
+          </button>
+
+          {/* Die 12 Hersteller-Buttons */}
+          {ALPHABETICAL_FAMILIES.map((family) => {
+            const isSelected = selectedFamilies.includes(family);
+            return (
+              <button
+                key={family}
+                type="button"
+                onClick={() => onToggleFamily(family)}
+                className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
+                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {family}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
