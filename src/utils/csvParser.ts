@@ -1,6 +1,6 @@
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { getCompanyMeta, getFaviconUrl } from '../data/companies';
-import { ComponentBreakdown, ModelRecord, RawBenchmarkScores } from '../types';
+import { ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode } from '../types';
 
 /**
  * Robust RFC-4180 CSV line parser handling quotes, embedded commas, and escaped quotes.
@@ -58,6 +58,20 @@ export function parseCsvRows(csvText: string): string[][] {
 }
 
 /**
+ * Extracts sheet date (e.g. "2026-10-11") from the first lines of the CSV.
+ */
+export function extractSheetDate(csvText: string): string | null {
+  const rows = parseCsvRows(csvText.slice(0, 1500));
+  for (let r = 0; r < Math.min(5, rows.length); r++) {
+    for (const cell of rows[r]) {
+      const match = cell.match(/(\d{4}-\d{2}-\d{2})/);
+      if (match) return match[1];
+    }
+  }
+  return null;
+}
+
+/**
  * Parse numeric string safely, supporting European commas like "81,6" or "-40"
  */
 function parseNum(val: string | undefined): number | null {
@@ -86,14 +100,16 @@ function extractFlag(text: string): { flag: string; cleanText: string } {
 }
 
 /**
- * Parses raw CSV into structured model records for the Top 30 table and expanded timeline.
- * 1. Parses the curated Top 30 from the top section.
- * 2. Parses additional models from the full timeline (starting at "Full Timeline:").
- * Deduplicates by cleaned model name so the Top 30 stay authoritative at ranks 1..30.
+ * Parses raw CSV into structured model records.
+ * Supports distinct score modes:
+ * - 'new': strictly models with Col M ("NEW Score").
+ * - 'old': strictly models with Col L ("OLD Score").
  */
-export function parseModelDataset(csvText: string): ModelRecord[] {
+export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): ModelRecord[] {
   const rows = parseCsvRows(csvText);
   if (rows.length < 3) return [];
+
+  const isOld = mode === 'old';
 
   // Find header row containing "10 Evals" or "Act Code" or "Creator | Release"
   let headerRowIndex = -1;
@@ -107,6 +123,16 @@ export function parseModelDataset(csvText: string): ModelRecord[] {
 
   if (headerRowIndex === -1) {
     headerRowIndex = 1;
+  }
+
+  // Find timeline row index before parsing models
+  let timelineRowIndex = -1;
+  for (let r = headerRowIndex + 1; r < rows.length; r++) {
+    const rowStr = (rows[r] || []).join(' ');
+    if (rowStr.includes('Full Timeline:') || rowStr.includes('Full Timeline')) {
+      timelineRowIndex = r;
+      break;
+    }
   }
 
   const parseRowToModel = (row: string[], rIdx: number): ModelRecord | null => {
@@ -182,9 +208,15 @@ export function parseModelDataset(csvText: string): ModelRecord[] {
       econLegal: valK ?? 0,
     };
 
-    const scoreNewReported = parseNum(row[12]);
-    const scoreOld = parseNum(row[11]);
+    const scoreNewReported = parseNum(row[12]); // Col M
+    const scoreOld = parseNum(row[11]);         // Col L
     const scoreWorstCase = parseNum(row[13]);
+
+    // Strictly enforce selected mode without blending/fallback!
+    const targetScore = isOld ? scoreOld : scoreNewReported;
+    if (targetScore === null || targetScore <= 0) {
+      return null;
+    }
 
     // Calculate components according to formula:
     const rawContributions: { comp: typeof BENCHMARK_COMPONENTS[0]; raw: number; transformed: number; pts: number }[] = [];
@@ -198,12 +230,7 @@ export function parseModelDataset(csvText: string): ModelRecord[] {
       sumTransformed += pts;
     });
 
-    const scoreNewCalculated = parseFloat(sumTransformed.toFixed(2));
-    const targetScore = scoreNewReported ?? scoreOld ?? Math.round(scoreNewCalculated);
-
-    if (targetScore <= 0) return null;
-
-    // Normalize points contribution slightly to match the reported score height exactly
+    // Normalize points contribution to match the target score height exactly
     const normFactor = sumTransformed > 0 ? targetScore / sumTransformed : 1;
 
     const breakdown: ComponentBreakdown[] = rawContributions.map(({ comp, raw, transformed, pts }) => {
@@ -232,11 +259,44 @@ export function parseModelDataset(csvText: string): ModelRecord[] {
 
     const parsedChatLink = extractHttpUrl(chatLinkRaw);
     const parsedApiLink = extractHttpUrl(apiLinkRaw);
-    // Modell-Link: Link aus Spalte P; wenn Spalte P kein Link (sondern nur Text wie z.B. "paid"), dann Link aus Spalte Q; sonst undefined
+    // Modell-Link: Link aus Spalte P; wenn Spalte P kein Link, dann Link aus Spalte Q; sonst undefined
     const modelUrl = parsedChatLink || parsedApiLink;
 
     const company = getCompanyMeta(cleanedCreator);
     const faviconUrl = getFaviconUrl(company.domain);
+
+    // Release date from Column Y (index 24) with robust fallback
+    const rawReleaseDate = (row[24] || '').trim();
+    let releaseDate = rawReleaseDate;
+    if (!releaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
+      const combined = `${rawCreatorCell} ${rawNameCell}`;
+      const m = combined.match(/(Jan|Feb|Mär|Mar|Apr|Mai|May|Jun|Jul|Aug|Sep|Sept|Okt|Oct|Nov|Dez|Dec)\s*(\d{2})/i);
+      if (m) {
+        const monthMap: Record<string, string> = {
+          jan: '01', feb: '02', mär: '03', mar: '03', apr: '04', mai: '05', may: '05',
+          jun: '06', jul: '07', aug: '08', sep: '09', sept: '09', okt: '10', oct: '10',
+          nov: '11', dez: '12', dec: '12'
+        };
+        const month = monthMap[m[1].toLowerCase()] || '01';
+        const year = '20' + m[2];
+        releaseDate = `${year}-${month}-01`;
+      } else {
+        releaseDate = '2024-01-01';
+      }
+    }
+
+    // Availability: Spalte P (Index 15) "Link to Chat or App if still available"
+    // Chatbots in the top table (before timeline) are current available bots.
+    // In timeline: only available if not superseded/discontinued and has active link or paid access.
+    const chatLinkLow = chatLinkRaw.toLowerCase();
+    const isSupersededOrDiscontinued =
+      chatLinkLow.includes('better') ||
+      chatLinkLow.includes('discontinued') ||
+      chatLinkRaw === '';
+
+    const isAvailable =
+      (timelineRowIndex !== -1 && rIdx < timelineRowIndex && rIdx >= 2) ||
+      (!isSupersededOrDiscontinued && (chatLinkLow.startsWith('http') || chatLinkLow.includes('paid') || chatLinkLow.includes('api') || !!parsedApiLink));
 
     return {
       id: `${displayName}-${rIdx}`,
@@ -250,12 +310,14 @@ export function parseModelDataset(csvText: string): ModelRecord[] {
       creator: rawCreatorCell,
       creatorClean: cleanedCreator,
       companyName: company.name,
-      releaseDate: '',
+      releaseDate,
       releaseText: cleanedCreator,
       rawScores,
       hasAll8Benchmarks: hasAll8,
       breakdown,
+      score: targetScore,
       scoreOld,
+      scoreNew: scoreNewReported,
       scoreNewCalculated: targetScore,
       scoreNewReported: targetScore,
       scoreWorstCase,
@@ -263,6 +325,7 @@ export function parseModelDataset(csvText: string): ModelRecord[] {
       chatLink: parsedChatLink,
       apiLink: parsedApiLink,
       modelUrl,
+      isAvailable,
       companyDomain: company.domain,
       companyColor: company.color,
       faviconUrl,
@@ -273,16 +336,11 @@ export function parseModelDataset(csvText: string): ModelRecord[] {
   const seenNames = new Set<string>();
 
   // 1. Parse top table (stop when hitting section break or timeline)
-  let timelineRowIndex = -1;
-  for (let r = headerRowIndex + 1; r < rows.length; r++) {
+  const stopIndex = timelineRowIndex !== -1 ? timelineRowIndex : rows.length;
+  for (let r = headerRowIndex + 1; r < stopIndex; r++) {
     const row = rows[r];
     const rowStr = (row || []).join(' ');
-    if (rowStr.includes('Full Timeline:') || rowStr.includes('Full Timeline')) {
-      timelineRowIndex = r;
-      break;
-    }
     if (rowStr.includes('Sources & Notes')) {
-      // Timeline might come soon after
       continue;
     }
 
@@ -295,9 +353,6 @@ export function parseModelDataset(csvText: string): ModelRecord[] {
       }
     }
   }
-
-  // Sort top models descending by score
-  topModels.sort((a, b) => (b.scoreNewReported ?? 0) - (a.scoreNewReported ?? 0));
 
   // 2. Parse timeline starting from timelineRowIndex
   const timelineModels: ModelRecord[] = [];
@@ -315,11 +370,9 @@ export function parseModelDataset(csvText: string): ModelRecord[] {
     }
   }
 
-  // Sort timeline models descending by score
-  timelineModels.sort((a, b) => (b.scoreNewReported ?? 0) - (a.scoreNewReported ?? 0));
-
-  // Combine top models first, then timeline models
+  // Combine and sort all deduplicated models descending by active score
   const allModels = [...topModels, ...timelineModels];
+  allModels.sort((a, b) => b.score - a.score);
 
   // Assign sequential ranks 1..N
   allModels.forEach((m, idx) => {

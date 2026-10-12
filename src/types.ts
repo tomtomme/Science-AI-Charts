@@ -59,7 +59,9 @@ export interface ModelRecord {
   breakdown: ComponentBreakdown[];
   
   // Final scores
+  score: number;
   scoreOld: number | null;
+  scoreNew: number | null;
   scoreNewCalculated: number;
   scoreNewReported: number | null;
   scoreWorstCase: number | null;
@@ -69,6 +71,7 @@ export interface ModelRecord {
   chatLink?: string;
   apiLink?: string;
   modelUrl?: string;
+  isAvailable: boolean;
   companyDomain: string;
   companyColor: string;
   faviconUrl: string;
@@ -83,3 +86,6 @@ export interface CompanyInfo {
 
 export type ViewFilter = 'all' | 'free' | 'paid' | 'top10' | 'top25';
 export type SortOption = 'newScore' | 'nonHallu' | 'vision' | 'science' | 'worstCase' | 'rank';
+export type SortField = 'score' | 'date';
+export type ScoreMode = 'new' | 'old';
+export type ModelScope = 'current' | 'all';
