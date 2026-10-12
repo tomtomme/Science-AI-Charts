@@ -1,6 +1,6 @@
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { getCompanyMeta, getFaviconUrl } from '../data/companies';
-import { ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode } from '../types';
+import { ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata } from '../types';
 
 /**
  * Robust RFC-4180 CSV line parser handling quotes, embedded commas, and escaped quotes.
@@ -95,6 +95,57 @@ export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
     cellC1,
     combinedTitle,
     subtitle: cellC1,
+  };
+}
+
+/**
+ * Extracts Section 1 (Cell A34 title & Cell C34 content) and Section 2 (Cell N34 title & Cell O34 content)
+ * directly from CSV, ensuring full synchronization with user updates in Google Sheets.
+ */
+export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
+  const rows = parseCsvRows(csvText);
+  let notesRow: string[] | null = null;
+
+  // 1. Check row immediately following "Sources & Notes"
+  for (let i = 0; i < Math.min(100, rows.length); i++) {
+    const rowStr = (rows[i] || []).join(' ');
+    if (rowStr.includes('Sources & Notes')) {
+      if (i + 1 < rows.length && rows[i + 1] && (rows[i + 1][0] || rows[i + 1][2])) {
+        notesRow = rows[i + 1];
+        break;
+      }
+    }
+  }
+
+  // 2. Check row index 33 (Row 34 in 1-based indexing: Cell A34 / C34)
+  if (!notesRow && rows.length > 33) {
+    const cand = rows[33];
+    if (cand && (cand[0] || cand[2])) {
+      notesRow = cand;
+    }
+  }
+
+  // 3. Fallback scan between row 25 and 80 for any row with long documentation text
+  if (!notesRow) {
+    for (let i = 20; i < Math.min(80, rows.length); i++) {
+      const cand = rows[i];
+      if (cand && cand[2] && cand[2].length > 200) {
+        notesRow = cand;
+        break;
+      }
+    }
+  }
+
+  const section1Title = (notesRow?.[0] || 'How To Read').trim();
+  const section1Content = (notesRow?.[2] || '').trim();
+  const section2Title = (notesRow?.[13] || "What Bots can & can't do for you").trim();
+  const section2Content = (notesRow?.[14] || '').trim();
+
+  return {
+    section1Title: section1Title || 'How To Read',
+    section1Content,
+    section2Title: section2Title || "What Bots can & can't do for you",
+    section2Content,
   };
 }
 

@@ -52,8 +52,12 @@ Im Gegensatz zu herkömmlichen Benchmarks, die primär textbasierte Programmiera
 * Direkte Filterknöpfe für führende LLM-Familien: `ChatGPT`, `Claude`, `DeepSeek`, `Gemini`, `GLM`, `Grok`, `Kimi`, `MiMo`, `MiniMax`, `Mistral`, `Muse`, `Qwen`.
 
 ### 8. Live Google-Sheets Synchronisation
-* Das Dashboard lädt beim Start verzögerungsfrei die eingebetteten Daten und synchronisiert im Hintergrund stündlich (oder per Klick auf den **Sync**-Button) mit der Live-Google-Sheets-Tabelle.
-* Ein Hover-Infokärtchen zeigt das Originaldatum der Google-Tabelle sowie den Zeitpunkt der letzten Aktualisierung.
+* Das Dashboard lädt beim Start verzögerungsfrei die Daten und synchronisiert im Hintergrund stündlich (oder per Klick auf den **Sync**-Button) mit der Live-Google-Sheets-Tabelle.
+* Synchronisiert werden neben den Modellen und Benchmark-Punktzahlen auch alle Titel und Texte:
+  * **Titel & Untertitel**: Direkt aus den Zellen `A1`, `B2` und `C1`.
+  * **Bereich 1 (Anleitung / How To Read)**: Titel direkt synchronisiert aus Zelle `A34`, Inhalt 1:1 aus Zelle `C34`.
+  * **Bereich 2 (Was Bots können / What Bots can & can't do)**: Titel aus Zelle `N34`, Inhalt 1:1 aus Zelle `O34`.
+* Ein Hover-Infokärtchen am Sync-Button zeigt das Datum der letzten Synchronisierung (ohne Uhrzeit).
 
 ### 9. Vollständige Zweisprachigkeit (DE / EN)
 * Nahtloser Wechsel zwischen deutscher und englischer Sprache über den `DE / EN`-Schalter im Header.

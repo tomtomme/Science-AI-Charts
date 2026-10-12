@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent } from './types';
 import { FALLBACK_CSV_CONTENT, SHEET_HTML_URL, CHART_HTML_URL, GITHUB_REPO_URL } from './data/rawCsvFallback';
-import { extractSheetDate, extractHeaderMetadata, parseModelDataset } from './utils/csvParser';
+import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset } from './utils/csvParser';
 import { LoadedDatasets, loadModelsData } from './services/dataService';
 import { BENCHMARK_COMPONENTS } from './data/benchmarks';
 import { ExplodedBarChart } from './components/ExplodedBarChart';
@@ -40,6 +40,7 @@ export default function App() {
     isLive: false,
     error: null,
     headerMeta: extractHeaderMetadata(FALLBACK_CSV_CONTENT),
+    notesMeta: extractCsvNotesMetadata(FALLBACK_CSV_CONTENT),
   }));
 
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -381,7 +382,7 @@ export default function App() {
 
         {/* Textfeld-Bereich unter dem Balkendiagramm: CSV-Zellen B34/C34 & N34/O34 */}
         <div className="w-full pt-1 pb-4">
-          <CsvNotesSection appLang={lang} />
+          <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
         </div>
       </main>
     </div>

@@ -1,6 +1,6 @@
-import { FALLBACK_CSV_CONTENT, RAW_CSV_URL } from '../data/rawCsvFallback';
-import { ModelRecord } from '../types';
-import { extractHeaderMetadata, extractSheetDate, parseModelDataset, CsvHeaderMetadata } from '../utils/csvParser';
+import { FALLBACK_CSV_CONTENT, RAW_CSV_URL, DIRECT_EXPORT_CSV_URL } from '../data/rawCsvFallback';
+import { ModelRecord, CsvNotesMetadata } from '../types';
+import { extractHeaderMetadata, extractSheetDate, parseModelDataset, extractCsvNotesMetadata, CsvHeaderMetadata } from '../utils/csvParser';
 
 export interface SyncState {
   isSyncing: boolean;
@@ -22,55 +22,58 @@ export interface LoadedDatasets {
   isLive: boolean;
   error: string | null;
   headerMeta: CsvHeaderMetadata;
+  notesMeta: CsvNotesMetadata;
 }
 
 /**
- * Fetch raw CSV from Google Sheets with cache-busting query parameter
+ * Fetch raw CSV from Google Sheets with cache-busting query parameter.
+ * Tries direct export URL first for immediate, real-time Google Sheets changes,
+ * then falls back to public published CSV URL, and finally to embedded fallback.
  */
 export async function fetchLiveCsv(): Promise<{
   csvText: string;
   isLive: boolean;
   headerDate: string | null;
 }> {
-  try {
-    const cacheBuster = `_t=${Date.now()}`;
-    const url = `${RAW_CSV_URL}&${cacheBuster}`;
-    
-    // Attempt live fetch with an 8-second timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const cacheBuster = `_t=${Date.now()}`;
+  const endpoints = [
+    `${DIRECT_EXPORT_CSV_URL}&${cacheBuster}`,
+    `${RAW_CSV_URL}&${cacheBuster}`,
+  ];
 
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'Accept': 'text/csv, text/plain, */*',
-      },
-    });
+  for (const url of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    clearTimeout(timeoutId);
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'text/csv, text/plain, */*',
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`Google Sheets responded with HTTP status ${response.status}`);
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const headerDate = response.headers.get('last-modified') || response.headers.get('date');
+        const csvText = await response.text();
+
+        // Verify that we received valid CSV content rather than an HTML error page
+        if (!csvText.includes('<HTML>') && !csvText.includes('<!DOCTYPE') && csvText.length >= 200) {
+          return { csvText, isLive: true, headerDate };
+        }
+      }
+    } catch (err) {
+      console.warn(`Failed fetching from ${url}:`, err);
     }
-
-    const headerDate = response.headers.get('last-modified') || response.headers.get('date');
-    const csvText = await response.text();
-
-    // Verify that we received valid CSV content rather than an HTML error page
-    if (csvText.includes('<HTML>') || csvText.includes('<!DOCTYPE') || csvText.length < 200) {
-      throw new Error('Received HTML response instead of CSV');
-    }
-
-    return { csvText, isLive: true, headerDate };
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.warn('Google Sheets live fetch warning (using embedded fallback):', errorMsg);
-    return { csvText: FALLBACK_CSV_CONTENT, isLive: false, headerDate: null };
   }
+
+  return { csvText: FALLBACK_CSV_CONTENT, isLive: false, headerDate: null };
 }
 
 /**
- * Loads both NEW and OLD models along with sheet metadata
+ * Loads both NEW and OLD models along with sheet metadata and notes metadata
  */
 export async function loadModelsData(): Promise<LoadedDatasets> {
   const { csvText, isLive, headerDate } = await fetchLiveCsv();
@@ -81,6 +84,7 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
     const sheetFileDate = extractSheetDate(csvText);
 
     const headerMeta = extractHeaderMetadata(csvText);
+    const notesMeta = extractCsvNotesMetadata(csvText);
 
     if (newModels.length === 0 && oldModels.length === 0) {
       throw new Error('Keine Datensätze gefunden');
@@ -95,12 +99,14 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
       isLive,
       error: null,
       headerMeta,
+      notesMeta,
     };
   } catch (err) {
     const fallbackNew = parseModelDataset(FALLBACK_CSV_CONTENT, 'new');
     const fallbackOld = parseModelDataset(FALLBACK_CSV_CONTENT, 'old');
     const sheetFileDate = extractSheetDate(FALLBACK_CSV_CONTENT);
     const headerMeta = extractHeaderMetadata(FALLBACK_CSV_CONTENT);
+    const notesMeta = extractCsvNotesMetadata(FALLBACK_CSV_CONTENT);
 
     return {
       models: fallbackNew,
@@ -112,6 +118,7 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
       isLive: false,
       error: err instanceof Error ? err.message : 'Parser-Fehler',
       headerMeta,
+      notesMeta,
     };
   }
 }

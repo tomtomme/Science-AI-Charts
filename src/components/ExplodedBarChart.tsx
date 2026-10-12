@@ -348,11 +348,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       href={displayedSegment.comp.sourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-mono text-[11px] font-semibold transition-colors cursor-pointer shadow-2xs hover:shadow-xs"
+                      className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer"
                       title={`${displayedSegment.comp.sourceName} ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
                     >
-                      <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                       <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
+                      <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
                     </a>
                   ) : (
                     <span className="font-mono text-[11px] text-slate-400">
@@ -412,11 +412,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   href={displayedCategoryComp.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-mono text-xs font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+                  className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer"
                   title={`${displayedCategoryComp.sourceName} ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
                 >
-                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                   <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
+                  <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
                 </a>
               ) : (
                 <span className="font-mono text-xs text-slate-400">

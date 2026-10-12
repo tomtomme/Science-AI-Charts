@@ -89,3 +89,18 @@ export type SortOption = 'newScore' | 'nonHallu' | 'vision' | 'science' | 'worst
 export type SortField = 'score' | 'date';
 export type ScoreMode = 'new' | 'old';
 export type ModelScope = 'current' | 'all';
+
+export interface CsvParagraph {
+  heading?: string;
+  text: string;
+  link?: { url: string; label: string };
+}
+
+export interface CsvNotesMetadata {
+  section1Title: string; // cell A34 (e.g. "How To Read")
+  section1Content: string; // cell C34
+  section2Title: string; // cell N34 (e.g. "What Bots can & can't do for you")
+  section2Content: string; // cell O34
+  section1Paragraphs?: CsvParagraph[];
+  section2Paragraphs?: CsvParagraph[];
+}

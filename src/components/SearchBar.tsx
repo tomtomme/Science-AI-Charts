@@ -110,32 +110,131 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2">
-      {/* ZEILE 1: Suchfeld + Chatbot-Anzahl-Regler + Kategorie-Regler (kompakt, harmonisch) */}
+      {/* ZEILE 1: Modell-Familien-Buttons (links) + Modus-Schalter, Sortierung, Current/All & Chatbot-Count-Slider (rechts) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* Suchfeld */}
-        <div className="relative flex-1 min-w-[200px] sm:max-w-xs md:max-w-sm flex items-center">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={t.searchPlaceholder}
-            className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
-          />
-          {value && (
-            <button
-              type="button"
-              onClick={() => onChange('')}
-              className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-              title={t.reset}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
+        {/* Modell-Familien Schnellfilter */}
+        <div className="flex flex-wrap items-center gap-1">
+          {/* 'Alle' Button */}
+          <button
+            type="button"
+            onClick={onClearFamilies}
+            className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+              selectedFamilies.length === 0
+                ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
+                : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            {t.all}
+          </button>
+
+          {/* Die alphabetischen Hersteller-Buttons */}
+          {ALPHABETICAL_FAMILIES.map((family) => {
+            const isSelected = selectedFamilies.includes(family);
+            return (
+              <button
+                key={family}
+                type="button"
+                onClick={() => onToggleFamily(family)}
+                className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
+                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {family}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Die beiden Slider nebeneinander: Chatbot Count & Kategorie */}
-        <div className="flex flex-wrap items-center gap-2 ml-auto">
+        {/* Rechte Kontroll-Gruppe: NEW/OLD Score + Sortierung + Current/All Switcher + Chatbot Count Slider */}
+        <div className="flex flex-wrap items-center gap-1.5 ml-auto">
+          {/* NEW vs OLD Score */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => onScoreModeChange('new')}
+              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                scoreMode === 'new'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.scoreModeNewDesc}
+            >
+              {t.scoreModeNew}
+            </button>
+            <button
+              type="button"
+              onClick={() => onScoreModeChange('old')}
+              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                scoreMode === 'old'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.scoreModeOldDesc}
+            >
+              {t.scoreModeOld}
+            </button>
+          </div>
+
+          {/* Sortierung (Score vs Datum) */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => onSortByChange('score')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                sortBy === 'score'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.sortScoreDesc}
+            >
+              <BarChart2 className="w-3 h-3" />
+              <span>{t.sortScore}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSortByChange('date')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                sortBy === 'date'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.sortDateDesc}
+            >
+              <Calendar className="w-3 h-3" />
+              <span>{t.sortDate}</span>
+            </button>
+          </div>
+
+          {/* Current vs All Chatbots (positioniert LINKS vom Chatbot Count Slider) */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => onModelScopeChange('current')}
+              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                modelScope === 'current'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.scopeCurrentDesc}
+            >
+              {t.scopeCurrent}
+            </button>
+            <button
+              type="button"
+              onClick={() => onModelScopeChange('all')}
+              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                modelScope === 'all'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t.scopeAllDesc}
+            >
+              {t.scopeAll}
+            </button>
+          </div>
+
           {/* Chatbot Count Slider */}
           <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
             <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
@@ -172,220 +271,115 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               {Math.min(topCount, maxAvailableModels)}
             </span>
           </div>
-
-          {/* Kategorie Slider */}
-          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
-            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-              {t.categorySliderLabel}
-            </span>
-            <button
-              type="button"
-              onClick={() => handleCategoryStep(-1)}
-              disabled={selectedCategoryIndex <= 0}
-              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-              title={t.categoryStepMinus}
-            >
-              <Minus className="w-3 h-3" />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={BENCHMARK_COMPONENTS.length}
-              step={1}
-              value={selectedCategoryIndex}
-              onChange={handleCategorySliderChange}
-              className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-            />
-            <button
-              type="button"
-              onClick={() => handleCategoryStep(1)}
-              disabled={selectedCategoryIndex >= BENCHMARK_COMPONENTS.length}
-              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-              title={t.categoryStepPlus}
-            >
-              <Plus className="w-3 h-3" />
-            </button>
-
-            {/* Badge der aktiven Kategorie */}
-            <div className="flex items-center min-w-[70px] sm:min-w-[100px]">
-              {activeCategoryComp ? (
-                <span
-                  className="text-[10px] sm:text-[11px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate max-w-[130px] sm:max-w-[170px]"
-                  style={{ backgroundColor: activeCategoryComp.color }}
-                  title={`${lang === 'en' ? activeCategoryComp.nameEn : activeCategoryComp.nameDe} (${activeCategoryComp.sourceName})`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">
-                    {lang === 'en' ? activeCategoryComp.nameEn : activeCategoryComp.nameDe}
-                  </span>
-                </span>
-              ) : (
-                <span
-                  className="text-[10px] sm:text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100"
-                  title={t.allBenchmarksOverall}
-                >
-                  {t.categoryAllShort}
-                </span>
-              )}
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* ZEILE 2: Modus-Schalter, Sortierung & Hersteller-Filter (übersichtlich gegliedert) */}
-      <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
-        {/* Linker Block: Score-Modus + Chatbots-Umfang + Explosion + Sortierung */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* NEW vs OLD Score */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-            <button
-              type="button"
-              onClick={() => onScoreModeChange('new')}
-              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                scoreMode === 'new'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+      {/* ZEILE 2: Explosion On/Off (links) -> Kategorie-Slider (rechts daneben mit festen + / - Buttons) -> Filter-Suchfeld (unter den Modell-Familien-Buttons) */}
+      <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+        {/* 1. Volle Explosion Schalter (links vom Filterfeld) */}
+        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg px-2.5 py-1 shrink-0">
+          <span className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-mono font-medium whitespace-nowrap">
+            {t.explosionToggle}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={fullExplosionEnabled}
+            onClick={onFullExplosionToggle}
+            className={`relative inline-flex h-3.5 w-6.5 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+              fullExplosionEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
+            }`}
+            title={fullExplosionEnabled ? t.fullExplosionOnDesc : t.fullExplosionOffDesc}
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                fullExplosionEnabled ? 'translate-x-3' : 'translate-x-0.5'
               }`}
-              title={t.scoreModeNewDesc}
-            >
-              {t.scoreModeNew}
-            </button>
-            <button
-              type="button"
-              onClick={() => onScoreModeChange('old')}
-              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                scoreMode === 'old'
-                  ? 'bg-amber-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.scoreModeOldDesc}
-            >
-              {t.scoreModeOld}
-            </button>
-          </div>
+            />
+          </button>
+          <span className="text-[9.5px] font-bold font-mono text-slate-500 dark:text-slate-400 min-w-[20px]">
+            {fullExplosionEnabled ? t.on : t.off}
+          </span>
+        </div>
 
-          {/* Current vs All Chatbots */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-            <button
-              type="button"
-              onClick={() => onModelScopeChange('current')}
-              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                modelScope === 'current'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.scopeCurrentDesc}
-            >
-              {t.scopeCurrent}
-            </button>
-            <button
-              type="button"
-              onClick={() => onModelScopeChange('all')}
-              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                modelScope === 'all'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.scopeAllDesc}
-            >
-              {t.scopeAll}
-            </button>
-          </div>
+        {/* 2. Kategorie Slider (rechts neben dem Explosion Button; strikt feste Breiten damit + und - an exakt stabiler Position bleiben!) */}
+        <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
+          <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap w-14 sm:w-16 shrink-0 truncate">
+            {t.categorySliderLabel}:
+          </span>
+          <button
+            type="button"
+            onClick={() => handleCategoryStep(-1)}
+            disabled={selectedCategoryIndex <= 0}
+            className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+            title={t.categoryStepMinus}
+          >
+            <Minus className="w-3 h-3" />
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={BENCHMARK_COMPONENTS.length}
+            step={1}
+            value={selectedCategoryIndex}
+            onChange={handleCategorySliderChange}
+            className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 shrink-0"
+          />
+          <button
+            type="button"
+            onClick={() => handleCategoryStep(1)}
+            disabled={selectedCategoryIndex >= BENCHMARK_COMPONENTS.length}
+            className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+            title={t.categoryStepPlus}
+          >
+            <Plus className="w-3 h-3" />
+          </button>
 
-          {/* Volle Explosion Schalter */}
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg px-2 py-0.5">
-            <span className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-mono font-medium">
-              {t.explosionToggle}
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={fullExplosionEnabled}
-              onClick={onFullExplosionToggle}
-              className={`relative inline-flex h-3.5 w-6.5 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                fullExplosionEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
-              }`}
-              title={fullExplosionEnabled ? t.fullExplosionOnDesc : t.fullExplosionOffDesc}
-            >
+          {/* Feste Box für das Badge: Verhindert jegliches Springen der + und - Positionen */}
+          <div className="w-[130px] sm:w-[160px] shrink-0 overflow-hidden flex items-center">
+            {activeCategoryComp ? (
               <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                  fullExplosionEnabled ? 'translate-x-3' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-            <span className="text-[9.5px] font-bold font-mono text-slate-500 dark:text-slate-400">
-              {fullExplosionEnabled ? t.on : t.off}
-            </span>
-          </div>
-
-          {/* Trenner */}
-          <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
-
-          {/* Sortierung (Score vs Datum) */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-            <button
-              type="button"
-              onClick={() => onSortByChange('score')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                sortBy === 'score'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.sortScoreDesc}
-            >
-              <BarChart2 className="w-3 h-3" />
-              <span>{t.sortScore}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onSortByChange('date')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                sortBy === 'date'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.sortDateDesc}
-            >
-              <Calendar className="w-3 h-3" />
-              <span>{t.sortDate}</span>
-            </button>
+                className="text-[10px] sm:text-[11px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full"
+                style={{ backgroundColor: activeCategoryComp.color }}
+                title={`${lang === 'en' ? activeCategoryComp.nameEn : activeCategoryComp.nameDe} (${activeCategoryComp.sourceName})`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                <span className="truncate">
+                  {lang === 'en' ? activeCategoryComp.nameEn : activeCategoryComp.nameDe}
+                </span>
+              </span>
+            ) : (
+              <span
+                className="text-[10px] sm:text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100"
+                title={t.allBenchmarksOverall}
+              >
+                {t.categoryAllShort}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Rechter Block: Hersteller-Filter (kompakt) */}
-        <div className="flex flex-wrap items-center gap-1">
-          {/* 'Alle' Button */}
-          <button
-            type="button"
-            onClick={onClearFamilies}
-            className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
-              selectedFamilies.length === 0
-                ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
-                : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            {t.all}
-          </button>
-
-          {/* Die 12 Hersteller-Buttons */}
-          {ALPHABETICAL_FAMILIES.map((family) => {
-            const isSelected = selectedFamilies.includes(family);
-            return (
-              <button
-                key={family}
-                type="button"
-                onClick={() => onToggleFamily(family)}
-                className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
-                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                {family}
-              </button>
-            );
-          })}
+        {/* 3. Filter/Suchfeld ("filter by company ...") unter den Modell-Familien-Buttons */}
+        <div className="relative flex-1 min-w-[200px] flex items-center">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={t.searchPlaceholder}
+            className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
+          />
+          {value && (
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              title={t.reset}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
     </div>
