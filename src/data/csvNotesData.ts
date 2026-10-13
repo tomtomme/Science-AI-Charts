@@ -1,8 +1,10 @@
+import { CsvParagraph } from '../types';
+
 export interface CsvNoteSection {
   titleEn: string;
   titleDe: string;
-  paragraphsEn: { heading?: string; text: string; link?: { url: string; label: string } }[];
-  paragraphsDe: { heading?: string; text: string; link?: { url: string; label: string } }[];
+  paragraphsEn: CsvParagraph[];
+  paragraphsDe: CsvParagraph[];
 }
 
 export const CSV_NOTES_DATA: {

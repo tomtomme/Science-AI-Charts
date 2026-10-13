@@ -11,14 +11,14 @@ export type Language = 'de' | 'en';
 export const TRANSLATIONS = {
   de: {
     // Titel & Untertitel (Zellen A1+B2 sowie C1 der CSV)
-    title: 'Chatbots mit Bild-Eingabe für die Wissenschaft | Paid Chat 💲 | Free Chat+API 🌐',
-    subtitle: 'Anleitung: Nach unten scrollen',
+    title: 'Science-IQ von ChatBots | Paid Chat 💲 Free Chat & API 🌐',
+    subtitle: 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding.',
 
     // Schieberegler: Chatbot-Anzahl
-    topSliderLabel: 'Chatbot Count:',
-    topSliderTop: 'Chatbot Count',
-    stepMinusChatbots: '-5 Chatbots',
-    stepPlusChatbots: '+5 Chatbots',
+    topSliderLabel: 'Max Bar Count:',
+    topSliderTop: 'Max Bar Count',
+    stepMinusChatbots: '-5',
+    stepPlusChatbots: '+5',
     maxLabel: 'max',
 
     // Kategorie-Slider (0 = Alles, 1..8 = Einzelkategorie)
@@ -99,14 +99,14 @@ export const TRANSLATIONS = {
   },
   en: {
     // Title & Subtitle (Cells A1+B2 and C1 of CSV)
-    title: 'Chatbots with Image-Input for Science | Paid Chat 💲 | Free Chat+API 🌐',
-    subtitle: 'How To Read: Scroll down',
+    title: 'Science-IQ of ChatBots | Paid Chat 💲 Free Chat & API 🌐',
+    subtitle: 'The scoring focusses on factual accuracy (non-hallucination), scientific expertise, and data analysis skills instead of coding.',
 
     // Chatbot Count Slider
-    topSliderLabel: 'Chatbot Count:',
-    topSliderTop: 'Chatbot Count',
-    stepMinusChatbots: '-5 Chatbots',
-    stepPlusChatbots: '+5 Chatbots',
+    topSliderLabel: 'Max Bar Count:',
+    topSliderTop: 'Max Bar Count',
+    stepMinusChatbots: '-5',
+    stepPlusChatbots: '+5',
     maxLabel: 'max',
 
     // Category Slider (0 = All, 1..8 = Single Category)

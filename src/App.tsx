@@ -46,8 +46,8 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(new Date());
   
-  // Slider: Anzahl angezeigter Modelle in 5er-Schritten (Standard: 15)
-  const [topCount, setTopCount] = useState<number>(15);
+  // Slider: Anzahl angezeigter Modelle in 5er-Schritten (Standard: 35)
+  const [topCount, setTopCount] = useState<number>(35);
 
   // Volle Explosion Schalter
   const [fullExplosionEnabled, setFullExplosionEnabled] = useState<boolean>(false);
@@ -57,6 +57,9 @@ export default function App() {
 
   // Slider für Kategorien: 0 = Alles (8 Benchmarks), 1..8 = nur eine der 8 Kategorien
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState<number>(0);
+
+  // Erweiterter Modus (Buttons & Slider eingeklappt als Standard, auf Klick ausklappbar)
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   // Filter: Freitext-Suche und Schnellfilter mit Standard-Vorauswahl: ChatGPT, Claude, Gemini
   const [searchFilter, setSearchFilter] = useState<string>('');
@@ -334,7 +337,12 @@ export default function App() {
         {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategorie-Slider, 5er-Schritt-Slider, NEW/OLD Score, Current/All Scope, Volle Explosion und alphabetischen Hersteller-Filtern */}
         <SearchBar
           value={searchFilter}
-          onChange={setSearchFilter}
+          onChange={(val) => {
+            setSearchFilter(val);
+            if (val.trim().length > 0) {
+              setSelectedFamilies([]);
+            }
+          }}
           selectedFamilies={selectedFamilies}
           onToggleFamily={handleToggleFamily}
           onClearFamilies={handleClearFamilies}
@@ -362,6 +370,8 @@ export default function App() {
           onModelScopeChange={setModelScope}
           fullExplosionEnabled={fullExplosionEnabled}
           onFullExplosionToggle={() => setFullExplosionEnabled((prev) => !prev)}
+          showAdvanced={showAdvanced}
+          categoryNames={loadedData.headerMeta?.categoryNames}
         />
 
         {/* Balkendiagramm: Breit dargestellt, die volle Containerbreite nutzend */}
@@ -377,6 +387,9 @@ export default function App() {
             selectedFamilies={selectedFamilies}
             selectedCompany={selectedCompany}
             lang={lang}
+            showAdvanced={showAdvanced}
+            onToggleAdvanced={() => setShowAdvanced((prev) => !prev)}
+            categoryNames={loadedData.headerMeta?.categoryNames}
           />
         </div>
 

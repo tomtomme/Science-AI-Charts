@@ -92,6 +92,7 @@ export type ModelScope = 'current' | 'all';
 
 export interface CsvParagraph {
   heading?: string;
+  isMajor?: boolean;
   text: string;
   link?: { url: string; label: string };
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ModelRecord, BenchmarkComponent } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, SlidersHorizontal } from 'lucide-react';
 
 interface ExplodedBarChartProps {
   models: ModelRecord[];
@@ -17,6 +17,9 @@ interface ExplodedBarChartProps {
   lang: Language;
   onExplosionStateChange?: (isExplodedActive: boolean) => void;
   hoveredCategoryComp?: BenchmarkComponent | null;
+  showAdvanced?: boolean;
+  onToggleAdvanced?: () => void;
+  categoryNames?: string[];
 }
 
 interface HoveredSegmentInfo {
@@ -39,6 +42,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   lang,
   onExplosionStateChange,
   hoveredCategoryComp = null,
+  showAdvanced = false,
+  onToggleAdvanced,
+  categoryNames,
 }) => {
   const t = TRANSLATIONS[lang];
 
@@ -246,234 +252,294 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     );
   };
 
+  // Format Month + 2-digit Year (e.g. "Sep 26") for bar top display when sorted by date
+  // Strictly displays ONLY Month and 2-digit Year, NEVER the day and NEVER the point score!
+  const formatMonthYearShort = (dateStr: string | undefined): string => {
+    if (!dateStr) return '';
+    const clean = dateStr.trim();
+    const monthsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthsDe = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    const monthList = lang === 'de' ? monthsDe : monthsEn;
+
+    // 1. Try ISO date YYYY-MM-DD or YYYY-MM
+    const isoMatch = clean.match(/^(\d{4})-(\d{1,2})/);
+    if (isoMatch) {
+      const year2 = isoMatch[1].slice(-2);
+      const monthNum = parseInt(isoMatch[2], 10);
+      if (monthNum >= 1 && monthNum <= 12) {
+        return `${monthList[monthNum - 1]} ${year2}`;
+      }
+    }
+
+    // 2. Try text formats with month word and 2/4 digit year: e.g. "Google Sept 26", "Sep 2026", "Oct 24"
+    const textMatch = clean.match(/(Jan|Feb|Mär|Mar|Apr|Mai|May|Jun|Jul|Aug|Sep|Sept|Okt|Oct|Nov|Dez|Dec)[a-z]*[\s./\-_]*(\d{2,4})/i);
+    if (textMatch) {
+      const monthMap: Record<string, number> = {
+        jan: 1, feb: 2, mär: 3, mar: 3, apr: 4, mai: 5, may: 5,
+        jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, okt: 10, oct: 10,
+        nov: 11, dez: 12, dec: 12
+      };
+      const mNum = monthMap[textMatch[1].toLowerCase()] || 1;
+      const year2 = textMatch[2].slice(-2);
+      return `${monthList[mNum - 1]} ${year2}`;
+    }
+
+    // Fallback: If split by hyphen
+    const parts = clean.split('-');
+    if (parts.length >= 2) {
+      const year2 = parts[0].slice(-2);
+      const monthNum = parseInt(parts[1], 10);
+      if (monthNum >= 1 && monthNum <= 12) {
+        return `${monthList[monthNum - 1]} ${year2}`;
+      }
+    }
+
+    return '';
+  };
+
   // Format X-axis label without country flag, but with 💲, 🌐, and prominent ✦ NEW badge
   const formatAxisLabel = (model: ModelRecord): string => {
     let label = model.displayName;
-    if (model.isNew) label += ' ✦ NEW';
-    if (model.isPaid) label += ' 💲';
-    else if (model.isFreeApi) label += ' 🌐';
+    if (model.isNew && !label.includes('✦') && !label.includes('★') && !label.includes('NEW')) {
+      label += ' ✦ NEW';
+    }
+    if (model.isPaid && !label.includes('💲')) label += ' 💲';
+    else if (model.isFreeApi && !label.includes('🌐')) label += ' 🌐';
     return label;
   };
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
       {/* Non-intrusive Info Bar above chart: dynamically displays model & hovered segment information */}
+      {/* Non-intrusive Info Bar above chart: dynamically displays model & hovered segment information */}
       <div className="flex flex-col justify-between gap-1.5 min-h-[64px] pb-2.5 mb-2 border-b border-slate-100 dark:border-slate-800 text-xs">
-        {displayedModel ? (
-          <div className="flex flex-col gap-1 w-full">
-            {/* Row 1: Model Identification + Hovered Segment or Summary Score */}
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-700 dark:text-slate-300 min-h-[24px]">
-              {/* Model Name & Favicon (Clickable link if modelUrl is available) */}
-              {displayedModel.modelUrl ? (
-                <a
-                  href={displayedModel.modelUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors group cursor-pointer"
-                  title={`${displayedModel.displayName} · ${t.openChatbotApp}`}
-                >
-                  <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
-                    <img
-                      src={displayedModel.faviconUrl}
-                      alt=""
-                      className={`w-full h-full object-contain ${
-                        isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
-                      }`}
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  </span>
-                  <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 group-hover:decoration-blue-500">
+        {/* Row 1: Left has information, Right has Advanced Button */}
+        <div className="flex items-center justify-between gap-2.5 w-full">
+          <div className="flex-1 min-w-0">
+            {displayedModel ? (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-700 dark:text-slate-300 min-h-[24px]">
+                {/* Model Name & Favicon (Clickable link if modelUrl is available) */}
+                {displayedModel.modelUrl ? (
+                  <a
+                    href={displayedModel.modelUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors group cursor-pointer"
+                    title={`${displayedModel.displayName} · ${t.openChatbotApp}`}
+                  >
+                    <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
+                      <img
+                        src={displayedModel.faviconUrl}
+                        alt=""
+                        className={`w-full h-full object-contain ${
+                          isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
+                        }`}
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </span>
+                    <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 group-hover:decoration-blue-500">
+                      {displayedModel.displayName}
+                    </span>
+                    <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                  </a>
+                ) : (
+                  <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
+                      <img
+                        src={displayedModel.faviconUrl}
+                        alt=""
+                        className={`w-full h-full object-contain ${
+                          isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
+                        }`}
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </span>
                     {displayedModel.displayName}
                   </span>
-                  <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
-                </a>
-              ) : (
-                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
-                    <img
-                      src={displayedModel.faviconUrl}
-                      alt=""
-                      className={`w-full h-full object-contain ${
-                        isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
-                      }`}
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  </span>
-                  {displayedModel.displayName}
+                )}
+
+                <span className="text-slate-400">·</span>
+                <span className="font-mono text-slate-600 dark:text-slate-400">
+                  {t.company} <strong>{displayedModel.companyName}</strong>
                 </span>
-              )}
 
-              <span className="text-slate-400">·</span>
-              <span className="font-mono text-slate-600 dark:text-slate-400">
-                {t.company} <strong>{displayedModel.companyName}</strong>
-              </span>
-
-              {displayedModel.releaseDate && (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                    <span className="opacity-75">📅</span>
-                    <span>{displayedModel.releaseDate}</span>
-                  </span>
-                </>
-              )}
-
-              {/* Specific segment info if hovered, else summary score */}
-              {displayedSegment ? (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <span
-                      className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
-                      style={{ backgroundColor: displayedSegment.comp.color }}
-                    />
-                    <span style={{ color: displayedSegment.comp.color }}>
-                      {lang === 'en' ? displayedSegment.comp.nameEn : displayedSegment.comp.nameDe}
+                {displayedModel.releaseDate && (
+                  <>
+                    <span className="text-slate-400">·</span>
+                    <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                      <span className="opacity-75">📅</span>
+                      <span>{displayedModel.releaseDate}</span>
                     </span>
-                    <span className="font-mono text-slate-900 dark:text-white font-bold">
-                      {Math.round(displayedSegment.raw)}%
-                    </span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400 font-normal">
-                      (+{displayedSegment.points.toFixed(1)} {t.points})
-                    </span>
-                  </div>
+                  </>
+                )}
 
-                  <span className="text-slate-400">·</span>
-                  {displayedSegment.comp.sourceUrl ? (
-                    <a
-                      href={displayedSegment.comp.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer"
-                      title={`${displayedSegment.comp.sourceName} ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
-                    >
-                      <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
-                      <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                    </a>
-                  ) : (
-                    <span className="font-mono text-[11px] text-slate-400">
-                      {t.sourceLabel} {displayedSegment.comp.sourceName}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                    {t.score}: {displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated} {t.points} ({t.rank} #{displayedModel.rank})
-                  </span>
-                  <span className="text-slate-400">·</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                    {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / 8).toFixed(1)} {t.points})
-                  </span>
-                </>
-              )}
-            </div>
+                {/* Specific segment info if hovered, else summary score */}
+                {displayedSegment ? (
+                  <>
+                    <span className="text-slate-400">·</span>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <span
+                        className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
+                        style={{ backgroundColor: displayedSegment.comp.color }}
+                      />
+                      <span style={{ color: displayedSegment.comp.color }}>
+                        {lang === 'en' ? displayedSegment.comp.nameEn : displayedSegment.comp.nameDe}
+                      </span>
+                      <span className="font-mono text-slate-900 dark:text-white font-bold">
+                        {Math.round(displayedSegment.raw)}%
+                      </span>
+                      <span className="font-mono text-slate-500 dark:text-slate-400 font-normal">
+                        (+{displayedSegment.points.toFixed(1)} {t.points})
+                      </span>
+                    </div>
 
-            {/* Row 2: Always present to guarantee rock-solid zero-shift height */}
-            <div className="text-[11.5px] rounded px-2.5 py-1 border flex items-center gap-2.5 leading-relaxed min-h-[30px] transition-colors bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60">
-              {displayedSegment ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
-                    {t.criterionLabel}
-                  </span>
-                  <span className="text-slate-600 dark:text-slate-300">
-                    {lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
+                    <span className="text-slate-400">·</span>
+                    {displayedSegment.comp.sourceUrl ? (
+                      <a
+                        href={displayedSegment.comp.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer"
+                        title={`${displayedSegment.comp.sourceName} ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
+                      >
+                        <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="font-mono text-[11px] text-slate-400">
+                        {t.sourceLabel} {displayedSegment.comp.sourceName}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span className="text-slate-400">·</span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                      {t.score}: {displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated} {t.points} ({t.rank} #{displayedModel.rank})
+                    </span>
+                    <span className="text-slate-400">·</span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                      {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / 8).toFixed(1)} {t.points})
+                    </span>
+                  </>
+                )}
+              </div>
+            ) : displayedCategoryComp ? (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-700 dark:text-slate-300 min-h-[24px]">
+                <div className="flex items-center gap-1.5 font-bold" style={{ color: displayedCategoryComp.color }}>
+                  <span
+                    className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
+                    style={{ backgroundColor: displayedCategoryComp.color }}
+                  />
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    {(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) ||
+                     (lang === 'en' ? displayedCategoryComp.nameEn : displayedCategoryComp.nameDe)}
                   </span>
                 </div>
-              ) : (
-                <span className="text-slate-500 dark:text-slate-400">
-                  {t.hoverBarPrompt}
-                </span>
-              )}
-            </div>
-          </div>
-        ) : displayedCategoryComp ? (
-          <div className="flex flex-col gap-1 w-full">
-            {/* Category Row 1: Name, Color chip, Clickable source link (Formel auf Wunsch entfernt) */}
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-700 dark:text-slate-300 min-h-[24px]">
-              <div className="flex items-center gap-1.5 font-bold" style={{ color: displayedCategoryComp.color }}>
-                <span
-                  className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
-                  style={{ backgroundColor: displayedCategoryComp.color }}
-                />
-                <span className="font-bold text-slate-900 dark:text-white">
-                  {lang === 'en' ? displayedCategoryComp.nameEn : displayedCategoryComp.nameDe}
-                </span>
-              </div>
 
-              <span className="text-slate-400">·</span>
-              {displayedCategoryComp.sourceUrl ? (
-                <a
-                  href={displayedCategoryComp.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer"
-                  title={`${displayedCategoryComp.sourceName} ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
-                >
-                  <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
-                  <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                </a>
-              ) : (
-                <span className="font-mono text-xs text-slate-400">
-                  {t.sourceLabel} {displayedCategoryComp.sourceName}
-                </span>
-              )}
-
-              {sortBy === 'date' && (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1">
-                    <span>📅</span>
-                    <span>{t.sortedByDateLabel}</span>
+                <span className="text-slate-400">·</span>
+                {displayedCategoryComp.sourceUrl ? (
+                  <a
+                    href={displayedCategoryComp.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer"
+                    title={`${displayedCategoryComp.sourceName} ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
+                  >
+                    <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
+                    <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                  </a>
+                ) : (
+                  <span className="font-mono text-xs text-slate-400">
+                    {t.sourceLabel} {displayedCategoryComp.sourceName}
                   </span>
-                </>
-              )}
-            </div>
+                )}
 
-            {/* Category Row 2: Full description (Quelle bereits oben verlinkt) */}
-            <div className="text-[11.5px] text-slate-700 dark:text-slate-200 rounded px-2.5 py-1 border border-slate-200/80 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/60 flex items-center gap-2.5 leading-relaxed min-h-[30px]">
+                {sortBy === 'date' && (
+                  <>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1">
+                      <span>📅</span>
+                      <span>{t.sortedByDateLabel}</span>
+                    </span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-300 min-h-[24px]">
+                <span className="font-bold text-slate-900 dark:text-white">AI-Top30 Ranking</span>
+                {sortBy === 'date' && (
+                  <>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1">
+                      <span>📅</span>
+                      <span>{t.sortedByDateLabel}</span>
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Advanced Button top right of the bar chart area */}
+          {onToggleAdvanced && (
+            <button
+              type="button"
+              onClick={onToggleAdvanced}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
+                showAdvanced
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
+                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+              }`}
+              title={showAdvanced ? (lang === 'de' ? 'Erweiterte Filter & Slider ausblenden' : 'Hide advanced controls') : (lang === 'de' ? 'Erweiterte Filter & Slider einblenden' : 'Show advanced controls')}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
+              <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Row 2: Always present to guarantee rock-solid zero-shift height */}
+        <div className="text-[11.5px] rounded px-2.5 py-1 border flex items-center gap-2.5 leading-relaxed min-h-[30px] transition-colors bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60">
+          {displayedModel ? (
+            displayedSegment ? (
               <div className="flex items-center gap-2 flex-1">
-                <span className="font-semibold text-slate-800 dark:text-slate-100 shrink-0">
+                <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
                   {t.criterionLabel}
                 </span>
                 <span className="text-slate-600 dark:text-slate-300">
-                  {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
+                  {lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
                 </span>
               </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1 w-full">
-            {/* Idle Row 1 */}
-            <div className="flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-300 min-h-[24px]">
-              <span className="font-bold text-slate-900 dark:text-white">AI-Top30 Ranking</span>
-              {sortBy === 'date' && (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1">
-                    <span>📅</span>
-                    <span>{t.sortedByDateLabel}</span>
-                  </span>
-                </>
-              )}
-            </div>
-            {/* Idle Row 2 */}
-            <div className="text-[11.5px] text-slate-600 dark:text-slate-300 rounded px-2.5 py-1 border border-slate-200/80 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/40 flex items-center gap-2 leading-relaxed min-h-[30px]">
-              <span>
-                {fullExplosionEnabled
-                  ? t.fullExplosionHelp
-                  : explodedViewEnabled
-                  ? t.hoverHelp
-                  : t.disabledHelp}
+            ) : (
+              <span className="text-slate-500 dark:text-slate-400">
+                {t.hoverBarPrompt}
+              </span>
+            )
+          ) : displayedCategoryComp ? (
+            <div className="flex items-center gap-2 flex-1">
+              <span className="font-semibold text-slate-800 dark:text-slate-100 shrink-0">
+                {t.criterionLabel}
+              </span>
+              <span className="text-slate-600 dark:text-slate-300">
+                {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
               </span>
             </div>
-          </div>
-        )}
+          ) : (
+            <span>
+              {fullExplosionEnabled
+                ? t.fullExplosionHelp
+                : explodedViewEnabled
+                ? t.hoverHelp
+                : t.disabledHelp}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* SVG Chart Container */}
@@ -804,37 +870,38 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   );
                 })()}
 
-                {/* Score Number & Optional Date directly above the bar */}
+                {/* Score Number OR (when sorted by date) Month & 2-Digit Year only */}
                 <g>
-                  {sortBy === 'date' && model.releaseDate && (
+                  {sortBy === 'date' ? (
                     <text
                       x={barCenterX}
-                      y={barTopY - 16}
+                      y={barTopY - 6}
                       textAnchor="middle"
-                      className="fill-blue-600 dark:fill-blue-400 font-bold"
-                      fontSize="8.5"
+                      className="fill-blue-600 dark:fill-blue-400 font-bold tabular-nums"
+                      fontSize="9.5"
                       fontFamily="monospace"
                       style={{
                         transition: 'y 0.25s ease-out',
                       }}
                     >
-                      {model.releaseDate.slice(5)}
+                      {formatMonthYearShort(model.releaseDate)}
+                    </text>
+                  ) : (
+                    <text
+                      x={barCenterX}
+                      y={barTopY - 6}
+                      textAnchor="middle"
+                      fill={isHovered || (hasActiveHighlight && highlighted) ? '#0F172A' : '#64748B'}
+                      className="dark:fill-slate-300 font-bold tabular-nums"
+                      fontSize="10"
+                      fontFamily="monospace"
+                      style={{
+                        transition: 'y 0.25s ease-out',
+                      }}
+                    >
+                      {activeComp ? `${Math.round(catRaw)}%` : score}
                     </text>
                   )}
-                  <text
-                    x={barCenterX}
-                    y={sortBy === 'date' && model.releaseDate ? barTopY - 4 : barTopY - 6}
-                    textAnchor="middle"
-                    fill={isHovered || (hasActiveHighlight && highlighted) ? '#0F172A' : '#64748B'}
-                    className="dark:fill-slate-300 font-bold tabular-nums"
-                    fontSize="10"
-                    fontFamily="monospace"
-                    style={{
-                      transition: 'y 0.25s ease-out',
-                    }}
-                  >
-                    {activeComp ? `${Math.round(catRaw)}%` : score}
-                  </text>
                 </g>
 
                 {/* Company Favicon shifted high enough and larger above exploded bar */}

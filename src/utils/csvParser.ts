@@ -77,24 +77,45 @@ export interface CsvHeaderMetadata {
   cellC1: string;
   combinedTitle: string;
   subtitle: string;
+  categoryNames?: string[];
 }
 
 /**
- * Extracts Title (combined A1 and B2) and Subtitle (cell C1) directly from CSV
+ * Extracts Title (combined A1 and B2), Subtitle (cell C1), and Category Names (cells D2 to K2) directly from CSV
  */
 export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
-  const rows = parseCsvRows(csvText.slice(0, 2000));
-  const cellA1 = (rows[0]?.[0] || 'Chatbots with Image-Input for Science').trim();
-  const rawB2 = (rows[1]?.[1] || 'Paid Chat💲\nFree Chat+API 🌐').trim();
-  const cellB2 = rawB2.replace(/[\r\n]+/g, ' | ').replace(/\s+/g, ' ');
-  const cellC1 = (rows[0]?.[2] || 'How To Read: Scroll down').trim();
-  const combinedTitle = cellA1 && cellB2 ? `${cellA1} | ${cellB2}` : cellA1 || cellB2;
+  const rows = parseCsvRows(csvText);
+  const cellA1 = (rows[0]?.[0] || 'Science-IQ of ChatBots').trim();
+  const rawB2 = (rows[1]?.[1] || '').trim();
+  const cellB2 = rawB2
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\|\s*\|+/g, '|')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const cellC1 = (rows[0]?.[2] || '').trim();
+  let combinedTitle = cellA1;
+  if (cellB2) {
+    const strippedB2 = cellB2.replace(/^\|\s*/, '');
+    combinedTitle = cellA1 ? `${cellA1} | ${strippedB2}` : strippedB2;
+  }
+
+  // Extract category names from row 1, cols 3 to 10 (cells D2 to K2)
+  const categoryNames: string[] = [];
+  const row1 = rows[1] || [];
+  for (let c = 3; c <= 10; c++) {
+    const raw = (row1[c] || '').replace(/\s+/g, ' ').trim();
+    if (raw) {
+      categoryNames.push(raw);
+    }
+  }
+
   return {
     cellA1,
     cellB2,
     cellC1,
     combinedTitle,
     subtitle: cellC1,
+    categoryNames: categoryNames.length === 8 ? categoryNames : undefined,
   };
 }
 
@@ -106,14 +127,21 @@ export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
   const rows = parseCsvRows(csvText);
   let notesRow: string[] | null = null;
 
-  // 1. Check row immediately following "Sources & Notes"
-  for (let i = 0; i < Math.min(100, rows.length); i++) {
-    const rowStr = (rows[i] || []).join(' ');
-    if (rowStr.includes('Sources & Notes')) {
-      if (i + 1 < rows.length && rows[i + 1] && (rows[i + 1][0] || rows[i + 1][2])) {
-        notesRow = rows[i + 1];
-        break;
-      }
+  // 1. Scan for any row containing 'How to read' or 'How To Read' or 'Sources & Notes' or long text in col 2/14
+  for (let i = 0; i < Math.min(120, rows.length); i++) {
+    const r = rows[i] || [];
+    const col0 = (r[0] || '').toLowerCase();
+    const col1 = (r[1] || '').toLowerCase();
+    const col2 = r[2] || '';
+    if (
+      col0.includes('how to read') ||
+      col1.includes('how to read') ||
+      col0.includes('sources & notes') ||
+      col1.includes('sources & notes') ||
+      (col2.length > 300 && (col0.length > 0 || (r[13] && r[13].length > 0)))
+    ) {
+      notesRow = r;
+      break;
     }
   }
 
@@ -125,9 +153,9 @@ export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
     }
   }
 
-  // 3. Fallback scan between row 25 and 80 for any row with long documentation text
+  // 3. Fallback scan between row 20 and 100 for any row with long documentation text
   if (!notesRow) {
-    for (let i = 20; i < Math.min(80, rows.length); i++) {
+    for (let i = 20; i < Math.min(100, rows.length); i++) {
       const cand = rows[i];
       if (cand && cand[2] && cand[2].length > 200) {
         notesRow = cand;
@@ -245,12 +273,27 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
     // Model badges
     const isPaid = rawNameCell.includes('💲');
     const isFreeApi = rawNameCell.includes('🌐');
-    const isNew = rawNameCell.includes('🆕');
+    const isNew =
+      rawNameCell.includes('🆕') ||
+      rawNameCell.includes('✦') ||
+      rawNameCell.includes('✧') ||
+      rawNameCell.includes('★') ||
+      rawNameCell.includes('⭐') ||
+      /\bNEW\b/i.test(rawNameCell);
 
     const displayName = cleanedName
       .replace(/💲/g, '')
       .replace(/🌐/g, '')
       .replace(/🆕/g, '')
+      .replace(/✦\s*NEW/gi, '')
+      .replace(/✧\s*NEW/gi, '')
+      .replace(/★\s*NEW/gi, '')
+      .replace(/⭐\s*NEW/gi, '')
+      .replace(/✦/g, '')
+      .replace(/✧/g, '')
+      .replace(/★/g, '')
+      .replace(/⭐/g, '')
+      .replace(/\s+NEW$/i, '')
       .trim();
 
     if (!displayName || displayName.length < 2) return null;

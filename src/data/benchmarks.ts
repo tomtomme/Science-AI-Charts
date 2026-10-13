@@ -16,7 +16,7 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
     id: 'actCodeReason',
     key: 'actCodeReason',
     nameDe: 'IQ',
-    nameEn: 'IQ (10 Evals)',
+    nameEn: 'IQ',
     sourceName: 'AA-II v4.3',
     sourceUrl: 'https://artificialanalysis.ai/methodology/intelligence-benchmarking',
     color: '#8B5CF6', // Purple
@@ -31,8 +31,8 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'nonHallucination',
     key: 'nonHallucination',
-    nameDe: 'Faktentreue',
-    nameEn: 'Non-Hallucination Rate',
+    nameDe: 'Non-Hallu-Rate',
+    nameEn: 'Non-Hallu-Rate',
     sourceName: 'Non-Hallu-Rate',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/omniscience#aa-omniscience-hallucination-rate',
     color: '#10B981', // Emerald
@@ -47,7 +47,7 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'scienceKnowledge',
     key: 'scienceKnowledge',
-    nameDe: 'Faktenwissen',
+    nameDe: 'Science Knowledge',
     nameEn: 'Science Knowledge',
     sourceName: 'AA-Omniscience',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/omniscience',
@@ -63,8 +63,8 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'visionPlot',
     key: 'visionPlot',
-    nameDe: 'Diagrammanalyse',
-    nameEn: 'Plot Reading (MMMU-Pro)',
+    nameDe: 'Plot Reading',
+    nameEn: 'Plot Reading',
     sourceName: 'MMMU-Pro',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/mmmu-pro',
     color: '#F59E0B', // Amber
@@ -79,8 +79,8 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'medReasoning',
     key: 'medReasoning',
-    nameDe: 'Diagnostik',
-    nameEn: 'Medical Reasoning',
+    nameDe: 'Diagnostics',
+    nameEn: 'Diagnostics',
     sourceName: 'MLCR-AA',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/mlcr-aa',
     color: '#F43F5E', // Rose
@@ -95,8 +95,8 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'excelAgent',
     key: 'excelAgent',
-    nameDe: 'Excel',
-    nameEn: 'Excel Agent',
+    nameDe: 'Excel Analyst',
+    nameEn: 'Excel Analyst',
     sourceName: 'ExcelAgent',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/aa-analyst-agent',
     color: '#06B6D4', // Cyan
@@ -111,8 +111,8 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'trickQuestions',
     key: 'trickQuestions',
-    nameDe: 'Trickfragen & 3D-Vorstellung',
-    nameEn: 'Trick Questions & 3D Spatial',
+    nameDe: '(3D) Trick Questions',
+    nameEn: '(3D) Trick Questions',
     sourceName: 'SimpleBench',
     sourceUrl: 'https://simple-bench.com',
     color: '#6366F1', // Indigo
@@ -127,8 +127,8 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'econLegal',
     key: 'econLegal',
-    nameDe: 'Wirtschaft & Recht',
-    nameEn: 'Econ & Legal',
+    nameDe: 'Real Econ & Legal Work',
+    nameEn: 'Real Econ & Legal Work',
     sourceName: 'Vals Econ 2',
     sourceUrl: 'https://www.vals.ai',
     color: '#EA580C', // Orange
