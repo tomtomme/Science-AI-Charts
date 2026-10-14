@@ -13,6 +13,16 @@ export const TRANSLATIONS = {
     // Titel & Untertitel (Zellen A1+B2 sowie C1 der CSV)
     title: 'Science-IQ von ChatBots | Paid Chat 💲 Free Chat & API 🌐',
     subtitle: 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding.',
+    headerPopupIntro:
+      'Im Gegensatz zu herkömmlichen Benchmarks, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen, legt dieser Benchmark-Parcours den Fokus gezielt auf Forschungs- und Wissenschaftsrelevanz:',
+    headerPopupItems: [
+      { text: 'Multimodales Verstehen wissenschaftlicher Abbildungen & Plots (MMMU-Pro)', color: '#F59E0B' },
+      { text: 'Mathematische & tabellarische Datenanalyse (Excel / FinanceBench)', color: '#06B6D4' },
+      { text: 'Faktentreue & Non-Hallucination-Rate (Ehrlichkeit bei Nichtwissen statt Erfinden)', color: '#10B981' },
+      { text: 'Medizinisches Langkontext-Denken über hunderte Seiten klinischer Fachliteratur', color: '#F43F5E' },
+      { text: 'Räumliches Vorstellungsvermögen & gesunder Menschenverstand (SimpleBench)', color: '#6366F1' },
+      { text: 'Automatisierte mehrstufige quantitative Workflows (Vals.ai)', color: '#EA580C' },
+    ],
 
     // Schieberegler: Chatbot-Anzahl
     topSliderLabel: 'Max Bar Count:',
@@ -109,6 +119,16 @@ export const TRANSLATIONS = {
     // Title & Subtitle (Cells A1+B2 and C1 of CSV)
     title: 'Science-IQ of ChatBots | Paid Chat 💲 Free Chat & API 🌐',
     subtitle: 'The scoring focusses on factual accuracy (non-hallucination), scientific expertise, and data analysis skills instead of coding.',
+    headerPopupIntro:
+      'Unlike conventional benchmarks that primarily measure text-based coding tasks or pure language skills, this benchmark suite focuses specifically on research and scientific relevance:',
+    headerPopupItems: [
+      { text: 'Multimodal understanding of scientific figures & plots (MMMU-Pro)', color: '#F59E0B' },
+      { text: 'Mathematical & tabular data analysis (Excel / FinanceBench)', color: '#06B6D4' },
+      { text: 'Factual accuracy & Non-Hallucination Rate (honesty when uncertain instead of inventing)', color: '#10B981' },
+      { text: 'Medical long-context reasoning across hundreds of pages of clinical literature', color: '#F43F5E' },
+      { text: 'Spatial reasoning & common sense (SimpleBench)', color: '#6366F1' },
+      { text: 'Automated multi-step quantitative workflows (Vals.ai)', color: '#EA580C' },
+    ],
 
     // Chatbot Count Slider
     topSliderLabel: 'Max Bar Count:',

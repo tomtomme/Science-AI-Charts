@@ -5,7 +5,7 @@ export const DIRECT_EXPORT_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Me
 export const SHEET_HTML_URL = 'https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=170267419#gid=170267419';
 export const PIVOT_HTML_URL = 'https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=78176537#gid=78176537';
 export const CHART_HTML_URL = 'https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=7983377#gid=7983377';
-export const GITHUB_REPO_URL = 'https://github.com/tomtomme/AI-Top30';
+export const GITHUB_REPO_URL = 'https://github.com/tomtomme/Science-AI-Charts';
 
 export const FALLBACK_CSV_CONTENT = `Science-IQ of ChatBots,,"The scoring focusses on factual accuracy (non-hallucination), scientific expertise, and data analysis skills instead of coding. The bots completed tests from ArtificialAnalysis.ai, Simple-Bench.com, and Vals.ai. Final scores are averages, with some sub-scores adjusted for guessing probability",,,,,,,,,Final Scores,,,To many numbers? => interactive info graph,,,,More from artificialanalysis.ai script-pulled via free API directly from their DB,,,,,,,,,,,,,,,,,,,,
 Logo,"Paid Chat💲|

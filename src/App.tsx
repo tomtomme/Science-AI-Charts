@@ -13,7 +13,7 @@ import { ExplodedBarChart } from './components/ExplodedBarChart';
 import { SearchBar } from './components/SearchBar';
 import { CsvNotesSection } from './components/CsvNotesSection';
 import { Language, TRANSLATIONS } from './utils/i18n';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2 } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info } from 'lucide-react';
 
 export default function App() {
   // Standardeinstellung: Englisch
@@ -28,6 +28,9 @@ export default function App() {
 
   // Preis-Filter: 'free' (Standard), 'paid', 'all'
   const [priceFilter, setPriceFilter] = useState<PriceFilter>('free');
+
+  // Pop-Up für Titel / Untertitel bei Mouse-Over
+  const [showHeaderInfo, setShowHeaderInfo] = useState<boolean>(false);
 
   // Aktive oder per Hover gewählte Kategorie für detaillierte Infos & Quellen-Link
   const [categoryInfoComp, setCategoryInfoComp] = useState<BenchmarkComponent | null>(null);
@@ -220,16 +223,59 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans antialiased">
       {/* Clean top bar */}
-      <header className="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs px-4 sm:px-6 py-2.5">
+      <header className="relative z-40 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6 py-2.5">
         <div className="w-full max-w-[1720px] mx-auto flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-          {/* Title & Subtitle directly from CSV cells: combined A1 and B2, and subtitle from C1 */}
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2">
-              {loadedData.headerMeta?.combinedTitle || t.title}
-            </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal font-sans line-clamp-2">
-              {loadedData.headerMeta?.subtitle || t.subtitle}
-            </p>
+          {/* Title & Subtitle directly from CSV cells with Pop-Up on hover */}
+          <div
+            className="relative min-w-0 flex-1 group"
+            onMouseEnter={() => setShowHeaderInfo(true)}
+            onMouseLeave={() => setShowHeaderInfo(false)}
+          >
+            <div className="cursor-help inline-block max-w-full">
+              <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-1.5">
+                <span>{loadedData.headerMeta?.combinedTitle || t.title}</span>
+                <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 shrink-0 opacity-70 group-hover:opacity-100 transition-all" />
+              </h1>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal font-sans line-clamp-2 transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-300">
+                {loadedData.headerMeta?.subtitle || t.subtitle}
+              </p>
+            </div>
+
+            {/* Pop-Up on hovering title or subtitle - fully opaque with 0% transparency */}
+            <div
+              className={`absolute left-0 top-full mt-2 w-full max-w-xl sm:max-w-2xl bg-slate-900 text-slate-100 border border-slate-700 rounded-xl p-4 shadow-2xl z-50 text-xs transition-all duration-200 pointer-events-none ${
+                showHeaderInfo
+                  ? 'opacity-100 translate-y-0 visible'
+                  : 'opacity-0 -translate-y-1 invisible'
+              }`}
+              style={{ backgroundColor: '#0f172a' }}
+            >
+              {/* Decorative top arrow pointing to the title */}
+              <div
+                className="absolute -top-1.5 left-7 w-3 h-3 bg-slate-900 border-t border-l border-slate-700 rotate-45"
+                style={{ backgroundColor: '#0f172a' }}
+              />
+
+              {/* Intro paragraph */}
+              <p className="text-[12px] leading-relaxed text-slate-200 font-medium mb-3">
+                {t.headerPopupIntro}
+              </p>
+
+              {/* 6 Benchmark Items */}
+              <ul className="space-y-2 text-[11.5px] leading-snug text-slate-300">
+                {t.headerPopupItems.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-2.5">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0 mt-1 shadow-2xs"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="flex-1">
+                      {item.text}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           {/* Controls, language toggle & sync / external link icons */}
