@@ -687,13 +687,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         </div>
       </div>
 
-      {/* SVG Chart Container: Zoom-out capped at 50% original size + horizontal scrollbar for discoverability */}
+      {/* SVG Chart Container: Zoom-out capped at 75% original size + horizontal scrollbar for discoverability */}
       <div className="relative select-none w-full overflow-x-auto pb-2 custom-scrollbar">
-        <div style={{ minWidth: `${Math.round(chartWidth * 0.5)}px` }} className="w-full">
+        <div style={{ minWidth: `${Math.round(chartWidth * 0.75)}px` }} className="w-full">
           <svg
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
             className="block w-full h-auto"
-            style={{ minWidth: `${Math.round(chartWidth * 0.5)}px` }}
+            style={{ minWidth: `${Math.round(chartWidth * 0.75)}px` }}
             preserveAspectRatio="xMidYMid meet"
           >
             <defs>

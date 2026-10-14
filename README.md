@@ -1,5 +1,6 @@
 # Science AI-Top-30: Chatbot „Wissenschafts-IQ“ Ranking
 
+> 🤖 **Hinweis**: Diese README-Dokumentation wurde KI-generiert.  
 > **Live-Web-App**: [tomtomme.github.io/Science-AI-Charts](https://tomtomme.github.io/Science-AI-Charts/)  
 > **Original Google Sheet**: [Google Sheets Tabelle (gid=170267419)](https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=170267419#gid=170267419)  
 > **GitHub Repository**: [github.com/tomtomme/Science-AI-Charts](https://github.com/tomtomme/Science-AI-Charts)
