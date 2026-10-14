@@ -58,6 +58,14 @@ export const TRANSLATIONS = {
     on: 'AN',
     off: 'AUS',
 
+    // Erweitert & Preis-Filter
+    advanced: 'Erweitert',
+    advancedDesc: 'Erweiterte Filter & Slider ein-/ausblenden',
+    priceFree: 'Free',
+    pricePaid: 'Paid',
+    priceAll: 'All',
+    priceFilterDesc: 'Zwischen Free, Paid (💲) und allen Chatbots wechseln',
+
     // Suche & Filter
     searchPlaceholder: 'Firma oder LLM-Familie suchen (z. B. ChatGPT, Claude, Gemini, Kimi, MiMo)...',
     all: 'Alle',
@@ -145,6 +153,14 @@ export const TRANSLATIONS = {
     fullExplosionOffDesc: 'Explode all bars simultaneously',
     on: 'ON',
     off: 'OFF',
+
+    // Advanced & Price Filter
+    advanced: 'Advanced',
+    advancedDesc: 'Show/hide advanced filters & sliders',
+    priceFree: 'Free',
+    pricePaid: 'Paid',
+    priceAll: 'All',
+    priceFilterDesc: 'Switch between free, paid (💲), and all chatbots',
 
     // Search & Filters
     searchPlaceholder: 'Filter by company or LLM family (e.g. ChatGPT, Claude, Gemini, Kimi, MiMo)...',

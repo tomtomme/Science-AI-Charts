@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent } from './types';
+import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent, PriceFilter } from './types';
 import { FALLBACK_CSV_CONTENT, SHEET_HTML_URL, CHART_HTML_URL, GITHUB_REPO_URL } from './data/rawCsvFallback';
 import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset } from './utils/csvParser';
 import { LoadedDatasets, loadModelsData } from './services/dataService';
@@ -25,6 +25,9 @@ export default function App() {
 
   // Schalter: 'current' (nur noch verfügbare Chatbots) vs 'all' (alle Chatbots der CSV)
   const [modelScope, setModelScope] = useState<ModelScope>('current');
+
+  // Preis-Filter: 'free' (Standard), 'paid', 'all'
+  const [priceFilter, setPriceFilter] = useState<PriceFilter>('free');
 
   // Aktive oder per Hover gewählte Kategorie für detaillierte Infos & Quellen-Link
   const [categoryInfoComp, setCategoryInfoComp] = useState<BenchmarkComponent | null>(null);
@@ -66,14 +69,20 @@ export default function App() {
   const [selectedFamilies, setSelectedFamilies] = useState<string[]>(['ChatGPT', 'Claude', 'Gemini']);
   const [selectedCompany] = useState<string | null>(null);
 
-  // Active models based on scoreMode & modelScope ('current' = nur verfügbare Chatbots, 'all' = alle Chatbots)
+  // Active models based on scoreMode, modelScope & priceFilter ('current' vs 'all', 'free' vs 'paid' vs 'all')
   const currentModels = useMemo(() => {
     const base = scoreMode === 'new' ? loadedData.newModels : loadedData.oldModels;
-    if (modelScope === 'current') {
-      return base.filter((m) => m.isAvailable);
+    let list = modelScope === 'current' ? base.filter((m) => m.isAvailable) : base;
+
+    // Preis-Filter: Default 'free', sonst 'paid' oder 'all'
+    if (priceFilter === 'free') {
+      list = list.filter((m) => !m.isPaid);
+    } else if (priceFilter === 'paid') {
+      list = list.filter((m) => m.isPaid);
     }
-    return base;
-  }, [scoreMode, modelScope, loadedData]);
+
+    return list;
+  }, [scoreMode, modelScope, loadedData, priceFilter]);
 
   const hasFilterActive =
     searchFilter.trim().length > 0 || selectedFamilies.length > 0 || selectedCompany !== null;
@@ -383,12 +392,15 @@ export default function App() {
             hoveredCategoryComp={categoryInfoComp}
             sortBy={sortBy}
             fullExplosionEnabled={fullExplosionEnabled}
+            onFullExplosionToggle={() => setFullExplosionEnabled((prev) => !prev)}
             searchFilter={searchFilter}
             selectedFamilies={selectedFamilies}
             selectedCompany={selectedCompany}
             lang={lang}
             showAdvanced={showAdvanced}
             onToggleAdvanced={() => setShowAdvanced((prev) => !prev)}
+            priceFilter={priceFilter}
+            onPriceFilterChange={setPriceFilter}
             categoryNames={loadedData.headerMeta?.categoryNames}
           />
         </div>

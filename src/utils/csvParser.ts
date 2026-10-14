@@ -241,6 +241,22 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
     }
   }
 
+  // Parse dynamic company lookup table from Column AJ (index 35) onwards, from row index ~230
+  const companyLookupMap: Record<string, { name: string; domain: string; color: string; flag: string }> = {};
+  for (let r = 200; r < rows.length; r++) {
+    const row = rows[r];
+    if (row && row.length > 35 && row[35]) {
+      const comp = row[35].trim();
+      if (!comp || comp.toLowerCase().includes('lookup') || comp.toLowerCase() === 'company') continue;
+      const domain = (row[36] || '').trim();
+      const color = (row[37] || '').trim();
+      const flag = (row[38] || '').trim();
+      if (flag || domain) {
+        companyLookupMap[comp.toLowerCase()] = { name: comp, domain, color, flag };
+      }
+    }
+  }
+
   const parseRowToModel = (row: string[], rIdx: number): ModelRecord | null => {
     if (!row || row.length < 5) return null;
 
@@ -268,7 +284,19 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
     // Extract Flag and Name
     const { flag: nameFlag, cleanText: cleanedName } = extractFlag(rawNameCell);
     const { flag: creatorFlag, cleanText: cleanedCreator } = extractFlag(rawCreatorCell);
-    const flag = nameFlag || creatorFlag || '🌐';
+
+    // Lookup flag from CSV lookup table (cell AJ:232 onwards)
+    let lookupFlag = '';
+    const creatorLow = cleanedCreator.toLowerCase();
+    for (const [key, info] of Object.entries(companyLookupMap)) {
+      if (info.flag && (creatorLow.includes(key) || key.includes(creatorLow))) {
+        lookupFlag = info.flag;
+        break;
+      }
+    }
+
+    const company = getCompanyMeta(cleanedCreator);
+    const flag = nameFlag || creatorFlag || lookupFlag || company.flag || '🌐';
 
     // Model badges
     const isPaid = rawNameCell.includes('💲');
@@ -383,7 +411,6 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
     // Modell-Link: Link aus Spalte P; wenn Spalte P kein Link, dann Link aus Spalte Q; sonst undefined
     const modelUrl = parsedChatLink || parsedApiLink;
 
-    const company = getCompanyMeta(cleanedCreator);
     const faviconUrl = getFaviconUrl(company.domain);
 
     // Release date from Column Y (index 24) with robust fallback

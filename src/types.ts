@@ -89,6 +89,7 @@ export type SortOption = 'newScore' | 'nonHallu' | 'vision' | 'science' | 'worst
 export type SortField = 'score' | 'date';
 export type ScoreMode = 'new' | 'old';
 export type ModelScope = 'current' | 'all';
+export type PriceFilter = 'free' | 'paid' | 'all';
 
 export interface CsvParagraph {
   heading?: string;

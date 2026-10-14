@@ -143,131 +143,133 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           )}
         </div>
 
-        {/* Rechte Kontroll-Gruppe: NEW/OLD Score + Current/All Switcher + Max Bar Count Slider + Sortierung ganz rechts */}
-        <div className="flex flex-wrap items-center gap-1.5 ml-auto">
-          {/* NEW vs OLD Score */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-            <button
-              type="button"
-              onClick={() => onScoreModeChange('new')}
-              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                scoreMode === 'new'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.scoreModeNewDesc}
-            >
-              {t.scoreModeNew}
-            </button>
-            <button
-              type="button"
-              onClick={() => onScoreModeChange('old')}
-              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                scoreMode === 'old'
-                  ? 'bg-amber-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.scoreModeOldDesc}
-            >
-              {t.scoreModeOld}
-            </button>
-          </div>
+        {/* Rechte Kontroll-Gruppe: NEW/OLD Score + Current/All Switcher + Max Bar Count Slider + Sortierung ganz rechts - nur sichtbar, wenn showAdvanced aktiv ist */}
+        {showAdvanced && (
+          <div className="flex flex-wrap items-center gap-1.5 ml-auto">
+            {/* NEW vs OLD Score */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => onScoreModeChange('new')}
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  scoreMode === 'new'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title={t.scoreModeNewDesc}
+              >
+                {t.scoreModeNew}
+              </button>
+              <button
+                type="button"
+                onClick={() => onScoreModeChange('old')}
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  scoreMode === 'old'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title={t.scoreModeOldDesc}
+              >
+                {t.scoreModeOld}
+              </button>
+            </div>
 
-          {/* Current vs All Chatbots */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-            <button
-              type="button"
-              onClick={() => onModelScopeChange('current')}
-              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                modelScope === 'current'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.scopeCurrentDesc}
-            >
-              {t.scopeCurrent}
-            </button>
-            <button
-              type="button"
-              onClick={() => onModelScopeChange('all')}
-              className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                modelScope === 'all'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.scopeAllDesc}
-            >
-              {t.scopeAll}
-            </button>
-          </div>
+            {/* Current vs All Chatbots */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => onModelScopeChange('current')}
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  modelScope === 'current'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title={t.scopeCurrentDesc}
+              >
+                {t.scopeCurrent}
+              </button>
+              <button
+                type="button"
+                onClick={() => onModelScopeChange('all')}
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  modelScope === 'all'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title={t.scopeAllDesc}
+              >
+                {t.scopeAll}
+              </button>
+            </div>
 
-          {/* Max Bar Count Slider */}
-          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
-            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-              {t.topSliderTop}:
-            </span>
-            <button
-              type="button"
-              onClick={() => handleTopStep(-5)}
-              disabled={topCount <= 5}
-              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-              title={t.stepMinusChatbots}
-            >
-              <Minus className="w-3 h-3" />
-            </button>
-            <input
-              type="range"
-              min={5}
-              max={Math.max(5, maxAvailableModels)}
-              step={5}
-              value={Math.min(topCount, maxAvailableModels)}
-              onChange={handleTopSliderChange}
-              className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-            />
-            <button
-              type="button"
-              onClick={() => handleTopStep(5)}
-              disabled={topCount >= maxAvailableModels}
-              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-              title={t.stepPlusChatbots}
-            >
-              <Plus className="w-3 h-3" />
-            </button>
-            <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right">
-              {Math.min(topCount, maxAvailableModels)}
-            </span>
-          </div>
+            {/* Max Bar Count Slider */}
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
+              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                {t.topSliderTop}:
+              </span>
+              <button
+                type="button"
+                onClick={() => handleTopStep(-5)}
+                disabled={topCount <= 5}
+                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                title={t.stepMinusChatbots}
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <input
+                type="range"
+                min={5}
+                max={Math.max(5, maxAvailableModels)}
+                step={5}
+                value={Math.min(topCount, maxAvailableModels)}
+                onChange={handleTopSliderChange}
+                className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={() => handleTopStep(5)}
+                disabled={topCount >= maxAvailableModels}
+                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                title={t.stepPlusChatbots}
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+              <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right">
+                {Math.min(topCount, maxAvailableModels)}
+              </span>
+            </div>
 
-          {/* Sortierung (Score vs Datum) ganz rechts in Zeile 1 */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-            <button
-              type="button"
-              onClick={() => onSortByChange('score')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                sortBy === 'score'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.sortScoreDesc}
-            >
-              <BarChart2 className="w-3 h-3" />
-              <span>{t.sortScore}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onSortByChange('date')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                sortBy === 'date'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title={t.sortDateDesc}
-            >
-              <Calendar className="w-3 h-3" />
-              <span>{t.sortDate}</span>
-            </button>
+            {/* Sortierung (Score vs Datum) ganz rechts in Zeile 1 */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => onSortByChange('score')}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  sortBy === 'score'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title={t.sortScoreDesc}
+              >
+                <BarChart2 className="w-3 h-3" />
+                <span>{t.sortScore}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSortByChange('date')}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  sortBy === 'date'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title={t.sortDateDesc}
+              >
+                <Calendar className="w-3 h-3" />
+                <span>{t.sortDate}</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ZEILE 2: Erweiterter Button-Slider-Bereich (wird nur angezeigt, wenn showAdvanced aktiv ist) */}
@@ -308,36 +310,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             })}
           </div>
 
-          {/* Rechts: Explosion-Button NEBEN dem Kategorie-Slider */}
+          {/* Rechts: Kategorie-Slider */}
           <div className="flex flex-wrap items-center gap-2 shrink-0 xl:ml-auto">
-            {/* Volle Explosion Schalter */}
-            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg px-2.5 py-1 shrink-0">
-              <span className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-mono font-medium whitespace-nowrap">
-                {t.explosionToggle}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={fullExplosionEnabled}
-                onClick={onFullExplosionToggle}
-                className={`relative inline-flex h-3.5 w-6.5 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  fullExplosionEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
-                }`}
-                title={fullExplosionEnabled ? t.fullExplosionOnDesc : t.fullExplosionOffDesc}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                    fullExplosionEnabled ? 'translate-x-3' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-              <span className="text-[9.5px] font-bold font-mono text-slate-500 dark:text-slate-400 min-w-[20px]">
-                {fullExplosionEnabled ? t.on : t.off}
-              </span>
-            </div>
-
-            {/* Kategorie Slider (rechts daneben mit festen + / - Tasten) */}
+            {/* Kategorie Slider (mit festen + / - Tasten) */}
             <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
               <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
                 {t.categorySliderLabel.endsWith(':') ? t.categorySliderLabel : `${t.categorySliderLabel}:`}

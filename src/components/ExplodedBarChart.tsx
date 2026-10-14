@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ModelRecord, BenchmarkComponent } from '../types';
+import { ModelRecord, BenchmarkComponent, PriceFilter } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { ExternalLink, SlidersHorizontal } from 'lucide-react';
@@ -19,6 +19,9 @@ interface ExplodedBarChartProps {
   hoveredCategoryComp?: BenchmarkComponent | null;
   showAdvanced?: boolean;
   onToggleAdvanced?: () => void;
+  priceFilter?: PriceFilter;
+  onPriceFilterChange?: (filter: PriceFilter) => void;
+  onFullExplosionToggle?: () => void;
   categoryNames?: string[];
 }
 
@@ -44,6 +47,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   hoveredCategoryComp = null,
   showAdvanced = false,
   onToggleAdvanced,
+  priceFilter = 'free',
+  onPriceFilterChange,
+  onFullExplosionToggle,
   categoryNames,
 }) => {
   const t = TRANSLATIONS[lang];
@@ -208,34 +214,99 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     : [0, 10, 20, 30, 40, 50, 60, 70, ...(maxAxisScore > 70 ? [80] : [])];
 
   // Regional pattern fill for unexploded bars:
-  // - USA: Blau mit weißen Sternen
-  // - China: Rot mit gelber Sichel / Stern
-  // - Europa / Frankreich: Blau-Gelb
+  // Dynamically colors each bar strictly matching the flag of the LLM creator (from CSV lookup table / model metadata):
+  // - 🇸🇬 Singapore: Red & White halves with crescent and 5 stars (Agnes / Sapiens AI)
+  // - 🇨🇳 China: Red with yellow star & sickle
+  // - 🇫🇷 France / Europe: Classic Tricolore (Blue-White-Red)
+  // - 🇰🇷 South Korea: White with central Taegeuk & black trigrams
+  // - 🇪🇸 Spain: Red-Yellow-Red horizontal stripes with coat of arms
+  // - 🇨🇦 Canada: Red-White-Red vertical stripes with red maple leaf
+  // - 🇩🇪 Germany: Black-Red-Gold horizontal stripes
+  // - 🇺🇸 USA & default: Blue with white stars
   const getCountryBarFill = (model: ModelRecord): string => {
+    const flag = model.flag || '';
+    const norm = (model.creatorClean + ' ' + model.companyName + ' ' + model.displayName).toLowerCase();
+
+    // 1. Singapore (🇸🇬) - e.g. Agnes / Sapiens AI
     if (
-      model.flag.includes('🇨🇳') ||
-      model.creatorClean.toLowerCase().includes('alibaba') ||
-      model.creatorClean.toLowerCase().includes('deepseek') ||
-      model.creatorClean.toLowerCase().includes('z.ai') ||
-      model.creatorClean.toLowerCase().includes('moonshot') ||
-      model.creatorClean.toLowerCase().includes('kimi') ||
-      model.creatorClean.toLowerCase().includes('xiaomi') ||
-      model.creatorClean.toLowerCase().includes('stepfun') ||
-      model.creatorClean.toLowerCase().includes('minimax') ||
-      model.creatorClean.toLowerCase().includes('inclusion')
+      flag.includes('🇸🇬') ||
+      norm.includes('agnes') ||
+      norm.includes('sapiens') ||
+      norm.includes('singapore')
+    ) {
+      return 'url(#pattern-singapore)';
+    }
+
+    // 2. China (🇨🇳) - e.g. DeepSeek, Alibaba/Qwen, Kimi, MiniMax, Xiaomi, StepFun, GLM
+    if (
+      flag.includes('🇨🇳') ||
+      norm.includes('alibaba') ||
+      norm.includes('deepseek') ||
+      norm.includes('z.ai') ||
+      norm.includes('z ai') ||
+      norm.includes('glm') ||
+      norm.includes('moonshot') ||
+      norm.includes('kimi') ||
+      norm.includes('xiaomi') ||
+      norm.includes('mimo') ||
+      norm.includes('stepfun') ||
+      norm.includes('minimax') ||
+      norm.includes('inclusion') ||
+      norm.includes('baidu') ||
+      norm.includes('longcat') ||
+      norm.includes('china mobile') ||
+      norm.includes('nex agi')
     ) {
       return 'url(#pattern-china)';
     }
 
+    // 3. France / Europe (🇫🇷, 🇪🇺) - e.g. Mistral AI
     if (
-      model.flag.includes('🇫🇷') ||
-      model.flag.includes('🇪🇺') ||
-      model.creatorClean.toLowerCase().includes('mistral')
+      flag.includes('🇫🇷') ||
+      flag.includes('🇪🇺') ||
+      norm.includes('mistral')
     ) {
-      return 'url(#pattern-europe)';
+      return 'url(#pattern-france)';
     }
 
-    // Default USA
+    // 4. South Korea (🇰🇷) - e.g. Motif Technologies, Upstage (Solar)
+    if (
+      flag.includes('🇰🇷') ||
+      norm.includes('motif') ||
+      norm.includes('upstage') ||
+      norm.includes('solar')
+    ) {
+      return 'url(#pattern-korea)';
+    }
+
+    // 5. Spain (🇪🇸) - e.g. Multiverse Computing (Quasar)
+    if (
+      flag.includes('🇪🇸') ||
+      norm.includes('multiverse') ||
+      norm.includes('quasar')
+    ) {
+      return 'url(#pattern-spain)';
+    }
+
+    // 6. Canada (🇨🇦) - e.g. Cohere (Command A+)
+    if (
+      flag.includes('🇨🇦') ||
+      norm.includes('cohere') ||
+      norm.includes('command a')
+    ) {
+      return 'url(#pattern-canada)';
+    }
+
+    // 7. Germany (🇩🇪) - e.g. DeepL SE
+    if (
+      flag.includes('🇩🇪') ||
+      norm.includes('deepl') ||
+      norm.includes('linguee')
+    ) {
+      return 'url(#pattern-germany)';
+    }
+
+    // 8. USA (🇺🇸) & Default
     return 'url(#pattern-usa)';
   };
 
@@ -485,23 +556,97 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             )}
           </div>
 
-          {/* Advanced Button top right of the bar chart area */}
-          {onToggleAdvanced && (
-            <button
-              type="button"
-              onClick={onToggleAdvanced}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
-                showAdvanced
-                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
-                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-              }`}
-              title={showAdvanced ? (lang === 'de' ? 'Erweiterte Filter & Slider ausblenden' : 'Hide advanced controls') : (lang === 'de' ? 'Erweiterte Filter & Slider einblenden' : 'Show advanced controls')}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
-              <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
-            </button>
-          )}
+          {/* Controls top right of the bar chart area: Advanced Button + Paid/Free/All Switcher + Explosion Button */}
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0 ml-auto">
+            {/* Advanced Button */}
+            {onToggleAdvanced && (
+              <button
+                type="button"
+                onClick={onToggleAdvanced}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
+                  showAdvanced
+                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
+                    : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                }`}
+                title={showAdvanced ? (lang === 'de' ? 'Erweiterte Filter & Slider ausblenden' : 'Hide advanced controls') : (lang === 'de' ? 'Erweiterte Filter & Slider einblenden' : 'Show advanced controls')}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
+                <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
+              </button>
+            )}
+
+            {/* New Button: right of the "advanced"-button which switches between "paid", "free", and "all". Default: "free" */}
+            {onPriceFilterChange && (
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onPriceFilterChange('free')}
+                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                    priceFilter === 'free'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title={lang === 'de' ? 'Nur kostenlose Chatbots anzeigen' : 'Show only free chatbots'}
+                >
+                  {t.priceFree}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPriceFilterChange('paid')}
+                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                    priceFilter === 'paid'
+                      ? 'bg-amber-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title={lang === 'de' ? 'Nur kostenpflichtige Chatbots (💲) anzeigen' : 'Show only paid chatbots (💲)'}
+                >
+                  {t.pricePaid} 💲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPriceFilterChange('all')}
+                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                    priceFilter === 'all'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title={lang === 'de' ? 'Alle Chatbots anzeigen (kostenlos & bezahlt)' : 'Show all chatbots (free & paid)'}
+                >
+                  {t.priceAll}
+                </button>
+              </div>
+            )}
+
+            {/* Explosion button: sensible exception placed right of the "advanced"-button */}
+            {onFullExplosionToggle && (
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg px-2 sm:px-2.5 py-1 shrink-0">
+                <span className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-mono font-medium whitespace-nowrap">
+                  {t.explosionToggle}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={fullExplosionEnabled}
+                  onClick={onFullExplosionToggle}
+                  className={`relative inline-flex h-3.5 w-6.5 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                    fullExplosionEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
+                  }`}
+                  title={fullExplosionEnabled ? t.fullExplosionOnDesc : t.fullExplosionOffDesc}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                      fullExplosionEnabled ? 'translate-x-3' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+                <span className="text-[9.5px] font-bold font-mono text-slate-500 dark:text-slate-400 min-w-[20px]">
+                  {fullExplosionEnabled ? t.on : t.off}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Row 2: Always present to guarantee rock-solid zero-shift height */}
@@ -542,67 +687,168 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         </div>
       </div>
 
-      {/* SVG Chart Container */}
-      <div className="relative select-none w-full">
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          className="block w-full h-auto"
-          preserveAspectRatio="xMidYMid meet"
-        >
-          <defs>
-            {/* USA: Blau mit weißen Sternen - Stärker gezoomt & dezent verteilt */}
-            <pattern
-              id="pattern-usa"
-              x="24"
-              width="38"
-              height="42"
-              patternUnits="userSpaceOnUse"
-            >
-              <rect width="38" height="42" fill="#1E3A8A" />
-              {/* Gezoomter weißer 5-Zack-Stern zentriert auf dem Balken */}
-              <polygon
-                points="13,13.5 14.9,18.4 20.1,18.7 16.0,22.0 17.4,27.1 13,24.2 8.6,27.1 10.0,22.0 5.9,18.7 11.1,18.4"
-                fill="#FFFFFF"
-              />
-              <circle cx="13" cy="0" r="1.6" fill="#FFFFFF" />
-              <circle cx="13" cy="42" r="1.6" fill="#FFFFFF" />
-            </pattern>
+      {/* SVG Chart Container: Zoom-out capped at 50% original size + horizontal scrollbar for discoverability */}
+      <div className="relative select-none w-full overflow-x-auto pb-2 custom-scrollbar">
+        <div style={{ minWidth: `${Math.round(chartWidth * 0.5)}px` }} className="w-full">
+          <svg
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            className="block w-full h-auto"
+            style={{ minWidth: `${Math.round(chartWidth * 0.5)}px` }}
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <defs>
+              {/* USA: Blau mit weißen Sternen - Stärker gezoomt & dezent verteilt */}
+              <pattern
+                id="pattern-usa"
+                x="24"
+                width="38"
+                height="42"
+                patternUnits="userSpaceOnUse"
+              >
+                <rect width="38" height="42" fill="#1E3A8A" />
+                <polygon
+                  points="13,13.5 14.9,18.4 20.1,18.7 16.0,22.0 17.4,27.1 13,24.2 8.6,27.1 10.0,22.0 5.9,18.7 11.1,18.4"
+                  fill="#FFFFFF"
+                />
+                <circle cx="13" cy="0" r="1.6" fill="#FFFFFF" />
+                <circle cx="13" cy="42" r="1.6" fill="#FFFFFF" />
+              </pattern>
 
-            {/* China: Rot mit gelber Sichel und Stern - Stärker gezoomt & dezent verteilt */}
-            <pattern
-              id="pattern-china"
-              x="24"
-              width="38"
-              height="44"
-              patternUnits="userSpaceOnUse"
-            >
-              <rect width="38" height="44" fill="#DC2626" />
-              {/* Gezoomte Sichel */}
-              <path
-                d="M 8.5,14 A 7.5,7.5 0 1 0 17.5,23 A 5.5,5.5 0 1 1 8.5,14 Z"
-                fill="#FACC15"
-              />
-              <line x1="17.5" y1="23" x2="21.5" y2="28" stroke="#FACC15" strokeWidth="2" strokeLinecap="round" />
-              {/* Gezoomter Stern */}
-              <polygon
-                points="18,8.2 19,10.6 21.6,10.6 19.5,12.2 20.2,14.6 18,13.1 15.8,14.6 16.5,12.2 14.4,10.6 17,10.6"
-                fill="#FACC15"
-              />
-            </pattern>
+              {/* China: Rot mit gelber Sichel und Stern */}
+              <pattern
+                id="pattern-china"
+                x="24"
+                width="38"
+                height="44"
+                patternUnits="userSpaceOnUse"
+              >
+                <rect width="38" height="44" fill="#DC2626" />
+                <path
+                  d="M 8.5,14 A 7.5,7.5 0 1 0 17.5,23 A 5.5,5.5 0 1 1 8.5,14 Z"
+                  fill="#FACC15"
+                />
+                <line x1="17.5" y1="23" x2="21.5" y2="28" stroke="#FACC15" strokeWidth="2" strokeLinecap="round" />
+                <polygon
+                  points="18,8.2 19,10.6 21.6,10.6 19.5,12.2 20.2,14.6 18,13.1 15.8,14.6 16.5,12.2 14.4,10.6 17,10.6"
+                  fill="#FACC15"
+                />
+              </pattern>
 
-            {/* Europa / Frankreich: Klassische Tricolore (Blau-Weiß-Rot) - Genau 3 Streifen je Balken */}
-            <pattern
-              id="pattern-europe"
-              width="1"
-              height="1"
-              viewBox="0 0 3 1"
-              preserveAspectRatio="none"
-            >
-              <rect x="0" y="0" width="1" height="1" fill="#002654" />
-              <rect x="1" y="0" width="1" height="1" fill="#FFFFFF" />
-              <rect x="2" y="0" width="1" height="1" fill="#ED2939" />
-            </pattern>
-          </defs>
+              {/* Singapur: Oben Rot mit weißer Mondsichel und 5 Sternen, unten Weiß (Flag of Singapore - z. B. Agnes) */}
+              <pattern
+                id="pattern-singapore"
+                width="38"
+                height="42"
+                patternUnits="userSpaceOnUse"
+              >
+                {/* Obere Hälfte: Rot */}
+                <rect x="0" y="0" width="38" height="21" fill="#EF3340" />
+                {/* Untere Hälfte: Weiß */}
+                <rect x="0" y="21" width="38" height="21" fill="#FFFFFF" />
+                {/* Weiße Mondsichel auf rotem Feld */}
+                <path
+                  d="M 8,6 A 5,5 0 1 0 8,16 A 4.1,4.1 0 1 1 8,6 Z"
+                  fill="#FFFFFF"
+                />
+                {/* 5 weiße fünfzackige Sterne im Kreis angeordnet */}
+                <circle cx="14.5" cy="8" r="0.85" fill="#FFFFFF" />
+                <circle cx="17.2" cy="9.8" r="0.85" fill="#FFFFFF" />
+                <circle cx="16.2" cy="13.2" r="0.85" fill="#FFFFFF" />
+                <circle cx="13" cy="13.2" r="0.85" fill="#FFFFFF" />
+                <circle cx="12" cy="9.8" r="0.85" fill="#FFFFFF" />
+              </pattern>
+
+              {/* Frankreich / Europa: Klassische vertikale Tricolore (Blau-Weiß-Rot) */}
+              <pattern
+                id="pattern-france"
+                width="1"
+                height="1"
+                viewBox="0 0 3 1"
+                preserveAspectRatio="none"
+              >
+                <rect x="0" y="0" width="1" height="1" fill="#002654" />
+                <rect x="1" y="0" width="1" height="1" fill="#FFFFFF" />
+                <rect x="2" y="0" width="1" height="1" fill="#ED2939" />
+              </pattern>
+              <pattern
+                id="pattern-europe"
+                width="1"
+                height="1"
+                viewBox="0 0 3 1"
+                preserveAspectRatio="none"
+              >
+                <rect x="0" y="0" width="1" height="1" fill="#002654" />
+                <rect x="1" y="0" width="1" height="1" fill="#FFFFFF" />
+                <rect x="2" y="0" width="1" height="1" fill="#ED2939" />
+              </pattern>
+
+              {/* Südkorea: Weißer Hintergrund, zentrales rot-blaues Taegeuk & schwarze Trigramme */}
+              <pattern
+                id="pattern-korea"
+                width="38"
+                height="42"
+                patternUnits="userSpaceOnUse"
+              >
+                <rect width="38" height="42" fill="#FFFFFF" />
+                {/* Zentrales rot-blaues Taegeuk */}
+                <circle cx="19" cy="21" r="7.5" fill="#CD2E3A" />
+                <path d="M 11.5,21 A 3.75,3.75 0 0,0 19,21 A 3.75,3.75 0 0,1 26.5,21 A 7.5,7.5 0 0,1 11.5,21 Z" fill="#0047A0" />
+                {/* Trigramme links und rechts */}
+                <line x1="4" y1="14" x2="8" y2="14" stroke="#000000" strokeWidth="1.2" />
+                <line x1="4" y1="16.5" x2="8" y2="16.5" stroke="#000000" strokeWidth="1.2" />
+                <line x1="30" y1="14" x2="34" y2="14" stroke="#000000" strokeWidth="1.2" />
+                <line x1="30" y1="16.5" x2="34" y2="16.5" stroke="#000000" strokeWidth="1.2" />
+                <line x1="4" y1="26" x2="8" y2="26" stroke="#000000" strokeWidth="1.2" />
+                <line x1="4" y1="28.5" x2="8" y2="28.5" stroke="#000000" strokeWidth="1.2" />
+                <line x1="30" y1="26" x2="34" y2="26" stroke="#000000" strokeWidth="1.2" />
+                <line x1="30" y1="28.5" x2="34" y2="28.5" stroke="#000000" strokeWidth="1.2" />
+              </pattern>
+
+              {/* Spanien: Rot - Gelb (doppelt so breit) - Rot horizontal mit Wappen-Emblem */}
+              <pattern
+                id="pattern-spain"
+                width="38"
+                height="40"
+                patternUnits="userSpaceOnUse"
+              >
+                <rect x="0" y="0" width="38" height="10" fill="#AA151B" />
+                <rect x="0" y="10" width="38" height="20" fill="#F1BF00" />
+                <rect x="0" y="30" width="38" height="10" fill="#AA151B" />
+                {/* Spanisches Wappen auf dem gelben Streifen */}
+                <rect x="15" y="15" width="8" height="10" rx="1.5" fill="#AA151B" />
+                <circle cx="19" cy="13.5" r="1.5" fill="#AA151B" />
+                <rect x="17" y="17" width="4" height="6" fill="#F1BF00" />
+              </pattern>
+
+              {/* Kanada: Rot - Weiß (doppelt so breit) - Rot vertikal mit rotem Ahornblatt */}
+              <pattern
+                id="pattern-canada"
+                width="38"
+                height="38"
+                patternUnits="userSpaceOnUse"
+              >
+                <rect x="0" y="0" width="9" height="38" fill="#FF0000" />
+                <rect x="9" y="0" width="20" height="38" fill="#FFFFFF" />
+                <rect x="29" y="0" width="9" height="38" fill="#FF0000" />
+                {/* Rotes Ahornblatt im weißen Zentrum */}
+                <path
+                  d="M 19,10 L 20.5,14 L 24,13.5 L 22.5,16.5 L 25,18.5 L 22,19.5 L 22.5,22 L 19.5,20.5 L 19.5,26 L 18.5,26 L 18.5,20.5 L 15.5,22 L 16,19.5 L 13,18.5 L 15.5,16.5 L 14,13.5 L 17.5,14 Z"
+                  fill="#FF0000"
+                />
+              </pattern>
+
+              {/* Deutschland: Schwarz - Rot - Gold (drei gleiche horizontale Streifen) */}
+              <pattern
+                id="pattern-germany"
+                width="38"
+                height="42"
+                patternUnits="userSpaceOnUse"
+              >
+                <rect x="0" y="0" width="38" height="14" fill="#000000" />
+                <rect x="0" y="14" width="38" height="14" fill="#DD0000" />
+                <rect x="0" y="28" width="38" height="14" fill="#FFCE00" />
+              </pattern>
+            </defs>
 
           {/* Horizontal Gridlines */}
           {yTicks.map((tick) => {
@@ -1039,7 +1285,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </g>
             );
           })}
-        </svg>
+          </svg>
+        </div>
       </div>
     </div>
   );
