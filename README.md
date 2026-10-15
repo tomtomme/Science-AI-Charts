@@ -3,8 +3,10 @@
 🤖 **Hinweis**: Diese README-Dokumentation wurde KI-generiert.  Die **Live-Web-App** wurde ebenfalls KI-generiert. Die Daten auf welchen die App beruht sind allerdings handverlesen.
 
 > **Live-Web-App**: [tomtomme.github.io/Science-AI-Charts](https://tomtomme.github.io/Science-AI-Charts/)  
-> **Original Google Sheet**: [Google Sheets Tabelle (gid=170267419)](https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=170267419#gid=170267419)  
+> **Original Google Sheet (Benchmarks)**: [Google Sheets Tabelle (gid=170267419)](https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=170267419#gid=170267419)  
+> **Original Google Sheet (Labs & Ökosystem)**: [Google Sheets Tabelle (gid=355721692)](https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=355721692#gid=355721692)  
 > **GitHub Repository**: [github.com/tomtomme/Science-AI-Charts](https://github.com/tomtomme/Science-AI-Charts)
+
 
 ---
 
@@ -63,6 +65,13 @@ Im Gegensatz zu herkömmlichen Benchmarks, die primär textbasierte Programmiera
 
 ### 9. Vollständige Zweisprachigkeit (DE / EN)
 * Nahtloser Wechsel zwischen deutscher und englischer Sprache über den `DE / EN`-Schalter im Header.
+
+### 10. Tab „LLM-Labs & Ökosystem“ (gid=355721692)
+* **Zusätzlicher Navigations-Tab**: Ermöglicht den direkten Wechsel zwischen dem visuellen Benchmark-Balkendiagramm und einer strukturierten Ökosystem-Matrix.
+* **Top 10 LLM Labs & 24 Contenders**: Schneller Wechsel zwischen den Top 10 Labs (Zeilen 2–17) und den 24 Contenders (Zeilen 19–28) oder allen 34 Organisationen.
+* **Modellgrößen & Tooling-Matrix**: Visualisiert Parameterklassen (<32B bis 15T+), Software Development Kits (The Harness), Web-Agenten (Daily Agent), Coding-Agenten und Abonnement-Stufen.
+* **Modell-Synchronisation**: Ein Klick auf ein Lab filtert und markiert die entsprechenden Modelle sofort im Benchmark-Diagramm.
+
 
 ---
 

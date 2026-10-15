@@ -106,3 +106,29 @@ export interface CsvNotesMetadata {
   section1Paragraphs?: CsvParagraph[];
   section2Paragraphs?: CsvParagraph[];
 }
+
+export interface LabEntry {
+  id: string;
+  group: 'top10' | 'contender';
+  country: string;
+  countryFlag: string;
+  creator: string;
+  famousFor: string;
+  engineName: string;
+  parameterSizes: {
+    small?: string;
+    medium?: string;
+    large?: string;
+    massive?: string;
+    colossal?: string;
+    planetary?: string;
+    singularity?: string;
+    godTier?: string;
+  };
+  subscriptionTiers?: string;
+  harnessSdk?: string;
+  dailyAgent?: string;
+  codingAgent?: string;
+  specialties?: string;
+}
+

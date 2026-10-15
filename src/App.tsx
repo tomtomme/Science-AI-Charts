@@ -4,16 +4,20 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent, PriceFilter } from './types';
+import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent, PriceFilter, LabEntry } from './types';
 import { FALLBACK_CSV_CONTENT, SHEET_HTML_URL, CHART_HTML_URL, GITHUB_REPO_URL } from './data/rawCsvFallback';
+import { FALLBACK_LAB_ENTRIES } from './data/rawLabCsvFallback';
 import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset } from './utils/csvParser';
 import { LoadedDatasets, loadModelsData } from './services/dataService';
+import { fetchLiveLabEntries } from './services/labDataService';
 import { BENCHMARK_COMPONENTS } from './data/benchmarks';
 import { ExplodedBarChart } from './components/ExplodedBarChart';
 import { SearchBar } from './components/SearchBar';
 import { CsvNotesSection } from './components/CsvNotesSection';
+import { LabMatrixView } from './components/LabMatrixView';
 import { Language, TRANSLATIONS } from './utils/i18n';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2 } from 'lucide-react';
+
 
 export default function App() {
   // Standardeinstellung: Englisch
@@ -67,10 +71,32 @@ export default function App() {
   // Erweiterter Modus (Buttons & Slider eingeklappt als Standard, auf Klick ausklappbar)
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
+  // Tab-Navigation: 'benchmark' vs 'labs'
+  const [activeTab, setActiveTab] = useState<'benchmark' | 'labs'>('benchmark');
+
+  // LLM Labs Datensatz (aus Google Sheets gid=355721692 mit Fallback)
+  const [labs, setLabs] = useState<LabEntry[]>(FALLBACK_LAB_ENTRIES);
+
+  useEffect(() => {
+    fetchLiveLabEntries().then((res) => {
+      if (res.entries && res.entries.length > 0) {
+        setLabs(res.entries);
+      }
+    });
+  }, []);
+
   // Filter: Freitext-Suche und Schnellfilter mit Standard-Vorauswahl: ChatGPT, Claude, Gemini
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [selectedFamilies, setSelectedFamilies] = useState<string[]>(['ChatGPT', 'Claude', 'Gemini']);
   const [selectedCompany] = useState<string | null>(null);
+
+  const handleSelectLabFromMatrix = useCallback((creatorName: string) => {
+    setSearchFilter(creatorName);
+    setSelectedFamilies([]);
+    setActiveTab('benchmark');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
 
   // Active models based on scoreMode, modelScope & priceFilter ('current' vs 'all', 'free' vs 'paid' vs 'all')
   const currentModels = useMemo(() => {
@@ -387,75 +413,140 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Bar Chart Container */}
-      <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-3 sm:py-3.5 flex flex-col space-y-3.5">
-        {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategorie-Slider, 5er-Schritt-Slider, NEW/OLD Score, Current/All Scope, Volle Explosion und alphabetischen Hersteller-Filtern */}
-        <SearchBar
-          value={searchFilter}
-          onChange={(val) => {
-            setSearchFilter(val);
-            if (val.trim().length > 0) {
-              setSelectedFamilies([]);
-            }
-          }}
-          selectedFamilies={selectedFamilies}
-          onToggleFamily={handleToggleFamily}
-          onClearFamilies={handleClearFamilies}
-          topCount={topCount}
-          onTopCountChange={setTopCount}
-          maxAvailableModels={currentModels.length}
-          matchCount={matchCount}
-          totalCount={currentModels.length}
-          lang={lang}
-          sortBy={sortBy}
-          onSortByChange={setSortBy}
-          selectedCategoryIndex={selectedCategoryIndex}
-          onCategoryIndexChange={(idx) => {
-            setSelectedCategoryIndex(idx);
-            if (idx > 0) {
-              setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
-            } else {
-              setCategoryInfoComp(null);
-            }
-          }}
-          onHoverCategory={setCategoryInfoComp}
-          scoreMode={scoreMode}
-          onScoreModeChange={setScoreMode}
-          modelScope={modelScope}
-          onModelScopeChange={setModelScope}
-          fullExplosionEnabled={fullExplosionEnabled}
-          onFullExplosionToggle={() => setFullExplosionEnabled((prev) => !prev)}
-          showAdvanced={showAdvanced}
-          categoryNames={loadedData.headerMeta?.categoryNames}
-        />
+      {/* Primary Tab Switcher */}
+      <div className="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 sticky top-0 z-30 px-4 sm:px-6 shadow-2xs">
+        <div className="w-full max-w-[1720px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 py-2">
+          {/* Segmented Tab Controls */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl shrink-0">
+            <button
+              onClick={() => setActiveTab('benchmark')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'benchmark'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              <span>{lang === 'de' ? 'Wissenschafts-IQ Benchmark' : 'Science-IQ Benchmark'}</span>
+              <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 dark:bg-slate-600/70 rounded text-slate-700 dark:text-slate-200 tabular-nums">
+                {displayedModels.length}
+              </span>
+            </button>
 
-        {/* Balkendiagramm: Breit dargestellt, die volle Containerbreite nutzend */}
-        <div className="w-full">
-          <ExplodedBarChart
-            models={displayedModels}
-            activeBenchmarkId={null}
-            activeCategoryIndex={selectedCategoryIndex}
-            hoveredCategoryComp={categoryInfoComp}
+            <button
+              onClick={() => setActiveTab('labs')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'labs'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>{lang === 'de' ? 'LLM-Labs & Ökosystem' : 'LLM Labs & Ecosystem'}</span>
+              <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 dark:bg-slate-600/70 rounded text-slate-700 dark:text-slate-200 tabular-nums">
+                {labs.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Active filter reset notice */}
+          {searchFilter && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-500 text-[11px]">
+                {lang === 'de' ? 'Aktiver Lab-/Modell-Filter:' : 'Active Lab/Model filter:'} <strong className="text-slate-800 dark:text-slate-200 font-semibold">{searchFilter}</strong>
+              </span>
+              <button
+                onClick={() => setSearchFilter('')}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium"
+              >
+                {lang === 'de' ? 'Filter aufheben' : 'Reset filter'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      {activeTab === 'benchmark' ? (
+        <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-3 sm:py-3.5 flex flex-col space-y-3.5">
+          {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategorie-Slider, 5er-Schritt-Slider, NEW/OLD Score, Current/All Scope, Volle Explosion und alphabetischen Hersteller-Filtern */}
+          <SearchBar
+            value={searchFilter}
+            onChange={(val) => {
+              setSearchFilter(val);
+              if (val.trim().length > 0) {
+                setSelectedFamilies([]);
+              }
+            }}
+            selectedFamilies={selectedFamilies}
+            onToggleFamily={handleToggleFamily}
+            onClearFamilies={handleClearFamilies}
+            topCount={topCount}
+            onTopCountChange={setTopCount}
+            maxAvailableModels={currentModels.length}
+            matchCount={matchCount}
+            totalCount={currentModels.length}
+            lang={lang}
             sortBy={sortBy}
+            onSortByChange={setSortBy}
+            selectedCategoryIndex={selectedCategoryIndex}
+            onCategoryIndexChange={(idx) => {
+              setSelectedCategoryIndex(idx);
+              if (idx > 0) {
+                setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
+              } else {
+                setCategoryInfoComp(null);
+              }
+            }}
+            onHoverCategory={setCategoryInfoComp}
+            scoreMode={scoreMode}
+            onScoreModeChange={setScoreMode}
+            modelScope={modelScope}
+            onModelScopeChange={setModelScope}
             fullExplosionEnabled={fullExplosionEnabled}
             onFullExplosionToggle={() => setFullExplosionEnabled((prev) => !prev)}
-            searchFilter={searchFilter}
-            selectedFamilies={selectedFamilies}
-            selectedCompany={selectedCompany}
-            lang={lang}
             showAdvanced={showAdvanced}
-            onToggleAdvanced={() => setShowAdvanced((prev) => !prev)}
-            priceFilter={priceFilter}
-            onPriceFilterChange={setPriceFilter}
             categoryNames={loadedData.headerMeta?.categoryNames}
           />
-        </div>
 
-        {/* Textfeld-Bereich unter dem Balkendiagramm: CSV-Zellen B34/C34 & N34/O34 */}
-        <div className="w-full pt-1 pb-4">
-          <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
-        </div>
-      </main>
+          {/* Balkendiagramm: Breit dargestellt, die volle Containerbreite nutzend */}
+          <div className="w-full">
+            <ExplodedBarChart
+              models={displayedModels}
+              activeBenchmarkId={null}
+              activeCategoryIndex={selectedCategoryIndex}
+              hoveredCategoryComp={categoryInfoComp}
+              sortBy={sortBy}
+              fullExplosionEnabled={fullExplosionEnabled}
+              onFullExplosionToggle={() => setFullExplosionEnabled((prev) => !prev)}
+              searchFilter={searchFilter}
+              selectedFamilies={selectedFamilies}
+              selectedCompany={selectedCompany}
+              lang={lang}
+              showAdvanced={showAdvanced}
+              onToggleAdvanced={() => setShowAdvanced((prev) => !prev)}
+              priceFilter={priceFilter}
+              onPriceFilterChange={setPriceFilter}
+              categoryNames={loadedData.headerMeta?.categoryNames}
+            />
+          </div>
+
+          {/* Textfeld-Bereich unter dem Balkendiagramm: CSV-Zellen B34/C34 & N34/O34 */}
+          <div className="w-full pt-1 pb-4">
+            <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
+          </div>
+        </main>
+      ) : (
+        <main className="flex-1 w-full">
+          <LabMatrixView
+            labs={labs}
+            models={currentModels}
+            onSelectLabForBenchmark={handleSelectLabFromMatrix}
+            lang={lang}
+          />
+        </main>
+      )}
+
     </div>
   );
 }
