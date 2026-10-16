@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent, PriceFilter, LabEntry } from './types';
+import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent, PriceFilter, LabEntry, ExplosionMode } from './types';
 import { FALLBACK_CSV_CONTENT, SHEET_HTML_URL, CHART_HTML_URL, GITHUB_REPO_URL } from './data/rawCsvFallback';
 import { FALLBACK_LAB_ENTRIES } from './data/rawLabCsvFallback';
 import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset } from './utils/csvParser';
@@ -16,7 +16,7 @@ import { SearchBar } from './components/SearchBar';
 import { CsvNotesSection } from './components/CsvNotesSection';
 import { LabMatrixView } from './components/LabMatrixView';
 import { Language, TRANSLATIONS } from './utils/i18n';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2 } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal } from 'lucide-react';
 
 
 export default function App() {
@@ -59,8 +59,8 @@ export default function App() {
   // Slider: Anzahl angezeigter Modelle in 5er-Schritten (Standard: 35)
   const [topCount, setTopCount] = useState<number>(35);
 
-  // Volle Explosion Schalter
-  const [fullExplosionEnabled, setFullExplosionEnabled] = useState<boolean>(false);
+  // Explosion Schalter: 'on' (an) | 'hover' (teils) | 'off' (aus) - Standard: 'hover' (wie bisheriges 'aus')
+  const [explosionMode, setExplosionMode] = useState<ExplosionMode>('hover');
 
   // Sortierung: 'score' (Punktzahl) vs 'date' (Datum aus Spalte Y)
   const [sortBy, setSortBy] = useState<SortField>('score');
@@ -99,9 +99,12 @@ export default function App() {
 
 
   // Active models based on scoreMode, modelScope & priceFilter ('current' vs 'all', 'free' vs 'paid' vs 'all')
+  // HINWEIS: Wenn im Freitextfilter gesucht wird, sollen immer alle Bots durchsucht werden, nicht nur 'current' Bots.
+  const effectiveModelScope: ModelScope = searchFilter.trim().length > 0 ? 'all' : modelScope;
+
   const currentModels = useMemo(() => {
     const base = scoreMode === 'new' ? loadedData.newModels : loadedData.oldModels;
-    let list = modelScope === 'current' ? base.filter((m) => m.isAvailable) : base;
+    let list = effectiveModelScope === 'current' ? base.filter((m) => m.isAvailable) : base;
 
     // Preis-Filter: Default 'free', sonst 'paid' oder 'all'
     if (priceFilter === 'free') {
@@ -111,7 +114,7 @@ export default function App() {
     }
 
     return list;
-  }, [scoreMode, modelScope, loadedData, priceFilter]);
+  }, [scoreMode, effectiveModelScope, loadedData, priceFilter]);
 
   const hasFilterActive =
     searchFilter.trim().length > 0 || selectedFamilies.length > 0 || selectedCompany !== null;
@@ -124,7 +127,8 @@ export default function App() {
         model.displayName.toLowerCase().includes(q) ||
         model.name.toLowerCase().includes(q) ||
         model.companyName.toLowerCase().includes(q) ||
-        model.creatorClean.toLowerCase().includes(q);
+        model.creatorClean.toLowerCase().includes(q) ||
+        Boolean(model.creator && model.creator.toLowerCase().includes(q));
 
       const matchesFamilies =
         selectedFamilies.length === 0 ||
@@ -134,16 +138,18 @@ export default function App() {
             model.displayName.toLowerCase().includes(famLow) ||
             model.name.toLowerCase().includes(famLow) ||
             model.companyName.toLowerCase().includes(famLow) ||
-            model.creatorClean.toLowerCase().includes(famLow)
+            model.creatorClean.toLowerCase().includes(famLow) ||
+            Boolean(model.creator && model.creator.toLowerCase().includes(famLow))
           );
         });
 
       const matchesCompany =
         !selectedCompany ||
         model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
-        model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase());
+        model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase()) ||
+        Boolean(model.creator && model.creator.toLowerCase().includes(selectedCompany.toLowerCase()));
 
-      return matchesSearch && matchesFamilies && matchesCompany;
+      return Boolean(matchesSearch && matchesFamilies && matchesCompany);
     },
     [searchFilter, selectedFamilies, selectedCompany]
   );
@@ -304,36 +310,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Controls, language toggle & sync / external link icons */}
+          {/* Controls, sync, date, language toggle & external link icons */}
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono shrink-0 self-start xl:self-center">
-            {/* Language Switcher DE / EN */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => setLang('de')}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
-                  lang === 'de'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={lang === 'de' ? 'Auf Deutsch umschalten' : 'Switch to German'}
-              >
-                DE
-              </button>
-              <button
-                type="button"
-                onClick={() => setLang('en')}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
-                  lang === 'en'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={lang === 'de' ? 'Auf Englisch umschalten' : 'Switch to English'}
-              >
-                EN
-              </button>
-            </div>
-
             {/* Synchronisieren-Button mit Popup für Datum der letzten Synchronisierung */}
             <div className="relative group">
               <button
@@ -374,10 +352,39 @@ export default function App() {
               </div>
             </div>
 
-            {/* Letzter Sync direkt sichtbar auf XL-Bildschirmen (nur Datum) */}
-            <span className="hidden xl:inline text-slate-500 dark:text-slate-400 text-[11px] font-mono">
-              {t.lastSync} {formatSyncDate(lastSyncedAt)}
+            {/* Datum der letzten Synchronisierung */}
+            <span className="text-slate-500 dark:text-slate-400 text-[11px] font-mono whitespace-nowrap">
+              <span className="hidden sm:inline">{t.lastSync} </span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300">{formatSyncDate(lastSyncedAt)}</span>
             </span>
+
+            {/* Language Switcher DE / EN - rechts vom Datum des letzten Syncs */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => setLang('de')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+                  lang === 'de'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title={lang === 'de' ? 'Auf Deutsch umschalten' : 'Switch to German'}
+              >
+                DE
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang('en')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+                  lang === 'en'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title={lang === 'de' ? 'Auf Englisch umschalten' : 'Switch to English'}
+              >
+                EN
+              </button>
+            </div>
 
             {/* Statisches Diagramm als Icon neben Google Sheets & GitHub */}
             <a
@@ -449,20 +456,129 @@ export default function App() {
             </button>
           </div>
 
-          {/* Active filter reset notice */}
-          {searchFilter && (
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-500 text-[11px]">
-                {lang === 'de' ? 'Aktiver Lab-/Modell-Filter:' : 'Active Lab/Model filter:'} <strong className="text-slate-800 dark:text-slate-200 font-semibold">{searchFilter}</strong>
-              </span>
-              <button
-                onClick={() => setSearchFilter('')}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium"
-              >
-                {lang === 'de' ? 'Filter aufheben' : 'Reset filter'}
-              </button>
-            </div>
-          )}
+          {/* Right section: Active filter reset notice + Benchmark Controls (only on benchmark tab) */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 sm:ml-auto">
+            {/* Active filter reset notice */}
+            {searchFilter && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-500 text-[11px]">
+                  {lang === 'de' ? 'Aktiver Lab-/Modell-Filter:' : 'Active Lab/Model filter:'} <strong className="text-slate-800 dark:text-slate-200 font-semibold">{searchFilter}</strong>
+                </span>
+                <button
+                  onClick={() => setSearchFilter('')}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium"
+                >
+                  {lang === 'de' ? 'Filter aufheben' : 'Reset filter'}
+                </button>
+              </div>
+            )}
+
+            {/* Benchmark Controls: Advanced Button + Paid/Free/All Switcher + Explosion Button */}
+            {activeTab === 'benchmark' && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* Advanced Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((prev) => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
+                    showAdvanced
+                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
+                      : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                  }`}
+                  title={t.advancedDesc}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>{t.advanced}</span>
+                  <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
+                </button>
+
+                {/* Price Filter Switcher: Free / Paid / All */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPriceFilter('free')}
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      priceFilter === 'free'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title={t.priceFreeDesc}
+                  >
+                    {t.priceFree}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriceFilter('paid')}
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      priceFilter === 'paid'
+                        ? 'bg-amber-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title={t.pricePaidDesc}
+                  >
+                    {t.pricePaid} 💲
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriceFilter('all')}
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      priceFilter === 'all'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title={t.priceAllDesc}
+                  >
+                    {t.priceAll}
+                  </button>
+                </div>
+
+                {/* Explosion Button: an / teils / aus (on / hover / off) */}
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0">
+                  <span className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-mono font-medium px-1.5 whitespace-nowrap">
+                    {t.explosionToggle}
+                  </span>
+                  <div className="flex items-center bg-slate-200/60 dark:bg-slate-900/50 rounded p-0.5 gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setExplosionMode('on')}
+                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                        explosionMode === 'on'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title={t.explosionOnDesc}
+                    >
+                      {t.explosionOn}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExplosionMode('hover')}
+                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                        explosionMode === 'hover'
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title={t.explosionHoverDesc}
+                    >
+                      {t.explosionHover}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExplosionMode('off')}
+                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                        explosionMode === 'off'
+                          ? 'bg-slate-600 text-white shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title={t.explosionOffDesc}
+                    >
+                      {t.explosionOff}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -501,10 +617,8 @@ export default function App() {
             onHoverCategory={setCategoryInfoComp}
             scoreMode={scoreMode}
             onScoreModeChange={setScoreMode}
-            modelScope={modelScope}
+            modelScope={effectiveModelScope}
             onModelScopeChange={setModelScope}
-            fullExplosionEnabled={fullExplosionEnabled}
-            onFullExplosionToggle={() => setFullExplosionEnabled((prev) => !prev)}
             showAdvanced={showAdvanced}
             categoryNames={loadedData.headerMeta?.categoryNames}
           />
@@ -517,8 +631,8 @@ export default function App() {
               activeCategoryIndex={selectedCategoryIndex}
               hoveredCategoryComp={categoryInfoComp}
               sortBy={sortBy}
-              fullExplosionEnabled={fullExplosionEnabled}
-              onFullExplosionToggle={() => setFullExplosionEnabled((prev) => !prev)}
+              explosionMode={explosionMode}
+              onExplosionModeChange={setExplosionMode}
               searchFilter={searchFilter}
               selectedFamilies={selectedFamilies}
               selectedCompany={selectedCompany}

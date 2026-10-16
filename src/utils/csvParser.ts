@@ -210,12 +210,11 @@ function extractFlag(text: string): { flag: string; cleanText: string } {
  * Supports distinct score modes:
  * - 'new': strictly models with Col M ("NEW Score").
  * - 'old': strictly models with Col L ("OLD Score").
+ * - 'worstCase': strictly models with Col N ("Worst Case Score").
  */
 export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): ModelRecord[] {
   const rows = parseCsvRows(csvText);
   if (rows.length < 3) return [];
-
-  const isOld = mode === 'old';
 
   // Find header row containing "10 Evals" or "Act Code" or "Creator | Release"
   let headerRowIndex = -1;
@@ -362,7 +361,15 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
     const scoreWorstCase = parseNum(row[13]);
 
     // Strictly enforce selected mode without blending/fallback!
-    const targetScore = isOld ? scoreOld : scoreNewReported;
+    let targetScore: number | null = null;
+    if (mode === 'old') {
+      targetScore = scoreOld;
+    } else if (mode === 'worstCase') {
+      targetScore = scoreWorstCase;
+    } else {
+      targetScore = scoreNewReported;
+    }
+
     if (targetScore === null || targetScore <= 0) {
       return null;
     }

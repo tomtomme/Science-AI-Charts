@@ -25,8 +25,6 @@ interface SearchBarProps {
   onScoreModeChange: (mode: ScoreMode) => void;
   modelScope: ModelScope;
   onModelScopeChange: (scope: ModelScope) => void;
-  fullExplosionEnabled: boolean;
-  onFullExplosionToggle: () => void;
   showAdvanced?: boolean;
   categoryNames?: string[];
 }
@@ -66,8 +64,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onScoreModeChange,
   modelScope,
   onModelScopeChange,
-  fullExplosionEnabled,
-  onFullExplosionToggle,
   showAdvanced = false,
   categoryNames,
 }) => {

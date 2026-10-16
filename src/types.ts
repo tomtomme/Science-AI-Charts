@@ -87,9 +87,10 @@ export interface CompanyInfo {
 export type ViewFilter = 'all' | 'free' | 'paid' | 'top10' | 'top25';
 export type SortOption = 'newScore' | 'nonHallu' | 'vision' | 'science' | 'worstCase' | 'rank';
 export type SortField = 'score' | 'date';
-export type ScoreMode = 'new' | 'old';
+export type ScoreMode = 'new' | 'old' | 'worstCase';
 export type ModelScope = 'current' | 'all';
 export type PriceFilter = 'free' | 'paid' | 'all';
+export type ExplosionMode = 'on' | 'hover' | 'off';
 
 export interface CsvParagraph {
   heading?: string;

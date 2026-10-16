@@ -25,11 +25,11 @@ export const TRANSLATIONS = {
     ],
 
     // Schieberegler: Chatbot-Anzahl
-    topSliderLabel: 'Max Bar Count:',
-    topSliderTop: 'Max Bar Count',
+    topSliderLabel: 'Max. Balkenanzahl:',
+    topSliderTop: 'Max. Balkenanzahl',
     stepMinusChatbots: '-5',
     stepPlusChatbots: '+5',
-    maxLabel: 'max',
+    maxLabel: 'Max.',
 
     // Kategorie-Slider (0 = Alles, 1..8 = Einzelkategorie)
     categorySliderLabel: 'Kategorie:',
@@ -48,33 +48,43 @@ export const TRANSLATIONS = {
     sortedByDateLabel: 'Sortiert nach Veröffentlichungsdatum',
 
     // Score-Modi
-    scoreModeNew: 'NEW Score',
-    scoreModeOld: 'OLD Score',
-    scoreModeNewDesc: 'NEW Score: 8 Benchmarks',
-    scoreModeOldDesc: 'OLD Score: 5 Benchmarks, bis zu 224 Modelle',
+    scoreModeNew: 'Neuer Score',
+    scoreModeOld: 'Alter Score',
+    scoreModeNewDesc: 'Neuer Score: 8 Benchmarks',
+    scoreModeOldDesc: 'Alter Score: 5 Benchmarks, bis zu 224 Modelle',
 
     // Scope: Current vs All
     scopeLabel: 'Chatbots:',
-    scopeCurrent: 'Current',
-    scopeCurrentDesc: 'Nur noch verfügbare Chatbots',
-    scopeAll: 'All',
-    scopeAllDesc: 'Alle Chatbots der CSV (inkl. Historie)',
+    scopeCurrent: 'Aktuell',
+    scopeCurrentDesc: 'Nur noch aktuell verfügbare Chatbots',
+    scopeAll: 'Alle',
+    scopeAllDesc: 'Alle Chatbots der Tabelle (inkl. Historie)',
 
-    // Volle Explosion
+    // Explosion Knopf (an / teils / aus)
     explosionToggle: 'Explosion:',
-    fullExplosionToggle: 'Volle Explosion:',
-    fullExplosionOnDesc: 'Volle Explosion deaktivieren',
-    fullExplosionOffDesc: 'Alle Balken gleichzeitig vollständig explodieren',
-    on: 'AN',
-    off: 'AUS',
+    explosionOn: 'an',
+    explosionHover: 'teils',
+    explosionOff: 'aus',
+    explosionOnDesc: 'Alle Balken werden forciert explodiert dargestellt',
+    explosionHoverDesc: 'Nur Balken unter dem Mauszeiger und die benachbarten explodieren',
+    explosionOffDesc: 'Balken explodieren auch bei Mausberührung nicht',
+    fullExplosionToggle: 'Explosion:',
+    fullExplosionOnDesc: 'Alle Balken werden forciert explodiert dargestellt',
+    fullExplosionOffDesc: 'Balken explodieren nicht',
+    on: 'an',
+    hover: 'teils',
+    off: 'aus',
 
     // Erweitert & Preis-Filter
     advanced: 'Erweitert',
     advancedDesc: 'Erweiterte Filter & Slider ein-/ausblenden',
-    priceFree: 'Free',
-    pricePaid: 'Paid',
-    priceAll: 'All',
-    priceFilterDesc: 'Zwischen Free, Paid (💲) und allen Chatbots wechseln',
+    priceFree: 'Kostenlos',
+    pricePaid: 'Kostenpflichtig',
+    priceAll: 'Alle',
+    priceFreeDesc: 'Nur kostenlose Chatbots anzeigen',
+    pricePaidDesc: 'Nur kostenpflichtige Chatbots (💲) anzeigen',
+    priceAllDesc: 'Alle Chatbots anzeigen (kostenlos & bezahlt)',
+    priceFilterDesc: 'Zwischen kostenlosen, kostenpflichtigen (💲) und allen Chatbots wechseln',
 
     // Suche & Filter
     searchPlaceholder: 'Firma oder LLM-Familie suchen (z. B. ChatGPT, Claude, Gemini, Kimi, MiMo)...',
@@ -113,7 +123,7 @@ export const TRANSLATIONS = {
     syncingText: 'Lädt...',
     googleSheetOpen: 'Google Sheet öffnen',
     staticChartOpen: 'Statisches Diagramm öffnen',
-    githubRepoOpen: 'GitHub Repository tomtomme/AI-Top30',
+    githubRepoOpen: 'GitHub Repository tomtomme/Science-AI-Charts',
   },
   en: {
     // Title & Subtitle (Cells A1+B2 and C1 of CSV)
@@ -135,7 +145,7 @@ export const TRANSLATIONS = {
     topSliderTop: 'Max Bar Count',
     stepMinusChatbots: '-5',
     stepPlusChatbots: '+5',
-    maxLabel: 'max',
+    maxLabel: 'Max',
 
     // Category Slider (0 = All, 1..8 = Single Category)
     categorySliderLabel: 'Category:',
@@ -154,10 +164,10 @@ export const TRANSLATIONS = {
     sortedByDateLabel: 'Sorted by Release Date',
 
     // Score Modes
-    scoreModeNew: 'NEW Score',
-    scoreModeOld: 'OLD Score',
-    scoreModeNewDesc: 'NEW Score: 8 benchmarks',
-    scoreModeOldDesc: 'OLD Score: 5 benchmarks, up to 224 models',
+    scoreModeNew: 'New Score',
+    scoreModeOld: 'Old Score',
+    scoreModeNewDesc: 'New Score: 8 benchmarks',
+    scoreModeOldDesc: 'Old Score: 5 benchmarks, up to 224 models',
 
     // Scope: Current vs All
     scopeLabel: 'Chatbots:',
@@ -166,13 +176,20 @@ export const TRANSLATIONS = {
     scopeAll: 'All',
     scopeAllDesc: 'All chatbots in CSV (including historical)',
 
-    // Full Explosion
+    // Explosion Button (on / hover / off)
     explosionToggle: 'Explosion:',
-    fullExplosionToggle: 'Full Explosion:',
-    fullExplosionOnDesc: 'Disable full explosion',
-    fullExplosionOffDesc: 'Explode all bars simultaneously',
-    on: 'ON',
-    off: 'OFF',
+    explosionOn: 'on',
+    explosionHover: 'hover',
+    explosionOff: 'off',
+    explosionOnDesc: 'All bars are forced exploded',
+    explosionHoverDesc: 'Only bars under cursor and adjacent neighbors explode',
+    explosionOffDesc: 'Bars do not explode even on mouse touch',
+    fullExplosionToggle: 'Explosion:',
+    fullExplosionOnDesc: 'All bars are forced exploded',
+    fullExplosionOffDesc: 'Bars do not explode',
+    on: 'on',
+    hover: 'hover',
+    off: 'off',
 
     // Advanced & Price Filter
     advanced: 'Advanced',
@@ -180,6 +197,9 @@ export const TRANSLATIONS = {
     priceFree: 'Free',
     pricePaid: 'Paid',
     priceAll: 'All',
+    priceFreeDesc: 'Show only free chatbots',
+    pricePaidDesc: 'Show only paid chatbots (💲)',
+    priceAllDesc: 'Show all chatbots (free & paid)',
     priceFilterDesc: 'Switch between free, paid (💲), and all chatbots',
 
     // Search & Filters
@@ -219,6 +239,6 @@ export const TRANSLATIONS = {
     syncingText: 'Syncing...',
     googleSheetOpen: 'Open Google Sheet',
     staticChartOpen: 'Open static chart',
-    githubRepoOpen: 'GitHub Repository tomtomme/AI-Top30',
+    githubRepoOpen: 'GitHub Repository tomtomme/Science-AI-Charts',
   },
 };

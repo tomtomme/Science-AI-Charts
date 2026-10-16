@@ -1,145 +1,58 @@
-# Implementierungsplan: Tab „LLM-Labs & Ökosystem“ (Matrix-Vergleich & Benchmark-Synchronisation)
+# Implementierungsplan: Verlagerung der Steuerknöpfe in die Tab-Leiste
 
-Dieser Plan beschreibt die Architektur und Umsetzung eines neuen, voll synchronisierten Tabs im Science-AI-Dashboard, der die Struktur- und Modell-Ecosystem-Daten der Google Sheets Tabelle (`gid=355721692`) als interaktive Matrix darstellt und nahtlos mit den bestehenden Benchmark-Modellen verknüpft.
-
----
-
-### User Review & Critical Decisions
-
-> [!IMPORTANT]
-> Basierend auf den geklärten Präferenzen:
-> 1. **Darstellung**: Interaktive Vergleichsmatrix mit Modellgrößen-Stufen (<32B bis 15T+) und Agenten-Tooling (Harness, Daily Agent, Coding Agent, Tiers).
-> 2. **Datenumfang**: Primärer Fokus auf die **Top 10 LLM Labs** (Zeilen 2–17) mit einem leicht erreichbaren Umschalter für die **24 Top 10 Contenders** (Zeilen 19–28).
-> 3. **Synchronisation**: Ein Klick auf ein Lab (z. B. Anthropic, Google, OpenAI, DeepSeek, Agnes/Sapiens AI) filtert und markiert die entsprechenden Modelle im Benchmark-Hauptdiagramm.
-
-- **Bestätigte Entscheidung 1**: Der neue Tab wird als gleichwertige Hauptansicht neben dem Benchmark-Diagramm im Dashboard-Header platziert (`[📊 Wissenschafts-IQ Benchmark]` / `[🏢 LLM-Labs & Ökosystem]`).
-- **Bestätigte Entscheidung 2**: Live-Synchronisation der CSV-Daten von Google Sheets via Proxy/Fetch mit integriertem statischem Fallback-Datensatz für maximale Zuverlässigkeit und Offline-Fähigkeit.
+Die drei Steuerknöpfe (**Erweitert**, **Preis-Filter: Kostenlos / Kostenpflichtig / Alle**, **Explosion: an / teils / aus**) werden aus dem Diagramm-Header nach oben in die primäre Tab-Leiste verschoben. Dadurch steht im Diagramm-Header die volle Breite exklusiv für Modellnamen, Firmen, Datumsangaben und detaillierte Kriterienbeschreibungen zur Verfügung, ohne dass Texte bei höheren Zoomstufen hinter Buttons abgeschnitten werden.
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Benutzeranforderung & Beschlüsse
 
-- **Ziel**: Nutzer können neben den rein quantitativen Testergebnissen der Benchmarks (Wissenschafts-IQ) die dahinterstehenden Organisationen, Modell-Familien, Größenklassen und das praktische Tooling (Entwickler-SDKs, Web-Agenten, Coding-Agenten, Abo-Stufen) vergleichen.
-- **Zielgruppe**: Forscher, Data Scientists, Entwickler und Technologieentscheider, die ein Modell nicht nur nach Benchmark-Scores auswählen, sondern nach Plattform-Reife, Tool-Ökosystem und Modellauswahl.
-- **Mehrwert**: Schließt die Lücke zwischen theoretischem Benchmark-Score und praktischer Nutzbarkeit im wissenschaftlichen Alltag.
-
----
-
-## 2. User Experience & Visual Design
-
-### A. Navigation & Tab-Struktur
-- Im oberen Dashboard-Bereich (unterhalb der Kopfzeile) befindet sich eine dezente, tastaturbedienbare Segmentsteuerung:
-  - **`📊 Benchmark-Diagramm`**: Das bestehende, zoom- und explosionsfähige Balkendiagramm mit allen Filtern (Paid/Free, Disziplinen, Schwellenwerten).
-  - **`🏢 LLM-Labs & Ökosystem`**: Die neue Vergleichsansicht.
-- Im Tab „LLM-Labs & Ökosystem“:
-  - Ein Filter-Segment: `Top 10 LLM Labs (Fokus)` | `24 Top 10 Contenders`
-  - Eine Suche / Filtersuche nach Lab-Name, Land oder Modell-Familie.
-  - Ein Badge mit der Anzahl der im aktuellen Benchmark getesteten Modelle des Labs (z. B. „4 Modelle im Benchmark“).
-
-### B. Matrix- und Kartendesign
-- **Lab-Köpfe**:
-  - Flagge des Landes (🇺🇸, 🇨🇳, 🇫🇷, 🇸🇬, 🇨🇦, 🇩🇪 etc.)
-  - Creator / Organisationsname
-  - Bekannt für (z. B. „YouTube, Android“, „AI- & Graphics Chips“, „Tesla, Twitter“)
-  - Primäre ChatBot- / Engine-Namen
-  - Interaktiver Button: *„Im Benchmark ansehen (N) →“*, der direkt in das Hauptdiagramm springt und den Filter auf diesen Anbieter setzt.
-- **Größenklassen-Matrix**:
-  - `Small (< 32B)`: z. B. Gemma, gpt-oss, Lite, Flash, Qwen 2.5
-  - `Medium (< 128B)`: z. B. Instant, Flash-Lite, Scout, Super
-  - `Large (< 256B)`: z. B. Flash (Cyber), Spark, 4o, K1
-  - `Massive (< 512B)`: z. B. Sonnet, Maverick, Plus, GLM
-  - `Colossal (< 1.5T)`: z. B. Pro, Wonder, Ultra, R1, K2
-  - `Planetary (< 5T)`: z. B. Opus, Behemoth, Sol, Max, K3
-  - `Singularity (< 15T)`: z. B. Fable/Mythos, Argon/Carbon, Astra
-- **Software- & Agenten-Ökosystem**:
-  - **Subscription Tiers**: Pro, Max, Enterprise, API per Token
-  - **The Harness (SDK)**: z. B. Claude SDK, Antigravity, NeMo Toolkit, Codex
-  - **Daily Agent**: z. B. Claude Cowork, Spark/Deep Research, ChatGPT Work
-  - **Coding Agent**: z. B. Claude Code, Jules Tools/Antigravity, Cursor Agent, Qwen Code
-
-### C. Responsives Verhalten
-- Auf Desktop: Vollständig horizontale Vergleichstabelle mit fixierter Merkmal-Spalte links und sauber scrollbaren Lab-Spalten oder als interaktive Grid-Karten mit aufklappbaren Parameter-Ebenen.
-- Auf Tablets/Mobile: Kompakte Karten mit Akkordeon-Aufklappung für Größenstufen und Agenten-Tools.
+Aus den Klärungsfragen:
+1. **Platzierung**: Rechts in der Tab-Leiste (in derselben Zeile wie die beiden Tabs *Wissenschafts-IQ Benchmark* und *LLM-Labs & Ökosystem*).
+2. **Sichtbarkeit**: Nur im Benchmark-Tab aktiv anzeigen (`activeTab === 'benchmark'`). Im Labs-Tab wird dieser Steuerungsbereich ausgeblendet.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. Geplante Änderungen im Detail
 
-- **Entscheidung 1: Getrennter Tab statt Überfrachtung des Balkendiagramms**
-  - *Begründung*: Das Balkendiagramm visualisiert metrische Prozentwerte (MMMU-Pro, Excel, etc.). Würde man Modellgrößen, SDKs und Abo-Pläne in die Balken einbauen, wäre das Diagramm unlesbar. Ein separater Tab mit klarer Querverlinkung wahrt die Übersichtlichkeit.
-- **Entscheidung 2: Datenhaltung mit Live-Sync und Fallback**
-  - *Begründung*: Wie beim Haupt-Sheet wird die CSV `gid=355721692` beim Start asynchron geladen. Schlägt der Abruf fehl (z. B. Netzwerk-/CORS-Blockade), greift ein integrierter Fallback-Datensatz. Das garantiert 100 % Stabilität.
-- **Entscheidung 3: Bidirektionale Synchronisation**
-  - *Begründung*: Wenn ein Nutzer in der Matrix auf ein Lab klickt, wird das Diagramm gefiltert. Umgekehrt zeigt die Matrix für jedes Lab die durchschnittliche Platzierung und Anzahl der Modelle im Benchmark an.
+### A. Primäre Tab-Leiste (`src/App.tsx`)
+- In der fixierten Tab-Leiste (`sticky top-0`) werden die drei Steuerknöpfe auf der rechten Seite platziert (`ml-auto flex items-center gap-1.5`):
+  - **Erweitert-Button** (`showAdvanced` Toggle) mit Icon (`SlidersHorizontal`) und Pfeilindikator.
+  - **Preis-Filter** (`Kostenlos` / `Kostenpflichtig` / `Alle`) als segmentierter Schalter mit farblicher Status-Hervorhebung.
+  - **Explosions-Schalter** (`an` / `teils` / `aus`) mit Tooltips und Statusfarben.
+- Bedingte Anzeige: Die Kontrollgruppe wird nur gerendert, wenn `activeTab === 'benchmark'`.
+- Der bestehende Freitextfilter-Hinweis (*„Aktiver Lab-/Modell-Filter: ...“*) wird harmonisch links neben den Knöpfen integriert.
 
----
-
-## 4. Technical Architecture & Data Strategy
-
-```
-┌────────────────────────────────────────────────────────┐
-│                        App.tsx                         │
-│  State: activeTab ('benchmark' | 'labs')               │
-│  State: selectedCreatorFilter (sync between tabs)      │
-└──────────┬─────────────────────────────────┬───────────┘
-           │                                 │
-           ▼                                 ▼
-┌─────────────────────────┐       ┌───────────────────────────────┐
-│   Benchmark View        │       │    Lab Ecosystem View         │
-│  - ExplodedBarChart     │       │  - LabMatrixView.tsx          │
-│  - Discipline Filters   │       │  - Top-10 vs Contenders Toggle│
-│  - Paid/Free/All Switch │       │  - Parameter & Tooling Matrix │
-│  - Zoom & Explosions    │       │  - Creator Cross-Link Action  │
-└─────────────────────────┘       └───────────────────────────────┘
-           │                                 │
-           ▼                                 ▼
-┌─────────────────────────┐       ┌───────────────────────────────┐
-│  dataService.ts         │       │  labDataService.ts            │
-│  (gid=170267419)        │       │  (gid=355721692)              │
-│  + rawCsvFallback.ts    │       │  + rawLabCsvFallback.ts       │
-└─────────────────────────┘       └───────────────────────────────┘
-```
-
-### Datenstruktur (`LabEntry`)
-```typescript
-export interface LabEntry {
-  id: string;
-  group: 'top10' | 'contender';
-  country: string;
-  countryFlag: string;
-  creator: string;
-  famousFor: string;
-  engineName: string;
-  parameterSizes: {
-    small?: string;      // < 32B
-    medium?: string;     // < 128B
-    large?: string;      // < 256B
-    massive?: string;    // < 512B
-    colossal?: string;   // < 1.5T
-    planetary?: string;  // < 5T
-    singularity?: string;// < 15T
-  };
-  subscriptionTiers?: string;
-  harnessSdk?: string;
-  dailyAgent?: string;
-  codingAgent?: string;
-  specialties?: string;
-}
-```
+### B. Diagramm-Header (`src/components/ExplodedBarChart.tsx`)
+- Die rechte Kontrollgruppe wird aus dem Info-Header entfernt.
+- **100% Breite für Modellinformationen**: Row 1 im Info-Header erhält nun die volle Containerbreite. 
+  - Modellname, Favicon, externe Verlinkung
+  - Hersteller / Company
+  - Veröffentlichungsdatum
+  - Detaillierter Benchmark-Segmentwert (Punkte & Rohprozent)
+  - Quellenlink
+- **Zero Layout Shift (CLS = 0)**:
+  - Zeile 1 und Zeile 2 behalten ihre feste, verriegelte Höhe (`h-[32px]` bzw. `h-[38px]`), sodass das Diagramm auch bei schnellen Mausbewegungen oder extremen Zoomstufen (125%, 150%, 200%) absolut wackelfrei und unbeweglich bleibt.
+  - Kein Text wird mehr von Buttons verdeckt.
 
 ---
 
-## 5. Umsetzungsschritte nach Freigabe
+## 3. Verifikationsplan
 
-1. **Parser & Fallback-Daten (`src/data/labDataService.ts`, `src/data/rawLabCsvFallback.ts`)**:
-   - Robuster CSV-Parser für die Spaltenmatrix der Tabelle `gid=355721692`.
-   - Einbettung der extrahierten Daten als stabiler Fallback.
-2. **Komponente `LabMatrixView.tsx`**:
-   - Tab-Navigation im oberen App-Bereich (`Benchmark` / `LLM-Labs & Ökosystem`).
-   - Schalter zwischen Top 10 und 24 Contenders.
-   - Matrix-Layout mit Größenstufen, Agenten-Stack und Link-Button zum Hauptdiagramm.
-3. **Synchronisation in `App.tsx`**:
-   - Klick auf ein Lab setzt den Creator-Filter und wechselt zum Diagramm.
-   - Anzeige von Benchmark-Statistiken direkt an jedem Lab-Eintrag.
-4. **Validierung**:
-   - `compile_applet` & `lint_applet` zur Prüfung von Typensicherheit und Fehlerfreiheit.
+### Manuelle Tests & Sichtprüfung
+1. **Sichtbarkeit & Tabs**:
+   - Im Tab *„Wissenschafts-IQ Benchmark“*: Die drei Knöpfe erscheinen rechts in der Tab-Leiste.
+   - Im Tab *„LLM-Labs & Ökosystem“*: Die drei Knöpfe werden ausgeblendet.
+2. **Zoom- & Platztest**:
+   - Browser-Zoom auf 125%, 150% und 175% testen.
+   - Prüfen, dass Modellnamen und Kriterienbeschreibungen über die volle Breite lesbar sind und nicht mehr hinter Buttons verschwinden.
+3. **Flacker- & Bewegungstest**:
+   - Schnelles Hovern über verschiedene Balkenteile (insb. *Plot Reading* und *Science Knowledge*).
+   - Sicherstellen, dass das Diagramm 0px vertikal verschiebt und kein Flackern auftritt.
+4. **Funktionalität der Knöpfe**:
+   - `Erweitert`: Blendet weiterhin die Schieberegler und Herstellerbuttons ein/aus.
+   - `Preis`: Filtert zuverlässig zwischen Free, Paid und All.
+   - `Explosion`: Schaltet korrekt zwischen `an`, `teils` und `aus`.
+
+### Automatisierte Validierung
+- Ausführung von `npm run lint` (`tsc --noEmit`).
+- Ausführung von `compile_applet` (`vite build`).

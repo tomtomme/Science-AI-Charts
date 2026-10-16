@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ModelRecord, BenchmarkComponent, PriceFilter } from '../types';
+import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
-import { ExternalLink, SlidersHorizontal } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 
 interface ExplodedBarChartProps {
   models: ModelRecord[];
@@ -10,7 +10,10 @@ interface ExplodedBarChartProps {
   activeCategoryIndex?: number;
   sortBy?: 'score' | 'date';
   explodedViewEnabled?: boolean;
-  fullExplosionEnabled: boolean;
+  explosionMode?: ExplosionMode;
+  onExplosionModeChange?: (mode: ExplosionMode) => void;
+  fullExplosionEnabled?: boolean;
+  onFullExplosionToggle?: () => void;
   searchFilter: string;
   selectedFamilies?: string[];
   selectedCompany?: string | null;
@@ -21,7 +24,6 @@ interface ExplodedBarChartProps {
   onToggleAdvanced?: () => void;
   priceFilter?: PriceFilter;
   onPriceFilterChange?: (filter: PriceFilter) => void;
-  onFullExplosionToggle?: () => void;
   categoryNames?: string[];
 }
 
@@ -38,7 +40,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   activeCategoryIndex = 0,
   sortBy = 'score',
   explodedViewEnabled = true,
+  explosionMode,
+  onExplosionModeChange,
   fullExplosionEnabled,
+  onFullExplosionToggle,
   searchFilter,
   selectedFamilies = [],
   selectedCompany = null,
@@ -49,10 +54,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   onToggleAdvanced,
   priceFilter = 'free',
   onPriceFilterChange,
-  onFullExplosionToggle,
   categoryNames,
 }) => {
   const t = TRANSLATIONS[lang];
+
+  // Explosion state: 'on' (an) | 'hover' (teils) | 'off' (aus)
+  const currentExplosionMode: ExplosionMode =
+    explosionMode ?? (fullExplosionEnabled ? 'on' : 'hover');
 
   // Active benchmark component if a single category is selected (1 to 8)
   const activeComp = activeCategoryIndex > 0 ? BENCHMARK_COMPONENTS[activeCategoryIndex - 1] : null;
@@ -103,7 +111,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       model.displayName.toLowerCase().includes(q) ||
       model.name.toLowerCase().includes(q) ||
       model.companyName.toLowerCase().includes(q) ||
-      model.creatorClean.toLowerCase().includes(q);
+      model.creatorClean.toLowerCase().includes(q) ||
+      Boolean(model.creator && model.creator.toLowerCase().includes(q));
 
     const matchesFamilies =
       selectedFamilies.length === 0 ||
@@ -113,24 +122,31 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
           model.displayName.toLowerCase().includes(famLow) ||
           model.name.toLowerCase().includes(famLow) ||
           model.companyName.toLowerCase().includes(famLow) ||
-          model.creatorClean.toLowerCase().includes(famLow)
+          model.creatorClean.toLowerCase().includes(famLow) ||
+          Boolean(model.creator && model.creator.toLowerCase().includes(famLow))
         );
       });
 
     const matchesCompany =
       !selectedCompany ||
       model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
-      model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase());
+      model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase()) ||
+      Boolean(model.creator && model.creator.toLowerCase().includes(selectedCompany.toLowerCase()));
 
-    return matchesSearch && matchesFamilies && matchesCompany;
+    return Boolean(matchesSearch && matchesFamilies && matchesCompany);
   };
 
   const hasActiveHighlight =
     searchFilter.trim().length > 0 || selectedFamilies.length > 0 || selectedCompany !== null;
 
   // Is a bar exploded?
+  // an: wie bisher, alle balken werden forciert explodiert dargestellt
+  // teils: wie das bisherige aus, nur Balken unter dem Mauszeiger und die benachbarten explodieren
+  // aus: Balken explodieren auch bei Mausberührung nicht
   const isExploded = (index: number) => {
-    if (fullExplosionEnabled) return true;
+    if (currentExplosionMode === 'on') return true;
+    if (currentExplosionMode === 'off') return false;
+    // 'hover' mode
     if (!explodedViewEnabled || hoveredIndex === null) return false;
     return index === hoveredIndex || index === hoveredIndex - 1 || index === hoveredIndex + 1;
   };
@@ -170,16 +186,22 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         }
       }
     }
-    if (onExplosionStateChange) onExplosionStateChange(true);
+    if (onExplosionStateChange) {
+      onExplosionStateChange(currentExplosionMode === 'on' || currentExplosionMode === 'hover');
+    }
   };
 
-  const handleMouseLeave = () => {
-    setHoveredIndex(null);
+  const handleMouseLeave = (index?: number) => {
+    if (typeof index === 'number') {
+      setHoveredIndex((prev) => (prev === index ? null : prev));
+    } else {
+      setHoveredIndex(null);
+    }
     setHoveredSegment(null);
     // Behalte persistentModel und persistentSegment bei, damit die Kriterien-Beschreibung und Quellenlinks sichtbar bleiben!
     // Verschwindet erst, wenn ein anderes Balkenelement gehovert oder eine Kategorie oben gewählt wird.
     if (onExplosionStateChange) {
-      onExplosionStateChange(fullExplosionEnabled);
+      onExplosionStateChange(currentExplosionMode === 'on');
     }
   };
 
@@ -381,14 +403,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
-      {/* Non-intrusive Info Bar above chart: dynamically displays model & hovered segment information */}
-      {/* Non-intrusive Info Bar above chart: dynamically displays model & hovered segment information */}
-      <div className="flex flex-col justify-between gap-1.5 min-h-[64px] pb-2.5 mb-2 border-b border-slate-100 dark:border-slate-800 text-xs">
-        {/* Row 1: Left has information, Right has Advanced Button */}
-        <div className="flex items-center justify-between gap-2.5 w-full">
-          <div className="flex-1 min-w-0">
+      {/* Non-intrusive Info Bar above chart: locked fixed height to guarantee rock-solid zero layout shift */}
+      <div className="flex flex-col justify-between gap-1.5 h-[86px] min-h-[86px] max-h-[86px] pb-2 mb-2 border-b border-slate-100 dark:border-slate-800 text-xs overflow-hidden">
+        {/* Row 1: Model & Benchmark details across full width (locked 32px height) */}
+        <div className="flex items-center w-full h-[32px] min-h-[32px] max-h-[32px] overflow-hidden">
+          <div className="w-full min-w-0 overflow-hidden">
             {displayedModel ? (
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-700 dark:text-slate-300 min-h-[24px]">
+              <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[32px] overflow-hidden whitespace-nowrap">
                 {/* Model Name & Favicon (Clickable link if modelUrl is available) */}
                 {displayedModel.modelUrl ? (
                   <a
@@ -500,13 +521,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 )}
               </div>
             ) : displayedCategoryComp ? (
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-700 dark:text-slate-300 min-h-[24px]">
-                <div className="flex items-center gap-1.5 font-bold" style={{ color: displayedCategoryComp.color }}>
+              <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[32px] overflow-hidden whitespace-nowrap">
+                <div className="flex items-center gap-1.5 font-bold shrink-0" style={{ color: displayedCategoryComp.color }}>
                   <span
                     className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
                     style={{ backgroundColor: displayedCategoryComp.color }}
                   />
-                  <span className="font-bold text-slate-900 dark:text-white">
+                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
                     {(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) ||
                      (lang === 'en' ? displayedCategoryComp.nameEn : displayedCategoryComp.nameDe)}
                   </span>
@@ -518,14 +539,14 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     href={displayedCategoryComp.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer"
+                    className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
                     title={`${displayedCategoryComp.sourceName} ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
                   >
                     <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
                     <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
                   </a>
                 ) : (
-                  <span className="font-mono text-xs text-slate-400">
+                  <span className="font-mono text-xs text-slate-400 shrink-0">
                     {t.sourceLabel} {displayedCategoryComp.sourceName}
                   </span>
                 )}
@@ -533,7 +554,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 {sortBy === 'date' && (
                   <>
                     <span className="text-slate-400">·</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1">
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
                       <span>📅</span>
                       <span>{t.sortedByDateLabel}</span>
                     </span>
@@ -541,145 +562,59 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 )}
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-300 min-h-[24px]">
-                <span className="font-bold text-slate-900 dark:text-white">AI-Top30 Ranking</span>
+              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 h-[32px] overflow-hidden whitespace-nowrap">
+                <span className="font-bold text-slate-900 dark:text-white shrink-0">AI-Top30 Ranking</span>
                 {sortBy === 'date' && (
                   <>
                     <span className="text-slate-400">·</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1">
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
                       <span>📅</span>
                       <span>{t.sortedByDateLabel}</span>
                     </span>
                   </>
                 )}
-              </div>
-            )}
-          </div>
-
-          {/* Controls top right of the bar chart area: Advanced Button + Paid/Free/All Switcher + Explosion Button */}
-          <div className="flex flex-wrap items-center gap-1.5 shrink-0 ml-auto">
-            {/* Advanced Button */}
-            {onToggleAdvanced && (
-              <button
-                type="button"
-                onClick={onToggleAdvanced}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
-                  showAdvanced
-                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
-                    : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                }`}
-                title={showAdvanced ? (lang === 'de' ? 'Erweiterte Filter & Slider ausblenden' : 'Hide advanced controls') : (lang === 'de' ? 'Erweiterte Filter & Slider einblenden' : 'Show advanced controls')}
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
-                <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
-              </button>
-            )}
-
-            {/* New Button: right of the "advanced"-button which switches between "paid", "free", and "all". Default: "free" */}
-            {onPriceFilterChange && (
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onPriceFilterChange('free')}
-                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                    priceFilter === 'free'
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                  title={lang === 'de' ? 'Nur kostenlose Chatbots anzeigen' : 'Show only free chatbots'}
-                >
-                  {t.priceFree}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onPriceFilterChange('paid')}
-                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                    priceFilter === 'paid'
-                      ? 'bg-amber-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                  title={lang === 'de' ? 'Nur kostenpflichtige Chatbots (💲) anzeigen' : 'Show only paid chatbots (💲)'}
-                >
-                  {t.pricePaid} 💲
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onPriceFilterChange('all')}
-                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                    priceFilter === 'all'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                  title={lang === 'de' ? 'Alle Chatbots anzeigen (kostenlos & bezahlt)' : 'Show all chatbots (free & paid)'}
-                >
-                  {t.priceAll}
-                </button>
-              </div>
-            )}
-
-            {/* Explosion button: sensible exception placed right of the "advanced"-button */}
-            {onFullExplosionToggle && (
-              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg px-2 sm:px-2.5 py-1 shrink-0">
-                <span className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-mono font-medium whitespace-nowrap">
-                  {t.explosionToggle}
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={fullExplosionEnabled}
-                  onClick={onFullExplosionToggle}
-                  className={`relative inline-flex h-3.5 w-6.5 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                    fullExplosionEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
-                  }`}
-                  title={fullExplosionEnabled ? t.fullExplosionOnDesc : t.fullExplosionOffDesc}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                      fullExplosionEnabled ? 'translate-x-3' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-                <span className="text-[9.5px] font-bold font-mono text-slate-500 dark:text-slate-400 min-w-[20px]">
-                  {fullExplosionEnabled ? t.on : t.off}
-                </span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Row 2: Always present to guarantee rock-solid zero-shift height */}
-        <div className="text-[11.5px] rounded px-2.5 py-1 border flex items-center gap-2.5 leading-relaxed min-h-[30px] transition-colors bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60">
+        {/* Row 2: Always present with strictly locked 38px height to guarantee rock-solid zero-shift height */}
+        <div className="text-[11.5px] rounded px-2.5 py-0.5 border flex items-center gap-2.5 leading-snug h-[38px] min-h-[38px] max-h-[38px] overflow-hidden transition-colors bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60">
           {displayedModel ? (
             displayedSegment ? (
-              <div className="flex items-center gap-2 flex-1">
+              <div className="flex items-center gap-2 flex-1 min-w-0 h-full overflow-hidden">
                 <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
                   {t.criterionLabel}
                 </span>
-                <span className="text-slate-600 dark:text-slate-300">
+                <span
+                  className="text-slate-600 dark:text-slate-300 line-clamp-2 min-w-0 flex-1 leading-snug"
+                  title={lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
+                >
                   {lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
                 </span>
               </div>
             ) : (
-              <span className="text-slate-500 dark:text-slate-400">
+              <span className="text-slate-500 dark:text-slate-400 line-clamp-1 truncate">
                 {t.hoverBarPrompt}
               </span>
             )
           ) : displayedCategoryComp ? (
-            <div className="flex items-center gap-2 flex-1">
+            <div className="flex items-center gap-2 flex-1 min-w-0 h-full overflow-hidden">
               <span className="font-semibold text-slate-800 dark:text-slate-100 shrink-0">
                 {t.criterionLabel}
               </span>
-              <span className="text-slate-600 dark:text-slate-300">
+              <span
+                className="text-slate-600 dark:text-slate-300 line-clamp-2 min-w-0 flex-1 leading-snug"
+                title={lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
+              >
                 {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
               </span>
             </div>
           ) : (
-            <span>
-              {fullExplosionEnabled
+            <span className="line-clamp-2 leading-snug">
+              {currentExplosionMode === 'on'
                 ? t.fullExplosionHelp
-                : explodedViewEnabled
+                : currentExplosionMode === 'hover'
                 ? t.hoverHelp
                 : t.disabledHelp}
             </span>
@@ -695,6 +630,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             className="block w-full h-auto"
             style={{ minWidth: `${Math.round(chartWidth * 0.75)}px` }}
             preserveAspectRatio="xMidYMid meet"
+            onMouseLeave={() => handleMouseLeave()}
           >
             <defs>
               {/* USA: Blau mit weißen Sternen - Stärker gezoomt & dezent verteilt */}
@@ -896,8 +832,14 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             const totalBarHeight = activeComp ? scaleY(catRaw) : scaleY(score);
             const barCenterY = baselineY - totalBarHeight / 2;
 
-            // Explosion gap
-            const explosionGap = isHovered ? 2.5 : exploded ? (fullExplosionEnabled ? 2.2 : 1.8) : 0;
+            // Explosion gap: 0 when not exploded (including in 'off' mode), 2.5 when hovered & exploded, 2.2 when forced 'on', 1.8 for neighbors in 'hover'
+            const explosionGap = !exploded
+              ? 0
+              : isHovered
+              ? 2.5
+              : currentExplosionMode === 'on'
+              ? 2.2
+              : 1.8;
 
             // Stack segments from bottom to top (for multi-category mode)
             let currentOffset = 0;
@@ -926,25 +868,36 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
             // Opacity handling
             let barOpacity = 1;
-            if (!fullExplosionEnabled && hoveredIndex !== null && !exploded && !activeComp) {
-              barOpacity = 0.45;
+            if (currentExplosionMode !== 'on' && hoveredIndex !== null && !activeComp) {
+              if (!exploded && hoveredIndex !== index) {
+                barOpacity = 0.45;
+              }
             }
 
             return (
               <g
                 key={model.id}
-                className="cursor-pointer transition-opacity duration-200"
-                style={{ opacity: barOpacity }}
+                className="cursor-pointer"
+                style={{ opacity: barOpacity, transition: 'opacity 0.2s' }}
                 onMouseEnter={() => handleMouseEnter(index)}
-                onMouseLeave={handleMouseLeave}
+                onMouseLeave={(e) => {
+                  const related = e.relatedTarget as Node | null;
+                  if (related && e.currentTarget.contains(related)) {
+                    return;
+                  }
+                  handleMouseLeave(index);
+                }}
               >
-                {/* Full-column invisible hit rect for smooth mouse tracking */}
+                {/* Full-column invisible hit rect for smooth mouse tracking with zero dead zones */}
                 <rect
                   x={barX - barGap / 2}
-                  y={topPadding - 40}
+                  y={0}
                   width={totalBarSlot}
-                  height={chartHeight - topPadding + 20}
-                  fill="transparent"
+                  height={chartHeight}
+                  fill="#000000"
+                  opacity={0}
+                  pointerEvents="all"
+                  style={{ pointerEvents: 'all' }}
                   onMouseEnter={() => {
                     if (activeComp) {
                       const segInfo: HoveredSegmentInfo = {
@@ -1032,17 +985,36 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           style={{
                             transition: 'y 0.25s ease-out, fill 0.25s ease-out, opacity 0.2s',
                           }}
+                          onMouseEnter={() => {
+                            if (exploded && benchMeta) {
+                              const segInfo: HoveredSegmentInfo = {
+                                comp: benchMeta,
+                                model,
+                                points: seg.comp.pointsContribution,
+                                raw: seg.comp.rawValue,
+                              };
+                              setHoveredSegment(segInfo);
+                              setPersistentSegment(segInfo);
+                              setPersistentModel(model);
+                            }
+                          }}
                         />
 
-                        {/* Seamless transparent hit area covering the segment and explosion gap to eliminate any dead zones */}
+                        {/* Seamless hit area covering the segment and explosion gap to eliminate any dead zones */}
                         {exploded && benchMeta && (
                           <rect
-                            x={barX - 1}
-                            y={seg.segY}
-                            width={barWidth + 2}
-                            height={Math.max(1, seg.segHeight + explosionGap)}
-                            fill="transparent"
+                            x={barX - 2}
+                            y={seg.segY - 1}
+                            width={barWidth + 4}
+                            height={Math.max(1, seg.segHeight + explosionGap + 2)}
+                            fill="#000000"
+                            opacity={0}
+                            pointerEvents="all"
                             className="cursor-pointer"
+                            style={{
+                              pointerEvents: 'all',
+                              transition: 'y 0.25s ease-out, height 0.25s ease-out',
+                            }}
                             onMouseEnter={() => {
                               const segInfo: HoveredSegmentInfo = {
                                 comp: benchMeta,
