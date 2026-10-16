@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode } from '../types';
+import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode, ScoreMode } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { ExternalLink } from 'lucide-react';
@@ -9,6 +9,7 @@ interface ExplodedBarChartProps {
   activeBenchmarkId: string | null;
   activeCategoryIndex?: number;
   sortBy?: 'score' | 'date';
+  scoreMode?: ScoreMode;
   explodedViewEnabled?: boolean;
   explosionMode?: ExplosionMode;
   onExplosionModeChange?: (mode: ExplosionMode) => void;
@@ -39,6 +40,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   activeBenchmarkId,
   activeCategoryIndex = 0,
   sortBy = 'score',
+  scoreMode = 'new',
   explodedViewEnabled = true,
   explosionMode,
   onExplosionModeChange,
@@ -511,7 +513,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   <>
                     <span className="text-slate-400">·</span>
                     <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                      {t.score}: {displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated} {t.points} ({t.rank} #{displayedModel.rank})
+                      {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated} {t.points} ({t.rank} #{displayedModel.rank})
                     </span>
                     <span className="text-slate-400">·</span>
                     <span className="font-mono text-emerald-600 dark:text-emerald-400">
@@ -828,7 +830,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             const catBreakdown = activeComp ? model.breakdown.find((b) => b.id === activeComp.id) : null;
             const catPoints = catBreakdown?.pointsContribution ?? (activeComp ? activeComp.transform(catRaw) / 8 : 0);
 
-            const score = model.scoreNewReported ?? model.scoreNewCalculated;
+            const score = model.score ?? model.scoreNewReported ?? model.scoreNewCalculated;
             const totalBarHeight = activeComp ? scaleY(catRaw) : scaleY(score);
             const barCenterY = baselineY - totalBarHeight / 2;
 

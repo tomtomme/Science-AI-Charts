@@ -110,13 +110,20 @@ export interface CsvNotesMetadata {
 
 export interface LabEntry {
   id: string;
-  group: 'top10' | 'contender';
+  group: 'top10' | 'contender' | 'tweakers' | 'small' | 'harness';
   country: string;
   countryFlag: string;
   creator: string;
   famousFor: string;
   engineName: string;
+  basedOn?: string;
+  harness?: string;
+  form?: string;
+  note?: string;
   parameterSizes: {
+    micro?: string;
+    mini?: string;
+    tiny?: string;
     small?: string;
     medium?: string;
     large?: string;

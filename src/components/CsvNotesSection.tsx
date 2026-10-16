@@ -68,10 +68,9 @@ function getBenchmarkHeadingColor(heading?: string): string {
   // Non-benchmark headings from C34
   if (clean === 'current' || clean.startsWith('current')) return '#3B82F6';
   if (clean === 'history' || clean.startsWith('history')) return '#6366F1';
-  if (clean === 'old' || clean.startsWith('old')) return '#D97706';
-  if (clean === 'new' || clean.startsWith('new')) return '#10B981';
-  if (clean.includes('worst-case') || clean.includes('worst case')) return '#F43F5E';
-  if (clean.includes('why')) return '#8B5CF6';
+  if (clean === 'old' || clean.startsWith('old') || clean.includes('spalte l') || clean.includes('column l')) return '#D97706';
+  if (clean === 'new' || clean.startsWith('new') || clean.includes('spalte m') || clean.includes('column m')) return '#10B981';
+  if (clean.includes('worst-case') || clean.includes('worst case') || clean.includes('spalte n') || clean.includes('column n') || clean.includes('why') || clean.includes('warum')) return '#F43F5E';
   if (clean.includes('storyline')) return '#06B6D4';
 
   return '#10B981';
@@ -123,17 +122,6 @@ function parseSection1Text(rawText: string): CsvParagraph[] {
       start: idxOld,
       end: idxOld + 4,
       heading: 'OLD',
-      isMajor: false,
-    });
-  }
-
-  // 4. Match 'Why?' sub-section
-  const idxWhy = rawText.indexOf('Why?');
-  if (idxWhy !== -1) {
-    cuts.push({
-      start: idxWhy,
-      end: idxWhy + 4,
-      heading: 'Why?',
       isMajor: false,
     });
   }
@@ -304,7 +292,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
     : (isDe ? practicalGuide.paragraphsDe : practicalGuide.paragraphsEn);
 
   return (
-    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
+    <section id="csv-notes-section" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
       {/* Zwei visuell getrennte Bereiche direkt aus der CSV */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
         {/* Bereich 1: How To Read (Titel aus Zelle A34, Inhalt aus Zelle C34) */}
@@ -318,13 +306,51 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
           </div>
 
           {/* Inhalt Bereich 1 (1:1 Text strukturiert mit Banderolen & Aufzählungs-Badges) */}
-          <div className="space-y-3.5 text-xs leading-relaxed text-slate-700 dark:text-slate-300 overflow-y-auto max-h-[620px] pr-2 scrollbar-thin">
+          <div id="section1-scroll-box" className="space-y-3.5 text-xs leading-relaxed text-slate-700 dark:text-slate-300 overflow-y-auto max-h-[620px] pr-2 scrollbar-thin">
             {paragraphs1.map((p, idx) => {
+              // Differentiate between Header 1 (categories explainer: "The different benchmarks which comprise the Final Scores")
+              // and Header 2 (the actual final scores section: "Final Scores")
+              const cleanHeading = (p.heading || '').toLowerCase().trim();
+              const isCategoriesHeading =
+                p.isMajor &&
+                (cleanHeading.includes('comprise') ||
+                 cleanHeading.includes('kategorie') ||
+                 (cleanHeading.includes('benchmark') && !cleanHeading.startsWith('final score')));
+
+              const isFinalScoresHeading =
+                p.isMajor &&
+                !isCategoriesHeading &&
+                (cleanHeading === 'final scores' ||
+                 cleanHeading === 'final score' ||
+                 cleanHeading === 'finale scores' ||
+                 cleanHeading.startsWith('final score'));
+
+              const isFirstScoreParagraph =
+                !p.isMajor &&
+                (p.heading === 'Column L' ||
+                 p.heading === 'Spalte L' ||
+                 p.heading === 'OLD' ||
+                 cleanHeading === 'final score old');
+
+              const hasActualFinalScoresMajor = paragraphs1.some(
+                (x) =>
+                  x.isMajor &&
+                  !x.heading?.toLowerCase().includes('comprise') &&
+                  !x.heading?.toLowerCase().includes('benchmark') &&
+                  (x.heading?.toLowerCase().trim() === 'final scores' ||
+                   x.heading?.toLowerCase().trim() === 'final score' ||
+                   x.heading?.toLowerCase().trim() === 'finale scores')
+              );
+              const isFinalScoresAnchor = isFinalScoresHeading || (!hasActualFinalScoresMajor && isFirstScoreParagraph);
+
               if (p.isMajor) {
                 return (
                   <div
                     key={idx}
-                    className="pt-3 pb-1 border-t-2 border-emerald-500/30 dark:border-emerald-400/20 first:border-t-0 first:pt-0"
+                    id={isFinalScoresAnchor ? 'final-scores-section' : undefined}
+                    className={`pt-3 pb-1 border-t-2 border-emerald-500/30 dark:border-emerald-400/20 first:border-t-0 first:pt-0 ${
+                      isFinalScoresAnchor ? 'scroll-mt-6 p-2 rounded-lg' : ''
+                    }`}
                   >
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -344,7 +370,10 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
               return (
                 <div
                   key={idx}
-                  className={p.heading ? 'pt-2 border-t border-slate-200/60 dark:border-slate-800/60 first:border-t-0 first:pt-0' : ''}
+                  id={isFinalScoresAnchor ? 'final-scores-section' : undefined}
+                  className={`${
+                    p.heading ? 'pt-2 border-t border-slate-200/60 dark:border-slate-800/60 first:border-t-0 first:pt-0' : ''
+                  } ${isFinalScoresAnchor ? 'scroll-mt-6 p-2 rounded-lg' : ''}`}
                 >
                   {p.heading && (() => {
                     const headingColor = getBenchmarkHeadingColor(p.heading);

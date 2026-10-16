@@ -44,6 +44,7 @@ export default function App() {
     models: parseModelDataset(FALLBACK_CSV_CONTENT, 'new'),
     newModels: parseModelDataset(FALLBACK_CSV_CONTENT, 'new'),
     oldModels: parseModelDataset(FALLBACK_CSV_CONTENT, 'old'),
+    worstCaseModels: parseModelDataset(FALLBACK_CSV_CONTENT, 'worstCase'),
     sheetFileDate: extractSheetDate(FALLBACK_CSV_CONTENT),
     sheetHeaderDate: null,
     lastSyncedAt: new Date(),
@@ -56,8 +57,8 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(new Date());
   
-  // Slider: Anzahl angezeigter Modelle in 5er-Schritten (Standard: 35)
-  const [topCount, setTopCount] = useState<number>(35);
+  // Slider: Anzahl angezeigter Modelle in 5er-Schritten (Standard: 100)
+  const [topCount, setTopCount] = useState<number>(100);
 
   // Explosion Schalter: 'on' (an) | 'hover' (teils) | 'off' (aus) - Standard: 'hover' (wie bisheriges 'aus')
   const [explosionMode, setExplosionMode] = useState<ExplosionMode>('hover');
@@ -93,17 +94,51 @@ export default function App() {
   const handleSelectLabFromMatrix = useCallback((creatorName: string) => {
     setSearchFilter(creatorName);
     setSelectedFamilies([]);
+    setPriceFilter('all');
     setActiveTab('benchmark');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // Smooth scroll down to "final scores" explainer section in notes below chart
+  const scrollToFinalScores = useCallback(() => {
+    // 1. Scroll page down to notes section container
+    const container = document.getElementById('csv-notes-section');
+    if (container) {
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    const doScrollToFinalScores = () => {
+      const el = document.getElementById('final-scores-section');
+      const box = document.getElementById('section1-scroll-box');
+      if (el) {
+        if (box) {
+          // Explicitly scroll internal container directly to Final Scores section
+          const targetTop = el.offsetTop - box.offsetTop;
+          box.scrollTo({ top: Math.max(0, targetTop - 8), behavior: 'smooth' });
+        }
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-2', 'ring-rose-500', 'bg-rose-500/15', 'rounded-lg', 'transition-all');
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-rose-500', 'bg-rose-500/15');
+        }, 3000);
+      }
+    };
+
+    setTimeout(doScrollToFinalScores, 200);
+    setTimeout(doScrollToFinalScores, 500);
+  }, []);
 
   // Active models based on scoreMode, modelScope & priceFilter ('current' vs 'all', 'free' vs 'paid' vs 'all')
   // HINWEIS: Wenn im Freitextfilter gesucht wird, sollen immer alle Bots durchsucht werden, nicht nur 'current' Bots.
   const effectiveModelScope: ModelScope = searchFilter.trim().length > 0 ? 'all' : modelScope;
 
   const currentModels = useMemo(() => {
-    const base = scoreMode === 'new' ? loadedData.newModels : loadedData.oldModels;
+    const base =
+      scoreMode === 'new'
+        ? loadedData.newModels
+        : scoreMode === 'old'
+        ? loadedData.oldModels
+        : loadedData.worstCaseModels;
     let list = effectiveModelScope === 'current' ? base.filter((m) => m.isAvailable) : base;
 
     // Preis-Filter: Default 'free', sonst 'paid' oder 'all'
@@ -434,7 +469,7 @@ export default function App() {
               }`}
             >
               <BarChart2 className="w-3.5 h-3.5" />
-              <span>{lang === 'de' ? 'Wissenschafts-IQ Benchmark' : 'Science-IQ Benchmark'}</span>
+              <span>{lang === 'de' ? 'Balkendiagramm' : 'Bar Chart'}</span>
               <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 dark:bg-slate-600/70 rounded text-slate-700 dark:text-slate-200 tabular-nums">
                 {displayedModels.length}
               </span>
@@ -617,6 +652,7 @@ export default function App() {
             onHoverCategory={setCategoryInfoComp}
             scoreMode={scoreMode}
             onScoreModeChange={setScoreMode}
+            onScrollToFinalScores={scrollToFinalScores}
             modelScope={effectiveModelScope}
             onModelScopeChange={setModelScope}
             showAdvanced={showAdvanced}
@@ -631,6 +667,7 @@ export default function App() {
               activeCategoryIndex={selectedCategoryIndex}
               hoveredCategoryComp={categoryInfoComp}
               sortBy={sortBy}
+              scoreMode={scoreMode}
               explosionMode={explosionMode}
               onExplosionModeChange={setExplosionMode}
               searchFilter={searchFilter}
@@ -654,7 +691,7 @@ export default function App() {
         <main className="flex-1 w-full">
           <LabMatrixView
             labs={labs}
-            models={currentModels}
+            models={loadedData.newModels}
             onSelectLabForBenchmark={handleSelectLabFromMatrix}
             lang={lang}
           />

@@ -16,6 +16,7 @@ export interface LoadedDatasets {
   models: ModelRecord[]; // default to newModels for backwards-compatibility
   newModels: ModelRecord[];
   oldModels: ModelRecord[];
+  worstCaseModels: ModelRecord[];
   sheetFileDate: string | null;
   sheetHeaderDate: string | null;
   lastSyncedAt: Date;
@@ -81,18 +82,20 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
   try {
     const newModels = parseModelDataset(csvText, 'new');
     const oldModels = parseModelDataset(csvText, 'old');
+    const worstCaseModels = parseModelDataset(csvText, 'worstCase');
     const sheetFileDate = extractSheetDate(csvText);
 
     const headerMeta = extractHeaderMetadata(csvText);
     const notesMeta = extractCsvNotesMetadata(csvText);
 
-    if (newModels.length === 0 && oldModels.length === 0) {
+    if (newModels.length === 0 && oldModels.length === 0 && worstCaseModels.length === 0) {
       throw new Error('Keine Datensätze gefunden');
     }
     return {
       models: newModels,
       newModels,
       oldModels,
+      worstCaseModels,
       sheetFileDate,
       sheetHeaderDate: headerDate,
       lastSyncedAt: now,
@@ -104,6 +107,7 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
   } catch (err) {
     const fallbackNew = parseModelDataset(FALLBACK_CSV_CONTENT, 'new');
     const fallbackOld = parseModelDataset(FALLBACK_CSV_CONTENT, 'old');
+    const fallbackWorstCase = parseModelDataset(FALLBACK_CSV_CONTENT, 'worstCase');
     const sheetFileDate = extractSheetDate(FALLBACK_CSV_CONTENT);
     const headerMeta = extractHeaderMetadata(FALLBACK_CSV_CONTENT);
     const notesMeta = extractCsvNotesMetadata(FALLBACK_CSV_CONTENT);
@@ -112,6 +116,7 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
       models: fallbackNew,
       newModels: fallbackNew,
       oldModels: fallbackOld,
+      worstCaseModels: fallbackWorstCase,
       sheetFileDate,
       sheetHeaderDate: null,
       lastSyncedAt: now,

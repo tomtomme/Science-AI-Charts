@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { Search, X, Plus, Minus, BarChart2, Calendar } from 'lucide-react';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
@@ -23,6 +23,7 @@ interface SearchBarProps {
   onHoverCategory?: (comp: BenchmarkComponent | null) => void;
   scoreMode: ScoreMode;
   onScoreModeChange: (mode: ScoreMode) => void;
+  onScrollToFinalScores?: () => void;
   modelScope: ModelScope;
   onModelScopeChange: (scope: ModelScope) => void;
   showAdvanced?: boolean;
@@ -62,12 +63,28 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onHoverCategory,
   scoreMode,
   onScoreModeChange,
+  onScrollToFinalScores,
   modelScope,
   onModelScopeChange,
   showAdvanced = false,
   categoryNames,
 }) => {
   const t = TRANSLATIONS[lang];
+
+  // Hover hint popup for the 3-way score mode button
+  const [showScoreHint, setShowScoreHint] = useState<boolean>(false);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleScoreMouseEnter = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setShowScoreHint(true);
+  };
+
+  const handleScoreMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setShowScoreHint(false);
+    }, 250);
+  };
 
   // Chatbot-Count Slider Handlers
   const handleTopSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,32 +159,79 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* Rechte Kontroll-Gruppe: NEW/OLD Score + Current/All Switcher + Max Bar Count Slider + Sortierung ganz rechts - nur sichtbar, wenn showAdvanced aktiv ist */}
         {showAdvanced && (
           <div className="flex flex-wrap items-center gap-1.5 ml-auto">
-            {/* NEW vs OLD Score */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => onScoreModeChange('new')}
-                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                  scoreMode === 'new'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={t.scoreModeNewDesc}
-              >
-                {t.scoreModeNew}
-              </button>
-              <button
-                type="button"
-                onClick={() => onScoreModeChange('old')}
-                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                  scoreMode === 'old'
-                    ? 'bg-amber-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={t.scoreModeOldDesc}
-              >
-                {t.scoreModeOld}
-              </button>
+            {/* NEW vs OLD vs WORST-CASE Score 3-way Switcher with Hover Hint Popup */}
+            <div
+              className="relative"
+              onMouseEnter={handleScoreMouseEnter}
+              onMouseLeave={handleScoreMouseLeave}
+            >
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => onScoreModeChange('new')}
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    scoreMode === 'new'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title={t.scoreModeNewDesc}
+                >
+                  {t.scoreModeNew}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onScoreModeChange('old')}
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    scoreMode === 'old'
+                      ? 'bg-amber-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title={t.scoreModeOldDesc}
+                >
+                  {t.scoreModeOld}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onScoreModeChange('worstCase')}
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    scoreMode === 'worstCase'
+                      ? 'bg-rose-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title={t.scoreModeWorstCaseDesc}
+                >
+                  {t.scoreModeWorstCase}
+                </button>
+              </div>
+
+              {/* Popup on hover with hint & clickable scroll to "final scores" */}
+              {showScoreHint && (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowScoreHint(false);
+                    onScrollToFinalScores?.();
+                  }}
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 sm:w-80 p-2.5 bg-slate-900/95 dark:bg-slate-800/95 text-white backdrop-blur-md rounded-xl shadow-xl border border-slate-700/80 hover:border-emerald-500/80 cursor-pointer z-50 transition-all select-none group"
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-100 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                    <span>{t.scoreModeHintTitle}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-snug mb-2">
+                    {t.scoreModeHintText}
+                  </p>
+                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between text-[10.5px] font-semibold text-emerald-400 group-hover:text-emerald-300">
+                    <span className="flex items-center gap-1">
+                      <span>👇</span>
+                      <span>{t.scoreModeHintClick}</span>
+                    </span>
+                    <span className="font-mono text-xs opacity-80 group-hover:translate-x-0.5 transition-transform">→</span>
+                  </div>
+                  {/* Subtle down-arrow triangle */}
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-800/95" />
+                </div>
+              )}
             </div>
 
             {/* Current vs All Chatbots */}
