@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Search, X, Plus, Minus, BarChart2, Calendar } from 'lucide-react';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
@@ -24,6 +24,7 @@ interface SearchBarProps {
   scoreMode: ScoreMode;
   onScoreModeChange: (mode: ScoreMode) => void;
   onScrollToFinalScores?: () => void;
+  onScrollToParagraph?: (targetId: string) => void;
   modelScope: ModelScope;
   onModelScopeChange: (scope: ModelScope) => void;
   showAdvanced?: boolean;
@@ -64,6 +65,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   scoreMode,
   onScoreModeChange,
   onScrollToFinalScores,
+  onScrollToParagraph,
   modelScope,
   onModelScopeChange,
   showAdvanced = false,
@@ -71,19 +73,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const t = TRANSLATIONS[lang];
 
-  // Hover hint popup for the 3-way score mode button
-  const [showScoreHint, setShowScoreHint] = useState<boolean>(false);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleScoreMouseEnter = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    setShowScoreHint(true);
-  };
-
-  const handleScoreMouseLeave = () => {
-    hoverTimeoutRef.current = setTimeout(() => {
-      setShowScoreHint(false);
-    }, 250);
+  const handleScroll = (targetId: string) => {
+    if (onScrollToParagraph) {
+      onScrollToParagraph(targetId);
+    } else if (onScrollToFinalScores) {
+      onScrollToFinalScores();
+    }
   };
 
   // Chatbot-Count Slider Handlers
@@ -99,27 +94,43 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     onTopCountChange(nextVal);
   };
 
-  // Category Slider Handlers (0 = Alles, 1..8 = Einzelkategorie)
-  const handleCategorySliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const idx = parseInt(e.target.value, 10);
-    if (!isNaN(idx)) {
-      onCategoryIndexChange(idx);
-      if (idx > 0) {
-        onHoverCategory?.(BENCHMARK_COMPONENTS[idx - 1]);
-      } else {
-        onHoverCategory?.(null);
-      }
+  // Unified Slider Value:
+  // 0 = New Score (scoreMode='new', category=0)
+  // 1 = Old Score (scoreMode='old', category=0)
+  // 2 = Worst Case (scoreMode='worstCase', category=0)
+  // 3..10 = Categories 1..8
+  const unifiedSliderValue = useMemo(() => {
+    if (selectedCategoryIndex === 0) {
+      if (scoreMode === 'old') return 1;
+      if (scoreMode === 'worstCase') return 2;
+      return 0;
+    }
+    return selectedCategoryIndex + 2;
+  }, [selectedCategoryIndex, scoreMode]);
+
+  const handleUnifiedSliderChange = (newVal: number) => {
+    if (newVal === 0) {
+      onScoreModeChange('new');
+      onCategoryIndexChange(0);
+      onHoverCategory?.(null);
+    } else if (newVal === 1) {
+      onScoreModeChange('old');
+      onCategoryIndexChange(0);
+      onHoverCategory?.(null);
+    } else if (newVal === 2) {
+      onScoreModeChange('worstCase');
+      onCategoryIndexChange(0);
+      onHoverCategory?.(null);
+    } else {
+      const catIdx = newVal - 2;
+      onCategoryIndexChange(catIdx);
+      onHoverCategory?.(BENCHMARK_COMPONENTS[catIdx - 1]);
     }
   };
 
-  const handleCategoryStep = (step: number) => {
-    const nextIdx = Math.max(0, Math.min(BENCHMARK_COMPONENTS.length, selectedCategoryIndex + step));
-    onCategoryIndexChange(nextIdx);
-    if (nextIdx > 0) {
-      onHoverCategory?.(BENCHMARK_COMPONENTS[nextIdx - 1]);
-    } else {
-      onHoverCategory?.(null);
-    }
+  const handleUnifiedStep = (step: number) => {
+    const nextVal = Math.max(0, Math.min(10, unifiedSliderValue + step));
+    handleUnifiedSliderChange(nextVal);
   };
 
   const activeCategoryComp =
@@ -130,12 +141,82 @@ export const SearchBar: React.FC<SearchBarProps> = ({
        (lang === 'en' ? activeCategoryComp.nameEn : activeCategoryComp.nameDe))
     : null;
 
+  // Exact popup info and scroll targets for all 3 composite scores + all 8 benchmark categories
+  const popupInfo = useMemo(() => {
+    const isDe = lang === 'de';
+    if (unifiedSliderValue === 0) {
+      return {
+        title: isDe ? 'Final Score NEW (Spalte M)' : 'Final Score NEW (Column M)',
+        desc: isDe
+          ? 'Gewichteter Gesamtscore über alle 8 wissenschaftlichen Benchmarks mit jeweils 12.5% Gewichtung.'
+          : 'Weighted total score across all 8 scientific benchmarks with 12.5% weight each.',
+        linkText: isDe ? 'Zum Textabschnitt von Spalte M springen' : 'Jump to explanation for Column M',
+        targetId: 'note-col-m',
+        color: '#10B981',
+      };
+    }
+    if (unifiedSliderValue === 1) {
+      return {
+        title: isDe ? 'Final Score OLD (Spalte L)' : 'Final Score OLD (Column L)',
+        desc: isDe
+          ? 'Früherer Gesamtscore über 5 Benchmarks vor Integration der Rechts-/Wirtschafts-Kategorie.'
+          : 'Earlier composite score over 5 benchmarks prior to legal/economics integration.',
+        linkText: isDe ? 'Zum Textabschnitt von Spalte L springen' : 'Jump to explanation for Column L',
+        targetId: 'note-col-l',
+        color: '#D97706',
+      };
+    }
+    if (unifiedSliderValue === 2) {
+      return {
+        title: isDe ? 'Final Score Worst-Case (Spalte N)' : 'Final Score Worst-Case (Column N)',
+        desc: isDe
+          ? '7-Benchmark-Durchschnitt multipliziert mit Non-Hallucination-Rate (Spalte N). Konservatives Szenario.'
+          : '7-benchmark average multiplied by Non-Hallucination Rate (Column N). Conservative scenario.',
+        linkText: isDe ? 'Zum Textabschnitt von Spalte N springen' : 'Jump to explanation for Column N',
+        targetId: 'note-col-n',
+        color: '#F43F5E',
+      };
+    }
+
+    // Category 1..8
+    const catIdx = unifiedSliderValue - 2; // 1..8
+    const comp = BENCHMARK_COMPONENTS[catIdx - 1];
+    const colLetters = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+    const colTargets = [
+      'note-col-d',
+      'note-col-e',
+      'note-col-f',
+      'note-col-g',
+      'note-col-h',
+      'note-col-i',
+      'note-col-j',
+      'note-col-k',
+    ];
+    const letter = colLetters[catIdx - 1] || '';
+    const targetId = colTargets[catIdx - 1] || 'final-scores-section';
+    const compName = isDe ? comp?.nameDe : comp?.nameEn;
+
+    return {
+      title: `#${catIdx} ${compName} (Spalte ${letter})`,
+      desc: isDe
+        ? `${comp?.descriptionDe} (Quelle: ${comp?.sourceName}, Formel: ${comp?.formulaDesc})`
+        : `${comp?.descriptionEn} (Source: ${comp?.sourceName}, Formula: ${comp?.formulaDesc})`,
+      linkText: isDe
+        ? `Zum Textabschnitt von Spalte ${letter} (${compName}) springen`
+        : `Jump to explanation for Column ${letter} (${compName})`,
+      targetId,
+      color: comp?.color || '#3B82F6',
+    };
+  }, [unifiedSliderValue, lang]);
+
+  if (!showAdvanced) return null;
+
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2">
-      {/* ZEILE 1: Filter-Suchfeld (oben links) + Modus-Schalter, Current/All, Max Bar Count Slider, Sortierung (rechts) */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* 1. Filter/Suchfeld ("filter by company ...") oben links */}
-        <div className="relative flex-1 min-w-[200px] max-w-full sm:max-w-xs md:max-w-sm flex items-center">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2.5">
+      {/* ZEILE 1: Filter-Suchfeld (links) + Score-Slider (rechts) - innerhalb des erweiterten Bereichs */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        {/* 1. Filter/Suchfeld ("filter by company ...") */}
+        <div className="relative flex-1 min-w-[190px] max-w-full sm:max-w-xs md:max-w-sm flex items-center">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
           <input
             type="text"
@@ -156,84 +237,135 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           )}
         </div>
 
-        {/* Rechte Kontroll-Gruppe: NEW/OLD Score + Current/All Switcher + Max Bar Count Slider + Sortierung ganz rechts - nur sichtbar, wenn showAdvanced aktiv ist */}
-        {showAdvanced && (
-          <div className="flex flex-wrap items-center gap-1.5 ml-auto">
-            {/* NEW vs OLD vs WORST-CASE Score 3-way Switcher with Hover Hint Popup */}
-            <div
-              className="relative"
-              onMouseEnter={handleScoreMouseEnter}
-              onMouseLeave={handleScoreMouseLeave}
+        {/* Merged Score Slider */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0 ml-auto">
+          <div
+            className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0"
+          >
+            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+              Score:
+            </span>
+            <button
+              type="button"
+              onClick={() => handleUnifiedStep(-1)}
+              disabled={unifiedSliderValue <= 0}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+              title="-1 Step"
             >
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-                <button
-                  type="button"
-                  onClick={() => onScoreModeChange('new')}
-                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    scoreMode === 'new'
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                  title={t.scoreModeNewDesc}
-                >
-                  {t.scoreModeNew}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onScoreModeChange('old')}
-                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    scoreMode === 'old'
-                      ? 'bg-amber-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                  title={t.scoreModeOldDesc}
-                >
-                  {t.scoreModeOld}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onScoreModeChange('worstCase')}
-                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    scoreMode === 'worstCase'
-                      ? 'bg-rose-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                  title={t.scoreModeWorstCaseDesc}
-                >
-                  {t.scoreModeWorstCase}
-                </button>
-              </div>
+              <Minus className="w-3 h-3" />
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={10}
+              step={1}
+              value={unifiedSliderValue}
+              onChange={(e) => handleUnifiedSliderChange(Number(e.target.value))}
+              className="w-20 sm:w-28 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
+            />
+            <button
+              type="button"
+              onClick={() => handleUnifiedStep(1)}
+              disabled={unifiedSliderValue >= 10}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+              title="+1 Step"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
 
-              {/* Popup on hover with hint & clickable scroll to "final scores" */}
-              {showScoreHint && (
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowScoreHint(false);
-                    onScrollToFinalScores?.();
-                  }}
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 sm:w-80 p-2.5 bg-slate-900/95 dark:bg-slate-800/95 text-white backdrop-blur-md rounded-xl shadow-xl border border-slate-700/80 hover:border-emerald-500/80 cursor-pointer z-50 transition-all select-none group"
+            {/* Feste Box für das Badge: New Score / Old Score / Worst Case oder Kategorie 1..8 */}
+            <div className="w-[155px] sm:w-[195px] shrink-0 overflow-hidden flex items-center">
+              {unifiedSliderValue === 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleScroll('note-col-m')}
+                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
+                  title={popupInfo.linkText}
                 >
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-100 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                    <span>{t.scoreModeHintTitle}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 leading-snug mb-2">
-                    {t.scoreModeHintText}
-                  </p>
-                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between text-[10.5px] font-semibold text-emerald-400 group-hover:text-emerald-300">
-                    <span className="flex items-center gap-1">
-                      <span>👇</span>
-                      <span>{t.scoreModeHintClick}</span>
-                    </span>
-                    <span className="font-mono text-xs opacity-80 group-hover:translate-x-0.5 transition-transform">→</span>
-                  </div>
-                  {/* Subtle down-arrow triangle */}
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-800/95" />
-                </div>
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">{t.scoreModeNew}</span>
+                </button>
+              )}
+              {unifiedSliderValue === 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleScroll('note-col-l')}
+                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
+                  title={popupInfo.linkText}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">{t.scoreModeOld}</span>
+                </button>
+              )}
+              {unifiedSliderValue === 2 && (
+                <button
+                  type="button"
+                  onClick={() => handleScroll('note-col-n')}
+                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
+                  title={popupInfo.linkText}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">{t.scoreModeWorstCase}</span>
+                </button>
+              )}
+              {unifiedSliderValue >= 3 && activeCategoryComp && activeCategoryName && (
+                <button
+                  type="button"
+                  onClick={() => handleScroll(popupInfo.targetId)}
+                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: activeCategoryComp.color }}
+                  title={popupInfo.linkText}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">
+                    #{unifiedSliderValue - 2} {activeCategoryName}
+                  </span>
+                </button>
               )}
             </div>
+          </div>
+        </div>
+      </div>
 
+      {/* ZEILE 2: Modell-Familien, Scope, Count & Sortierung */}
+      <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+          {/* Modell-Familien Buttons */}
+          <div className="flex flex-wrap items-center gap-1">
+            {/* 'Alle' Button */}
+            <button
+              type="button"
+              onClick={onClearFamilies}
+              className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                selectedFamilies.length === 0
+                  ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
+                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {t.all}
+            </button>
+
+            {/* Die alphabetischen Hersteller-Buttons */}
+            {ALPHABETICAL_FAMILIES.map((family) => {
+              const isSelected = selectedFamilies.includes(family);
+              return (
+                <button
+                  key={family}
+                  type="button"
+                  onClick={() => onToggleFamily(family)}
+                  className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
+                      : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {family}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Rechte Kontroll-Gruppe: Current/All Switcher + Max Bar Count Slider + Sortierung ganz rechts */}
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0 xl:ml-auto">
             {/* Current vs All Chatbots */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
               <button
@@ -299,7 +431,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               </span>
             </div>
 
-            {/* Sortierung (Score vs Datum) ganz rechts in Zeile 1 */}
+            {/* Sortierung (Score vs Datum) ganz rechts */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
               <button
                 type="button"
@@ -329,108 +461,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               </button>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* ZEILE 2: Erweiterter Button-Slider-Bereich (wird nur angezeigt, wenn showAdvanced aktiv ist) */}
-      {showAdvanced && (
-        <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-          {/* Modell-Familien Buttons (nach unten verschoben) */}
-          <div className="flex flex-wrap items-center gap-1">
-            {/* 'Alle' Button */}
-            <button
-              type="button"
-              onClick={onClearFamilies}
-              className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
-                selectedFamilies.length === 0
-                  ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
-                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {t.all}
-            </button>
-
-            {/* Die alphabetischen Hersteller-Buttons */}
-            {ALPHABETICAL_FAMILIES.map((family) => {
-              const isSelected = selectedFamilies.includes(family);
-              return (
-                <button
-                  key={family}
-                  type="button"
-                  onClick={() => onToggleFamily(family)}
-                  className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
-                      : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  {family}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Rechts: Kategorie-Slider */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0 xl:ml-auto">
-            {/* Kategorie Slider (mit festen + / - Tasten) */}
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
-                {t.categorySliderLabel.endsWith(':') ? t.categorySliderLabel : `${t.categorySliderLabel}:`}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleCategoryStep(-1)}
-                disabled={selectedCategoryIndex <= 0}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title={t.categoryStepMinus}
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={BENCHMARK_COMPONENTS.length}
-                step={1}
-                value={selectedCategoryIndex}
-                onChange={handleCategorySliderChange}
-                className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 shrink-0"
-              />
-              <button
-                type="button"
-                onClick={() => handleCategoryStep(1)}
-                disabled={selectedCategoryIndex >= BENCHMARK_COMPONENTS.length}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title={t.categoryStepPlus}
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-
-              {/* Feste Box für das Badge: Synchronisierte Kategorienamen aus C34 / Zellen D2-K2 */}
-              <div className="w-[145px] sm:w-[185px] shrink-0 overflow-hidden flex items-center">
-                {activeCategoryComp && activeCategoryName ? (
-                  <span
-                    className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full"
-                    style={{ backgroundColor: activeCategoryComp.color }}
-                    title={`${activeCategoryName} (${activeCategoryComp.sourceName})`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                    <span className="truncate">
-                      {activeCategoryName}
-                    </span>
-                  </span>
-                ) : (
-                  <span
-                    className="text-[10px] sm:text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100"
-                    title={t.allBenchmarksOverall}
-                  >
-                    {t.categoryAllShort}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
-      )}
-    </div>
+      </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode, ScoreMode } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
@@ -54,7 +54,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   hoveredCategoryComp = null,
   showAdvanced = false,
   onToggleAdvanced,
-  priceFilter = 'free',
+  priceFilter = 'paid',
   onPriceFilterChange,
   categoryNames,
 }) => {
@@ -76,11 +76,52 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const [persistentModel, setPersistentModel] = useState<ModelRecord | null>(null);
   const [persistentSegment, setPersistentSegment] = useState<HoveredSegmentInfo | null>(null);
 
-  // Reset persistent bar info when switching categories
+  // Reset persistent bar info when switching categories, scoreMode, or when explosion is set to 'off'
   useEffect(() => {
     setPersistentModel(null);
     setPersistentSegment(null);
-  }, [activeCategoryIndex, hoveredCategoryComp]);
+    setHoveredSegment(null);
+  }, [activeCategoryIndex, hoveredCategoryComp, scoreMode, currentExplosionMode]);
+
+  // Score details for default banner state (when no individual category is selected)
+  const currentScoreInfo = useMemo(() => {
+    const isDe = lang === 'de';
+    if (scoreMode === 'old') {
+      return {
+        name: isDe ? 'Alter Score' : 'OLD Score',
+        color: '#D97706', // Amber
+        badgeLabel: isDe ? '5 Benchmarks' : '5 Benchmarks',
+        sourceName: 'ArtificialAnalysis · Simple-Bench · Vals.ai',
+        description: isDe
+          ? 'Früherer Gesamtscore über 5 Benchmarks vor Integration der Rechts-/Wirtschafts-Kategorie.'
+          : 'Earlier composite score across 5 benchmarks prior to legal/economics integration.',
+        targetId: 'note-col-l',
+      };
+    }
+    if (scoreMode === 'worstCase') {
+      return {
+        name: 'Worst-Case',
+        color: '#F43F5E', // Rose
+        badgeLabel: isDe ? 'Konservatives Szenario' : 'Conservative Scenario',
+        sourceName: 'Non-Hallucination Multiplier',
+        description: isDe
+          ? '7-Benchmark-Durchschnitt multipliziert mit Non-Hallucination-Rate (Spalte N).'
+          : 'Conservative scenario: 7-benchmark average multiplied by Non-Hallucination Rate (Column N).',
+        targetId: 'note-col-n',
+      };
+    }
+    // Default: 'new'
+    return {
+      name: isDe ? 'Neuer Score' : 'NEW Score',
+      color: '#10B981', // Emerald
+      badgeLabel: isDe ? '8 Benchmarks (12.5% je)' : '8 Benchmarks (12.5% each)',
+      sourceName: 'ArtificialAnalysis · Simple-Bench · Vals.ai',
+      description: isDe
+        ? 'Gewichteter Gesamtscore über alle 8 wissenschaftlichen Benchmarks mit jeweils 12.5% Gewichtung.'
+        : 'Weighted total score across all 8 scientific benchmarks with 12.5% weight each.',
+      targetId: 'note-col-m',
+    };
+  }, [scoreMode, lang]);
 
   // Dynamic Y-axis scale based on single category (0-100%) or overall score (e.g. 74 in OLD mode, 69 in NEW mode)
   const maxScoreInPlot = activeComp
@@ -156,7 +197,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const handleMouseEnter = (index: number) => {
     setHoveredIndex(index);
     const m = models[index];
-    if (m) {
+    if (m && currentExplosionMode !== 'off') {
       setPersistentModel(m);
       if (activeComp) {
         const raw = m.rawScores[activeComp.key] ?? 0;
@@ -200,8 +241,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       setHoveredIndex(null);
     }
     setHoveredSegment(null);
-    // Behalte persistentModel und persistentSegment bei, damit die Kriterien-Beschreibung und Quellenlinks sichtbar bleiben!
-    // Verschwindet erst, wenn ein anderes Balkenelement gehovert oder eine Kategorie oben gewählt wird.
+    // Behalte persistentModel und persistentSegment nur bei, wenn Explosion aktiv ist
+    if (currentExplosionMode === 'off') {
+      setPersistentModel(null);
+      setPersistentSegment(null);
+    }
     if (onExplosionStateChange) {
       onExplosionStateChange(currentExplosionMode === 'on');
     }
@@ -229,8 +273,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   }, [activeCategoryIndex]);
 
   const hoveredModel = hoveredIndex !== null ? models[hoveredIndex] : null;
-  const displayedModel = hoveredModel || persistentModel;
-  const displayedSegment = hoveredSegment || persistentSegment;
+  const displayedModel = currentExplosionMode === 'off' ? hoveredModel : (hoveredModel || persistentModel);
+  const displayedSegment = currentExplosionMode === 'off' ? null : (hoveredSegment || persistentSegment);
 
   // Grid tick lines: if single category (0-100%), ticks: 0, 20, 40, 60, 80, 100
   const yTicks = activeComp
@@ -564,8 +608,48 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 h-[32px] overflow-hidden whitespace-nowrap">
-                <span className="font-bold text-slate-900 dark:text-white shrink-0">AI-Top30 Ranking</span>
+              <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[32px] overflow-hidden whitespace-nowrap">
+                <div className="flex items-center gap-1.5 font-bold shrink-0" style={{ color: currentScoreInfo.color }}>
+                  <span
+                    className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
+                    style={{ backgroundColor: currentScoreInfo.color }}
+                  />
+                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                    {currentScoreInfo.name}
+                  </span>
+                </div>
+
+                <span className="text-slate-400">·</span>
+                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                  {currentScoreInfo.badgeLabel}
+                </span>
+
+                <span className="text-slate-400">·</span>
+                <a
+                  href={`#${currentScoreInfo.targetId}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const el = document.getElementById(currentScoreInfo.targetId) || document.getElementById('final-scores-section');
+                    const box = document.getElementById('section1-scroll-box');
+                    const container = document.getElementById('csv-notes-section');
+                    if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (el) {
+                      if (box) {
+                        const targetTop = el.offsetTop - box.offsetTop;
+                        box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
+                      }
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
+                      setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15'), 3000);
+                    }
+                  }}
+                  className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                  title={lang === 'de' ? 'Zum Textabschnitt springen' : 'Jump to explanation'}
+                >
+                  <span>{t.sourceLabel} <strong className="underline">{currentScoreInfo.sourceName}</strong></span>
+                  <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                </a>
+
                 {sortBy === 'date' && (
                   <>
                     <span className="text-slate-400">·</span>
@@ -582,24 +666,18 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
         {/* Row 2: Always present with strictly locked 38px height to guarantee rock-solid zero-shift height */}
         <div className="text-[11.5px] rounded px-2.5 py-0.5 border flex items-center gap-2.5 leading-snug h-[38px] min-h-[38px] max-h-[38px] overflow-hidden transition-colors bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60">
-          {displayedModel ? (
-            displayedSegment ? (
-              <div className="flex items-center gap-2 flex-1 min-w-0 h-full overflow-hidden">
-                <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
-                  {t.criterionLabel}
-                </span>
-                <span
-                  className="text-slate-600 dark:text-slate-300 line-clamp-2 min-w-0 flex-1 leading-snug"
-                  title={lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
-                >
-                  {lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
-                </span>
-              </div>
-            ) : (
-              <span className="text-slate-500 dark:text-slate-400 line-clamp-1 truncate">
-                {t.hoverBarPrompt}
+          {displayedSegment ? (
+            <div className="flex items-center gap-2 flex-1 min-w-0 h-full overflow-hidden">
+              <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
+                {t.criterionLabel}
               </span>
-            )
+              <span
+                className="text-slate-600 dark:text-slate-300 line-clamp-2 min-w-0 flex-1 leading-snug"
+                title={lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
+              >
+                {lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
+              </span>
+            </div>
           ) : displayedCategoryComp ? (
             <div className="flex items-center gap-2 flex-1 min-w-0 h-full overflow-hidden">
               <span className="font-semibold text-slate-800 dark:text-slate-100 shrink-0">
@@ -613,13 +691,17 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </span>
             </div>
           ) : (
-            <span className="line-clamp-2 leading-snug">
-              {currentExplosionMode === 'on'
-                ? t.fullExplosionHelp
-                : currentExplosionMode === 'hover'
-                ? t.hoverHelp
-                : t.disabledHelp}
-            </span>
+            <div className="flex items-center gap-2 flex-1 min-w-0 h-full overflow-hidden">
+              <span className="font-semibold text-slate-800 dark:text-slate-100 shrink-0">
+                {t.criterionLabel}
+              </span>
+              <span
+                className="text-slate-600 dark:text-slate-300 line-clamp-1 truncate min-w-0 flex-1 leading-snug"
+                title={currentScoreInfo.description}
+              >
+                {currentScoreInfo.description}
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -883,9 +965,20 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 style={{ opacity: barOpacity, transition: 'opacity 0.2s' }}
                 onMouseEnter={() => handleMouseEnter(index)}
                 onMouseLeave={(e) => {
-                  const related = e.relatedTarget as Node | null;
-                  if (related && e.currentTarget.contains(related)) {
-                    return;
+                  const related = e.relatedTarget;
+                  if (
+                    related &&
+                    related instanceof Node &&
+                    e.currentTarget &&
+                    typeof e.currentTarget.contains === 'function'
+                  ) {
+                    try {
+                      if (e.currentTarget.contains(related)) {
+                        return;
+                      }
+                    } catch {
+                      // Safe fallback if target does not implement Node
+                    }
                   }
                   handleMouseLeave(index);
                 }}

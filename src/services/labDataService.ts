@@ -43,32 +43,44 @@ export function parseLabCsv(csvText: string): LabEntry[] {
 
   // 1. Top 10 Labs (Default row 1)
   const rTop10 = findRow('top 10') !== -1 ? findRow('top 10') : 1;
-  const top10Specs: Array<{ id: string; name: string; cols: number[]; country: string }> = [
-    { id: 'anthropic', name: 'Anthropic', cols: [1], country: 'America (US)' },
-    { id: 'google', name: 'Google', cols: [2], country: 'America (US)' },
-    { id: 'meta', name: 'Meta', cols: [3, 4], country: 'America (US)' },
-    { id: 'nvidia', name: 'Nvidia', cols: [5], country: 'America (US)' },
-    { id: 'openai', name: 'OpenAI / Microsoft', cols: [6, 7], country: 'America (US)' },
-    { id: 'spacexai', name: 'SpaceXAI / xAI', cols: [8], country: 'America (US)' },
-    { id: 'alibaba', name: 'Alibaba', cols: [9, 10], country: 'China' },
-    { id: 'deepseek', name: 'DeepSeek', cols: [11], country: 'China' },
-    { id: 'moonshot', name: 'Moonshot', cols: [12], country: 'China' },
-    { id: 'zhipu', name: 'Zhipu AI (Z.ai)', cols: [13, 14], country: 'China' },
+  const top10Specs: Array<{ id: string; defaultName: string; cols: number[]; country: string }> = [
+    { id: 'anthropic', defaultName: 'Anthropic', cols: [1], country: 'America (US)' },
+    { id: 'google', defaultName: 'Google', cols: [2], country: 'America (US)' },
+    { id: 'meta', defaultName: 'Meta', cols: [3], country: 'America (US)' },
+    { id: 'nvidia', defaultName: 'Nvidia', cols: [4], country: 'America (US)' },
+    { id: 'openai', defaultName: 'OpenAI', cols: [5], country: 'America (US)' },
+    { id: 'spacexai', defaultName: 'SpaceXAI', cols: [6], country: 'America (US)' },
+    { id: 'alibaba', defaultName: 'Alibaba', cols: [7, 8], country: 'China' },
+    { id: 'deepseek', defaultName: 'DeepSeek', cols: [9], country: 'China' },
+    { id: 'moonshot', defaultName: 'Moonshot', cols: [10], country: 'China' },
+    { id: 'zhipu', defaultName: 'Z.ai / Zhipu', cols: [11], country: 'China' },
   ];
+
+  // Map of fallback entries by ID for open weights metadata
+  const fallbackMap = new Map<string, LabEntry>(FALLBACK_LAB_ENTRIES.map((l) => [l.id, l]));
 
   const top10Entries: LabEntry[] = top10Specs.map((spec) => {
     const getCombined = (offset: number) => {
       const r = rTop10 + offset;
       return spec.cols.map((c) => getCell(r, c)).filter(Boolean).join(' / ');
     };
+    const dynamicCreator =
+      spec.id === 'alibaba'
+        ? 'Alibaba'
+        : getCell(rTop10 + 1, spec.cols[0]) || spec.defaultName;
+
+    const fb = fallbackMap.get(spec.id);
+
     return {
       id: spec.id,
       group: 'top10',
       country: spec.country,
       countryFlag: flagMap[spec.country] || '🌐',
-      creator: spec.name,
+      creator: dynamicCreator,
       famousFor: getCombined(2),
       engineName: getCombined(3),
+      weightsType: fb?.weightsType || 'hybrid',
+      openWeights: fb?.openWeights,
       parameterSizes: {
         small: getCombined(4),
         medium: getCombined(5),
@@ -86,6 +98,7 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     };
   });
 
+
   // 2. Contenders (Default row 18)
   const rContenders = findRow('contender') !== -1 ? findRow('contender') : 18;
   let curCountryContender = 'America (US)';
@@ -94,7 +107,7 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     const countryHeader = getCell(rContenders, c);
     if (countryHeader) curCountryContender = countryHeader;
     const creator = getCell(rContenders + 1, c);
-    if (!creator) continue;
+    const fb = fallbackMap.get(`contender-${c}`);
     contenders.push({
       id: `contender-${c}`,
       group: 'contender',
@@ -103,6 +116,8 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       creator: creator,
       engineName: getCell(rContenders + 2, c),
       famousFor: getCell(rContenders + 9, c),
+      weightsType: fb?.weightsType || 'open',
+      openWeights: fb?.openWeights,
       parameterSizes: {
         small: getCell(rContenders + 3, c),
         medium: getCell(rContenders + 4, c),
@@ -124,6 +139,7 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     if (countryHeader) curCountryTweaker = countryHeader;
     const creator = getCell(rTweakers + 1, c);
     if (!creator) continue;
+    const fb = fallbackMap.get(`tweaker-${c}`);
     tweakers.push({
       id: `tweaker-${c}`,
       group: 'tweakers',
@@ -133,6 +149,8 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       engineName: getCell(rTweakers + 2, c),
       basedOn: getCell(rTweakers + 3, c),
       famousFor: getCell(rTweakers + 3, c) ? `Based on ${getCell(rTweakers + 3, c)}` : '',
+      weightsType: fb?.weightsType || 'open',
+      openWeights: fb?.openWeights,
       parameterSizes: {
         small: getCell(rTweakers + 4, c),
         medium: getCell(rTweakers + 5, c),
@@ -154,7 +172,7 @@ export function parseLabCsv(csvText: string): LabEntry[] {
   ];
   moreTweakers.forEach((mt, idx) => {
     tweakers.push({
-      id: `tweaker-more-${idx + 1}`,
+      id: `tweaker-extra-${idx + 1}`,
       group: 'tweakers',
       country: 'America (US)',
       countryFlag: '🇺🇸',
@@ -162,7 +180,9 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       engineName: mt.name,
       basedOn: mt.based,
       famousFor: mt.note,
-      parameterSizes: {},
+      weightsType: 'open',
+      openWeights: { small: true },
+      parameterSizes: { small: mt.based },
       specialties: mt.note,
     });
   });
@@ -171,11 +191,12 @@ export function parseLabCsv(csvText: string): LabEntry[] {
   const rSmall = findRow('small model') !== -1 ? findRow('small model') : 39;
   const smallLabs: LabEntry[] = [];
   let curCountrySmall = 'America (US)';
-  for (let c = 1; c <= 14; c++) {
+  for (let c = 1; c <= 22; c++) {
     const countryHeader = getCell(rSmall, c);
     if (countryHeader && !countryHeader.includes('Small LLMs')) curCountrySmall = countryHeader.trim();
     const creator = getCell(rSmall + 1, c);
     if (!creator) continue;
+    const fb = fallbackMap.get(`small-${c}`);
     smallLabs.push({
       id: `small-${c}`,
       group: 'small',
@@ -184,6 +205,8 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       creator: creator,
       engineName: getCell(rSmall + 2, c),
       famousFor: getCell(rSmall + 9, c),
+      weightsType: fb?.weightsType || 'open',
+      openWeights: fb?.openWeights,
       parameterSizes: {
         micro: getCell(rSmall + 3, c),
         mini: getCell(rSmall + 4, c),
@@ -195,6 +218,7 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       specialties: getCell(rSmall + 9, c),
     });
   }
+
 
   // 5. Harness Only Labs (Default row 51)
   const rHarness = findRow('harness only') !== -1 ? findRow('harness only') : 51;

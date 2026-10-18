@@ -120,6 +120,20 @@ export interface LabEntry {
   harness?: string;
   form?: string;
   note?: string;
+  weightsType?: 'open' | 'closed' | 'hybrid';
+  openWeights?: {
+    micro?: boolean;
+    mini?: boolean;
+    tiny?: boolean;
+    small?: boolean;
+    medium?: boolean;
+    large?: boolean;
+    massive?: boolean;
+    colossal?: boolean;
+    planetary?: boolean;
+    singularity?: boolean;
+    godTier?: boolean;
+  };
   parameterSizes: {
     micro?: string;
     mini?: string;
@@ -139,4 +153,28 @@ export interface LabEntry {
   codingAgent?: string;
   specialties?: string;
 }
+
+export type RegressionType = 'linear' | 'exponential' | 'power' | 'polynomial' | 'loess';
+
+export interface TimelineDataPoint {
+  id: string;
+  name: string;
+  displayName: string;
+  company: string;
+  releaseDate: string;
+  timestamp: number;
+  score: number;
+  chatUrl?: string;
+  isPaid?: boolean;
+  flag?: string;
+}
+
+export interface RegressionResult {
+  type: RegressionType;
+  name: string;
+  r2: number;
+  formula: string;
+  points: Array<{ x: number; y: number }>;
+}
+
 

@@ -9,10 +9,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "anthropic",
     "group": "top10",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Anthropic",
     "famousFor": "",
     "engineName": "Claude",
+    "weightsType": "closed",
+    "openWeights": {
+      "medium": false,
+      "massive": false,
+      "planetary": false,
+      "singularity": false
+    },
     "parameterSizes": {
       "medium": "Instant; Haiku",
       "massive": "Sonnet",
@@ -28,10 +35,18 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "google",
     "group": "top10",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Google",
     "famousFor": "YouTube, Android",
-    "engineName": "Gemini & NotebookLM",
+    "engineName": "Gemini & Notebook",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "small": true,
+      "medium": false,
+      "large": false,
+      "colossal": false,
+      "singularity": false
+    },
     "parameterSizes": {
       "small": "Gemma",
       "medium": "Flash-Lite",
@@ -48,17 +63,21 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "meta",
     "group": "top10",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Meta",
     "famousFor": "Facebook, Instagram, WhatsApp",
-    "engineName": "Muse / Llama 4",
+    "engineName": "Muse",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "small": true,
+      "large": false,
+      "colossal": false,
+      "singularity": false
+    },
     "parameterSizes": {
       "small": "Glimmer",
-      "medium": "Scout",
       "large": "Spark",
-      "massive": "Maverick",
       "colossal": "Wonder",
-      "planetary": "Behemoth",
       "singularity": "Wonder Full"
     },
     "subscriptionTiers": "Core, Premium, Essential, Advanced, Expert, Max",
@@ -70,10 +89,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "nvidia",
     "group": "top10",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Nvidia",
     "famousFor": "AI- & Graphics Chips",
     "engineName": "Nemotron",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "colossal": true
+    },
     "parameterSizes": {
       "small": "Lightning",
       "medium": "Bolt; Super",
@@ -81,38 +106,51 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "subscriptionTiers": "",
     "harnessSdk": "NemoClaw +NeMo Toolkit",
-    "dailyAgent": "\u2013",
+    "dailyAgent": "–",
     "codingAgent": "Enterprise AI Fact."
   },
   {
     "id": "openai",
     "group": "top10",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
-    "creator": "OpenAI / Microsoft",
-    "famousFor": "Windows",
-    "engineName": "ChatGPT / Copilot",
+    "countryFlag": "🇺🇸",
+    "creator": "OpenAI",
+    "famousFor": "",
+    "engineName": "ChatGPT",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "small": true,
+      "large": false,
+      "massive": false,
+      "planetary": false,
+      "singularity": false
+    },
     "parameterSizes": {
-      "small": "gpt-oss / Turbo; Nano; Mini; 1; 2",
-      "large": "Instant; Luna / 3; 4o",
+      "small": "gpt-oss",
+      "large": "Instant; Luna",
       "massive": "Terra",
-      "colossal": "4; oX",
       "planetary": "Sol; Cyber",
       "singularity": "Astra; Bel"
     },
     "subscriptionTiers": "Go, Plus, Pro, Business, Ent.",
-    "harnessSdk": "Codex Harness / Copilot Workspace",
-    "dailyAgent": "Dots, ChatGPT Work / Autopilot",
-    "codingAgent": "Codex + Workspace / Copilot Code & Cowork"
+    "harnessSdk": "Codex Harness",
+    "dailyAgent": "Dots, ChatGPT Work",
+    "codingAgent": "Codex + Workspace"
   },
   {
     "id": "spacexai",
     "group": "top10",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
-    "creator": "SpaceXAI / xAI",
+    "countryFlag": "🇺🇸",
+    "creator": "SpaceXAI",
     "famousFor": "Tesla, Twitter",
     "engineName": "Grok",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "medium": false,
+      "massive": true,
+      "colossal": false
+    },
     "parameterSizes": {
       "medium": "0",
       "massive": "1; 2",
@@ -127,10 +165,18 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "alibaba",
     "group": "top10",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Alibaba",
-    "famousFor": "Chinas Amazon",
+    "famousFor": "Chinas Amazon / Chinas Amazon",
     "engineName": "Qwen / Qwen Coder",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "large": true,
+      "massive": true,
+      "planetary": true
+    },
     "parameterSizes": {
       "small": "27B / 2.5",
       "medium": "Next",
@@ -147,10 +193,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "deepseek",
     "group": "top10",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "DeepSeek",
     "famousFor": "",
     "engineName": "DeepSeek",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "massive": true,
+      "colossal": true,
+      "planetary": true
+    },
     "parameterSizes": {
       "small": "Lite; Distill",
       "massive": "Flash",
@@ -166,10 +219,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "moonshot",
     "group": "top10",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Moonshot",
     "famousFor": "",
     "engineName": "Kimi",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "medium": true,
+      "large": false,
+      "colossal": true,
+      "planetary": true
+    },
     "parameterSizes": {
       "medium": "Linear",
       "large": "K1",
@@ -185,15 +245,19 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "zhipu",
     "group": "top10",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
-    "creator": "Zhipu AI (Z.ai)",
+    "countryFlag": "🇨🇳",
+    "creator": "Z.ai / Zhipu",
     "famousFor": "",
-    "engineName": "GLM 4 / GLM 5",
+    "engineName": "GLM 5",
+    "weightsType": "open",
+    "openWeights": {
+      "large": true,
+      "massive": true,
+      "colossal": true
+    },
     "parameterSizes": {
-      "small": "Flash",
-      "medium": "Air",
       "large": "V",
-      "massive": "GLM / Flash",
+      "massive": "Flash",
       "colossal": "GLM"
     },
     "subscriptionTiers": "Lite, Pro, Max, Team Standard & Premium",
@@ -205,10 +269,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-1",
     "group": "contender",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Amazon",
     "engineName": "Nova",
     "famousFor": "Alexa, Kiro on AWS",
+    "weightsType": "closed",
+    "openWeights": {
+      "small": false,
+      "medium": false,
+      "massive": false
+    },
     "parameterSizes": {
       "small": "Micro; Lite; Sonic",
       "medium": "Omni; Pro",
@@ -220,10 +290,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-2",
     "group": "contender",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Inception",
     "engineName": "Mercury",
     "famousFor": "",
+    "weightsType": "closed",
+    "openWeights": {
+      "medium": false,
+      "large": false
+    },
     "parameterSizes": {
       "medium": "1",
       "large": "2"
@@ -234,27 +309,37 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-3",
     "group": "contender",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Microsoft",
     "engineName": "Phi & MAI",
-    "famousFor": "GitHub Copilot",
+    "famousFor": "Copilot",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "small": true,
+      "large": false,
+      "colossal": false
+    },
     "parameterSizes": {
       "small": "Phi",
       "large": "Flash",
       "colossal": "Thinking"
     },
-    "specialties": "GitHub Copilot"
+    "specialties": "Copilot"
   },
   {
     "id": "contender-4",
     "group": "contender",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Reflection",
     "engineName": "Beam",
     "famousFor": "https://reflection.ai/blog/introducing-beam",
+    "weightsType": "open",
+    "openWeights": {
+      "massive": true
+    },
     "parameterSizes": {
-      "massive": "Beam"
+      "massive": "1"
     },
     "specialties": "https://reflection.ai/blog/introducing-beam"
   },
@@ -262,10 +347,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-5",
     "group": "contender",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Thinking Machines",
     "engineName": "Inkling",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "massive": true,
+      "colossal": true
+    },
     "parameterSizes": {
       "massive": "Small",
       "colossal": "Inkling"
@@ -276,10 +366,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-6",
     "group": "contender",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "SSI.inc",
     "engineName": "SSI",
     "famousFor": "",
+    "weightsType": "closed",
+    "openWeights": {
+      "small": false
+    },
     "parameterSizes": {
       "small": "incoming 2026"
     },
@@ -289,10 +383,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-7",
     "group": "contender",
     "country": "Canada",
-    "countryFlag": "\ud83c\udde8\ud83c\udde6",
+    "countryFlag": "🇨🇦",
     "creator": "Cohere",
     "engineName": "-",
     "famousFor": "merged with Aleph-Alpha",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "large": true
+    },
     "parameterSizes": {
       "small": "Command R",
       "medium": "Kolibri",
@@ -304,10 +404,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-8",
     "group": "contender",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Ant Group/InclusionAI",
     "engineName": "Ling",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "massive": true
+    },
     "parameterSizes": {
       "small": "3 Tiny; 2 Mini; 1 Lite",
       "medium": "3 Flash",
@@ -319,10 +425,18 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-9",
     "group": "contender",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Baidu",
     "engineName": "ERNIE",
     "famousFor": "Chinas Google",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "small": true,
+      "medium": false,
+      "large": false,
+      "massive": false,
+      "colossal": false
+    },
     "parameterSizes": {
       "small": "ERNIE",
       "medium": "1",
@@ -336,10 +450,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-10",
     "group": "contender",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Meituan",
     "engineName": "LongCat",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "medium": true,
+      "colossal": true,
+      "planetary": true
+    },
     "parameterSizes": {
       "medium": "Flash-Lite",
       "colossal": "Flash-Thinking",
@@ -351,10 +471,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-11",
     "group": "contender",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "MiniMax",
     "engineName": "M",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "large": true,
+      "massive": true
+    },
     "parameterSizes": {
       "large": "2",
       "massive": "1; 3"
@@ -365,10 +490,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-12",
     "group": "contender",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Nex AGI",
     "engineName": "N",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "medium": true,
+      "massive": true,
+      "planetary": true
+    },
     "parameterSizes": {
       "medium": "Mini",
       "massive": "Pro",
@@ -380,10 +511,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-13",
     "group": "contender",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Unisound",
     "engineName": "U",
     "famousFor": "",
+    "weightsType": "closed",
+    "openWeights": {
+      "medium": false,
+      "massive": false
+    },
     "parameterSizes": {
       "medium": "1",
       "massive": "2"
@@ -394,10 +530,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-14",
     "group": "contender",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Stepfun",
     "engineName": "Step",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "large": true,
+      "colossal": true
+    },
     "parameterSizes": {
       "small": "VL",
       "medium": "1",
@@ -410,10 +553,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-15",
     "group": "contender",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Tencent",
     "engineName": "Hy / Hunyuan",
     "famousFor": "Chinas WhatsApp",
+    "weightsType": "open",
+    "openWeights": {
+      "medium": true,
+      "large": true,
+      "massive": true,
+      "colossal": true
+    },
     "parameterSizes": {
       "medium": "1",
       "large": "2",
@@ -426,10 +576,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-16",
     "group": "contender",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Xiaomi",
     "engineName": "MiMo",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "massive": true,
+      "colossal": true
+    },
     "parameterSizes": {
       "small": "V1",
       "massive": "Flash",
@@ -441,10 +597,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-17",
     "group": "contender",
     "country": "French",
-    "countryFlag": "\ud83c\uddeb\ud83c\uddf7",
+    "countryFlag": "🇫🇷",
     "creator": "MIstral AI",
     "engineName": "Mistral",
     "famousFor": "DeepResearch",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "large": true,
+      "colossal": true
+    },
     "parameterSizes": {
       "small": "Small",
       "large": "Medium",
@@ -456,10 +618,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-18",
     "group": "contender",
     "country": "Israel",
-    "countryFlag": "\ud83c\uddee\ud83c\uddf1",
+    "countryFlag": "🇮🇱",
     "creator": "AI21 Labs",
     "engineName": "Jamba",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "medium": true,
+      "massive": true
+    },
     "parameterSizes": {
       "medium": "Mini",
       "massive": "Large"
@@ -470,10 +637,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-19",
     "group": "contender",
     "country": "Singapore",
-    "countryFlag": "\ud83c\uddf8\ud83c\uddec",
+    "countryFlag": "🇸🇬",
     "creator": "Sapiens AI",
     "engineName": "Agnes",
     "famousFor": "Wide Research",
+    "weightsType": "closed",
+    "openWeights": {
+      "medium": false,
+      "massive": false
+    },
     "parameterSizes": {
       "medium": "Flash",
       "massive": "Pro"
@@ -484,10 +656,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-20",
     "group": "contender",
     "country": "South Korea",
-    "countryFlag": "\ud83c\uddf0\ud83c\uddf7",
+    "countryFlag": "🇰🇷",
     "creator": "LG AI Research",
     "engineName": "K-EXAONE",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "large": true,
+      "colossal": true
+    },
     "parameterSizes": {
       "large": "1",
       "colossal": "2"
@@ -498,10 +675,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-21",
     "group": "contender",
     "country": "South Korea",
-    "countryFlag": "\ud83c\uddf0\ud83c\uddf7",
+    "countryFlag": "🇰🇷",
     "creator": "Motif Technologies",
     "engineName": "Motif",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "massive": true
+    },
     "parameterSizes": {
       "small": "2",
       "medium": "1",
@@ -513,10 +696,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-22",
     "group": "contender",
     "country": "South Korea",
-    "countryFlag": "\ud83c\uddf0\ud83c\uddf7",
+    "countryFlag": "🇰🇷",
     "creator": "SK Telecom",
     "engineName": "A.X",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "colossal": true
+    },
     "parameterSizes": {
       "colossal": "K2"
     },
@@ -526,10 +713,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-23",
     "group": "contender",
     "country": "South Korea",
-    "countryFlag": "\ud83c\uddf0\ud83c\uddf7",
+    "countryFlag": "🇰🇷",
     "creator": "Upstage",
     "engineName": "Solar",
     "famousFor": "Reasoning",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "large": true,
+      "massive": false
+    },
     "parameterSizes": {
       "small": "Mini",
       "medium": "1; 3",
@@ -542,10 +736,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "contender-24",
     "group": "contender",
     "country": "UAE",
-    "countryFlag": "\ud83c\udde6\ud83c\uddea",
+    "countryFlag": "🇦🇪",
     "creator": "MBZUAI*",
     "engineName": "K2",
     "famousFor": "*Institute of Foundation Models",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true
+    },
     "parameterSizes": {
       "small": "Think; Horizon"
     },
@@ -555,11 +753,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "tweaker-1",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Apodex (Alibaba)",
     "engineName": "Apodex",
     "basedOn": "Qwen",
     "famousFor": "Based on Qwen",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "small": true,
+      "massive": false
+    },
     "parameterSizes": {
       "small": "Mini",
       "massive": "1"
@@ -570,11 +773,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "tweaker-2",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Apple (Google)",
     "engineName": "Siri AI",
     "basedOn": "Gemini",
     "famousFor": "Based on Gemini",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "small": true,
+      "medium": false
+    },
     "parameterSizes": {
       "small": "OpenELM",
       "medium": "Gemini trained AFM model famility only available on EN locales for now, DE locale end of 2026"
@@ -585,11 +793,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "tweaker-3",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Circuit & Chisel / Unbiased.ai",
     "engineName": "Pareto",
     "basedOn": "various",
     "famousFor": "Based on various",
+    "weightsType": "closed",
+    "openWeights": {
+      "small": false
+    },
     "parameterSizes": {
       "small": "orchestrates a mix of openweight models"
     },
@@ -599,11 +811,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "tweaker-4",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "DeepReinforce (Alibaba, Google)",
     "engineName": "Ornith",
     "basedOn": "Qwen / Gemma",
     "famousFor": "Based on Qwen / Gemma",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true
+    },
     "parameterSizes": {
       "small": "1"
     },
@@ -613,11 +829,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "tweaker-5",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Perplexity (Meta, Mistral)",
     "engineName": "Sonar",
     "basedOn": "Llama, Mistral",
     "famousFor": "Based on Llama, Mistral",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "massive": true
+    },
     "parameterSizes": {
       "small": "Llama, Mistral",
       "massive": "Llama 3.1"
@@ -628,11 +849,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "tweaker-6",
     "group": "tweakers",
     "country": "Japan",
-    "countryFlag": "\ud83c\uddef\ud83c\uddf5",
+    "countryFlag": "🇯🇵",
     "creator": "Sakana AI (Moonshot, Alibaba)",
     "engineName": "Sakana",
     "basedOn": "Kimi, Qwen",
     "famousFor": "Based on Kimi, Qwen",
+    "weightsType": "open",
+    "openWeights": {
+      "colossal": true
+    },
     "parameterSizes": {
       "colossal": "Namazu; Fugu"
     },
@@ -642,11 +867,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "tweaker-7",
     "group": "tweakers",
     "country": "Saudi Arabia",
-    "countryFlag": "\ud83c\uddf8\ud83c\udde6",
+    "countryFlag": "🇸🇦",
     "creator": "HUMAIN (MiniMax)",
     "engineName": "M",
     "basedOn": "MiniMax",
     "famousFor": "Based on MiniMax",
+    "weightsType": "closed",
+    "openWeights": {
+      "small": false,
+      "medium": false,
+      "massive": false
+    },
     "parameterSizes": {
       "small": "1",
       "medium": "2",
@@ -658,11 +889,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "tweaker-8",
     "group": "tweakers",
     "country": "Spain",
-    "countryFlag": "\ud83c\uddea\ud83c\uddf8",
+    "countryFlag": "🇪🇸",
     "creator": "Multiverse Computing (Z.ai)",
     "engineName": "-",
     "basedOn": "GLM",
     "famousFor": "Based on GLM",
+    "weightsType": "closed",
+    "openWeights": {
+      "medium": false,
+      "massive": false
+    },
     "parameterSizes": {
       "medium": "HyperNova",
       "massive": "Quasar"
@@ -670,73 +906,107 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "specialties": "Based on GLM"
   },
   {
-    "id": "tweaker-more-1",
+    "id": "tweaker-extra-1",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Abacus AI",
     "engineName": "Abacus AI",
-    "basedOn": "Alibaba (Qwen)",
+    "basedOn": "Alibaba / Qwen",
     "famousFor": "The Smaug series re-spins Qwen.",
-    "parameterSizes": {},
+    "weightsType": "open",
+    "openWeights": {
+      "small": true
+    },
+    "parameterSizes": {
+      "small": "Alibaba / Qwen"
+    },
     "specialties": "The Smaug series re-spins Qwen."
   },
   {
-    "id": "tweaker-more-2",
+    "id": "tweaker-extra-2",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Arcee AI",
     "engineName": "Arcee AI",
     "basedOn": "Meta / Mistral / Alibaba",
-    "famousFor": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins (SuperNova, Virtuoso).",
-    "parameterSizes": {},
-    "specialties": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins (SuperNova, Virtuoso)."
+    "famousFor": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins.",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true
+    },
+    "parameterSizes": {
+      "small": "Meta / Mistral / Alibaba"
+    },
+    "specialties": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins."
   },
   {
-    "id": "tweaker-more-3",
+    "id": "tweaker-extra-3",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Cognitive Computations",
     "engineName": "Cognitive Computations",
     "basedOn": "Meta / Mistral / Alibaba",
     "famousFor": "Dolphin family for uncensored post-trained re-spins of Llama, Mistral, and Qwen.",
-    "parameterSizes": {},
+    "weightsType": "open",
+    "openWeights": {
+      "small": true
+    },
+    "parameterSizes": {
+      "small": "Meta / Mistral / Alibaba"
+    },
     "specialties": "Dolphin family for uncensored post-trained re-spins of Llama, Mistral, and Qwen."
   },
   {
-    "id": "tweaker-more-4",
+    "id": "tweaker-extra-4",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Nous Research",
     "engineName": "Nous Research",
     "basedOn": "Meta / Alibaba",
-    "famousFor": "Hermes Agent family of fine-tuned Llama and Qwen re-spins.",
-    "parameterSizes": {},
-    "specialties": "Hermes Agent family of fine-tuned Llama and Qwen re-spins."
+    "famousFor": "Hermes Agent family of fine-tuned Llama and Qwen re-spins",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true
+    },
+    "parameterSizes": {
+      "small": "Meta / Alibaba"
+    },
+    "specialties": "Hermes Agent family of fine-tuned Llama and Qwen re-spins"
   },
   {
-    "id": "tweaker-more-5",
+    "id": "tweaker-extra-5",
     "group": "tweakers",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Fireworks AI",
     "engineName": "Fireworks AI",
-    "basedOn": "Moonshot (Kimi)",
-    "famousFor": "Kimi K3 efficiency re-spin named Ember.",
-    "parameterSizes": {},
-    "specialties": "Kimi K3 efficiency re-spin named Ember."
+    "basedOn": "Moonshot / Kimi",
+    "famousFor": "Kimi K3 efficiency re-spin named Ember",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true
+    },
+    "parameterSizes": {
+      "small": "Moonshot / Kimi"
+    },
+    "specialties": "Kimi K3 efficiency re-spin named Ember"
   },
   {
     "id": "small-1",
     "group": "small",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Hugging Face",
     "engineName": "SmolLM",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "micro": true
+    },
     "parameterSizes": {
       "micro": "SmolLM"
     },
@@ -746,10 +1016,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-2",
     "group": "small",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "IBM",
     "engineName": "Granite",
     "famousFor": "Watson, SPSS",
+    "weightsType": "open",
+    "openWeights": {
+      "micro": true
+    },
     "parameterSizes": {
       "micro": "Granite"
     },
@@ -759,10 +1033,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-3",
     "group": "small",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Liquid AI",
     "engineName": "LFM",
     "famousFor": "",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "micro": true,
+      "medium": false
+    },
     "parameterSizes": {
       "micro": "2",
       "medium": "1"
@@ -773,10 +1052,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-4",
     "group": "small",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Magic.dev",
     "engineName": "LTM",
     "famousFor": "Scam?",
+    "weightsType": "closed",
+    "openWeights": {
+      "micro": false,
+      "tiny": false
+    },
     "parameterSizes": {
       "micro": "1",
       "tiny": "2"
@@ -787,10 +1071,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-5",
     "group": "small",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Morph Labs",
     "engineName": "diverse",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "micro": true,
+      "mini": true,
+      "tiny": true
+    },
     "parameterSizes": {
       "micro": "Reflexes",
       "mini": "Warp Grep",
@@ -802,10 +1092,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-6",
     "group": "small",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Poolside",
     "engineName": "Laguna",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "large": true
+    },
     "parameterSizes": {
       "small": "XS",
       "medium": "S",
@@ -817,10 +1113,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-7",
     "group": "small",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "PrismML",
     "engineName": "Bonsai",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "mini": true,
+      "small": true
+    },
     "parameterSizes": {
       "mini": "v1",
       "small": "Qwen3.x re-spins"
@@ -831,10 +1132,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-8",
     "group": "small",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "01.AI",
     "engineName": "Yi",
     "famousFor": "",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "tiny": true,
+      "medium": false
+    },
     "parameterSizes": {
       "tiny": "1",
       "medium": "Lightning & Large"
@@ -845,10 +1151,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-9",
     "group": "small",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "ByteDance",
     "engineName": "Dola-Seed",
     "famousFor": "TikTok",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "tiny": true,
+      "small": false,
+      "medium": false,
+      "large": false
+    },
     "parameterSizes": {
       "tiny": "X / Coder",
       "small": "Mini & OSS",
@@ -861,10 +1174,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-10",
     "group": "small",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "iFlytek",
     "engineName": "Spark",
     "famousFor": "",
+    "weightsType": "hybrid",
+    "openWeights": {
+      "mini": true,
+      "medium": false,
+      "large": false
+    },
     "parameterSizes": {
       "mini": "V1 to 4",
       "medium": "X1",
@@ -876,10 +1195,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-11",
     "group": "small",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "OpenBMB",
     "engineName": "MiniCPM",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "mini": true
+    },
     "parameterSizes": {
       "mini": "1 to 4"
     },
@@ -889,10 +1212,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-12",
     "group": "small",
     "country": "China",
-    "countryFlag": "\ud83c\udde8\ud83c\uddf3",
+    "countryFlag": "🇨🇳",
     "creator": "Shanghai AI Lab",
     "engineName": "Intern",
     "famousFor": "big GLM 5.x re-spin",
+    "weightsType": "open",
+    "openWeights": {
+      "mini": true,
+      "medium": true
+    },
     "parameterSizes": {
       "mini": "LM 1 & 2",
       "medium": "LM 3; VL"
@@ -903,10 +1231,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-13",
     "group": "small",
     "country": "India",
-    "countryFlag": "\ud83c\uddee\ud83c\uddf3",
+    "countryFlag": "🇮🇳",
     "creator": "Sarvam AI",
     "engineName": "Sarvam",
     "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "mini": true,
+      "small": true
+    },
     "parameterSizes": {
       "mini": "1",
       "small": "2"
@@ -917,10 +1250,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-14",
     "group": "small",
     "country": "South Korea",
-    "countryFlag": "\ud83c\uddf0\ud83c\uddf7",
+    "countryFlag": "🇰🇷",
     "creator": "Samsung",
     "engineName": "Gauss 1",
     "famousFor": "for Galaxy AI",
+    "weightsType": "closed",
+    "openWeights": {
+      "mini": false,
+      "tiny": false,
+      "medium": false,
+      "large": false
+    },
     "parameterSizes": {
       "mini": "Image",
       "tiny": "Language",
@@ -930,241 +1270,372 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "specialties": "for Galaxy AI"
   },
   {
+    "id": "small-16",
+    "group": "small",
+    "country": "Small LLMs from Labs that also have BIG models; not counted again",
+    "countryFlag": "🌐",
+    "creator": "Alibaba",
+    "engineName": "Qwen",
+    "famousFor": "community driven",
+    "weightsType": "open",
+    "openWeights": {
+      "micro": true
+    },
+    "parameterSizes": {
+      "micro": "1 to 4"
+    },
+    "specialties": "community driven"
+  },
+  {
+    "id": "small-17",
+    "group": "small",
+    "country": "Small LLMs from Labs that also have BIG models; not counted again",
+    "countryFlag": "🌐",
+    "creator": "DeepSeek",
+    "engineName": "R1 Distill",
+    "famousFor": "community driven",
+    "weightsType": "open",
+    "openWeights": {
+      "mini": true,
+      "medium": true
+    },
+    "parameterSizes": {
+      "mini": "Qwen based",
+      "medium": "Llama based"
+    },
+    "specialties": "community driven"
+  },
+  {
+    "id": "small-18",
+    "group": "small",
+    "country": "Small LLMs from Labs that also have BIG models; not counted again",
+    "countryFlag": "🌐",
+    "creator": "Google",
+    "engineName": "Gemma",
+    "famousFor": "for Android",
+    "weightsType": "open",
+    "openWeights": {
+      "micro": true,
+      "mini": true,
+      "small": true
+    },
+    "parameterSizes": {
+      "micro": "3",
+      "mini": "1 to 4",
+      "small": "2 to 4"
+    },
+    "specialties": "for Android"
+  },
+  {
+    "id": "small-19",
+    "group": "small",
+    "country": "Small LLMs from Labs that also have BIG models; not counted again",
+    "countryFlag": "🌐",
+    "creator": "Meta",
+    "engineName": "Llama",
+    "famousFor": "discontinued",
+    "weightsType": "open",
+    "openWeights": {
+      "mini": true
+    },
+    "parameterSizes": {
+      "mini": "1 to 3"
+    },
+    "specialties": "discontinued"
+  },
+  {
+    "id": "small-20",
+    "group": "small",
+    "country": "Small LLMs from Labs that also have BIG models; not counted again",
+    "countryFlag": "🌐",
+    "creator": "Microsoft",
+    "engineName": "Phi (Mini)",
+    "famousFor": "for Copilot",
+    "weightsType": "open",
+    "openWeights": {
+      "mini": true,
+      "tiny": true,
+      "small": true
+    },
+    "parameterSizes": {
+      "mini": "1 & 2",
+      "tiny": "4",
+      "small": "3"
+    },
+    "specialties": "for Copilot"
+  },
+  {
+    "id": "small-21",
+    "group": "small",
+    "country": "Small LLMs from Labs that also have BIG models; not counted again",
+    "countryFlag": "🌐",
+    "creator": "Mistral AI",
+    "engineName": "Ministral",
+    "famousFor": "",
+    "weightsType": "open",
+    "openWeights": {
+      "tiny": true,
+      "small": true
+    },
+    "parameterSizes": {
+      "tiny": "1",
+      "small": "3"
+    },
+    "specialties": ""
+  },
+  {
     "id": "harness-1",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Aider",
-    "famousFor": "Canadian origin (Paul Gauthier)",
-    "engineName": "Aider Git Harness",
+    "engineName": "Aider",
+    "famousFor": "Aider Git Harness",
     "harness": "Aider Git Harness",
     "form": "CLI",
     "note": "Canadian origin (Paul Gauthier)",
-    "parameterSizes": {},
-    "specialties": "CLI (Canadian origin (Paul Gauthier))"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-2",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "All Hands AI",
-    "famousFor": "formerly OpenDevin",
-    "engineName": "OpenHands",
+    "engineName": "All Hands AI",
+    "famousFor": "OpenHands",
     "harness": "OpenHands",
     "form": "CLI + Web SDK",
     "note": "formerly OpenDevin",
-    "parameterSizes": {},
-    "specialties": "CLI + Web SDK (formerly OpenDevin)"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-3",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Augment Code",
-    "famousFor": "",
-    "engineName": "Context Engine",
+    "engineName": "Augment Code",
+    "famousFor": "Context Engine",
     "harness": "Context Engine",
     "form": "IDE",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "IDE"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-4",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "CodeRabbit",
-    "famousFor": "",
     "engineName": "CodeRabbit",
+    "famousFor": "CodeRabbit",
     "harness": "CodeRabbit",
     "form": "IDE + CLI + Git",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "IDE + CLI + Git"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-5",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Coder",
-    "famousFor": "",
-    "engineName": "Coder Agents",
+    "engineName": "Coder",
+    "famousFor": "Coder Agents",
     "harness": "Coder Agents",
     "form": "Web",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "Web"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-6",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Cognition AI",
-    "famousFor": "formerly Windsurf",
-    "engineName": "Devin",
+    "engineName": "Cognition AI",
+    "famousFor": "Devin",
     "harness": "Devin",
     "form": "IDE + CLI + Web",
     "note": "formerly Windsurf",
-    "parameterSizes": {},
-    "specialties": "IDE + CLI + Web (formerly Windsurf)"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-7",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Factory AI",
-    "famousFor": "",
-    "engineName": "Droid",
+    "engineName": "Factory AI",
+    "famousFor": "Droid",
     "harness": "Droid",
     "form": "CLI",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "CLI"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-8",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "LangChain",
-    "famousFor": "",
-    "engineName": "Deep Agents+LangGraph",
+    "engineName": "LangChain",
+    "famousFor": "Deep Agents+LangGraph",
     "harness": "Deep Agents+LangGraph",
     "form": "SDK",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "SDK"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-9",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Nous Research",
-    "famousFor": "",
-    "engineName": "Hermes",
+    "engineName": "Nous Research",
+    "famousFor": "Hermes",
     "harness": "Hermes",
     "form": "CLI",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "CLI"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-10",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "OpenClaw Foundation",
-    "famousFor": "Austrian origin",
-    "engineName": "OpenClaw/Code",
+    "engineName": "OpenClaw Foundation",
+    "famousFor": "OpenClaw/Code",
     "harness": "OpenClaw/Code",
-    "form": "CLI \u00fcber Messenger",
+    "form": "CLI über Messenger",
     "note": "Austrian origin",
-    "parameterSizes": {},
-    "specialties": "CLI \u00fcber Messenger (Austrian origin)"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-11",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Pydantic AI",
-    "famousFor": "UK origin",
-    "engineName": "Pyd.-AI Harness",
+    "engineName": "Pydantic AI",
+    "famousFor": "Pyd.-AI Harness",
     "harness": "Pyd.-AI Harness",
     "form": "SDK",
     "note": "UK origin",
-    "parameterSizes": {},
-    "specialties": "SDK (UK origin)"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-12",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Replit",
-    "famousFor": "",
-    "engineName": "Replit Agent",
+    "engineName": "Replit",
+    "famousFor": "Replit Agent",
     "harness": "Replit Agent",
     "form": "Web",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "Web"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-13",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Sourcegraph",
-    "famousFor": "",
-    "engineName": "Amp +CodyAssist.",
+    "engineName": "Sourcegraph",
+    "famousFor": "Amp +CodyAssist.",
     "harness": "Amp +CodyAssist.",
     "form": "CLI + IDE",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "CLI + IDE"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-14",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Warp",
-    "famousFor": "",
-    "engineName": "Warp+Factories",
+    "engineName": "Warp",
+    "famousFor": "Warp+Factories",
     "harness": "Warp+Factories",
     "form": "CLI/IDE-Hybrid",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "CLI/IDE-Hybrid"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-15",
     "group": "harness",
     "country": "America (US)",
-    "countryFlag": "\ud83c\uddfa\ud83c\uddf8",
+    "countryFlag": "🇺🇸",
     "creator": "Zed Industries",
-    "famousFor": "",
-    "engineName": "Zed +Threads",
+    "engineName": "Zed Industries",
+    "famousFor": "Zed +Threads",
     "harness": "Zed +Threads",
     "form": "IDE",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "IDE"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-16",
     "group": "harness",
     "country": "Israel",
-    "countryFlag": "\ud83c\uddee\ud83c\uddf1",
+    "countryFlag": "🇮🇱",
     "creator": "Qodo",
-    "famousFor": "formerly CodiumAI",
-    "engineName": "Gen/Review",
+    "engineName": "Qodo",
+    "famousFor": "Gen/Review",
     "harness": "Gen/Review",
     "form": "IDE + CLI + Git",
     "note": "formerly CodiumAI",
-    "parameterSizes": {},
-    "specialties": "IDE + CLI + Git (formerly CodiumAI)"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   },
   {
     "id": "harness-17",
     "group": "harness",
     "country": "Singapur",
-    "countryFlag": "\ud83c\uddf8\ud83c\uddec",
+    "countryFlag": "🇸🇬",
     "creator": "Butterfly Effect",
-    "famousFor": "China origin",
-    "engineName": "Manus",
+    "engineName": "Butterfly Effect",
+    "famousFor": "Manus",
     "harness": "Manus",
     "form": "Web",
     "note": "China origin",
-    "parameterSizes": {},
-    "specialties": "Web (China origin)"
+    "weightsType": "open",
+    "openWeights": {},
+    "parameterSizes": {}
   }
 ];

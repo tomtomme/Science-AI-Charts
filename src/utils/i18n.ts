@@ -54,8 +54,8 @@ export const TRANSLATIONS = {
     scoreModeNewDesc: 'Neuer Score: 8 Benchmarks',
     scoreModeOldDesc: 'Alter Score: 5 Benchmarks, bis zu 224 Modelle',
     scoreModeWorstCaseDesc: 'Worst-Case: 7-Benchmark-Durchschnitt multipliziert mit Non-Hallucination-Rate (Spalte N)',
-    scoreModeHintTitle: 'Bedeutung der 3 Scores',
-    scoreModeHintText: 'Mehr Infos zur Bedeutung & Berechnung der 3 Scores finden Sie im Text unter dem Diagramm.',
+    scoreModeHintTitle: 'Bedeutung der Scores',
+    scoreModeHintText: 'Mehr Infos zur Bedeutung & Berechnung der Scores finden Sie im Text unter dem Diagramm.',
     scoreModeHintClick: 'Klicken für mehr Infos',
 
     // Scope: Current vs All
@@ -175,8 +175,8 @@ export const TRANSLATIONS = {
     scoreModeNewDesc: 'New Score: 8 benchmarks',
     scoreModeOldDesc: 'Old Score: 5 benchmarks, up to 224 models',
     scoreModeWorstCaseDesc: 'Worst Case: 7-benchmark average multiplied by Non-Hallucination Rate (Column N)',
-    scoreModeHintTitle: 'Meaning of the 3 Scores',
-    scoreModeHintText: 'More info on the meaning & calculation of the 3 scores can be found in the text below the chart.',
+    scoreModeHintTitle: 'Meaning of the Scores',
+    scoreModeHintText: 'More info on the meaning & calculation of the scores can be found in the text below the chart.',
     scoreModeHintClick: 'Click for more info',
 
     // Scope: Current vs All

@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { LabEntry, ModelRecord } from '../types';
-import { Search, ExternalLink, Cpu, Wrench, Sparkles, Terminal } from 'lucide-react';
+import { Search, ExternalLink, Cpu, Wrench, Terminal } from 'lucide-react';
 
 interface LabMatrixViewProps {
   labs: LabEntry[];
-  models: ModelRecord[];
-  onSelectLabForBenchmark: (creatorName: string) => void;
+  models?: ModelRecord[];
+  onSelectLabForBenchmark?: (creatorName: string) => void;
   lang?: 'de' | 'en';
 }
 
@@ -13,66 +13,11 @@ type LabGroup = 'top10' | 'contender' | 'tweakers' | 'small' | 'harness' | 'all'
 
 export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   labs,
-  models,
-  onSelectLabForBenchmark,
   lang = 'de',
 }) => {
   const [activeGroup, setActiveGroup] = useState<LabGroup>('top10');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedLabId, setExpandedLabId] = useState<string | null>(null);
-
-  // Compute how many models in the current benchmark match each lab
-  const labBenchmarkStats = useMemo(() => {
-    const stats: Record<string, { count: number; bestScore: number; bestModel: string }> = {};
-
-    labs.forEach((lab) => {
-      const creatorLower = lab.creator.toLowerCase();
-      const engineLower = (lab.engineName || '').toLowerCase();
-
-      const matched = models.filter((m) => {
-        const cClean = (m.creatorClean || '').toLowerCase();
-        const cName = (m.companyName || '').toLowerCase();
-        const mName = (m.displayName || m.name || '').toLowerCase();
-
-        // Specific matching logic
-        if (creatorLower.includes('anthropic') && (cClean.includes('anthropic') || mName.includes('claude'))) return true;
-        if (creatorLower.includes('google') && (cClean.includes('google') || mName.includes('gemini') || mName.includes('gemma'))) return true;
-        if (creatorLower.includes('meta') && (cClean.includes('meta') || mName.includes('muse') || mName.includes('llama'))) return true;
-        if (creatorLower.includes('nvidia') && (cClean.includes('nvidia') || mName.includes('nemotron'))) return true;
-        if ((creatorLower.includes('openai') || creatorLower.includes('microsoft')) && (cClean.includes('openai') || mName.includes('chatgpt') || mName.includes('gpt'))) return true;
-        if ((creatorLower.includes('spacex') || creatorLower.includes('xai')) && (cClean.includes('xai') || cClean.includes('spacex') || mName.includes('grok'))) return true;
-        if (creatorLower.includes('alibaba') && (cClean.includes('alibaba') || mName.includes('qwen'))) return true;
-        if (creatorLower.includes('deepseek') && (cClean.includes('deepseek') || mName.includes('deepseek'))) return true;
-        if (creatorLower.includes('moonshot') && (cClean.includes('moonshot') || mName.includes('kimi'))) return true;
-        if ((creatorLower.includes('z.ai') || creatorLower.includes('zhipu')) && (cClean.includes('z.ai') || cClean.includes('zhipu') || mName.includes('glm'))) return true;
-        if (creatorLower.includes('mistral') && (cClean.includes('mistral') || mName.includes('mistral'))) return true;
-        if (creatorLower.includes('sapiens') && (cClean.includes('sapiens') || mName.includes('agnes'))) return true;
-        if (creatorLower.includes('xiaomi') && (cClean.includes('xiaomi') || mName.includes('mimo'))) return true;
-        if (creatorLower.includes('stepfun') && (cClean.includes('stepfun') || mName.includes('step'))) return true;
-        if (creatorLower.includes('minimax') && (cClean.includes('minimax') || mName.includes('minimax'))) return true;
-        if (creatorLower.includes('baidu') && (cClean.includes('baidu') || mName.includes('ernie'))) return true;
-        if (creatorLower.includes('cohere') && (cClean.includes('cohere') || mName.includes('command'))) return true;
-        if (creatorLower.includes('hugging face') && (cClean.includes('hugging') || mName.includes('smollm'))) return true;
-        if (creatorLower.includes('ibm') && (cClean.includes('ibm') || mName.includes('granite'))) return true;
-
-        // General fallback match
-        return cClean.includes(creatorLower) || cName.includes(creatorLower) || (engineLower && mName.includes(engineLower));
-      });
-
-      if (matched.length > 0) {
-        const best = matched.reduce((max, cur) => (cur.score > max.score ? cur : max), matched[0]);
-        stats[lab.id] = {
-          count: matched.length,
-          bestScore: best.score,
-          bestModel: best.displayName || best.name,
-        };
-      } else {
-        stats[lab.id] = { count: 0, bestScore: 0, bestModel: '' };
-      }
-    });
-
-    return stats;
-  }, [labs, models]);
 
   // Group counts
   const top10Count = labs.filter((l) => l.group === 'top10').length;
@@ -232,7 +177,6 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
       {/* Grid of Lab Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredLabs.map((lab) => {
-          const stats = labBenchmarkStats[lab.id];
           const isExpanded = expandedLabId === lab.id;
 
           return (
@@ -242,7 +186,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             >
               {/* Header */}
               <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xl leading-none" title={lab.country}>
                       {lab.countryFlag}
@@ -257,18 +201,29 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Benchmark models badge */}
-                  {stats && stats.count > 0 ? (
-                    <button
-                      onClick={() => onSelectLabForBenchmark(lab.creator)}
-                      title={`Im Diagramm nach ${lab.creator} filtern`}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors cursor-pointer"
+                  {/* Open / Closed / Hybrid Weights Badge based on Google Sheets color */}
+                  {lab.weightsType && (
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${
+                        lab.weightsType === 'open'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                          : lab.weightsType === 'hybrid'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                      }`}
+                      title={
+                        lab.weightsType === 'open'
+                          ? 'OpenWeights (grüner Hintergrund in Tabelle)'
+                          : lab.weightsType === 'hybrid'
+                          ? 'Open & Closed Weights Modelle'
+                          : 'ClosedWeights (proprietär)'
+                      }
                     >
-                      <Sparkles className="w-3 h-3 text-emerald-500" />
-                      <span>{stats.count} {stats.count === 1 ? 'Modell' : 'Modelle'}</span>
-                    </button>
-                  ) : null}
+                      {lab.weightsType === 'open' ? 'Open' : lab.weightsType === 'hybrid' ? 'Hybrid' : 'Closed'}
+                    </span>
+                  )}
                 </div>
+
 
                 {/* Group 5: Harness Only Labs Special Card Layout */}
                 {lab.group === 'harness' && (
@@ -340,7 +295,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         <div className="grid grid-cols-2 gap-1 text-[11px]">
                           {lab.parameterSizes.small && (
                             <div className="bg-slate-50 dark:bg-slate-800/60 p-1 rounded border border-slate-100 dark:border-slate-800/80">
-                              <span className="text-slate-400 block text-[9.5px]">&lt; 32B</span>
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-slate-400 block text-[9.5px]">&lt; 32B</span>
+                                {lab.openWeights?.small !== undefined && (
+                                  <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.small ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                    {lab.openWeights.small ? 'Open' : 'Closed'}
+                                  </span>
+                                )}
+                              </div>
                               <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                                 {lab.parameterSizes.small}
                               </span>
@@ -348,7 +310,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                           )}
                           {lab.parameterSizes.medium && (
                             <div className="bg-slate-50 dark:bg-slate-800/60 p-1 rounded border border-slate-100 dark:border-slate-800/80">
-                              <span className="text-slate-400 block text-[9.5px]">&lt; 128B</span>
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-slate-400 block text-[9.5px]">&lt; 128B</span>
+                                {lab.openWeights?.medium !== undefined && (
+                                  <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.medium ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                    {lab.openWeights.medium ? 'Open' : 'Closed'}
+                                  </span>
+                                )}
+                              </div>
                               <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                                 {lab.parameterSizes.medium}
                               </span>
@@ -356,7 +325,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                           )}
                           {lab.parameterSizes.massive && (
                             <div className="bg-slate-50 dark:bg-slate-800/60 p-1 rounded border border-slate-100 dark:border-slate-800/80">
-                              <span className="text-slate-400 block text-[9.5px]">&lt; 512B</span>
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-slate-400 block text-[9.5px]">&lt; 512B</span>
+                                {lab.openWeights?.massive !== undefined && (
+                                  <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.massive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                    {lab.openWeights.massive ? 'Open' : 'Closed'}
+                                  </span>
+                                )}
+                              </div>
                               <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                                 {lab.parameterSizes.massive}
                               </span>
@@ -364,7 +340,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                           )}
                           {lab.parameterSizes.colossal && (
                             <div className="bg-slate-50 dark:bg-slate-800/60 p-1 rounded border border-slate-100 dark:border-slate-800/80">
-                              <span className="text-slate-400 block text-[9.5px]">&lt; 1.5T</span>
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-slate-400 block text-[9.5px]">&lt; 1.5T</span>
+                                {lab.openWeights?.colossal !== undefined && (
+                                  <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.colossal ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                    {lab.openWeights.colossal ? 'Open' : 'Closed'}
+                                  </span>
+                                )}
+                              </div>
                               <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                                 {lab.parameterSizes.colossal}
                               </span>
@@ -398,7 +381,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       <div className="grid grid-cols-2 gap-1 text-[11px]">
                         {lab.parameterSizes.micro && (
                           <div className="bg-emerald-50/60 dark:bg-emerald-950/30 p-1 rounded border border-emerald-100 dark:border-emerald-900/50">
-                            <span className="text-emerald-700 dark:text-emerald-400 block text-[9.5px] font-semibold">Micro &lt; 0.5B</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-emerald-700 dark:text-emerald-400 block text-[9.5px] font-semibold">Micro &lt; 0.5B</span>
+                              {lab.openWeights?.micro !== undefined && (
+                                <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.micro ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                  {lab.openWeights.micro ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.micro}
                             </span>
@@ -406,7 +396,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.mini && (
                           <div className="bg-emerald-50/60 dark:bg-emerald-950/30 p-1 rounded border border-emerald-100 dark:border-emerald-900/50">
-                            <span className="text-emerald-700 dark:text-emerald-400 block text-[9.5px] font-semibold">Mini &lt; 2B</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-emerald-700 dark:text-emerald-400 block text-[9.5px] font-semibold">Mini &lt; 2B</span>
+                              {lab.openWeights?.mini !== undefined && (
+                                <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.mini ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                  {lab.openWeights.mini ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.mini}
                             </span>
@@ -414,7 +411,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.tiny && (
                           <div className="bg-emerald-50/60 dark:bg-emerald-950/30 p-1 rounded border border-emerald-100 dark:border-emerald-900/50">
-                            <span className="text-emerald-700 dark:text-emerald-400 block text-[9.5px] font-semibold">Tiny &lt; 8B</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-emerald-700 dark:text-emerald-400 block text-[9.5px] font-semibold">Tiny &lt; 8B</span>
+                              {lab.openWeights?.tiny !== undefined && (
+                                <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.tiny ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                  {lab.openWeights.tiny ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.tiny}
                             </span>
@@ -422,7 +426,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.small && (
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-1 rounded border border-slate-100 dark:border-slate-800/80">
-                            <span className="text-slate-400 block text-[9.5px]">Small &lt; 32B</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[9.5px]">Small &lt; 32B</span>
+                              {lab.openWeights?.small !== undefined && (
+                                <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.small ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                  {lab.openWeights.small ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.small}
                             </span>
@@ -430,9 +441,31 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.medium && (
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-1 rounded border border-slate-100 dark:border-slate-800/80">
-                            <span className="text-slate-400 block text-[9.5px]">Medium &lt; 128B</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[9.5px]">Medium &lt; 128B</span>
+                              {lab.openWeights?.medium !== undefined && (
+                                <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.medium ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                  {lab.openWeights.medium ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.medium}
+                            </span>
+                          </div>
+                        )}
+                        {lab.parameterSizes.large && (
+                          <div className="bg-slate-50 dark:bg-slate-800/60 p-1 rounded border border-slate-100 dark:border-slate-800/80">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[9.5px]">Large &lt; 256B</span>
+                              {lab.openWeights?.large !== undefined && (
+                                <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${lab.openWeights.large ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                  {lab.openWeights.large ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
+                              {lab.parameterSizes.large}
                             </span>
                           </div>
                         )}
@@ -489,7 +522,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       <div className="grid grid-cols-2 gap-1 text-[11px]">
                         {lab.parameterSizes.small && (
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded border border-slate-100 dark:border-slate-800/80">
-                            <span className="text-slate-400 block text-[10px]">&lt; 32B</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[10px]">&lt; 32B</span>
+                              {lab.openWeights?.small !== undefined && (
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                                  lab.openWeights.small
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                                    : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                }`}>
+                                  {lab.openWeights.small ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.small}
                             </span>
@@ -497,7 +541,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.medium && (
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded border border-slate-100 dark:border-slate-800/80">
-                            <span className="text-slate-400 block text-[10px]">&lt; 128B</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[10px]">&lt; 128B</span>
+                              {lab.openWeights?.medium !== undefined && (
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                                  lab.openWeights.medium
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                                    : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                }`}>
+                                  {lab.openWeights.medium ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.medium}
                             </span>
@@ -505,7 +560,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.large && (
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded border border-slate-100 dark:border-slate-800/80">
-                            <span className="text-slate-400 block text-[10px]">&lt; 256B</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[10px]">&lt; 256B</span>
+                              {lab.openWeights?.large !== undefined && (
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                                  lab.openWeights.large
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                                    : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                }`}>
+                                  {lab.openWeights.large ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.large}
                             </span>
@@ -513,7 +579,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.massive && (
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded border border-slate-100 dark:border-slate-800/80">
-                            <span className="text-slate-400 block text-[10px]">&lt; 512B</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[10px]">&lt; 512B</span>
+                              {lab.openWeights?.massive !== undefined && (
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                                  lab.openWeights.massive
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                                    : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                }`}>
+                                  {lab.openWeights.massive ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.massive}
                             </span>
@@ -521,7 +598,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.colossal && (
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded border border-slate-100 dark:border-slate-800/80">
-                            <span className="text-slate-400 block text-[10px]">&lt; 1.5T</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[10px]">&lt; 1.5T</span>
+                              {lab.openWeights?.colossal !== undefined && (
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                                  lab.openWeights.colossal
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                                    : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                }`}>
+                                  {lab.openWeights.colossal ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.colossal}
                             </span>
@@ -529,7 +617,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.planetary && (
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded border border-slate-100 dark:border-slate-800/80">
-                            <span className="text-slate-400 block text-[10px]">&lt; 5T</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[10px]">&lt; 5T</span>
+                              {lab.openWeights?.planetary !== undefined && (
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                                  lab.openWeights.planetary
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                                    : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                }`}>
+                                  {lab.openWeights.planetary ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.planetary}
                             </span>
@@ -537,7 +636,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.parameterSizes.singularity && (
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded border border-slate-100 dark:border-slate-800/80">
-                            <span className="text-slate-400 block text-[10px]">&lt; 15T</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-slate-400 block text-[10px]">&lt; 15T</span>
+                              {lab.openWeights?.singularity !== undefined && (
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                                  lab.openWeights.singularity
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                                    : 'bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                }`}>
+                                  {lab.openWeights.singularity ? 'Open' : 'Closed'}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                               {lab.parameterSizes.singularity}
                             </span>

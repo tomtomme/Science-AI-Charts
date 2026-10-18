@@ -77,10 +77,53 @@ function getBenchmarkHeadingColor(heading?: string): string {
 }
 
 /**
+ * Resolves exact anchor DOM IDs for column paragraphs (Col D to N) to support targeted scrolling from the slider
+ */
+export function getParagraphAnchorId(heading?: string): string | undefined {
+  if (!heading) return undefined;
+  const h = heading.toLowerCase().trim();
+
+  // Cat 1: IQ (Col D)
+  if (h.includes('spalte d') || h.includes('column d') || h.startsWith('iq') || h.includes('aa-ii')) return 'note-col-d';
+
+  // Cat 2: Non-Hallu-Rate (Col E)
+  if (h.includes('spalte e') || h.includes('column e') || h.includes('non-hallu') || h.includes('faktentreue')) return 'note-col-e';
+
+  // Cat 3: Science Knowledge (Col F)
+  if (h.includes('spalte f') || h.includes('column f') || h.includes('science knowledge') || h.includes('omniscience') || h.includes('faktenwissen')) return 'note-col-f';
+
+  // Cat 4: Plot Reading (Col G)
+  if (h.includes('spalte g') || h.includes('column g') || h.includes('plot reading') || h.includes('mmmu') || h.includes('diagrammanalyse')) return 'note-col-g';
+
+  // Cat 5: Diagnostics (Col H)
+  if (h.includes('spalte h') || h.includes('column h') || h.includes('diagnostic') || h.includes('diagnostik') || h.includes('medical') || h.includes('mlcr')) return 'note-col-h';
+
+  // Cat 6: Excel Analyst (Col I)
+  if (h.includes('spalte i') || h.includes('column i') || h.includes('excel')) return 'note-col-i';
+
+  // Cat 7: (3D) Trick Questions (Col J)
+  if (h.includes('spalte j') || h.includes('column j') || h.includes('trick questions') || h.includes('trickfragen') || h.includes('simplebench') || h.includes('(3d)')) return 'note-col-j';
+
+  // Cat 8: Real Econ & Legal Work (Col K)
+  if (h.includes('spalte k') || h.includes('column k') || h.includes('real econ') || h.includes('econ & legal') || h.includes('vals') || h.includes('wirtschaft')) return 'note-col-k';
+
+  // Final Score OLD (Col L)
+  if (h.includes('spalte l') || h.includes('column l') || h.includes('score old') || h === 'old' || h.startsWith('old:')) return 'note-col-l';
+
+  // Final Score NEW (Col M)
+  if (h.includes('spalte m') || h.includes('column m') || h.includes('score new') || h === 'new' || h.startsWith('new:')) return 'note-col-m';
+
+  // Worst-Case (Col N)
+  if (h.includes('spalte n') || h.includes('column n') || h.includes('worst-case') || h.includes('worst case') || h.startsWith('worst')) return 'note-col-n';
+
+  return undefined;
+}
+
+/**
  * Dynamically parse Section 1 content from Cell C34 into headings & paragraphs,
  * honoring dash cues ('- '), dashed divider lines ('---'), and section cues added by the user.
  */
-function parseSection1Text(rawText: string): CsvParagraph[] {
+export function parseSection1Text(rawText: string): CsvParagraph[] {
   if (!rawText) return [];
 
   interface Cut {
@@ -342,14 +385,16 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                    x.heading?.toLowerCase().trim() === 'finale scores')
               );
               const isFinalScoresAnchor = isFinalScoresHeading || (!hasActualFinalScoresMajor && isFirstScoreParagraph);
+              const paragraphAnchor = getParagraphAnchorId(p.heading);
+              const anchorId = paragraphAnchor || (isFinalScoresAnchor ? 'final-scores-section' : undefined);
 
               if (p.isMajor) {
                 return (
                   <div
                     key={idx}
-                    id={isFinalScoresAnchor ? 'final-scores-section' : undefined}
+                    id={anchorId}
                     className={`pt-3 pb-1 border-t-2 border-emerald-500/30 dark:border-emerald-400/20 first:border-t-0 first:pt-0 ${
-                      isFinalScoresAnchor ? 'scroll-mt-6 p-2 rounded-lg' : ''
+                      anchorId ? 'scroll-mt-6 p-2 rounded-lg' : ''
                     }`}
                   >
                     <div className="flex items-center gap-1.5 mb-1.5">
@@ -370,10 +415,10 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
               return (
                 <div
                   key={idx}
-                  id={isFinalScoresAnchor ? 'final-scores-section' : undefined}
+                  id={anchorId}
                   className={`${
                     p.heading ? 'pt-2 border-t border-slate-200/60 dark:border-slate-800/60 first:border-t-0 first:pt-0' : ''
-                  } ${isFinalScoresAnchor ? 'scroll-mt-6 p-2 rounded-lg' : ''}`}
+                  } ${anchorId ? 'scroll-mt-6 p-2 rounded-lg' : ''}`}
                 >
                   {p.heading && (() => {
                     const headingColor = getBenchmarkHeadingColor(p.heading);

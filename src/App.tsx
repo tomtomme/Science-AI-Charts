@@ -15,8 +15,10 @@ import { ExplodedBarChart } from './components/ExplodedBarChart';
 import { SearchBar } from './components/SearchBar';
 import { CsvNotesSection } from './components/CsvNotesSection';
 import { LabMatrixView } from './components/LabMatrixView';
+import { TimelineScatterplot } from './components/TimelineScatterplot';
 import { Language, TRANSLATIONS } from './utils/i18n';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp } from 'lucide-react';
+
 
 
 export default function App() {
@@ -30,8 +32,8 @@ export default function App() {
   // Schalter: 'current' (nur noch verfügbare Chatbots) vs 'all' (alle Chatbots der CSV)
   const [modelScope, setModelScope] = useState<ModelScope>('current');
 
-  // Preis-Filter: 'free' (Standard), 'paid', 'all'
-  const [priceFilter, setPriceFilter] = useState<PriceFilter>('free');
+  // Preis-Filter: 'paid' (Standard), 'free', 'all'
+  const [priceFilter, setPriceFilter] = useState<PriceFilter>('paid');
 
   // Pop-Up für Titel / Untertitel bei Mouse-Over
   const [showHeaderInfo, setShowHeaderInfo] = useState<boolean>(false);
@@ -74,6 +76,9 @@ export default function App() {
 
   // Tab-Navigation: 'benchmark' vs 'labs'
   const [activeTab, setActiveTab] = useState<'benchmark' | 'labs'>('benchmark');
+  // Two-Way Tab for Benchmark: 'barchart' (Balkendiagramm) vs 'timeline' (Zeitachse)
+  const [benchmarkView, setBenchmarkView] = useState<'barchart' | 'timeline'>('barchart');
+
 
   // LLM Labs Datensatz (aus Google Sheets gid=355721692 mit Fallback)
   const [labs, setLabs] = useState<LabEntry[]>(FALLBACK_LAB_ENTRIES);
@@ -86,9 +91,9 @@ export default function App() {
     });
   }, []);
 
-  // Filter: Freitext-Suche und Schnellfilter mit Standard-Vorauswahl: ChatGPT, Claude, Gemini
+  // Filter: Freitext-Suche und Schnellfilter mit Standard-Vorauswahl 'All' (alle Modell-Familien)
   const [searchFilter, setSearchFilter] = useState<string>('');
-  const [selectedFamilies, setSelectedFamilies] = useState<string[]>(['ChatGPT', 'Claude', 'Gemini']);
+  const [selectedFamilies, setSelectedFamilies] = useState<string[]>([]);
   const [selectedCompany] = useState<string | null>(null);
 
   const handleSelectLabFromMatrix = useCallback((creatorName: string) => {
@@ -99,34 +104,37 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // Smooth scroll down to "final scores" explainer section in notes below chart
-  const scrollToFinalScores = useCallback(() => {
-    // 1. Scroll page down to notes section container
+  // Smooth scroll down to exact paragraph in notes below chart (Columns D to N)
+  const scrollToParagraph = useCallback((targetId: string) => {
     const container = document.getElementById('csv-notes-section');
     if (container) {
       container.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    const doScrollToFinalScores = () => {
-      const el = document.getElementById('final-scores-section');
+    const doScrollToTarget = () => {
+      const el = document.getElementById(targetId) || document.getElementById('final-scores-section');
       const box = document.getElementById('section1-scroll-box');
       if (el) {
         if (box) {
-          // Explicitly scroll internal container directly to Final Scores section
           const targetTop = el.offsetTop - box.offsetTop;
-          box.scrollTo({ top: Math.max(0, targetTop - 8), behavior: 'smooth' });
+          box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
         }
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.classList.add('ring-2', 'ring-rose-500', 'bg-rose-500/15', 'rounded-lg', 'transition-all');
+        el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
         setTimeout(() => {
-          el.classList.remove('ring-2', 'ring-rose-500', 'bg-rose-500/15');
+          el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15');
         }, 3000);
       }
     };
 
-    setTimeout(doScrollToFinalScores, 200);
-    setTimeout(doScrollToFinalScores, 500);
+    setTimeout(doScrollToTarget, 200);
+    setTimeout(doScrollToTarget, 500);
   }, []);
+
+  // Smooth scroll down to "final scores" explainer section in notes below chart
+  const scrollToFinalScores = useCallback(() => {
+    scrollToParagraph('final-scores-section');
+  }, [scrollToParagraph]);
 
   // Active models based on scoreMode, modelScope & priceFilter ('current' vs 'all', 'free' vs 'paid' vs 'all')
   // HINWEIS: Wenn im Freitextfilter gesucht wird, sollen immer alle Bots durchsucht werden, nicht nur 'current' Bots.
@@ -460,20 +468,41 @@ export default function App() {
         <div className="w-full max-w-[1720px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 py-2">
           {/* Segmented Tab Controls */}
           <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl shrink-0">
-            <button
-              onClick={() => setActiveTab('benchmark')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                activeTab === 'benchmark'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <BarChart2 className="w-3.5 h-3.5" />
-              <span>{lang === 'de' ? 'Balkendiagramm' : 'Bar Chart'}</span>
-              <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 dark:bg-slate-600/70 rounded text-slate-700 dark:text-slate-200 tabular-nums">
-                {displayedModels.length}
-              </span>
-            </button>
+            {/* Two-Way Tab: Bar Chart & Timeline */}
+            <div className="flex items-center bg-slate-200/70 dark:bg-slate-700/60 rounded-lg p-0.5">
+              <button
+                onClick={() => {
+                  setActiveTab('benchmark');
+                  setBenchmarkView('barchart');
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  activeTab === 'benchmark' && benchmarkView === 'barchart'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <BarChart2 className="w-3.5 h-3.5" />
+                <span>{lang === 'de' ? 'Balkendiagramm' : 'Bar Chart'}</span>
+                <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 dark:bg-slate-600/70 rounded text-slate-700 dark:text-slate-200 tabular-nums">
+                  {displayedModels.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('benchmark');
+                  setBenchmarkView('timeline');
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  activeTab === 'benchmark' && benchmarkView === 'timeline'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+                <span>{lang === 'de' ? 'Zeitachse' : 'Timeline'}</span>
+              </button>
+            </div>
 
             <button
               onClick={() => setActiveTab('labs')}
@@ -491,10 +520,10 @@ export default function App() {
             </button>
           </div>
 
-          {/* Right section: Active filter reset notice + Benchmark Controls (only on benchmark tab) */}
+          {/* Right section: Active filter reset notice + Benchmark Controls (only on barchart benchmark view) */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 sm:ml-auto">
             {/* Active filter reset notice */}
-            {searchFilter && (
+            {searchFilter && activeTab === 'benchmark' && benchmarkView === 'barchart' && (
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-slate-500 text-[11px]">
                   {lang === 'de' ? 'Aktiver Lab-/Modell-Filter:' : 'Active Lab/Model filter:'} <strong className="text-slate-800 dark:text-slate-200 font-semibold">{searchFilter}</strong>
@@ -508,9 +537,10 @@ export default function App() {
               </div>
             )}
 
-            {/* Benchmark Controls: Advanced Button + Paid/Free/All Switcher + Explosion Button */}
-            {activeTab === 'benchmark' && (
+            {/* Benchmark Controls: Advanced Button + Paid/Free/All Switcher + Explosion Button (only on Bar Chart view) */}
+            {activeTab === 'benchmark' && benchmarkView === 'barchart' && (
               <div className="flex items-center gap-1.5 shrink-0">
+
                 {/* Advanced Button */}
                 <button
                   type="button"
@@ -619,74 +649,101 @@ export default function App() {
 
       {/* Main Content Area */}
       {activeTab === 'benchmark' ? (
-        <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-3 sm:py-3.5 flex flex-col space-y-3.5">
-          {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategorie-Slider, 5er-Schritt-Slider, NEW/OLD Score, Current/All Scope, Volle Explosion und alphabetischen Hersteller-Filtern */}
-          <SearchBar
-            value={searchFilter}
-            onChange={(val) => {
-              setSearchFilter(val);
-              if (val.trim().length > 0) {
-                setSelectedFamilies([]);
-              }
-            }}
-            selectedFamilies={selectedFamilies}
-            onToggleFamily={handleToggleFamily}
-            onClearFamilies={handleClearFamilies}
-            topCount={topCount}
-            onTopCountChange={setTopCount}
-            maxAvailableModels={currentModels.length}
-            matchCount={matchCount}
-            totalCount={currentModels.length}
-            lang={lang}
-            sortBy={sortBy}
-            onSortByChange={setSortBy}
-            selectedCategoryIndex={selectedCategoryIndex}
-            onCategoryIndexChange={(idx) => {
-              setSelectedCategoryIndex(idx);
-              if (idx > 0) {
-                setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
-              } else {
-                setCategoryInfoComp(null);
-              }
-            }}
-            onHoverCategory={setCategoryInfoComp}
-            scoreMode={scoreMode}
-            onScoreModeChange={setScoreMode}
-            onScrollToFinalScores={scrollToFinalScores}
-            modelScope={effectiveModelScope}
-            onModelScopeChange={setModelScope}
-            showAdvanced={showAdvanced}
-            categoryNames={loadedData.headerMeta?.categoryNames}
-          />
-
-          {/* Balkendiagramm: Breit dargestellt, die volle Containerbreite nutzend */}
-          <div className="w-full">
-            <ExplodedBarChart
+        benchmarkView === 'timeline' ? (
+          <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-4 flex flex-col space-y-4">
+            <TimelineScatterplot
               models={displayedModels}
-              activeBenchmarkId={null}
-              activeCategoryIndex={selectedCategoryIndex}
-              hoveredCategoryComp={categoryInfoComp}
-              sortBy={sortBy}
+              allModels={currentModels}
               scoreMode={scoreMode}
-              explosionMode={explosionMode}
-              onExplosionModeChange={setExplosionMode}
-              searchFilter={searchFilter}
-              selectedFamilies={selectedFamilies}
-              selectedCompany={selectedCompany}
+              onScoreModeChange={setScoreMode}
+              selectedCategoryIndex={selectedCategoryIndex}
+              onCategoryIndexChange={(idx) => {
+                setSelectedCategoryIndex(idx);
+                if (idx > 0) {
+                  setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
+                } else {
+                  setCategoryInfoComp(null);
+                }
+              }}
               lang={lang}
+            />
+
+            {/* Notes Section under Timeline */}
+            <div className="w-full pt-1 pb-4">
+              <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
+            </div>
+          </main>
+        ) : (
+          <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-3 sm:py-3.5 flex flex-col space-y-3.5">
+            {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategorie-Slider, 5er-Schritt-Slider, NEW/OLD Score, Current/All Scope, Volle Explosion und alphabetischen Hersteller-Filtern */}
+            <SearchBar
+              value={searchFilter}
+              onChange={(val) => {
+                setSearchFilter(val);
+                if (val.trim().length > 0) {
+                  setSelectedFamilies([]);
+                }
+              }}
+              selectedFamilies={selectedFamilies}
+              onToggleFamily={handleToggleFamily}
+              onClearFamilies={handleClearFamilies}
+              topCount={topCount}
+              onTopCountChange={setTopCount}
+              maxAvailableModels={currentModels.length}
+              matchCount={matchCount}
+              totalCount={currentModels.length}
+              lang={lang}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
+              selectedCategoryIndex={selectedCategoryIndex}
+              onCategoryIndexChange={(idx) => {
+                setSelectedCategoryIndex(idx);
+                if (idx > 0) {
+                  setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
+                } else {
+                  setCategoryInfoComp(null);
+                }
+              }}
+              onHoverCategory={setCategoryInfoComp}
+              scoreMode={scoreMode}
+              onScoreModeChange={setScoreMode}
+              onScrollToFinalScores={scrollToFinalScores}
+              onScrollToParagraph={scrollToParagraph}
+              modelScope={effectiveModelScope}
+              onModelScopeChange={setModelScope}
               showAdvanced={showAdvanced}
-              onToggleAdvanced={() => setShowAdvanced((prev) => !prev)}
-              priceFilter={priceFilter}
-              onPriceFilterChange={setPriceFilter}
               categoryNames={loadedData.headerMeta?.categoryNames}
             />
-          </div>
 
-          {/* Textfeld-Bereich unter dem Balkendiagramm: CSV-Zellen B34/C34 & N34/O34 */}
-          <div className="w-full pt-1 pb-4">
-            <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
-          </div>
-        </main>
+            {/* Balkendiagramm: Breit dargestellt, die volle Containerbreite nutzend */}
+            <div className="w-full">
+              <ExplodedBarChart
+                models={displayedModels}
+                activeBenchmarkId={null}
+                activeCategoryIndex={selectedCategoryIndex}
+                hoveredCategoryComp={categoryInfoComp}
+                sortBy={sortBy}
+                scoreMode={scoreMode}
+                explosionMode={explosionMode}
+                onExplosionModeChange={setExplosionMode}
+                searchFilter={searchFilter}
+                selectedFamilies={selectedFamilies}
+                selectedCompany={selectedCompany}
+                lang={lang}
+                showAdvanced={showAdvanced}
+                onToggleAdvanced={() => setShowAdvanced((prev) => !prev)}
+                priceFilter={priceFilter}
+                onPriceFilterChange={setPriceFilter}
+                categoryNames={loadedData.headerMeta?.categoryNames}
+              />
+            </div>
+
+            {/* Textfeld-Bereich unter dem Balkendiagramm: CSV-Zellen B34/C34 & N34/O34 */}
+            <div className="w-full pt-1 pb-4">
+              <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
+            </div>
+          </main>
+        )
       ) : (
         <main className="flex-1 w-full">
           <LabMatrixView
@@ -697,6 +754,7 @@ export default function App() {
           />
         </main>
       )}
+
 
     </div>
   );
