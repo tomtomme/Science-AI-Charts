@@ -141,47 +141,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
        (lang === 'en' ? activeCategoryComp.nameEn : activeCategoryComp.nameDe))
     : null;
 
-  // Exact popup info and scroll targets for all 3 composite scores + all 8 benchmark categories
-  const popupInfo = useMemo(() => {
-    const isDe = lang === 'de';
-    if (unifiedSliderValue === 0) {
-      return {
-        title: isDe ? 'Final Score NEW (Spalte M)' : 'Final Score NEW (Column M)',
-        desc: isDe
-          ? 'Gewichteter Gesamtscore über alle 8 wissenschaftlichen Benchmarks mit jeweils 12.5% Gewichtung.'
-          : 'Weighted total score across all 8 scientific benchmarks with 12.5% weight each.',
-        linkText: isDe ? 'Zum Textabschnitt von Spalte M springen' : 'Jump to explanation for Column M',
-        targetId: 'note-col-m',
-        color: '#10B981',
-      };
-    }
-    if (unifiedSliderValue === 1) {
-      return {
-        title: isDe ? 'Final Score OLD (Spalte L)' : 'Final Score OLD (Column L)',
-        desc: isDe
-          ? 'Früherer Gesamtscore über 5 Benchmarks vor Integration der Rechts-/Wirtschafts-Kategorie.'
-          : 'Earlier composite score over 5 benchmarks prior to legal/economics integration.',
-        linkText: isDe ? 'Zum Textabschnitt von Spalte L springen' : 'Jump to explanation for Column L',
-        targetId: 'note-col-l',
-        color: '#D97706',
-      };
-    }
-    if (unifiedSliderValue === 2) {
-      return {
-        title: isDe ? 'Final Score Worst-Case (Spalte N)' : 'Final Score Worst-Case (Column N)',
-        desc: isDe
-          ? '7-Benchmark-Durchschnitt multipliziert mit Non-Hallucination-Rate (Spalte N). Konservatives Szenario.'
-          : '7-benchmark average multiplied by Non-Hallucination Rate (Column N). Conservative scenario.',
-        linkText: isDe ? 'Zum Textabschnitt von Spalte N springen' : 'Jump to explanation for Column N',
-        targetId: 'note-col-n',
-        color: '#F43F5E',
-      };
-    }
+  // Scroll targets for all 3 composite scores + all 8 benchmark categories (clean labels without Spalte/Col strings)
+  const scoreScrollTargets = useMemo(() => {
+    if (unifiedSliderValue === 0) return { targetId: 'note-col-m' };
+    if (unifiedSliderValue === 1) return { targetId: 'note-col-l' };
+    if (unifiedSliderValue === 2) return { targetId: 'note-col-n' };
 
-    // Category 1..8
     const catIdx = unifiedSliderValue - 2; // 1..8
-    const comp = BENCHMARK_COMPONENTS[catIdx - 1];
-    const colLetters = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
     const colTargets = [
       'note-col-d',
       'note-col-e',
@@ -192,22 +158,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       'note-col-j',
       'note-col-k',
     ];
-    const letter = colLetters[catIdx - 1] || '';
-    const targetId = colTargets[catIdx - 1] || 'final-scores-section';
-    const compName = isDe ? comp?.nameDe : comp?.nameEn;
-
     return {
-      title: `#${catIdx} ${compName} (Spalte ${letter})`,
-      desc: isDe
-        ? `${comp?.descriptionDe} (Quelle: ${comp?.sourceName}, Formel: ${comp?.formulaDesc})`
-        : `${comp?.descriptionEn} (Source: ${comp?.sourceName}, Formula: ${comp?.formulaDesc})`,
-      linkText: isDe
-        ? `Zum Textabschnitt von Spalte ${letter} (${compName}) springen`
-        : `Jump to explanation for Column ${letter} (${compName})`,
-      targetId,
-      color: comp?.color || '#3B82F6',
+      targetId: colTargets[catIdx - 1] || 'final-scores-section',
     };
-  }, [unifiedSliderValue, lang]);
+  }, [unifiedSliderValue]);
 
   if (!showAdvanced) return null;
 
@@ -250,7 +204,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               onClick={() => handleUnifiedStep(-1)}
               disabled={unifiedSliderValue <= 0}
               className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-              title="-1 Step"
             >
               <Minus className="w-3 h-3" />
             </button>
@@ -268,19 +221,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               onClick={() => handleUnifiedStep(1)}
               disabled={unifiedSliderValue >= 10}
               className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-              title="+1 Step"
             >
               <Plus className="w-3 h-3" />
             </button>
 
-            {/* Feste Box für das Badge: New Score / Old Score / Worst Case oder Kategorie 1..8 */}
+            {/* Feste Box für das Badge: New Score / Old Score / Worst Case oder Kategorie 1..8 (klickbar als Sprungmarke, ohne störende Popups) */}
             <div className="w-[155px] sm:w-[195px] shrink-0 overflow-hidden flex items-center">
               {unifiedSliderValue === 0 && (
                 <button
                   type="button"
                   onClick={() => handleScroll('note-col-m')}
                   className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
-                  title={popupInfo.linkText}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                   <span className="truncate">{t.scoreModeNew}</span>
@@ -291,7 +242,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   type="button"
                   onClick={() => handleScroll('note-col-l')}
                   className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
-                  title={popupInfo.linkText}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                   <span className="truncate">{t.scoreModeOld}</span>
@@ -302,7 +252,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   type="button"
                   onClick={() => handleScroll('note-col-n')}
                   className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
-                  title={popupInfo.linkText}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                   <span className="truncate">{t.scoreModeWorstCase}</span>
@@ -311,10 +260,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               {unifiedSliderValue >= 3 && activeCategoryComp && activeCategoryName && (
                 <button
                   type="button"
-                  onClick={() => handleScroll(popupInfo.targetId)}
+                  onClick={() => handleScroll(scoreScrollTargets.targetId)}
                   className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ backgroundColor: activeCategoryComp.color }}
-                  title={popupInfo.linkText}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                   <span className="truncate">

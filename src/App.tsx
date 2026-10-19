@@ -17,6 +17,7 @@ import { CsvNotesSection } from './components/CsvNotesSection';
 import { LabMatrixView } from './components/LabMatrixView';
 import { TimelineScatterplot } from './components/TimelineScatterplot';
 import { Language, TRANSLATIONS } from './utils/i18n';
+import { matchesSearchQuery } from './utils/searchUtils';
 import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp } from 'lucide-react';
 
 
@@ -164,14 +165,8 @@ export default function App() {
 
   const matchesFilter = useCallback(
     (model: ModelRecord) => {
-      const q = searchFilter.trim().toLowerCase();
-      const matchesSearch =
-        !q ||
-        model.displayName.toLowerCase().includes(q) ||
-        model.name.toLowerCase().includes(q) ||
-        model.companyName.toLowerCase().includes(q) ||
-        model.creatorClean.toLowerCase().includes(q) ||
-        Boolean(model.creator && model.creator.toLowerCase().includes(q));
+      const targetText = `${model.displayName} ${model.name} ${model.companyName} ${model.creatorClean} ${model.creator || ''}`;
+      const matchesSearch = matchesSearchQuery(searchFilter, targetText);
 
       const matchesFamilies =
         selectedFamilies.length === 0 ||
@@ -246,6 +241,13 @@ export default function App() {
   const handleClearFamilies = useCallback(() => {
     setSelectedFamilies([]);
   }, []);
+
+  const handleExplosionModeChange = useCallback((mode: ExplosionMode) => {
+    setExplosionMode(mode);
+    if (mode === 'off' && selectedCategoryIndex === 0) {
+      setCategoryInfoComp(null);
+    }
+  }, [selectedCategoryIndex]);
 
   // Hourly countdown timer (3600 seconds)
   const SYNC_INTERVAL = 3600;
@@ -605,7 +607,7 @@ export default function App() {
                   <div className="flex items-center bg-slate-200/60 dark:bg-slate-900/50 rounded p-0.5 gap-0.5">
                     <button
                       type="button"
-                      onClick={() => setExplosionMode('on')}
+                      onClick={() => handleExplosionModeChange('on')}
                       className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                         explosionMode === 'on'
                           ? 'bg-emerald-600 text-white shadow-2xs'
@@ -617,7 +619,7 @@ export default function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setExplosionMode('hover')}
+                      onClick={() => handleExplosionModeChange('hover')}
                       className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                         explosionMode === 'hover'
                           ? 'bg-blue-600 text-white shadow-2xs'
@@ -629,7 +631,7 @@ export default function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setExplosionMode('off')}
+                      onClick={() => handleExplosionModeChange('off')}
                       className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                         explosionMode === 'off'
                           ? 'bg-slate-600 text-white shadow-2xs'
@@ -725,7 +727,7 @@ export default function App() {
                 sortBy={sortBy}
                 scoreMode={scoreMode}
                 explosionMode={explosionMode}
-                onExplosionModeChange={setExplosionMode}
+                onExplosionModeChange={handleExplosionModeChange}
                 searchFilter={searchFilter}
                 selectedFamilies={selectedFamilies}
                 selectedCompany={selectedCompany}

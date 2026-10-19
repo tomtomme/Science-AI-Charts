@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode, ScoreMode } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
+import { matchesSearchQuery } from '../utils/searchUtils';
 import { ExternalLink } from 'lucide-react';
 
 interface ExplodedBarChartProps {
@@ -66,7 +67,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
   // Active benchmark component if a single category is selected (1 to 8)
   const activeComp = activeCategoryIndex > 0 ? BENCHMARK_COMPONENTS[activeCategoryIndex - 1] : null;
-  const displayedCategoryComp = hoveredCategoryComp || activeComp;
+  const isScienceKnowledge = activeComp?.id === 'scienceKnowledge';
+  // When explosion is 'off', revert details area back to full score info unless a category is explicitly selected on the slider
+  const displayedCategoryComp = currentExplosionMode === 'off'
+    ? activeComp
+    : (hoveredCategoryComp || activeComp);
 
   // Index of hovered bar
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -146,16 +151,19 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     return (Math.max(0, val) / maxAxisScore) * availablePlotHeight;
   };
 
-  // Determine if a model matches the search/family filters (multi-select supported)
+  // For Science Knowledge (Col F), Y-axis is -60 to +60 (range = 120, centered at 0)
+  // For other views, Y-axis is 0 to maxAxisScore
+  const getYPosForVal = (val: number): number => {
+    if (isScienceKnowledge) {
+      return topPadding + ((60 - val) / 120) * availablePlotHeight;
+    }
+    return baselineY - scaleY(val);
+  };
+
+  // Determine if a model matches the search/family filters (multi-select & boolean search supported)
   const isModelHighlighted = (model: ModelRecord): boolean => {
-    const q = searchFilter.trim().toLowerCase();
-    const matchesSearch =
-      !q ||
-      model.displayName.toLowerCase().includes(q) ||
-      model.name.toLowerCase().includes(q) ||
-      model.companyName.toLowerCase().includes(q) ||
-      model.creatorClean.toLowerCase().includes(q) ||
-      Boolean(model.creator && model.creator.toLowerCase().includes(q));
+    const targetText = `${model.displayName} ${model.name} ${model.companyName} ${model.creatorClean} ${model.creator || ''}`;
+    const matchesSearch = matchesSearchQuery(searchFilter, targetText);
 
     const matchesFamilies =
       selectedFamilies.length === 0 ||
@@ -276,8 +284,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const displayedModel = currentExplosionMode === 'off' ? hoveredModel : (hoveredModel || persistentModel);
   const displayedSegment = currentExplosionMode === 'off' ? null : (hoveredSegment || persistentSegment);
 
-  // Grid tick lines: if single category (0-100%), ticks: 0, 20, 40, 60, 80, 100
-  const yTicks = activeComp
+  // Grid tick lines:
+  // - If Science Knowledge (Col F): -60 to +60 with 0 centered
+  // - If other single category: 0, 20, 40, 60, 80, 100
+  // - If overall score: 0, 10, 20, 30, 40, 50, 60, 70, ...
+  const yTicks = isScienceKnowledge
+    ? [-60, -40, -20, 0, 20, 40, 60]
+    : activeComp
     ? [0, 20, 40, 60, 80, 100]
     : [0, 10, 20, 30, 40, 50, 60, 70, ...(maxAxisScore > 70 ? [80] : [])];
 
@@ -449,258 +462,232 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
-      {/* Non-intrusive Info Bar above chart: locked fixed height to guarantee rock-solid zero layout shift */}
-      <div className="flex flex-col justify-between gap-1.5 h-[86px] min-h-[86px] max-h-[86px] pb-2 mb-2 border-b border-slate-100 dark:border-slate-800 text-xs overflow-hidden">
-        {/* Row 1: Model & Benchmark details across full width (locked 32px height) */}
-        <div className="flex items-center w-full h-[32px] min-h-[32px] max-h-[32px] overflow-hidden">
-          <div className="w-full min-w-0 overflow-hidden">
-            {displayedModel ? (
-              <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[32px] overflow-hidden whitespace-nowrap">
-                {/* Model Name & Favicon (Clickable link if modelUrl is available) */}
-                {displayedModel.modelUrl ? (
-                  <a
-                    href={displayedModel.modelUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors group cursor-pointer"
-                    title={`${displayedModel.displayName} · ${t.openChatbotApp}`}
-                  >
-                    <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
-                      <img
-                        src={displayedModel.faviconUrl}
-                        alt=""
-                        className={`w-full h-full object-contain ${
-                          isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
-                        }`}
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    </span>
-                    <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 group-hover:decoration-blue-500">
-                      {displayedModel.displayName}
-                    </span>
-                    <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
-                  </a>
-                ) : (
-                  <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
-                      <img
-                        src={displayedModel.faviconUrl}
-                        alt=""
-                        className={`w-full h-full object-contain ${
-                          isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
-                        }`}
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    </span>
+      {/* Sleek one-row explainer & info bar above chart: locked 38px height for zero layout shift */}
+      <div className="flex items-center h-[38px] min-h-[38px] max-h-[38px] px-3 mb-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-hidden">
+        <div className="w-full min-w-0 overflow-hidden">
+          {displayedModel ? (
+            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
+              {/* Model Name & Favicon (Clickable link if modelUrl is available) */}
+              {displayedModel.modelUrl ? (
+                <a
+                  href={displayedModel.modelUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors group cursor-pointer shrink-0"
+                  title={`${displayedModel.displayName} · ${t.openChatbotApp}`}
+                >
+                  <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
+                    <img
+                      src={displayedModel.faviconUrl}
+                      alt=""
+                      className={`w-full h-full object-contain ${
+                        isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
+                      }`}
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  </span>
+                  <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 group-hover:decoration-blue-500">
                     {displayedModel.displayName}
                   </span>
-                )}
-
-                <span className="text-slate-400">·</span>
-                <span className="font-mono text-slate-600 dark:text-slate-400">
-                  {t.company} <strong>{displayedModel.companyName}</strong>
-                </span>
-
-                {displayedModel.releaseDate && (
-                  <>
-                    <span className="text-slate-400">·</span>
-                    <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                      <span className="opacity-75">📅</span>
-                      <span>{displayedModel.releaseDate}</span>
-                    </span>
-                  </>
-                )}
-
-                {/* Specific segment info if hovered, else summary score */}
-                {displayedSegment ? (
-                  <>
-                    <span className="text-slate-400">·</span>
-                    <div className="flex items-center gap-1.5 font-bold">
-                      <span
-                        className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
-                        style={{ backgroundColor: displayedSegment.comp.color }}
-                      />
-                      <span style={{ color: displayedSegment.comp.color }}>
-                        {lang === 'en' ? displayedSegment.comp.nameEn : displayedSegment.comp.nameDe}
-                      </span>
-                      <span className="font-mono text-slate-900 dark:text-white font-bold">
-                        {Math.round(displayedSegment.raw)}%
-                      </span>
-                      <span className="font-mono text-slate-500 dark:text-slate-400 font-normal">
-                        (+{displayedSegment.points.toFixed(1)} {t.points})
-                      </span>
-                    </div>
-
-                    <span className="text-slate-400">·</span>
-                    {displayedSegment.comp.sourceUrl ? (
-                      <a
-                        href={displayedSegment.comp.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer"
-                        title={`${displayedSegment.comp.sourceName} ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
-                      >
-                        <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
-                        <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                      </a>
-                    ) : (
-                      <span className="font-mono text-[11px] text-slate-400">
-                        {t.sourceLabel} {displayedSegment.comp.sourceName}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <span className="text-slate-400">·</span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                      {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated} {t.points} ({t.rank} #{displayedModel.rank})
-                    </span>
-                    <span className="text-slate-400">·</span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                      {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / 8).toFixed(1)} {t.points})
-                    </span>
-                  </>
-                )}
-              </div>
-            ) : displayedCategoryComp ? (
-              <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[32px] overflow-hidden whitespace-nowrap">
-                <div className="flex items-center gap-1.5 font-bold shrink-0" style={{ color: displayedCategoryComp.color }}>
-                  <span
-                    className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
-                    style={{ backgroundColor: displayedCategoryComp.color }}
-                  />
-                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
-                    {(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) ||
-                     (lang === 'en' ? displayedCategoryComp.nameEn : displayedCategoryComp.nameDe)}
-                  </span>
-                </div>
-
-                <span className="text-slate-400">·</span>
-                {displayedCategoryComp.sourceUrl ? (
-                  <a
-                    href={displayedCategoryComp.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
-                    title={`${displayedCategoryComp.sourceName} ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
-                  >
-                    <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
-                    <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                  </a>
-                ) : (
-                  <span className="font-mono text-xs text-slate-400 shrink-0">
-                    {t.sourceLabel} {displayedCategoryComp.sourceName}
-                  </span>
-                )}
-
-                {sortBy === 'date' && (
-                  <>
-                    <span className="text-slate-400">·</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
-                      <span>📅</span>
-                      <span>{t.sortedByDateLabel}</span>
-                    </span>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[32px] overflow-hidden whitespace-nowrap">
-                <div className="flex items-center gap-1.5 font-bold shrink-0" style={{ color: currentScoreInfo.color }}>
-                  <span
-                    className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
-                    style={{ backgroundColor: currentScoreInfo.color }}
-                  />
-                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
-                    {currentScoreInfo.name}
-                  </span>
-                </div>
-
-                <span className="text-slate-400">·</span>
-                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
-                  {currentScoreInfo.badgeLabel}
-                </span>
-
-                <span className="text-slate-400">·</span>
-                <a
-                  href={`#${currentScoreInfo.targetId}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const el = document.getElementById(currentScoreInfo.targetId) || document.getElementById('final-scores-section');
-                    const box = document.getElementById('section1-scroll-box');
-                    const container = document.getElementById('csv-notes-section');
-                    if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    if (el) {
-                      if (box) {
-                        const targetTop = el.offsetTop - box.offsetTop;
-                        box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
-                      }
-                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
-                      setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15'), 3000);
-                    }
-                  }}
-                  className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
-                  title={lang === 'de' ? 'Zum Textabschnitt springen' : 'Jump to explanation'}
-                >
-                  <span>{t.sourceLabel} <strong className="underline">{currentScoreInfo.sourceName}</strong></span>
-                  <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                  <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
                 </a>
+              ) : (
+                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 shrink-0">
+                  <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
+                    <img
+                      src={displayedModel.faviconUrl}
+                      alt=""
+                      className={`w-full h-full object-contain ${
+                        isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
+                      }`}
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  </span>
+                  {displayedModel.displayName}
+                </span>
+              )}
 
-                {sortBy === 'date' && (
-                  <>
-                    <span className="text-slate-400">·</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
-                      <span>📅</span>
-                      <span>{t.sortedByDateLabel}</span>
+              <span className="text-slate-400">·</span>
+              <span className="font-mono text-slate-600 dark:text-slate-400 shrink-0">
+                {t.company} <strong>{displayedModel.companyName}</strong>
+              </span>
+
+              {displayedModel.releaseDate && (
+                <>
+                  <span className="text-slate-400">·</span>
+                  <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 shrink-0">
+                    <span className="opacity-75">📅</span>
+                    <span>{displayedModel.releaseDate}</span>
+                  </span>
+                </>
+              )}
+
+              {/* Specific segment info if hovered, else summary score */}
+              {displayedSegment ? (
+                <>
+                  <span className="text-slate-400">·</span>
+                  <div className="flex items-center gap-1.5 font-bold shrink-0">
+                    <span
+                      className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
+                      style={{ backgroundColor: displayedSegment.comp.color }}
+                    />
+                    <span style={{ color: displayedSegment.comp.color }}>
+                      {lang === 'en' ? displayedSegment.comp.nameEn : displayedSegment.comp.nameDe}
                     </span>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+                    <span className="font-mono text-slate-900 dark:text-white font-bold">
+                      {displayedSegment.comp.id === 'scienceKnowledge'
+                        ? (displayedSegment.raw > 0 ? `+${Math.round(displayedSegment.raw)} pts` : `${Math.round(displayedSegment.raw)} pts`)
+                        : `${Math.round(displayedSegment.raw)}%`}
+                    </span>
+                    <span className="font-mono text-slate-500 dark:text-slate-400 font-normal">
+                      (+{displayedSegment.points.toFixed(1)} {t.points})
+                    </span>
+                  </div>
 
-        {/* Row 2: Always present with strictly locked 38px height to guarantee rock-solid zero-shift height */}
-        <div className="text-[11.5px] rounded px-2.5 py-0.5 border flex items-center gap-2.5 leading-snug h-[38px] min-h-[38px] max-h-[38px] overflow-hidden transition-colors bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60">
-          {displayedSegment ? (
-            <div className="flex items-center gap-2 flex-1 min-w-0 h-full overflow-hidden">
-              <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
-                {t.criterionLabel}
-              </span>
-              <span
-                className="text-slate-600 dark:text-slate-300 line-clamp-2 min-w-0 flex-1 leading-snug"
-                title={lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
-              >
-                {lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
-              </span>
+                  <span className="text-slate-400">·</span>
+                  {displayedSegment.comp.sourceUrl ? (
+                    <a
+                      href={displayedSegment.comp.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                      title={`${displayedSegment.comp.sourceName} ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
+                    >
+                      <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
+                      <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="font-mono text-[11px] text-slate-400 shrink-0">
+                      {t.sourceLabel} {displayedSegment.comp.sourceName}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="text-slate-400">·</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
+                    {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated} {t.points} ({t.rank} #{displayedModel.rank})
+                  </span>
+                  <span className="text-slate-400">·</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
+                    {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / 8).toFixed(1)} {t.points})
+                  </span>
+                </>
+              )}
             </div>
           ) : displayedCategoryComp ? (
-            <div className="flex items-center gap-2 flex-1 min-w-0 h-full overflow-hidden">
-              <span className="font-semibold text-slate-800 dark:text-slate-100 shrink-0">
-                {t.criterionLabel}
-              </span>
+            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
+              <div className="flex items-center gap-1.5 font-bold shrink-0" style={{ color: displayedCategoryComp.color }}>
+                <span
+                  className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
+                  style={{ backgroundColor: displayedCategoryComp.color }}
+                />
+                <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                  {(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) ||
+                   (lang === 'en' ? displayedCategoryComp.nameEn : displayedCategoryComp.nameDe)}
+                </span>
+              </div>
+
+              <span className="text-slate-400">·</span>
+              {displayedCategoryComp.sourceUrl ? (
+                <a
+                  href={displayedCategoryComp.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                  title={`${displayedCategoryComp.sourceName} ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
+                >
+                  <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
+                  <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                </a>
+              ) : (
+                <span className="font-mono text-xs text-slate-400 shrink-0">
+                  {t.sourceLabel} {displayedCategoryComp.sourceName}
+                </span>
+              )}
+
+              <span className="text-slate-400">·</span>
               <span
-                className="text-slate-600 dark:text-slate-300 line-clamp-2 min-w-0 flex-1 leading-snug"
+                className="text-slate-600 dark:text-slate-300 truncate min-w-0 flex-1 leading-snug"
                 title={lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
               >
                 {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
               </span>
+
+              {sortBy === 'date' && (
+                <>
+                  <span className="text-slate-400">·</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
+                    <span>📅</span>
+                    <span>{t.sortedByDateLabel}</span>
+                  </span>
+                </>
+              )}
             </div>
           ) : (
-            <div className="flex items-center gap-2 flex-1 min-w-0 h-full overflow-hidden">
-              <span className="font-semibold text-slate-800 dark:text-slate-100 shrink-0">
-                {t.criterionLabel}
+            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
+              <div className="flex items-center gap-1.5 font-bold shrink-0" style={{ color: currentScoreInfo.color }}>
+                <span
+                  className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
+                  style={{ backgroundColor: currentScoreInfo.color }}
+                />
+                <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                  {currentScoreInfo.name}
+                </span>
+              </div>
+
+              <span className="text-slate-400">·</span>
+              <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                {currentScoreInfo.badgeLabel}
               </span>
+
+              <span className="text-slate-400">·</span>
+              <a
+                href={`#${currentScoreInfo.targetId}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  const el = document.getElementById(currentScoreInfo.targetId) || document.getElementById('final-scores-section');
+                  const box = document.getElementById('section1-scroll-box');
+                  const container = document.getElementById('csv-notes-section');
+                  if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  if (el) {
+                    if (box) {
+                      const targetTop = el.offsetTop - box.offsetTop;
+                      box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
+                    }
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
+                    setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15'), 3000);
+                  }
+                }}
+                className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                title={lang === 'de' ? 'Zum Textabschnitt springen' : 'Jump to explanation'}
+              >
+                <span>{t.sourceLabel} <strong className="underline">{currentScoreInfo.sourceName}</strong></span>
+                <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+              </a>
+
+              <span className="text-slate-400">·</span>
               <span
-                className="text-slate-600 dark:text-slate-300 line-clamp-1 truncate min-w-0 flex-1 leading-snug"
+                className="text-slate-600 dark:text-slate-300 truncate min-w-0 flex-1 leading-snug"
                 title={currentScoreInfo.description}
               >
                 {currentScoreInfo.description}
               </span>
+
+              {sortBy === 'date' && (
+                <>
+                  <span className="text-slate-400">·</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
+                    <span>📅</span>
+                    <span>{t.sortedByDateLabel}</span>
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -872,7 +859,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
           {/* Horizontal Gridlines */}
           {yTicks.map((tick) => {
-            const yPos = baselineY - scaleY(tick);
+            const yPos = getYPosForVal(tick);
+            const isZero = tick === 0;
             return (
               <g key={`tick-${tick}`}>
                 <line
@@ -880,20 +868,21 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   y1={yPos}
                   x2={chartWidth - 25}
                   y2={yPos}
-                  stroke={tick === 0 ? '#94A3B8' : '#E2E8F0'}
-                  className="dark:stroke-slate-800"
-                  strokeWidth={tick === 0 ? 1.5 : 1}
+                  stroke={isZero ? '#64748B' : '#E2E8F0'}
+                  className={isZero ? 'dark:stroke-slate-400' : 'dark:stroke-slate-800'}
+                  strokeWidth={isZero ? 1.5 : 1}
+                  strokeDasharray={isScienceKnowledge && !isZero ? '2,2' : undefined}
                 />
                 <text
                   x={marginLeft - 18}
                   y={yPos + 4}
                   textAnchor="end"
-                  fill="#94A3B8"
+                  fill={isZero ? '#475569' : '#94A3B8'}
                   fontSize="10"
                   fontFamily="monospace"
                   className="tabular-nums font-semibold"
                 >
-                  {tick}
+                  {isScienceKnowledge && tick > 0 ? `+${tick}` : tick}
                 </text>
               </g>
             );
@@ -907,14 +896,42 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             const isHovered = hoveredIndex === index;
             const highlighted = isModelHighlighted(model);
 
-            // In single category mode, measure that category's raw score (0-100%)
+            // In single category mode, measure that category's raw score
             const catRaw = activeComp ? (model.rawScores[activeComp.key] ?? 0) : 0;
             const catBreakdown = activeComp ? model.breakdown.find((b) => b.id === activeComp.id) : null;
             const catPoints = catBreakdown?.pointsContribution ?? (activeComp ? activeComp.transform(catRaw) / 8 : 0);
 
             const score = model.score ?? model.scoreNewReported ?? model.scoreNewCalculated;
-            const totalBarHeight = activeComp ? scaleY(catRaw) : scaleY(score);
-            const barCenterY = baselineY - totalBarHeight / 2;
+            const zeroY = isScienceKnowledge ? getYPosForVal(0) : baselineY;
+
+            let totalBarHeight: number;
+            let barTopY: number;
+            let barBottomY: number;
+            let barCenterY: number;
+
+            if (isScienceKnowledge) {
+              if (catRaw >= 0) {
+                barTopY = getYPosForVal(catRaw);
+                barBottomY = zeroY;
+                totalBarHeight = Math.max(1.5, zeroY - barTopY);
+                barCenterY = barTopY + totalBarHeight / 2;
+              } else {
+                barTopY = zeroY;
+                barBottomY = getYPosForVal(catRaw);
+                totalBarHeight = Math.max(1.5, barBottomY - zeroY);
+                barCenterY = zeroY + totalBarHeight / 2;
+              }
+            } else if (activeComp) {
+              totalBarHeight = scaleY(catRaw);
+              barTopY = baselineY - totalBarHeight;
+              barBottomY = baselineY;
+              barCenterY = baselineY - totalBarHeight / 2;
+            } else {
+              totalBarHeight = scaleY(score);
+              barTopY = baselineY - totalBarHeight;
+              barBottomY = baselineY;
+              barCenterY = baselineY - totalBarHeight / 2;
+            }
 
             // Explosion gap: 0 when not exploded (including in 'off' mode), 2.5 when hovered & exploded, 2.2 when forced 'on', 1.8 for neighbors in 'hover'
             const explosionGap = !exploded
@@ -939,13 +956,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               };
             });
 
-            // Top of the bar
+            // Top of the bar (multi-category exploded)
             const topSegment = segments[segments.length - 1];
-            const barTopY = activeComp
-              ? baselineY - totalBarHeight
-              : exploded && topSegment
-              ? topSegment.segY
-              : baselineY - totalBarHeight;
+            if (!activeComp) {
+              barTopY = exploded && topSegment ? topSegment.segY : (baselineY - totalBarHeight);
+            }
 
             // Unexploded country color fill: USA stars, China sickle, Europe blue-yellow
             const countryFill = getCountryBarFill(model);
@@ -964,22 +979,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 className="cursor-pointer"
                 style={{ opacity: barOpacity, transition: 'opacity 0.2s' }}
                 onMouseEnter={() => handleMouseEnter(index)}
-                onMouseLeave={(e) => {
-                  const related = e.relatedTarget;
-                  if (
-                    related &&
-                    related instanceof Node &&
-                    e.currentTarget &&
-                    typeof e.currentTarget.contains === 'function'
-                  ) {
-                    try {
-                      if (e.currentTarget.contains(related)) {
-                        return;
-                      }
-                    } catch {
-                      // Safe fallback if target does not implement Node
-                    }
-                  }
+                onMouseLeave={() => {
                   handleMouseLeave(index);
                 }}
               >
@@ -1026,8 +1026,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       }}
                     />
 
-                    {/* Centered raw percentage inside bar if height >= 20 */}
-                    {totalBarHeight >= 20 && (
+                    {/* Centered raw score inside bar if height >= 18 */}
+                    {totalBarHeight >= 18 && (
                       <text
                         x={barCenterX}
                         y={barCenterY + 3.5}
@@ -1041,7 +1041,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           textShadow: '0 1px 2px rgba(0,0,0,0.85)',
                         }}
                       >
-                        {`${Math.round(catRaw)}%`}
+                        {isScienceKnowledge
+                          ? (catRaw > 0 ? `+${Math.round(catRaw)}` : `${Math.round(catRaw)}`)
+                          : `${Math.round(catRaw)}%`}
                       </text>
                     )}
                   </g>
@@ -1188,7 +1190,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   {sortBy === 'date' ? (
                     <text
                       x={barCenterX}
-                      y={barTopY - 6}
+                      y={catRaw < 0 && isScienceKnowledge ? barBottomY + 12 : barTopY - 6}
                       textAnchor="middle"
                       className="fill-blue-600 dark:fill-blue-400 font-bold tabular-nums"
                       fontSize="9.5"
@@ -1202,7 +1204,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   ) : (
                     <text
                       x={barCenterX}
-                      y={barTopY - 6}
+                      y={catRaw < 0 && isScienceKnowledge ? barBottomY + 12 : barTopY - 6}
                       textAnchor="middle"
                       fill={isHovered || (hasActiveHighlight && highlighted) ? '#0F172A' : '#64748B'}
                       className="dark:fill-slate-300 font-bold tabular-nums"
@@ -1212,7 +1214,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         transition: 'y 0.25s ease-out',
                       }}
                     >
-                      {activeComp ? `${Math.round(catRaw)}%` : score}
+                      {activeComp
+                        ? isScienceKnowledge
+                          ? (catRaw > 0 ? `+${Math.round(catRaw)}` : `${Math.round(catRaw)}`)
+                          : `${Math.round(catRaw)}%`
+                        : score}
                     </text>
                   )}
                 </g>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ExternalLink, Info, TrendingUp, Calendar, Building2, Award, Plus, Minus } from 'lucide-react';
 import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
@@ -39,6 +39,49 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCloseTimeout = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  };
+
+  const handleDotMouseEnter = (e: React.MouseEvent, pt: TimelineDataPoint) => {
+    clearCloseTimeout();
+    const rect = containerRef.current?.getBoundingClientRect();
+    setHoveredPoint({
+      point: pt,
+      screenX: e.clientX - (rect?.left || 0),
+      screenY: e.clientY - (rect?.top || 0),
+    });
+  };
+
+  const handleDotMouseLeave = () => {
+    clearCloseTimeout();
+    // Keep dot & tooltip visible for 600ms so user can comfortably move their mouse to the link
+    closeTimeoutRef.current = setTimeout(() => {
+      setHoveredPoint(null);
+    }, 600);
+  };
+
+  const handleTooltipMouseEnter = () => {
+    clearCloseTimeout(); // Keep tooltip open while cursor is inside tooltip
+  };
+
+  const handleTooltipMouseLeave = () => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = setTimeout(() => {
+      setHoveredPoint(null);
+    }, 350);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimeout();
+    };
+  }, []);
 
   // Active benchmark component if category index is 1..8
   const activeComponent = selectedCategoryIndex > 0 ? BENCHMARK_COMPONENTS[selectedCategoryIndex - 1] : null;
@@ -331,16 +374,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               <div>
                 <span className="font-bold text-blue-900 dark:text-blue-300">
                   {scoreMode === 'new'
-                    ? lang === 'de'
-                      ? 'Final Score NEW (Spalte M): '
-                      : 'Final Score NEW (Col M): '
+                    ? 'Final Score NEW: '
                     : scoreMode === 'old'
-                    ? lang === 'de'
-                      ? 'Final Score OLD (Spalte L): '
-                      : 'Final Score OLD (Col L): '
-                    : lang === 'de'
-                    ? 'Final Score Worst-Case (Spalte N): '
-                    : 'Final Score Worst-Case (Col N): '}
+                    ? 'Final Score OLD: '
+                    : 'Final Score Worst-Case: '}
                 </span>
                 <span className="text-slate-600 dark:text-slate-400">
                   {scoreMode === 'new'
@@ -573,7 +610,25 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             const isHovered = hoveredPoint?.point.id === pt.id;
 
             return (
-              <g key={pt.id} className="cursor-pointer">
+              <g
+                key={pt.id}
+                className="cursor-pointer"
+                onMouseEnter={(e) => handleDotMouseEnter(e, pt)}
+                onMouseLeave={handleDotMouseLeave}
+                onClick={() => {
+                  if (pt.chatUrl) {
+                    window.open(pt.chatUrl, '_blank', 'noopener,noreferrer');
+                  }
+                }}
+              >
+                {/* Invisible larger hit target for smooth and forgiving hover */}
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={15}
+                  fill="transparent"
+                />
+
                 {/* Glow ring when hovered */}
                 {isHovered && (
                   <circle
@@ -584,6 +639,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                     stroke="#f43f5e"
                     strokeWidth="2.5"
                     className="animate-pulse"
+                    pointerEvents="none"
                   />
                 )}
 
@@ -597,27 +653,14 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   strokeWidth={isHovered ? 2 : 1.2}
                   filter="url(#dotGlow)"
                   className="transition-all duration-150 hover:opacity-95"
-                  onMouseEnter={(e) => {
-                    const rect = containerRef.current?.getBoundingClientRect();
-                    setHoveredPoint({
-                      point: pt,
-                      screenX: e.clientX - (rect?.left || 0),
-                      screenY: e.clientY - (rect?.top || 0),
-                    });
-                  }}
-                  onMouseLeave={() => setHoveredPoint(null)}
-                  onClick={() => {
-                    if (pt.chatUrl) {
-                      window.open(pt.chatUrl, '_blank', 'noopener,noreferrer');
-                    }
-                  }}
+                  pointerEvents="none"
                 />
               </g>
             );
           })}
         </svg>
 
-        {/* Hover Tooltip Popup */}
+        {/* Hover Tooltip Popup with grace period so user can move into it and click links */}
         {hoveredPoint && (
           <div
             style={{
@@ -625,6 +668,8 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               top: `${Math.max(16, hoveredPoint.screenY - 140)}px`,
             }}
             className="absolute z-40 bg-slate-900/95 text-white p-3 rounded-xl shadow-xl border border-slate-700/80 backdrop-blur-md pointer-events-auto min-w-[240px] max-w-[320px] transition-all animate-in fade-in zoom-in-95 duration-150"
+            onMouseEnter={handleTooltipMouseEnter}
+            onMouseLeave={handleTooltipMouseLeave}
           >
             <div className="flex items-start justify-between gap-2 mb-1.5">
               <div>
@@ -665,7 +710,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               <div className="bg-slate-800/80 p-1.5 rounded">
                 <span className="text-slate-400 block text-[10px] uppercase font-bold flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  <span>Datum (Sp. Y)</span>
+                  <span>Datum</span>
                 </span>
                 <span className="font-mono text-xs font-medium text-slate-200">
                   {hoveredPoint.point.releaseDate}
