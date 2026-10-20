@@ -154,7 +154,15 @@ export interface LabEntry {
   specialties?: string;
 }
 
-export type RegressionType = 'linear' | 'exponential' | 'power' | 'polynomial' | 'loess';
+export type RegressionType =
+  | 'linear'
+  | 'exponential'
+  | 'power'
+  | 'polynomial'
+  | 'movingAverage'
+  | 'logistic'
+  | 'loess'
+  | 'frontier';
 
 export interface TimelineDataPoint {
   id: string;

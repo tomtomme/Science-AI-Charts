@@ -16,9 +16,10 @@ import { SearchBar } from './components/SearchBar';
 import { CsvNotesSection } from './components/CsvNotesSection';
 import { LabMatrixView } from './components/LabMatrixView';
 import { TimelineScatterplot } from './components/TimelineScatterplot';
+import { CorrelationsScatterplot } from './components/CorrelationsScatterplot';
 import { Language, TRANSLATIONS } from './utils/i18n';
 import { matchesSearchQuery } from './utils/searchUtils';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp, GitCompare } from 'lucide-react';
 
 
 
@@ -29,6 +30,9 @@ export default function App() {
 
   // Score-Modus: 'new' (8 Benchmarks) vs 'old' (5 Benchmarks)
   const [scoreMode, setScoreMode] = useState<ScoreMode>('new');
+
+  // Score-Modus für die Timeline: Default 'old' (umfasst bis zu 224 historische Modelle)
+  const [timelineScoreMode, setTimelineScoreMode] = useState<ScoreMode>('old');
 
   // Schalter: 'current' (nur noch verfügbare Chatbots) vs 'all' (alle Chatbots der CSV)
   const [modelScope, setModelScope] = useState<ModelScope>('current');
@@ -71,14 +75,16 @@ export default function App() {
 
   // Slider für Kategorien: 0 = Alles (8 Benchmarks), 1..8 = nur eine der 8 Kategorien
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState<number>(0);
+  // Separater Slider für Kategorien in der Timeline: Default 0 (führt bei timelineScoreMode 'old' zu Old Score als Standard)
+  const [timelineCategoryIndex, setTimelineCategoryIndex] = useState<number>(0);
 
   // Erweiterter Modus (Buttons & Slider eingeklappt als Standard, auf Klick ausklappbar)
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   // Tab-Navigation: 'benchmark' vs 'labs'
   const [activeTab, setActiveTab] = useState<'benchmark' | 'labs'>('benchmark');
-  // Two-Way Tab for Benchmark: 'barchart' (Balkendiagramm) vs 'timeline' (Zeitachse)
-  const [benchmarkView, setBenchmarkView] = useState<'barchart' | 'timeline'>('barchart');
+  // Three-Way Tab for Benchmark: 'barchart' (Balkendiagramm) vs 'timeline' (Zeitachse) vs 'correlations' (Korrelationen)
+  const [benchmarkView, setBenchmarkView] = useState<'barchart' | 'timeline' | 'correlations'>('barchart');
 
 
   // LLM Labs Datensatz (aus Google Sheets gid=355721692 mit Fallback)
@@ -159,6 +165,15 @@ export default function App() {
 
     return list;
   }, [scoreMode, effectiveModelScope, loadedData, priceFilter]);
+
+  // Full unfiltered models dataset for Timeline tab (always displays the full timeline, independent from bar chart filters like current/all, free/paid, max bar count, search, etc.)
+  const fullTimelineModels = useMemo(() => {
+    return timelineScoreMode === 'new'
+      ? loadedData.newModels
+      : timelineScoreMode === 'old'
+      ? loadedData.oldModels
+      : loadedData.worstCaseModels;
+  }, [timelineScoreMode, loadedData]);
 
   const hasFilterActive =
     searchFilter.trim().length > 0 || selectedFamilies.length > 0 || selectedCompany !== null;
@@ -504,6 +519,21 @@ export default function App() {
                 <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
                 <span>{lang === 'de' ? 'Zeitachse' : 'Timeline'}</span>
               </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('benchmark');
+                  setBenchmarkView('correlations');
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  activeTab === 'benchmark' && benchmarkView === 'correlations'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <GitCompare className="w-3.5 h-3.5 text-indigo-500" />
+                <span>{lang === 'de' ? 'Korrelationen' : 'Correlations'}</span>
+              </button>
             </div>
 
             <button
@@ -654,23 +684,40 @@ export default function App() {
         benchmarkView === 'timeline' ? (
           <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-4 flex flex-col space-y-4">
             <TimelineScatterplot
-              models={displayedModels}
-              allModels={currentModels}
-              scoreMode={scoreMode}
-              onScoreModeChange={setScoreMode}
-              selectedCategoryIndex={selectedCategoryIndex}
+              models={fullTimelineModels}
+              allModels={fullTimelineModels}
+              scoreMode={timelineScoreMode}
+              onScoreModeChange={setTimelineScoreMode}
+              selectedCategoryIndex={timelineCategoryIndex}
               onCategoryIndexChange={(idx) => {
-                setSelectedCategoryIndex(idx);
+                setTimelineCategoryIndex(idx);
                 if (idx > 0) {
                   setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
                 } else {
                   setCategoryInfoComp(null);
                 }
               }}
+              onScrollToParagraph={scrollToParagraph}
+              onScrollToFinalScores={scrollToFinalScores}
               lang={lang}
             />
 
             {/* Notes Section under Timeline */}
+            <div className="w-full pt-1 pb-4">
+              <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
+            </div>
+          </main>
+        ) : benchmarkView === 'correlations' ? (
+          <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-4 flex flex-col space-y-4">
+            <CorrelationsScatterplot
+              models={fullTimelineModels}
+              allModels={fullTimelineModels}
+              onScrollToParagraph={scrollToParagraph}
+              onScrollToFinalScores={scrollToFinalScores}
+              lang={lang}
+            />
+
+            {/* Notes Section under Correlations */}
             <div className="w-full pt-1 pb-4">
               <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
             </div>

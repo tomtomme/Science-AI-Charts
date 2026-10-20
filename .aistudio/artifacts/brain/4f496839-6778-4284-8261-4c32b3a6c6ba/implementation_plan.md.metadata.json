@@ -1,6 +1,6 @@
 {
-  "summary": "Implementierungsplan für das Verschieben der Steuerknöpfe (Erweitert, Preis-Filter, Explosion) in die primäre Tab-Leiste rechts neben den Tabs und das Freigeben der vollen Breite für Modell- und Kriterienbeschreibungen im Diagramm-Header.",
-  "updatedAt": "2026-10-15T16:06:02.660720154Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Comprehensive implementation plan for the new Correlations Tab: interactive bivariate scatterplot with selectable X- and Y-axes (all 8 categories + composite scores), side-by-side Pearson r and Spearman rho metrics, regression model fitting, and persistent hover cards.",
+  "updatedAt":  "2026-10-20T17:13:24.158950590Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

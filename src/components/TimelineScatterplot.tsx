@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { ExternalLink, Info, TrendingUp, Calendar, Building2, Award, Plus, Minus } from 'lucide-react';
+import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, Sparkles } from 'lucide-react';
 import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
-
-import { calculateRegression, getRegressionName } from '../utils/mathRegression';
+import { calculateRegression, extractFrontierPoints } from '../utils/mathRegression';
+import { TRANSLATIONS } from '../utils/i18n';
 
 interface TimelineScatterplotProps {
   models: ModelRecord[];
@@ -12,15 +12,103 @@ interface TimelineScatterplotProps {
   onScoreModeChange: (mode: ScoreMode) => void;
   selectedCategoryIndex: number; // 0 = All (Final Score), 1..8 = individual components
   onCategoryIndexChange: (index: number) => void;
+  onScrollToParagraph?: (targetId: string) => void;
+  onScrollToFinalScores?: () => void;
   lang: 'de' | 'en';
 }
 
-const REGRESSION_OPTIONS: Array<{ id: RegressionType; labelDe: string; labelEn: string; descDe: string; descEn: string }> = [
-  { id: 'linear', labelDe: 'Linear', labelEn: 'Linear', descDe: 'Geradliniger Trend über Zeit', descEn: 'Straight-line trend over time' },
-  { id: 'exponential', labelDe: 'Exponential', labelEn: 'Exponential', descDe: 'Exponentielles Wachstum', descEn: 'Exponential acceleration' },
-  { id: 'power', labelDe: 'Power (Potenz)', labelEn: 'Power', descDe: 'Potenzgesetz-Entwicklung', descEn: 'Power-law scaling curve' },
-  { id: 'polynomial', labelDe: 'Polynome (Grad 2)', labelEn: 'Polynomial (deg 2)', descDe: 'Parabolischer Kurventrend', descEn: 'Quadratic parabolic curve' },
-  { id: 'loess', labelDe: 'LOESS (Smoothing)', labelEn: 'LOESS (Smoothing)', descDe: 'Lokale Glättung empirischer Daten', descEn: 'Locally estimated empirical smoothing' },
+interface RegressionOption {
+  id: RegressionType;
+  labelDe: string;
+  labelEn: string;
+  shortDe: string;
+  shortEn: string;
+  descDe: string;
+  descEn: string;
+  color: string;
+}
+
+const REGRESSION_OPTIONS: RegressionOption[] = [
+  {
+    id: 'linear',
+    labelDe: 'Linear (Trendlinie)',
+    labelEn: 'Linear (Trendline)',
+    shortDe: 'Linear',
+    shortEn: 'Linear',
+    descDe: 'Geradliniger Trend über Zeit',
+    descEn: 'Straight-line trend over time',
+    color: '#6366f1', // Indigo
+  },
+  {
+    id: 'exponential',
+    labelDe: 'Exponential (Wachstum)',
+    labelEn: 'Exponential (Growth)',
+    shortDe: 'Expon.',
+    shortEn: 'Expon.',
+    descDe: 'Exponentielles Wachstum',
+    descEn: 'Exponential acceleration',
+    color: '#8b5cf6', // Violet
+  },
+  {
+    id: 'power',
+    labelDe: 'Power (Potenzkurve)',
+    labelEn: 'Power (Scaling)',
+    shortDe: 'Power',
+    shortEn: 'Power',
+    descDe: 'Potenzgesetz-Entwicklung',
+    descEn: 'Power-law scaling curve',
+    color: '#ec4899', // Pink
+  },
+  {
+    id: 'polynomial',
+    labelDe: 'Polynom (Grad 2-4)',
+    labelEn: 'Polynomial (deg 2-4)',
+    shortDe: 'Polynom',
+    shortEn: 'Polynom.',
+    descDe: 'Parabolischer Kurventrend (Grad 2, 3 oder 4 wählbar)',
+    descEn: 'Quadratic or higher curve (deg 2, 3 or 4)',
+    color: '#f43f5e', // Rose
+  },
+  {
+    id: 'movingAverage',
+    labelDe: 'Gleitender Schnitt (MA)',
+    labelEn: 'Moving Average (MA)',
+    shortDe: 'Moving Avg',
+    shortEn: 'Moving Avg',
+    descDe: 'Gleitender Durchschnitt über wählbare Tage (z.B. 60d)',
+    descEn: 'Rolling moving average over selectable days (e.g. 60d)',
+    color: '#10b981', // Emerald
+  },
+  {
+    id: 'logistic',
+    labelDe: 'Logistische S-Kurve',
+    labelEn: 'Logistic S-Curve',
+    shortDe: 'S-Kurve',
+    shortEn: 'S-Curve',
+    descDe: 'Sättigungs-Wachstumsmodell mit oberer Schranke (max 100%)',
+    descEn: 'Saturation growth model with theoretical ceiling',
+    color: '#06b6d4', // Cyan
+  },
+  {
+    id: 'loess',
+    labelDe: 'LOESS (Smoothing)',
+    labelEn: 'LOESS (Smoothing)',
+    shortDe: 'LOESS',
+    shortEn: 'LOESS',
+    descDe: 'Lokale Glättung empirischer Daten',
+    descEn: 'Locally estimated empirical smoothing',
+    color: '#f59e0b', // Amber
+  },
+  {
+    id: 'frontier',
+    labelDe: 'SOTA Frontier (Rekorde)',
+    labelEn: 'SOTA Frontier (Records)',
+    shortDe: 'Frontier',
+    shortEn: 'Frontier',
+    descDe: 'Verlauf der historischen Höchststände (Pareto-Frontier)',
+    descEn: 'Cumulative maximum state-of-the-art breakthroughs',
+    color: '#d97706', // Gold / Bronze
+  },
 ];
 
 export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
@@ -29,9 +117,20 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   onScoreModeChange,
   selectedCategoryIndex,
   onCategoryIndexChange,
+  onScrollToParagraph,
+  onScrollToFinalScores,
   lang,
 }) => {
-  const [regressionType, setRegressionType] = useState<RegressionType>('polynomial');
+  // Regression Model state: index 0..7 (Default: Moving Average, index 4)
+  const [regressionIndex, setRegressionIndex] = useState<number>(4);
+  const [movingAvgDays, setMovingAvgDays] = useState<number>(60); // Default: 60 days
+  const [polyDegree, setPolyDegree] = useState<number>(2); // Default: degree 2
+  const [loessSpan, setLoessSpan] = useState<number>(40); // Default: 40% smoothing span
+  const [logisticCeiling, setLogisticCeiling] = useState<number>(100); // Default: 100% saturation ceiling
+  const [timelineScope, setTimelineScope] = useState<'all' | 'frontier'>('all'); // All Models vs Frontier Only
+
+  const activeRegression = REGRESSION_OPTIONS[regressionIndex] || REGRESSION_OPTIONS[0];
+
   const [hoveredPoint, setHoveredPoint] = useState<{
     point: TimelineDataPoint;
     screenX: number;
@@ -60,10 +159,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
 
   const handleDotMouseLeave = () => {
     clearCloseTimeout();
-    // Keep dot & tooltip visible for 600ms so user can comfortably move their mouse to the link
+    // Keep dot & tooltip visible for 1800ms so user can comfortably move their mouse to the link
     closeTimeoutRef.current = setTimeout(() => {
       setHoveredPoint(null);
-    }, 600);
+    }, 1800);
   };
 
   const handleTooltipMouseEnter = () => {
@@ -72,9 +171,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
 
   const handleTooltipMouseLeave = () => {
     clearCloseTimeout();
+    // Keep tooltip visible for 1000ms upon leaving tooltip
     closeTimeoutRef.current = setTimeout(() => {
       setHoveredPoint(null);
-    }, 350);
+    }, 1000);
   };
 
   useEffect(() => {
@@ -129,6 +229,22 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     return list.sort((a, b) => a.timestamp - b.timestamp);
   }, [allModels, selectedCategoryIndex, scoreMode, activeComponent]);
 
+  // Identify Pareto frontier models (breakthrough models that set a new benchmark high score at release date)
+  const frontierPoints = useMemo(() => {
+    return extractFrontierPoints(scatterPoints);
+  }, [scatterPoints]);
+
+  const frontierPointIds = useMemo(() => {
+    return new Set(frontierPoints.map((p) => p.id));
+  }, [frontierPoints]);
+
+  // Data points passed into regression fitting based on timelineScope toggle
+  const regressionDataPoints = useMemo(() => {
+    if (timelineScope === 'frontier') {
+      return frontierPoints;
+    }
+    return scatterPoints;
+  }, [scatterPoints, frontierPoints, timelineScope]);
 
   // SVG dimensions & scales
   const svgWidth = 1000;
@@ -173,9 +289,20 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   };
 
   // Compute regression curve & R²
+  const regressionParam =
+    activeRegression.id === 'movingAverage'
+      ? movingAvgDays
+      : activeRegression.id === 'polynomial'
+      ? polyDegree
+      : activeRegression.id === 'loess'
+      ? loessSpan
+      : activeRegression.id === 'logistic'
+      ? logisticCeiling
+      : 60;
+
   const regression = useMemo(() => {
-    return calculateRegression(scatterPoints, regressionType);
-  }, [scatterPoints, regressionType]);
+    return calculateRegression(regressionDataPoints, activeRegression.id, 120, regressionParam);
+  }, [regressionDataPoints, activeRegression.id, regressionParam]);
 
   // Format SVG Path for regression line
   const regressionPath = useMemo(() => {
@@ -223,7 +350,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     return ticks;
   }, [minScore, maxScore]);
 
-  // Unified Slider Value:
+  // Unified Score Slider Value:
   // 0 = New Score (scoreMode='new', category=0)
   // 1 = Old Score (scoreMode='old', category=0)
   // 2 = Worst Case (scoreMode='worstCase', category=0)
@@ -258,62 +385,87 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     handleUnifiedSliderChange(nextVal);
   };
 
+  const t = TRANSLATIONS[lang];
+
+  const handleScroll = (targetId: string) => {
+    if (onScrollToParagraph) {
+      onScrollToParagraph(targetId);
+      return;
+    }
+    if (onScrollToFinalScores) {
+      onScrollToFinalScores();
+      return;
+    }
+    const container = document.getElementById('csv-notes-section');
+    if (container) {
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    const doScrollToTarget = () => {
+      const el = document.getElementById(targetId) || document.getElementById('final-scores-section');
+      const box = document.getElementById('section1-scroll-box');
+      if (el) {
+        if (box) {
+          const targetTop = el.offsetTop - box.offsetTop;
+          box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
+        }
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15');
+        }, 3000);
+      }
+    };
+    setTimeout(doScrollToTarget, 200);
+    setTimeout(doScrollToTarget, 500);
+  };
+
+  const activeCategoryName = activeComponent
+    ? lang === 'en'
+      ? activeComponent.nameEn
+      : activeComponent.nameDe
+    : null;
+
+  // Scroll targets for all 3 composite scores + all 8 benchmark categories
+  const scoreScrollTargets = useMemo(() => {
+    if (unifiedSliderValue === 0) return { targetId: 'note-col-m' };
+    if (unifiedSliderValue === 1) return { targetId: 'note-col-l' };
+    if (unifiedSliderValue === 2) return { targetId: 'note-col-n' };
+
+    const catIdx = unifiedSliderValue - 2; // 1..8
+    const colTargets = [
+      'note-col-d',
+      'note-col-e',
+      'note-col-f',
+      'note-col-g',
+      'note-col-h',
+      'note-col-i',
+      'note-col-j',
+      'note-col-k',
+    ];
+    return {
+      targetId: colTargets[catIdx - 1] || 'final-scores-section',
+    };
+  }, [unifiedSliderValue]);
+
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-3.5">
       {/* Controls Container */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3.5">
-        {/* Row 1: Merged Score & Category Slider */}
-        <div className="bg-slate-50 dark:bg-slate-800/60 p-3 sm:p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-              <Award className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>Score:</span>
-            </label>
-
-            {/* Active Selection Badge */}
-            <div className="flex items-center gap-1.5">
-              {unifiedSliderValue === 0 && (
-                <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-white shrink-0" />
-                  <span>NEW Score</span>
-                </span>
-              )}
-              {unifiedSliderValue === 1 && (
-                <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-amber-600 text-white shadow-2xs flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-white shrink-0" />
-                  <span>OLD Score</span>
-                </span>
-              )}
-              {unifiedSliderValue === 2 && (
-                <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-rose-600 text-white shadow-2xs flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-white shrink-0" />
-                  <span>Worst-Case</span>
-                </span>
-              )}
-              {unifiedSliderValue >= 3 && activeComponent && (
-                <span
-                  className="text-xs font-mono font-bold px-2.5 py-1 rounded-md text-white shadow-2xs flex items-center gap-1.5"
-                  style={{ backgroundColor: activeComponent.color }}
-                >
-                  <span className="w-2 h-2 rounded-full bg-white shrink-0" />
-                  <span>
-                    #{unifiedSliderValue - 2} {lang === 'de' ? activeComponent.nameDe : activeComponent.nameEn}
-                  </span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Slider with - and + Step Buttons */}
-          <div className="flex items-center gap-2.5">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2.5">
+        {/* Row 1: Score Slider + Regression Model Slider + Contextual Param Input */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {/* Merged Score Slider (Identical styling to bar chart tab) */}
+          <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
+            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+              Score:
+            </span>
             <button
               type="button"
               onClick={() => handleUnifiedStep(-1)}
               disabled={unifiedSliderValue <= 0}
-              className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0 border border-slate-200 dark:border-slate-700"
-              title="-1 Step"
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+              title="-1"
             >
-              <Minus className="w-3.5 h-3.5" />
+              <Minus className="w-3 h-3" />
             </button>
             <input
               type="range"
@@ -322,135 +474,311 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               step={1}
               value={unifiedSliderValue}
               onChange={(e) => handleUnifiedSliderChange(Number(e.target.value))}
-              className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 dark:bg-slate-700 rounded-lg"
+              className="w-18 sm:w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
             />
             <button
               type="button"
               onClick={() => handleUnifiedStep(1)}
               disabled={unifiedSliderValue >= 10}
-              className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0 border border-slate-200 dark:border-slate-700"
-              title="+1 Step"
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+              title="+1"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3 h-3" />
             </button>
-          </div>
 
-          {/* Slider Quick Tick Labels */}
-          <div className="grid grid-cols-11 text-center text-[9.5px] sm:text-[10px] text-slate-500 dark:text-slate-400 mt-2 font-mono gap-0.5">
-            {[
-              { val: 0, label: 'New', full: 'NEW Score' },
-              { val: 1, label: 'Old', full: 'OLD Score' },
-              { val: 2, label: 'Worst', full: 'Worst Case' },
-              { val: 3, label: '#1', full: '#1 Math' },
-              { val: 4, label: '#2', full: '#2 General' },
-              { val: 5, label: '#3', full: '#3 Code' },
-              { val: 6, label: '#4', full: '#4 Logic' },
-              { val: 7, label: '#5', full: '#5 Vision' },
-              { val: 8, label: '#6', full: '#6 Instruct' },
-              { val: 9, label: '#7', full: '#7 Tools' },
-              { val: 10, label: '#8', full: '#8 Domain' },
-            ].map((tick) => (
-              <button
-                key={tick.val}
-                type="button"
-                onClick={() => handleUnifiedSliderChange(tick.val)}
-                className={`py-0.5 px-0.5 rounded transition-colors cursor-pointer truncate ${
-                  unifiedSliderValue === tick.val
-                    ? 'font-bold text-blue-600 dark:text-blue-400 bg-blue-100/70 dark:bg-blue-900/40'
-                    : 'hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-                title={tick.full}
-              >
-                {tick.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Row 2: Explainer Space (Copied over from original tab to explain what the score means) */}
-        <div className="bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/60 rounded-lg p-3 text-xs text-slate-700 dark:text-slate-300">
-          {selectedCategoryIndex === 0 ? (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <div>
-                <span className="font-bold text-blue-900 dark:text-blue-300">
-                  {scoreMode === 'new'
-                    ? 'Final Score NEW: '
-                    : scoreMode === 'old'
-                    ? 'Final Score OLD: '
-                    : 'Final Score Worst-Case: '}
-                </span>
-                <span className="text-slate-600 dark:text-slate-400">
-                  {scoreMode === 'new'
-                    ? lang === 'de'
-                      ? 'Gewichteter Gesamtscore über alle 8 wissenschaftlichen Benchmarks mit jeweils 12.5% Gewichtung.'
-                      : 'Weighted total score across all 8 scientific benchmarks with 12.5% weight each.'
-                    : scoreMode === 'old'
-                    ? lang === 'de'
-                      ? 'Früherer Gesamtscore über 7 Benchmarks vor Integration der Rechts-/Wirtschafts-Kategorie.'
-                      : 'Earlier composite score over 7 benchmarks prior to legal/economics integration.'
-                    : lang === 'de'
-                    ? 'Konservatives Worst-Case-Szenario basierend auf der jeweils schwächsten Einzelleistung des Modells.'
-                    : 'Conservative worst-case scenario reflecting the lowest individual evaluated component.'}
-                </span>
-              </div>
-              <div className="shrink-0 font-mono text-[11px] px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded">
-                Gewichtung: 8 × 12.5% = 100%
-              </div>
-            </div>
-          ) : activeComponent ? (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <div>
-                <span className="font-bold text-blue-900 dark:text-blue-300">
-                  #{selectedCategoryIndex} {lang === 'de' ? activeComponent.nameDe : activeComponent.nameEn}:{' '}
-                </span>
-                <span className="text-slate-600 dark:text-slate-400">
-                  {lang === 'de' ? activeComponent.descriptionDe : activeComponent.descriptionEn} (Quelle:{' '}
-                  {activeComponent.sourceName})
-                </span>
-              </div>
-              <div className="shrink-0 font-mono text-[11px] px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded">
-                Formel: {activeComponent.formulaDesc}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        {/* Row 3: Regression Controls & R² Metric */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-              <span>{lang === 'de' ? 'Regressionslinie:' : 'Regression Line:'}</span>
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {REGRESSION_OPTIONS.map((opt) => (
+            {/* Feste Box für das Badge: New Score / Old Score / Worst Case oder Kategorie 1..8 (klickbar als Sprungmarke) */}
+            <div className="w-[140px] sm:w-[170px] shrink-0 overflow-hidden flex items-center">
+              {unifiedSliderValue === 0 && (
                 <button
-                  key={opt.id}
                   type="button"
-                  onClick={() => setRegressionType(opt.id)}
-                  title={lang === 'de' ? opt.descDe : opt.descEn}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                    regressionType === opt.id
-                      ? 'bg-rose-500 text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
+                  onClick={() => handleScroll('note-col-m')}
+                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
                 >
-                  {lang === 'de' ? opt.labelDe : opt.labelEn}
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">{t.scoreModeNew}</span>
                 </button>
-              ))}
+              )}
+              {unifiedSliderValue === 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleScroll('note-col-l')}
+                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">{t.scoreModeOld}</span>
+                </button>
+              )}
+              {unifiedSliderValue === 2 && (
+                <button
+                  type="button"
+                  onClick={() => handleScroll('note-col-n')}
+                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">{t.scoreModeWorstCase}</span>
+                </button>
+              )}
+              {unifiedSliderValue >= 3 && activeComponent && activeCategoryName && (
+                <button
+                  type="button"
+                  onClick={() => handleScroll(scoreScrollTargets.targetId)}
+                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: activeComponent.color }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">
+                    #{unifiedSliderValue - 2} {activeCategoryName}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Prominent R² Display */}
-          <div className="flex items-center gap-2 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-3 py-1.5 rounded-lg">
-            <span className="text-[11px] uppercase tracking-wider font-bold text-rose-600 dark:text-rose-400">
-              Bestimmtheitsmaß:
+          {/* Right Group: Regression Model Slider + Contextual Param Input */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
+            {/* Regression Model Slider */}
+            <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
+              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+                <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+                <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setRegressionIndex((prev) => Math.max(0, prev - 1))}
+                disabled={regressionIndex <= 0}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                title="-1"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={REGRESSION_OPTIONS.length - 1}
+                step={1}
+                value={regressionIndex}
+                onChange={(e) => setRegressionIndex(Number(e.target.value))}
+                className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
+              />
+              <button
+                type="button"
+                onClick={() => setRegressionIndex((prev) => Math.min(REGRESSION_OPTIONS.length - 1, prev + 1))}
+                disabled={regressionIndex >= REGRESSION_OPTIONS.length - 1}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                title="+1"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+
+              {/* Regression Badge */}
+              <div className="w-[105px] sm:w-[130px] shrink-0 overflow-hidden flex items-center">
+                <span
+                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full"
+                  style={{ backgroundColor: activeRegression.color }}
+                  title={lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">
+                    {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            {/* Contextual Parameter Input (Fixed width, Active for Moving Average, Polynomial, LOESS & Logistic, otherwise grayed-out) */}
+            <div
+              className={`w-[142px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
+                activeRegression.id !== 'movingAverage' &&
+                activeRegression.id !== 'polynomial' &&
+                activeRegression.id !== 'loess' &&
+                activeRegression.id !== 'logistic'
+                  ? 'opacity-40 cursor-not-allowed'
+                  : ''
+              }`}
+              title={
+                activeRegression.id === 'movingAverage'
+                  ? lang === 'de'
+                    ? 'Glättungsfenster in Tagen (7–365 Tage)'
+                    : 'Moving window in days (7–365 days)'
+                  : activeRegression.id === 'polynomial'
+                  ? lang === 'de'
+                    ? 'Polynom-Grad (2, 3 oder 4)'
+                    : 'Polynomial degree (2, 3 or 4)'
+                  : activeRegression.id === 'loess'
+                  ? lang === 'de'
+                    ? 'Bandbreite / Glättungs-Span (15–80%)'
+                    : 'Bandwidth smoothing span (15–80%)'
+                  : activeRegression.id === 'logistic'
+                  ? lang === 'de'
+                    ? 'Sättigungsgrenze / Decke L (80–150%)'
+                    : 'Saturation ceiling L (80–150%)'
+                  : lang === 'de'
+                  ? 'Kein variabler Parameter für dieses Modell'
+                  : 'No variable parameter for this model'
+              }
+            >
+              <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
+                Param:
+              </span>
+              <div className="w-[76px] shrink-0 flex items-center justify-end">
+                {activeRegression.id === 'movingAverage' ? (
+                  <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-emerald-500">
+                    <input
+                      type="number"
+                      min={7}
+                      max={365}
+                      step={5}
+                      value={movingAvgDays}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val) && val >= 7 && val <= 365) setMovingAvgDays(val);
+                      }}
+                      className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
+                    />
+                    <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
+                      {lang === 'de' ? 'T' : 'd'}
+                    </span>
+                  </div>
+                ) : activeRegression.id === 'polynomial' ? (
+                  <select
+                    value={polyDegree}
+                    onChange={(e) => setPolyDegree(Number(e.target.value))}
+                    className="w-[76px] h-6 px-1.5 font-mono text-[11px] font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-hidden focus:border-rose-500 text-center"
+                  >
+                    <option value={2}>{lang === 'de' ? 'Grad 2' : 'Deg 2'}</option>
+                    <option value={3}>{lang === 'de' ? 'Grad 3' : 'Deg 3'}</option>
+                    <option value={4}>{lang === 'de' ? 'Grad 4' : 'Deg 4'}</option>
+                  </select>
+                ) : activeRegression.id === 'loess' ? (
+                  <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-amber-500">
+                    <input
+                      type="number"
+                      min={15}
+                      max={80}
+                      step={5}
+                      value={loessSpan}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val) && val >= 15 && val <= 80) setLoessSpan(val);
+                      }}
+                      className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
+                    />
+                    <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
+                      %
+                    </span>
+                  </div>
+                ) : activeRegression.id === 'logistic' ? (
+                  <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-cyan-500">
+                    <input
+                      type="number"
+                      min={80}
+                      max={150}
+                      step={5}
+                      value={logisticCeiling}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val) && val >= 80 && val <= 150) setLogisticCeiling(val);
+                      }}
+                      className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
+                    />
+                    <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
+                      %
+                    </span>
+                  </div>
+                ) : (
+                  <div className="w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
+                    —
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Model Scope Toggle (All Models vs SOTA Frontier) + R² Metric Display */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+          {/* Scope Segmented Control */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-400">
+              {lang === 'de' ? 'Datenbasis:' : 'Scope:'}
             </span>
-            <span className="font-mono text-sm font-extrabold text-rose-700 dark:text-rose-300">
-              R² = {regression.r2.toFixed(3)}
-            </span>
-            <span className="text-[11px] text-rose-600/80 dark:text-rose-400/80">
-              ({(regression.r2 * 100).toFixed(1)}% {lang === 'de' ? 'Varianz erklärt' : 'variance explained'})
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => setTimelineScope('all')}
+                className={`px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  timelineScope === 'all'
+                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({scatterPoints.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimelineScope('frontier')}
+                className={`px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  timelineScope === 'frontier'
+                    ? 'bg-amber-500 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+                }`}
+                title={
+                  lang === 'de'
+                    ? 'Nur Modelle, die zum Release-Zeitpunkt einen neuen Rekord-Highscore erzielten (Pareto-Frontier)'
+                    : 'Only models setting a new record score at release date (Pareto frontier)'
+                }
+              >
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                <span>{lang === 'de' ? 'SOTA Frontier' : 'SOTA Frontier'}</span>
+                <span className="text-[10px] opacity-90">({frontierPointIds.size})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Prominent R² Metric Display with Formula Hint (greyed out for non-regression models like Frontier where R² is 0 or not applicable) */}
+          <div className="flex items-center gap-2 sm:ml-auto">
+            {activeRegression.id !== 'frontier' && regression.r2 > 0 ? (
+              <div className="flex items-center gap-1.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-2.5 py-1 rounded-lg">
+                <span className="text-[10.5px] uppercase tracking-wider font-bold text-rose-600 dark:text-rose-400">
+                  {lang === 'de' ? 'Bestimmtheitsmaß:' : 'R² Metric:'}
+                </span>
+                <span className="font-mono text-xs sm:text-sm font-extrabold text-rose-700 dark:text-rose-300">
+                  R² = {regression.r2.toFixed(3)}
+                </span>
+                <span className="text-[10px] text-rose-600/80 dark:text-rose-400/80 hidden sm:inline">
+                  ({(regression.r2 * 100).toFixed(1)}% {lang === 'de' ? 'Varianz erklärt' : 'variance explained'})
+                </span>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 rounded-lg opacity-40 cursor-not-allowed select-none"
+                title={
+                  activeRegression.id === 'frontier'
+                    ? lang === 'de'
+                      ? 'Bestimmtheitsmaß R² ist für die SOTA-Frontier-Hüllkurve nicht definiert'
+                      : 'R² metric does not apply to the SOTA frontier envelope'
+                    : lang === 'de'
+                    ? 'Bestimmtheitsmaß R² für dieses Modell nicht anwendbar'
+                    : 'R² metric not applicable for this model'
+                }
+              >
+                <span className="text-[10.5px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
+                  {lang === 'de' ? 'Bestimmtheitsmaß:' : 'R² Metric:'}
+                </span>
+                <span className="font-mono text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  {activeRegression.id === 'frontier'
+                    ? lang === 'de'
+                      ? '— (Hüllkurve / n/a)'
+                      : '— (Envelope / n/a)'
+                    : '— (n/a)'}
+                </span>
+              </div>
+            )}
+            <span
+              className="text-[10px] font-mono text-slate-400 hidden xl:inline max-w-[280px] truncate"
+              title={regression.formula}
+            >
+              {regression.formula}
             </span>
           </div>
         </div>
@@ -461,22 +789,6 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
         ref={containerRef}
         className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm overflow-hidden select-none"
       >
-        {/* R² Badge Overlay in Top-Right of Scatterplot */}
-        <div className="absolute top-6 right-6 z-10 pointer-events-none bg-white/90 dark:bg-slate-900/90 backdrop-blur-xs border border-slate-200 dark:border-slate-800 p-2.5 rounded-lg shadow-xs space-y-1">
-          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-            {getRegressionName(regressionType)} Fit
-          </div>
-          <div className="text-base font-mono font-extrabold text-rose-600 dark:text-rose-400">
-            R² = {regression.r2.toFixed(3)}
-          </div>
-          <div className="text-[10px] text-slate-400 font-mono">
-            {regression.formula}
-          </div>
-          <div className="text-[10px] text-slate-400">
-            {scatterPoints.length} {lang === 'de' ? 'Modelle' : 'models'}
-          </div>
-        </div>
-
         {/* SVG Scatterplot */}
         <svg
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
@@ -484,15 +796,15 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
         >
           <defs>
             <linearGradient id="regressionGlow" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#ec4899" stopOpacity="1" />
+              <stop offset="0%" stopColor={activeRegression.color} stopOpacity="0.85" />
+              <stop offset="100%" stopColor="#f43f5e" stopOpacity="1" />
             </linearGradient>
             <filter id="dotGlow" x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000000" floodOpacity="0.15" />
             </filter>
           </defs>
 
-          {/* Background Grid Lines (Horizontal / Y-Axis) */}
+          {/* Background Grid Lines (Horizontal / Scores) */}
           {yTicks.map((tick) => {
             const y = scaleY(tick);
             return (
@@ -508,10 +820,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   strokeDasharray="4 4"
                 />
                 <text
-                  x={margin.left - 10}
+                  x={margin.left - 12}
                   y={y + 4}
                   textAnchor="end"
-                  className="text-[11px] font-mono fill-slate-400 dark:fill-slate-500 font-semibold"
+                  className="text-[11px] font-mono fill-slate-400 dark:fill-slate-500"
                 >
                   {tick}
                 </text>
@@ -519,7 +831,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             );
           })}
 
-          {/* Background Grid Lines (Vertical / X-Axis) */}
+          {/* Background Grid Lines (Vertical / Dates) */}
           {xTicks.map((tick) => {
             const x = scaleX(tick.time);
             return (
@@ -608,11 +920,14 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             const cx = scaleX(pt.timestamp);
             const cy = scaleY(pt.score);
             const isHovered = hoveredPoint?.point.id === pt.id;
+            const isFrontier = frontierPointIds.has(pt.id);
+            const isDimmed = timelineScope === 'frontier' && !isFrontier;
 
             return (
               <g
                 key={pt.id}
                 className="cursor-pointer"
+                style={{ opacity: isDimmed ? 0.22 : 1, transition: 'opacity 0.2s' }}
                 onMouseEnter={(e) => handleDotMouseEnter(e, pt)}
                 onMouseLeave={handleDotMouseLeave}
                 onClick={() => {
@@ -629,12 +944,26 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   fill="transparent"
                 />
 
-                {/* Glow ring when hovered */}
+                {/* Outer Golden Accent Ring for SOTA Frontier Breakthrough Models */}
+                {isFrontier && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isHovered ? 11 : 7.5}
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth={isHovered ? 2 : 1.5}
+                    strokeDasharray={timelineScope === 'frontier' ? undefined : '2,2'}
+                    pointerEvents="none"
+                  />
+                )}
+
+                {/* Pulsing ring when hovered */}
                 {isHovered && (
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={12}
+                    r={13}
                     fill="none"
                     stroke="#f43f5e"
                     strokeWidth="2.5"
@@ -647,8 +976,8 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={isHovered ? 7 : 4.5}
-                  fill={isHovered ? '#f43f5e' : '#3b82f6'}
+                  r={isHovered ? 7 : isFrontier ? 5 : 4.5}
+                  fill={isHovered ? '#f43f5e' : isFrontier ? '#d97706' : '#3b82f6'}
                   stroke="#ffffff"
                   strokeWidth={isHovered ? 2 : 1.2}
                   filter="url(#dotGlow)"
@@ -667,15 +996,21 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               left: `${Math.min(window.innerWidth > 768 ? 750 : 280, Math.max(16, hoveredPoint.screenX - 120))}px`,
               top: `${Math.max(16, hoveredPoint.screenY - 140)}px`,
             }}
-            className="absolute z-40 bg-slate-900/95 text-white p-3 rounded-xl shadow-xl border border-slate-700/80 backdrop-blur-md pointer-events-auto min-w-[240px] max-w-[320px] transition-all animate-in fade-in zoom-in-95 duration-150"
+            className="absolute z-40 bg-slate-900/95 text-white p-3 rounded-xl shadow-xl border border-slate-700/80 backdrop-blur-md pointer-events-auto min-w-[240px] max-w-[320px] transition-all animate-in fade-in zoom-in-95 duration-150 before:content-[''] before:absolute before:-bottom-6 before:left-0 before:right-0 before:h-8"
             onMouseEnter={handleTooltipMouseEnter}
             onMouseLeave={handleTooltipMouseLeave}
           >
             <div className="flex items-start justify-between gap-2 mb-1.5">
               <div>
-                <h4 className="font-bold text-sm text-white flex items-center gap-1.5 leading-tight">
+                <h4 className="font-bold text-sm text-white flex items-center gap-1.5 leading-tight flex-wrap">
                   <span>{hoveredPoint.point.displayName}</span>
                   {hoveredPoint.point.flag && <span>{hoveredPoint.point.flag}</span>}
+                  {frontierPointIds.has(hoveredPoint.point.id) && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5">
+                      <Sparkles className="w-2.5 h-2.5 text-amber-300" />
+                      <span>SOTA</span>
+                    </span>
+                  )}
                 </h4>
                 <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                   <Building2 className="w-3 h-3 text-slate-400" />

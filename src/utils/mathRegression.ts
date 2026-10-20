@@ -1,21 +1,42 @@
 import { RegressionResult, RegressionType, TimelineDataPoint } from '../types';
 
 /**
- * Calculates mathematical regressions for scatterplot data:
- * - Linear: y = m*x + b
- * - Exponential: y = a * e^(b*x)
- * - Power: y = a * x^b
- * - Polynomial: degree 2 (quadratic) y = a*x^2 + b*x + c
- * - LOESS: Locally Estimated Scatterplot Smoothing with tri-cube kernel
- *
- * All functions return the regression model curve points across the time range
- * and the coefficient of determination R² (0.00 to 1.00).
+ * Extracts Pareto-frontier data points (breakthrough models that set a new benchmark record).
  */
+export function extractFrontierPoints(data: TimelineDataPoint[]): TimelineDataPoint[] {
+  const sorted = [...data]
+    .filter((d) => !isNaN(d.timestamp) && !isNaN(d.score) && d.score > 0)
+    .sort((a, b) => a.timestamp - b.timestamp);
 
+  const frontier: TimelineDataPoint[] = [];
+  let currentMax = -Infinity;
+
+  for (const pt of sorted) {
+    if (pt.score > currentMax) {
+      currentMax = pt.score;
+      frontier.push(pt);
+    }
+  }
+
+  return frontier;
+}
+
+/**
+ * Calculates mathematical regressions and trend models for timeline data:
+ * - Linear: y = m·x + b
+ * - Exponential: y = a · e^(b·x)
+ * - Power: y = a · (1+x)^b
+ * - Polynomial: degree 2, 3, or 4 (controlled by param)
+ * - Moving Average: time-weighted Gaussian moving window (param = windowDays, e.g. 60)
+ * - Logistic: Sigmoid growth curve y = L / (1 + e^(-k(x - x0)))
+ * - LOESS: Locally Estimated Scatterplot Smoothing
+ * - Frontier Envelope: Cumulative maximum frontier tracking record breakthroughs
+ */
 export function calculateRegression(
   data: TimelineDataPoint[],
   type: RegressionType,
-  steps = 100
+  steps = 100,
+  param = 60 // windowDays for movingAverage (default 60), degree for polynomial (default 2)
 ): RegressionResult {
   // Sort data points by timestamp
   const sorted = [...data]
@@ -25,7 +46,7 @@ export function calculateRegression(
   if (sorted.length < 3) {
     return {
       type,
-      name: getRegressionName(type),
+      name: getRegressionName(type, param),
       r2: 0,
       formula: 'N/A',
       points: [],
@@ -49,7 +70,7 @@ export function calculateRegression(
 
   let predictFn: (normX: number) => number;
   let formula = '';
-  let modelName = getRegressionName(type);
+  const modelName = getRegressionName(type, param);
 
   if (type === 'linear') {
     // y = m*x + b
@@ -126,57 +147,170 @@ export function calculateRegression(
       formula = `y = ${meanY.toFixed(1)}`;
     }
   } else if (type === 'polynomial') {
-    // Quadratic: y = a*x^2 + b*x + c
-    // Solve standard 3x3 normal equations
-    let s0 = n, s1 = 0, s2 = 0, s3 = 0, s4 = 0;
-    let t0 = 0, t1 = 0, t2 = 0;
-    for (const d of normData) {
-      const x = d.x;
-      const x2 = x * x;
-      s1 += x;
-      s2 += x2;
-      s3 += x2 * x;
-      s4 += x2 * x2;
-      t0 += d.y;
-      t1 += x * d.y;
-      t2 += x2 * d.y;
+    // Polynomial of degree d (2, 3, or 4)
+    const degree = Math.max(2, Math.min(4, Math.round(param || 2)));
+    const m = degree + 1;
+    const A: number[][] = Array.from({ length: m }, () => Array(m).fill(0));
+    const B: number[] = Array(m).fill(0);
+
+    for (let i = 0; i < m; i++) {
+      for (let j = 0; j < m; j++) {
+        let sum = 0;
+        for (const d of normData) sum += Math.pow(d.x, i + j);
+        A[i][j] = sum;
+      }
+      let sumY = 0;
+      for (const d of normData) sumY += d.y * Math.pow(d.x, i);
+      B[i] = sumY;
     }
 
-    // Solve 3x3 linear system via Cramer's rule
-    const det =
-      s4 * (s2 * s0 - s1 * s1) -
-      s3 * (s3 * s0 - s1 * s2) +
-      s2 * (s3 * s1 - s2 * s2);
+    // Solve system via Gauss-Jordan elimination
+    let solvable = true;
+    for (let i = 0; i < m; i++) {
+      let pivot = i;
+      for (let r = i + 1; r < m; r++) {
+        if (Math.abs(A[r][i]) > Math.abs(A[pivot][i])) pivot = r;
+      }
+      if (Math.abs(A[pivot][i]) < 1e-12) {
+        solvable = false;
+        break;
+      }
+      [A[i], A[pivot]] = [A[pivot], A[i]];
+      [B[i], B[pivot]] = [B[pivot], B[i]];
 
-    if (Math.abs(det) > 1e-12) {
-      const a =
-        (t2 * (s2 * s0 - s1 * s1) -
-          s3 * (t1 * s0 - s1 * t0) +
-          s2 * (t1 * s1 - s2 * t0)) /
-        det;
-      const b =
-        (s4 * (t1 * s0 - s1 * t0) -
-          t2 * (s3 * s0 - s1 * s2) +
-          s2 * (s3 * t0 - t1 * s2)) /
-        det;
-      const c =
-        (s4 * (s2 * t0 - t1 * s1) -
-          s3 * (s3 * t0 - t1 * s2) +
-          t2 * (s3 * s1 - s2 * s2)) /
-        det;
+      const div = A[i][i];
+      for (let c = i; c < m; c++) A[i][c] /= div;
+      B[i] /= div;
 
-      predictFn = (nx) => a * nx * nx + b * nx + c;
-      formula = `y = ${a.toFixed(1)}·t² + ${b.toFixed(1)}·t + ${c.toFixed(1)}`;
+      for (let r = 0; r < m; r++) {
+        if (r !== i) {
+          const factor = A[r][i];
+          for (let c = i; c < m; c++) A[r][c] -= factor * A[i][c];
+          B[r] -= factor * B[i];
+        }
+      }
+    }
+
+    if (solvable) {
+      // B contains coeffs [c0, c1, c2, ...]
+      predictFn = (nx) => {
+        let val = 0;
+        for (let i = 0; i < m; i++) val += B[i] * Math.pow(nx, i);
+        return val;
+      };
+
+      if (degree === 2) {
+        formula = `y = ${B[2].toFixed(1)}·t² + ${B[1].toFixed(1)}·t + ${B[0].toFixed(1)}`;
+      } else if (degree === 3) {
+        formula = `y = ${B[3].toFixed(1)}·t³ + ${B[2].toFixed(1)}·t² + ${B[1].toFixed(1)}·t + ${B[0].toFixed(1)}`;
+      } else {
+        formula = `y = ${B[4].toFixed(1)}·t⁴ + ${B[3].toFixed(1)}·t³ + ${B[2].toFixed(1)}·t² + ...`;
+      }
     } else {
       predictFn = () => meanY;
       formula = `y = ${meanY.toFixed(1)}`;
     }
+  } else if (type === 'movingAverage') {
+    // Rolling Window Moving Average
+    const windowDays = Math.max(7, Math.min(365, param || 60));
+    const windowMs = windowDays * 86400000;
+    const sigma = Math.max(0.02, (windowMs / rangeX) / 2); // Normalized Gaussian sigma
+
+    predictFn = (nx) => {
+      let sumW = 0;
+      let sumWY = 0;
+      for (let i = 0; i < n; i++) {
+        const dx = Math.abs(normData[i].x - nx);
+        // Gaussian kernel
+        const w = Math.exp(-Math.pow(dx / sigma, 2) / 2);
+        sumW += w;
+        sumWY += w * normData[i].y;
+      }
+      return sumW > 1e-6 ? sumWY / sumW : meanY;
+    };
+    formula = `Gleitender Durchschnitt (${windowDays} Tage Fenster)`;
+  } else if (type === 'logistic') {
+    // Logistic S-Curve Model: y = L / (1 + e^(-k*(x - x0)))
+    let bestFit: { L: number; k: number; b: number; rss: number } | null = null;
+    let minResidual = Infinity;
+
+    // Search upper asymptote L or use user-specified ceiling param
+    const maxY = Math.max(...normData.map((d) => d.y));
+    const userCeiling = param && param >= 50 && param <= 200 ? param : null;
+    const candidates = userCeiling
+      ? [Math.max(userCeiling, Math.ceil(maxY + 0.5))]
+      : [
+          Math.min(100, Math.ceil(maxY + 2)),
+          Math.min(100, Math.ceil(maxY + 6)),
+          Math.min(100, Math.ceil(maxY + 10)),
+          85,
+          90,
+          95,
+          100,
+        ];
+    const uniqueL = Array.from(new Set(candidates.filter((l) => l > maxY)));
+
+    for (const L of uniqueL) {
+      const valid = normData.filter((d) => d.y > 0 && d.y < L);
+      if (valid.length < 3) continue;
+      let sX = 0, sY = 0, sXY = 0, sX2 = 0;
+      for (const d of valid) {
+        const logit = Math.log(d.y / (L - d.y));
+        sX += d.x;
+        sY += logit;
+        sXY += d.x * logit;
+        sX2 += d.x * d.x;
+      }
+      const denom = valid.length * sX2 - sX * sX;
+      if (denom === 0) continue;
+      const k = (valid.length * sXY - sX * sY) / denom;
+      const b = (sY - k * sX) / valid.length;
+
+      let rss = 0;
+      for (const d of valid) {
+        const pred = L / (1 + Math.exp(-(k * d.x + b)));
+        rss += Math.pow(d.y - pred, 2);
+      }
+      if (rss < minResidual) {
+        minResidual = rss;
+        bestFit = { L, k, b, rss };
+      }
+    }
+
+    if (bestFit) {
+      const { L, k, b } = bestFit;
+      predictFn = (nx) => L / (1 + Math.exp(-(k * nx + b)));
+      formula = `y = ${L.toFixed(0)} / (1 + e^(-${k.toFixed(2)}·t ${b >= 0 ? '+' : '-'} ${Math.abs(b).toFixed(1)}))`;
+    } else {
+      predictFn = () => meanY;
+      formula = `y = ${meanY.toFixed(1)}`;
+    }
+  } else if (type === 'frontier') {
+    // SOTA Frontier Envelope: Cumulative maximum progress
+    // Evaluates the highest benchmark score achieved up to normalized time nx
+    const frontierPoints = extractFrontierPoints(sorted);
+    
+    predictFn = (nx) => {
+      const targetTime = minX + nx * rangeX;
+      let maxScore = frontierPoints[0]?.score || 0;
+      for (const pt of frontierPoints) {
+        if (pt.timestamp <= targetTime) {
+          maxScore = pt.score;
+        } else {
+          break;
+        }
+      }
+      return maxScore;
+    };
+    formula = `SOTA Frontier Envelope (${frontierPoints.length} Rekord-Modelle)`;
   } else {
     // LOESS (Locally Estimated Scatterplot Smoothing)
-    // Bandwidth span h (approx 50% of range or k nearest points)
-    const span = Math.max(0.35, Math.min(0.65, 8 / n));
+    // Bandwidth span h (controlled by param e.g. 40 = 40%)
+    const span =
+      param && param >= 10 && param <= 90
+        ? param / 100
+        : Math.max(0.20, Math.min(0.65, 8 / n));
     predictFn = (nx) => {
-      // Find distances to all points
       const dists = normData.map((d) => Math.abs(d.x - nx));
       const sortedDists = [...dists].sort((a, b) => a - b);
       const k = Math.min(dists.length - 1, Math.max(3, Math.floor(dists.length * span)));
@@ -218,7 +352,7 @@ export function calculateRegression(
   }
 
   let r2 = ssTotal > 0 ? 1 - ssRes / ssTotal : 0;
-  // Clamp R² between 0 and 1
+  // Clamp R² between 0 and 0.999
   r2 = Math.max(0, Math.min(0.999, r2));
 
   // Generate curve sample points
@@ -239,7 +373,7 @@ export function calculateRegression(
   };
 }
 
-export function getRegressionName(type: RegressionType): string {
+export function getRegressionName(type: RegressionType, param?: number): string {
   switch (type) {
     case 'linear':
       return 'Linear';
@@ -248,9 +382,15 @@ export function getRegressionName(type: RegressionType): string {
     case 'power':
       return 'Power';
     case 'polynomial':
-      return 'Polynome (Grad 2)';
+      return param && param > 2 ? `Polynom (Grad ${param})` : 'Polynome (Grad 2)';
+    case 'movingAverage':
+      return param ? `Gleitender Durchschnitt (${param}d)` : 'Gleitender Durchschnitt (MA)';
+    case 'logistic':
+      return param ? `Logistische S-Kurve (${param}%)` : 'Logistische S-Kurve';
     case 'loess':
-      return 'LOESS Smoothing';
+      return param ? `LOESS Smoothing (${param}%)` : 'LOESS Smoothing';
+    case 'frontier':
+      return 'SOTA Frontier Envelope';
     default:
       return 'Linear';
   }
