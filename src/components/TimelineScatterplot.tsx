@@ -190,23 +190,23 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   const scatterPoints: TimelineDataPoint[] = useMemo(() => {
     const list: TimelineDataPoint[] = [];
     for (const m of allModels) {
-      let score = 0;
+      let score: number | null = null;
       if (selectedCategoryIndex === 0) {
         // Final Score based on scoreMode
         if (scoreMode === 'old') {
-          score = m.scoreOld ?? 0;
+          score = m.scoreOld;
         } else if (scoreMode === 'worstCase') {
-          score = m.scoreWorstCase ?? 0;
+          score = m.scoreWorstCase;
         } else {
-          score = m.scoreNewReported ?? m.score;
+          score = m.scoreNewReported;
         }
       } else if (activeComponent) {
-        // Individual benchmark component score
+        // Individual benchmark component score: empty cells from CSV are missing (null)
         const raw = m.rawScores[activeComponent.key];
-        score = typeof raw === 'number' ? activeComponent.transform(raw) : 0;
+        score = typeof raw === 'number' && raw !== null ? activeComponent.transform(raw) : null;
       }
 
-      if (score <= 0) continue;
+      if (score === null || isNaN(score) || score <= 0) continue;
 
       // Parse release date (Column Y)
       const dateStr = m.releaseDate || '2024-01-01';

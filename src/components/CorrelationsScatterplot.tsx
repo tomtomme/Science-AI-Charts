@@ -50,36 +50,6 @@ const CORRELATION_REGRESSION_OPTIONS: RegressionOption[] = [
     color: '#f43f5e', // Rose
   },
   {
-    id: 'movingAverage',
-    labelDe: 'Gleitender Schnitt (MA)',
-    labelEn: 'Moving Average (MA)',
-    shortDe: 'Moving Avg',
-    shortEn: 'Moving Avg',
-    descDe: 'Gleitender Durchschnitt über X-Werte',
-    descEn: 'Rolling moving average over X values',
-    color: '#10b981', // Emerald
-  },
-  {
-    id: 'loess',
-    labelDe: 'LOESS (Smoothing)',
-    labelEn: 'LOESS (Smoothing)',
-    shortDe: 'LOESS',
-    shortEn: 'LOESS',
-    descDe: 'Lokale Glättung empirischer Daten',
-    descEn: 'Locally estimated empirical smoothing',
-    color: '#f59e0b', // Amber
-  },
-  {
-    id: 'logistic',
-    labelDe: 'Logistische S-Kurve',
-    labelEn: 'Logistic S-Curve',
-    shortDe: 'S-Kurve',
-    shortEn: 'S-Curve',
-    descDe: 'Sättigungs-Wachstumsmodell mit oberer Schranke',
-    descEn: 'Saturation growth model with theoretical ceiling',
-    color: '#06b6d4', // Cyan
-  },
-  {
     id: 'power',
     labelDe: 'Power (Potenzkurve)',
     labelEn: 'Power (Scaling)',
@@ -98,6 +68,16 @@ const CORRELATION_REGRESSION_OPTIONS: RegressionOption[] = [
     descDe: 'Exponentielles Wachstum',
     descEn: 'Exponential acceleration',
     color: '#8b5cf6', // Violet
+  },
+  {
+    id: 'loess',
+    labelDe: 'LOESS (Smoothing)',
+    labelEn: 'LOESS (Smoothing)',
+    shortDe: 'LOESS',
+    shortEn: 'LOESS',
+    descDe: 'Lokale Glättung empirischer Daten',
+    descEn: 'Locally estimated empirical smoothing',
+    color: '#f59e0b', // Amber
   },
 ];
 
@@ -207,26 +187,27 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
     return list.sort((a, b) => a.x - b.x);
   }, [allModels, xDim, yDim]);
 
-  // Identify frontier breakthrough models
-  const frontierPoints = useMemo(() => {
-    // Treat (x, y) with timestamps for frontier extraction
-    const asTimelinePoints = allCorrelationPoints.map((p) => ({
-      id: p.id,
-      name: p.name,
-      displayName: p.displayName,
-      company: p.company,
-      releaseDate: p.releaseDate,
-      timestamp: new Date(p.releaseDate).getTime(),
-      score: p.y,
-      flag: p.flag,
-      isPaid: p.isPaid,
-    }));
-    return extractFrontierPoints(asTimelinePoints);
-  }, [allCorrelationPoints]);
-
+  // Identify genuine historical SOTA breakthrough models (models that set an all-time record on the composite benchmark score over time)
   const frontierPointIds = useMemo(() => {
-    return new Set(frontierPoints.map((p) => p.id));
-  }, [frontierPoints]);
+    const eligible = allModels
+      .filter((m) => {
+        const sc = m.scoreOld ?? m.scoreNewReported;
+        return typeof sc === 'number' && sc > 0;
+      })
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        displayName: m.displayName,
+        company: m.creatorClean || m.companyName || 'LLM Lab',
+        releaseDate: m.releaseDate,
+        timestamp: new Date(m.releaseDate).getTime(),
+        score: (m.scoreOld ?? m.scoreNewReported) as number,
+        flag: m.flag,
+        isPaid: m.isPaid,
+      }));
+    const sota = extractFrontierPoints(eligible);
+    return new Set(sota.map((p) => p.id));
+  }, [allModels]);
 
   const activePoints = useMemo(() => {
     if (scope === 'frontier') {
@@ -551,19 +532,12 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             {/* Contextual Param Input (Fixed 76px width) */}
             <div
               className={`w-[142px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
-                activeRegression.id !== 'movingAverage' &&
-                activeRegression.id !== 'polynomial' &&
-                activeRegression.id !== 'loess' &&
-                activeRegression.id !== 'logistic'
+                activeRegression.id !== 'polynomial' && activeRegression.id !== 'loess'
                   ? 'opacity-40 cursor-not-allowed'
                   : ''
               }`}
               title={
-                activeRegression.id === 'movingAverage'
-                  ? lang === 'de'
-                    ? 'Glättungsfenster in X-Punkten (5–50)'
-                    : 'Moving window in X points (5–50)'
-                  : activeRegression.id === 'polynomial'
+                activeRegression.id === 'polynomial'
                   ? lang === 'de'
                     ? 'Polynom-Grad (2, 3 oder 4)'
                     : 'Polynomial degree (2, 3 or 4)'
@@ -571,10 +545,6 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   ? lang === 'de'
                     ? 'Bandbreite / Glättungs-Span (15–80%)'
                     : 'Bandwidth smoothing span (15–80%)'
-                  : activeRegression.id === 'logistic'
-                  ? lang === 'de'
-                    ? 'Sättigungsgrenze / Decke L (80–150%)'
-                    : 'Saturation ceiling L (80–150%)'
                   : lang === 'de'
                   ? 'Kein variabler Parameter für dieses Modell'
                   : 'No variable parameter for this model'
@@ -584,25 +554,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                 Param:
               </span>
               <div className="w-[76px] shrink-0 flex items-center justify-end">
-                {activeRegression.id === 'movingAverage' ? (
-                  <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-emerald-500">
-                    <input
-                      type="number"
-                      min={5}
-                      max={50}
-                      step={5}
-                      value={movingAvgDays}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        if (!isNaN(val) && val >= 5 && val <= 50) setMovingAvgDays(val);
-                      }}
-                      className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
-                    />
-                    <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
-                      P
-                    </span>
-                  </div>
-                ) : activeRegression.id === 'polynomial' ? (
+                {activeRegression.id === 'polynomial' ? (
                   <select
                     value={polyDegree}
                     onChange={(e) => setPolyDegree(Number(e.target.value))}
@@ -623,24 +575,6 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
                         if (!isNaN(val) && val >= 15 && val <= 80) setLoessSpan(val);
-                      }}
-                      className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
-                    />
-                    <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
-                      %
-                    </span>
-                  </div>
-                ) : activeRegression.id === 'logistic' ? (
-                  <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-cyan-500">
-                    <input
-                      type="number"
-                      min={80}
-                      max={150}
-                      step={5}
-                      value={logisticCeiling}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        if (!isNaN(val) && val >= 80 && val <= 150) setLogisticCeiling(val);
                       }}
                       className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
                     />

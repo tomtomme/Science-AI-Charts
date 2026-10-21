@@ -16,14 +16,14 @@ export interface BenchmarkComponent {
 }
 
 export interface RawBenchmarkScores {
-  actCodeReason: number; // Col D (10 Evals)
-  nonHallucination: number; // Col E
-  scienceKnowledge: number; // Col F (-100 to 100)
-  visionPlot: number; // Col G (MMMU-Pro)
-  medReasoning: number; // Col H (MLCR-AA)
-  excelAgent: number; // Col I (ExcelAgent)
-  trickQuestions: number; // Col J (SimpleBench)
-  econLegal: number; // Col K (Vals.ai)
+  actCodeReason: number | null; // Col D (10 Evals)
+  nonHallucination: number | null; // Col E
+  scienceKnowledge: number | null; // Col F (-100 to 100)
+  visionPlot: number | null; // Col G (MMMU-Pro)
+  medReasoning: number | null; // Col H (MLCR-AA)
+  excelAgent: number | null; // Col I (ExcelAgent)
+  trickQuestions: number | null; // Col J (SimpleBench)
+  econLegal: number | null; // Col K (Vals.ai)
 }
 
 export interface ComponentBreakdown {

@@ -1,6 +1,6 @@
 import { FALLBACK_CSV_CONTENT, RAW_CSV_URL, DIRECT_EXPORT_CSV_URL } from '../data/rawCsvFallback';
 import { ModelRecord, CsvNotesMetadata } from '../types';
-import { extractHeaderMetadata, extractSheetDate, parseModelDataset, extractCsvNotesMetadata, CsvHeaderMetadata } from '../utils/csvParser';
+import { extractHeaderMetadata, extractSheetDate, parseModelDataset, parseAllModels, extractCsvNotesMetadata, CsvHeaderMetadata } from '../utils/csvParser';
 
 export interface SyncState {
   isSyncing: boolean;
@@ -14,6 +14,7 @@ export interface SyncState {
 
 export interface LoadedDatasets {
   models: ModelRecord[]; // default to newModels for backwards-compatibility
+  allModels: ModelRecord[]; // all 237+ models scanned from row 36 down to end of Col S
   newModels: ModelRecord[];
   oldModels: ModelRecord[];
   worstCaseModels: ModelRecord[];
@@ -80,6 +81,7 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
   const { csvText, isLive, headerDate } = await fetchLiveCsv();
   const now = new Date();
   try {
+    const allModels = parseAllModels(csvText);
     const newModels = parseModelDataset(csvText, 'new');
     const oldModels = parseModelDataset(csvText, 'old');
     const worstCaseModels = parseModelDataset(csvText, 'worstCase');
@@ -88,11 +90,12 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
     const headerMeta = extractHeaderMetadata(csvText);
     const notesMeta = extractCsvNotesMetadata(csvText);
 
-    if (newModels.length === 0 && oldModels.length === 0 && worstCaseModels.length === 0) {
+    if (newModels.length === 0 && oldModels.length === 0 && worstCaseModels.length === 0 && allModels.length === 0) {
       throw new Error('Keine Datensätze gefunden');
     }
     return {
       models: newModels,
+      allModels,
       newModels,
       oldModels,
       worstCaseModels,
@@ -105,6 +108,7 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
       notesMeta,
     };
   } catch (err) {
+    const fallbackAll = parseAllModels(FALLBACK_CSV_CONTENT);
     const fallbackNew = parseModelDataset(FALLBACK_CSV_CONTENT, 'new');
     const fallbackOld = parseModelDataset(FALLBACK_CSV_CONTENT, 'old');
     const fallbackWorstCase = parseModelDataset(FALLBACK_CSV_CONTENT, 'worstCase');
@@ -114,6 +118,7 @@ export async function loadModelsData(): Promise<LoadedDatasets> {
 
     return {
       models: fallbackNew,
+      allModels: fallbackAll,
       newModels: fallbackNew,
       oldModels: fallbackOld,
       worstCaseModels: fallbackWorstCase,

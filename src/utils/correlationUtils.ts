@@ -48,7 +48,7 @@ export const CORRELATION_DIMENSIONS: CorrelationDimension[] = [
     color: '#059669', // Emerald
     bgColor: '#ecfdf5',
     targetId: 'note-col-m',
-    getValue: (m) => (typeof m.scoreNewReported === 'number' ? m.scoreNewReported : typeof m.scoreNew === 'number' ? m.scoreNew : m.score),
+    getValue: (m) => (typeof m.scoreNewReported === 'number' ? m.scoreNewReported : typeof m.scoreNew === 'number' ? m.scoreNew : null),
   },
   {
     id: 'old_score',

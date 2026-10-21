@@ -7,7 +7,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent, PriceFilter, LabEntry, ExplosionMode } from './types';
 import { FALLBACK_CSV_CONTENT, SHEET_HTML_URL, CHART_HTML_URL, GITHUB_REPO_URL } from './data/rawCsvFallback';
 import { FALLBACK_LAB_ENTRIES } from './data/rawLabCsvFallback';
-import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset } from './utils/csvParser';
+import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset, parseAllModels } from './utils/csvParser';
 import { LoadedDatasets, loadModelsData } from './services/dataService';
 import { fetchLiveLabEntries } from './services/labDataService';
 import { BENCHMARK_COMPONENTS } from './data/benchmarks';
@@ -49,6 +49,7 @@ export default function App() {
   // Pre-load all models from embedded fallback for instant zero-latency render
   const [loadedData, setLoadedData] = useState<LoadedDatasets>(() => ({
     models: parseModelDataset(FALLBACK_CSV_CONTENT, 'new'),
+    allModels: parseAllModels(FALLBACK_CSV_CONTENT),
     newModels: parseModelDataset(FALLBACK_CSV_CONTENT, 'new'),
     oldModels: parseModelDataset(FALLBACK_CSV_CONTENT, 'old'),
     worstCaseModels: parseModelDataset(FALLBACK_CSV_CONTENT, 'worstCase'),
@@ -64,8 +65,8 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(new Date());
   
-  // Slider: Anzahl angezeigter Modelle in 5er-Schritten (Standard: 100)
-  const [topCount, setTopCount] = useState<number>(100);
+  // Slider: Anzahl angezeigter Modelle in 5er-Schritten (Standard: 250, damit alle Modelle sichtbar sind)
+  const [topCount, setTopCount] = useState<number>(250);
 
   // Explosion Schalter: 'on' (an) | 'hover' (teils) | 'off' (aus) - Standard: 'hover' (wie bisheriges 'aus')
   const [explosionMode, setExplosionMode] = useState<ExplosionMode>('hover');
@@ -148,15 +149,23 @@ export default function App() {
   const effectiveModelScope: ModelScope = searchFilter.trim().length > 0 ? 'all' : modelScope;
 
   const currentModels = useMemo(() => {
-    const base =
-      scoreMode === 'new'
-        ? loadedData.newModels
-        : scoreMode === 'old'
-        ? loadedData.oldModels
-        : loadedData.worstCaseModels;
+    let base: ModelRecord[];
+    if (selectedCategoryIndex === 0) {
+      base =
+        scoreMode === 'new'
+          ? loadedData.newModels
+          : scoreMode === 'old'
+          ? loadedData.oldModels
+          : loadedData.worstCaseModels;
+    } else {
+      // Individual category selected: include ALL models from the CSV that have a valid score in this category
+      const comp = BENCHMARK_COMPONENTS[selectedCategoryIndex - 1];
+      base = loadedData.allModels.filter((m) => m.rawScores[comp.key] !== null);
+    }
+
     let list = effectiveModelScope === 'current' ? base.filter((m) => m.isAvailable) : base;
 
-    // Preis-Filter: Default 'free', sonst 'paid' oder 'all'
+    // Preis-Filter: Default 'paid', sonst 'free' oder 'all'
     if (priceFilter === 'free') {
       list = list.filter((m) => !m.isPaid);
     } else if (priceFilter === 'paid') {
@@ -164,16 +173,13 @@ export default function App() {
     }
 
     return list;
-  }, [scoreMode, effectiveModelScope, loadedData, priceFilter]);
+  }, [scoreMode, selectedCategoryIndex, effectiveModelScope, loadedData, priceFilter]);
 
-  // Full unfiltered models dataset for Timeline tab (always displays the full timeline, independent from bar chart filters like current/all, free/paid, max bar count, search, etc.)
+  // Full unfiltered models dataset for Timeline tab and Correlations tab:
+  // Supplies all 237+ models scanned from row 36 downwards across all 8 categories and 3 scores.
   const fullTimelineModels = useMemo(() => {
-    return timelineScoreMode === 'new'
-      ? loadedData.newModels
-      : timelineScoreMode === 'old'
-      ? loadedData.oldModels
-      : loadedData.worstCaseModels;
-  }, [timelineScoreMode, loadedData]);
+    return loadedData.allModels;
+  }, [loadedData.allModels]);
 
   const hasFilterActive =
     searchFilter.trim().length > 0 || selectedFamilies.length > 0 || selectedCompany !== null;
@@ -229,8 +235,10 @@ export default function App() {
       // Sortieren nach Punktzahl: Bei Einzelkategorie nach der Kategorie, sonst Gesamtwert
       if (activeComp) {
         sorted.sort((a, b) => {
-          const valA = a.rawScores[activeComp.key] ?? 0;
-          const valB = b.rawScores[activeComp.key] ?? 0;
+          const rawA = a.rawScores[activeComp.key];
+          const rawB = b.rawScores[activeComp.key];
+          const valA = typeof rawA === 'number' && rawA !== null ? activeComp.transform(rawA) : -9999;
+          const valB = typeof rawB === 'number' && rawB !== null ? activeComp.transform(rawB) : -9999;
           if (valB !== valA) return valB - valA;
           return (b.score ?? 0) - (a.score ?? 0);
         });

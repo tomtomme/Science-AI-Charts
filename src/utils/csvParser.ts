@@ -212,37 +212,31 @@ function extractFlag(text: string): { flag: string; cleanText: string } {
  * - 'old': strictly models with Col L ("OLD Score").
  * - 'worstCase': strictly models with Col N ("Worst Case Score").
  */
-export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): ModelRecord[] {
+/**
+ * Parses all LLM model records by scanning from Row 36 down to where Column S ends.
+ * - Collects the 29 current bots from rows 2-31 to identify active chatbots.
+ * - Scans from row 36 (index 35) downwards, dynamically expanding as new LLMs are added.
+ * - Stops at summary / notes rows (Sources & Notes, min, mean, median, max, count).
+ * - Treats empty cells as missing (null) rather than zero.
+ */
+export function parseAllModels(csvText: string): ModelRecord[] {
   const rows = parseCsvRows(csvText);
   if (rows.length < 3) return [];
 
-  // Find header row containing "10 Evals" or "Act Code" or "Creator | Release"
-  let headerRowIndex = -1;
-  for (let r = 0; r < Math.min(10, rows.length); r++) {
-    const rowStr = rows[r].join(' ');
-    if (rowStr.includes('10 Evals') || rowStr.includes('Non-Hallucination') || rowStr.includes('Creator | Release')) {
-      headerRowIndex = r;
-      break;
-    }
+  // 1. Current bot names from top table (rows 2 to 31)
+  const currentBotNames = new Set<string>();
+  for (let r = 1; r < Math.min(32, rows.length); r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const s = (row[18] || '').trim().toLowerCase();
+    const b = (row[1] || '').trim().toLowerCase();
+    if (s) currentBotNames.add(s);
+    if (b) currentBotNames.add(b);
   }
 
-  if (headerRowIndex === -1) {
-    headerRowIndex = 1;
-  }
-
-  // Find timeline row index before parsing models
-  let timelineRowIndex = -1;
-  for (let r = headerRowIndex + 1; r < rows.length; r++) {
-    const rowStr = (rows[r] || []).join(' ');
-    if (rowStr.includes('Full Timeline:') || rowStr.includes('Full Timeline')) {
-      timelineRowIndex = r;
-      break;
-    }
-  }
-
-  // Parse dynamic company lookup table from Column AJ (index 35) onwards, from row index ~230
+  // 2. Parse dynamic company lookup table from Column AJ (index 35) onwards
   const companyLookupMap: Record<string, { name: string; domain: string; color: string; flag: string }> = {};
-  for (let r = 200; r < rows.length; r++) {
+  for (let r = 180; r < rows.length; r++) {
     const row = rows[r];
     if (row && row.length > 35 && row[35]) {
       const comp = row[35].trim();
@@ -256,28 +250,48 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
     }
   }
 
-  const parseRowToModel = (row: string[], rIdx: number): ModelRecord | null => {
-    if (!row || row.length < 5) return null;
+  // 3. Locate start of history table: Row 36 (index 35) or row after "History"
+  let startIndex = 35; // Row 36 in 1-based indexing
+  for (let r = 0; r < Math.min(45, rows.length); r++) {
+    const b = (rows[r]?.[1] || '').trim().toLowerCase();
+    const c = (rows[r]?.[2] || '').trim().toLowerCase();
+    if (b === 'history' || c.includes('full timeline')) {
+      startIndex = r + 1;
+      break;
+    }
+  }
+
+  const allModels: ModelRecord[] = [];
+
+  for (let r = startIndex; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.length < 5) continue;
 
     const rawNameCell = (row[1] || '').trim();
     const rawCreatorCell = (row[2] || '').trim();
+    const colS = (row[18] || '').trim();
 
-    if (!rawNameCell && !rawCreatorCell) return null;
+    // Termination: when hitting summary rows, min/mean/median/max/count, or notes
     if (
       rawNameCell.includes('Sources & Notes') ||
-      rawNameCell.includes('Full Timeline') ||
-      rawNameCell.includes('Expectations') ||
-      rawNameCell.includes('Rumors') ||
+      rawCreatorCell.includes('Sources & Notes') ||
+      rawCreatorCell === 'min' ||
+      rawCreatorCell === 'mean' ||
+      rawCreatorCell === 'median' ||
+      rawCreatorCell === 'max' ||
+      rawCreatorCell.startsWith('count') ||
       rawNameCell === 'min' ||
       rawNameCell === 'mean' ||
       rawNameCell === 'median' ||
       rawNameCell === 'max' ||
       rawNameCell.startsWith('count')
     ) {
-      return null;
+      break;
     }
-    if (rawCreatorCell.includes('Sources & Notes') || rawCreatorCell.includes('Company')) {
-      return null;
+
+    // Skip section placeholders / rumors where Column S is empty
+    if (!colS || rawNameCell.toLowerCase().includes('expectations') || rawNameCell.toLowerCase().includes('rumors')) {
+      continue;
     }
 
     // Extract Flag and Name
@@ -308,24 +322,10 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
       rawNameCell.includes('⭐') ||
       /\bNEW\b/i.test(rawNameCell);
 
-    const displayName = cleanedName
-      .replace(/💲/g, '')
-      .replace(/🌐/g, '')
-      .replace(/🆕/g, '')
-      .replace(/✦\s*NEW/gi, '')
-      .replace(/✧\s*NEW/gi, '')
-      .replace(/★\s*NEW/gi, '')
-      .replace(/⭐\s*NEW/gi, '')
-      .replace(/✦/g, '')
-      .replace(/✧/g, '')
-      .replace(/★/g, '')
-      .replace(/⭐/g, '')
-      .replace(/\s+NEW$/i, '')
-      .trim();
+    // Canonical display name from Column S
+    const displayName = colS;
 
-    if (!displayName || displayName.length < 2) return null;
-
-    // Parse Benchmark Columns (D through K):
+    // Parse Benchmark Columns (D through K) - Empty cells remain null (missing)
     const valD = parseNum(row[3]);
     const valE = parseNum(row[4]);
     const valF = parseNum(row[5]);
@@ -346,48 +346,35 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
       valK !== null;
 
     const rawScores: RawBenchmarkScores = {
-      actCodeReason: valD ?? 0,
-      nonHallucination: valE ?? 0,
-      scienceKnowledge: valF ?? 0,
-      visionPlot: valG ?? 0,
-      medReasoning: valH ?? 0,
-      excelAgent: valI ?? 0,
-      trickQuestions: valJ ?? 0,
-      econLegal: valK ?? 0,
+      actCodeReason: valD,
+      nonHallucination: valE,
+      scienceKnowledge: valF,
+      visionPlot: valG,
+      medReasoning: valH,
+      excelAgent: valI,
+      trickQuestions: valJ,
+      econLegal: valK,
     };
 
-    const scoreNewReported = parseNum(row[12]); // Col M
     const scoreOld = parseNum(row[11]);         // Col L
-    const scoreWorstCase = parseNum(row[13]);
+    const scoreNewReported = parseNum(row[12]); // Col M
+    const scoreWorstCase = parseNum(row[13]);   // Col N
 
-    // Strictly enforce selected mode without blending/fallback!
-    let targetScore: number | null = null;
-    if (mode === 'old') {
-      targetScore = scoreOld;
-    } else if (mode === 'worstCase') {
-      targetScore = scoreWorstCase;
-    } else {
-      targetScore = scoreNewReported;
-    }
+    const activeScore = scoreOld ?? scoreNewReported ?? scoreWorstCase ?? 0;
 
-    if (targetScore === null || targetScore <= 0) {
-      return null;
-    }
-
-    // Calculate components according to formula:
+    // Component breakdown for bar explosion / tooltips
     const rawContributions: { comp: typeof BENCHMARK_COMPONENTS[0]; raw: number; transformed: number; pts: number }[] = [];
     let sumTransformed = 0;
 
     BENCHMARK_COMPONENTS.forEach((comp) => {
-      const raw = rawScores[comp.key];
+      const raw = rawScores[comp.key] ?? 0;
       const transformed = comp.transform(raw);
       const pts = transformed / 8;
       rawContributions.push({ comp, raw, transformed, pts });
       sumTransformed += pts;
     });
 
-    // Normalize points contribution to match the target score height exactly
-    const normFactor = sumTransformed > 0 ? targetScore / sumTransformed : 1;
+    const normFactor = sumTransformed > 0 && activeScore > 0 ? activeScore / sumTransformed : 1;
 
     const breakdown: ComponentBreakdown[] = rawContributions.map(({ comp, raw, transformed, pts }) => {
       const normalizedContribution = parseFloat((pts * normFactor).toFixed(2));
@@ -398,7 +385,7 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
         rawValue: raw,
         transformedValue: transformed,
         pointsContribution: normalizedContribution,
-        percentageOfTotal: targetScore > 0 ? parseFloat(((normalizedContribution / targetScore) * 100).toFixed(1)) : 0,
+        percentageOfTotal: activeScore > 0 ? parseFloat(((normalizedContribution / activeScore) * 100).toFixed(1)) : 0,
       };
     });
 
@@ -415,7 +402,6 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
 
     const parsedChatLink = extractHttpUrl(chatLinkRaw);
     const parsedApiLink = extractHttpUrl(apiLinkRaw);
-    // Modell-Link: Link aus Spalte P; wenn Spalte P kein Link, dann Link aus Spalte Q; sonst undefined
     const modelUrl = parsedChatLink || parsedApiLink;
 
     const faviconUrl = getFaviconUrl(company.domain);
@@ -440,9 +426,6 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
       }
     }
 
-    // Availability: Spalte P (Index 15) "Link to Chat or App if still available"
-    // Chatbots in the top table (before timeline) are current available bots.
-    // In timeline: only available if not superseded/discontinued and has active link or paid access.
     const chatLinkLow = chatLinkRaw.toLowerCase();
     const isSupersededOrDiscontinued =
       chatLinkLow.includes('better') ||
@@ -450,11 +433,12 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
       chatLinkRaw === '';
 
     const isAvailable =
-      (timelineRowIndex !== -1 && rIdx < timelineRowIndex && rIdx >= 2) ||
+      currentBotNames.has(colS.toLowerCase()) ||
+      currentBotNames.has(cleanedName.toLowerCase()) ||
       (!isSupersededOrDiscontinued && (chatLinkLow.startsWith('http') || chatLinkLow.includes('paid') || chatLinkLow.includes('api') || !!parsedApiLink));
 
-    return {
-      id: `${displayName}-${rIdx}`,
+    allModels.push({
+      id: `${displayName}-${r}`,
       rank: 0,
       flag,
       name: rawNameCell,
@@ -470,11 +454,11 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
       rawScores,
       hasAll8Benchmarks: hasAll8,
       breakdown,
-      score: targetScore,
+      score: activeScore,
       scoreOld,
       scoreNew: scoreNewReported,
-      scoreNewCalculated: targetScore,
-      scoreNewReported: targetScore,
+      scoreNewCalculated: activeScore,
+      scoreNewReported,
       scoreWorstCase,
       storyline,
       chatLink: parsedChatLink,
@@ -484,55 +468,43 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
       companyDomain: company.domain,
       companyColor: company.color,
       faviconUrl,
-    };
-  };
-
-  const topModels: ModelRecord[] = [];
-  const seenNames = new Set<string>();
-
-  // 1. Parse top table (stop when hitting section break or timeline)
-  const stopIndex = timelineRowIndex !== -1 ? timelineRowIndex : rows.length;
-  for (let r = headerRowIndex + 1; r < stopIndex; r++) {
-    const row = rows[r];
-    const rowStr = (row || []).join(' ');
-    if (rowStr.includes('Sources & Notes')) {
-      continue;
-    }
-
-    const model = parseRowToModel(row, r);
-    if (model) {
-      const cleanKey = model.displayName.toLowerCase();
-      if (!seenNames.has(cleanKey)) {
-        seenNames.add(cleanKey);
-        topModels.push(model);
-      }
-    }
+    });
   }
 
-  // 2. Parse timeline starting from timelineRowIndex
-  const timelineModels: ModelRecord[] = [];
-  if (timelineRowIndex !== -1) {
-    for (let r = timelineRowIndex + 1; r < rows.length; r++) {
-      const row = rows[r];
-      const model = parseRowToModel(row, r);
-      if (model) {
-        const cleanKey = model.displayName.toLowerCase();
-        if (!seenNames.has(cleanKey)) {
-          seenNames.add(cleanKey);
-          timelineModels.push(model);
-        }
-      }
-    }
+  return allModels;
+}
+
+/**
+ * Parses models filtered and ranked by specific score mode:
+ * - 'new': strictly models with Col M ("NEW Score", 73 models)
+ * - 'old': strictly models with Col L ("OLD Score", 169 models)
+ * - 'worstCase': strictly models with Col N ("Worst Case Score", 73 models)
+ */
+export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): ModelRecord[] {
+  const all = parseAllModels(csvText);
+
+  let filtered: ModelRecord[] = [];
+  if (mode === 'old') {
+    filtered = all
+      .filter((m) => m.scoreOld !== null && m.scoreOld > 0)
+      .map((m) => ({ ...m, score: m.scoreOld as number, scoreNewCalculated: m.scoreOld as number }));
+  } else if (mode === 'worstCase') {
+    filtered = all
+      .filter((m) => m.scoreWorstCase !== null && m.scoreWorstCase > 0)
+      .map((m) => ({ ...m, score: m.scoreWorstCase as number, scoreNewCalculated: m.scoreWorstCase as number }));
+  } else {
+    filtered = all
+      .filter((m) => m.scoreNewReported !== null && m.scoreNewReported > 0)
+      .map((m) => ({ ...m, score: m.scoreNewReported as number, scoreNewCalculated: m.scoreNewReported as number }));
   }
 
-  // Combine and sort all deduplicated models descending by active score
-  const allModels = [...topModels, ...timelineModels];
-  allModels.sort((a, b) => b.score - a.score);
+  // Sort descending by target score
+  filtered.sort((a, b) => b.score - a.score);
 
   // Assign sequential ranks 1..N
-  allModels.forEach((m, idx) => {
+  filtered.forEach((m, idx) => {
     m.rank = idx + 1;
   });
 
-  return allModels;
+  return filtered;
 }

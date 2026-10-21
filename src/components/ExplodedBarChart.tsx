@@ -572,10 +572,14 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
                     {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated} {t.points} ({t.rank} #{displayedModel.rank})
                   </span>
-                  <span className="text-slate-400">·</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
-                    {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / 8).toFixed(1)} {t.points})
-                  </span>
+                  {displayedModel.rawScores.nonHallucination !== null && (
+                    <>
+                      <span className="text-slate-400">·</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
+                        {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / 8).toFixed(1)} {t.points})
+                      </span>
+                    </>
+                  )}
                 </>
               )}
             </div>
