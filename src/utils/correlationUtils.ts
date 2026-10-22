@@ -195,26 +195,40 @@ export function calculateSpearman(points: Array<{ x: number; y: number }>): Corr
 function formatCorrelationResult(val: number, type: 'pearson' | 'spearman'): CorrelationMetricResult {
   const abs = Math.abs(val);
   const isPos = val >= 0;
+  // Round to 2 decimal places to match Cohen's standard thresholds (0.10, 0.30, 0.50)
+  const r2 = Math.round(abs * 100) / 100;
 
-  let strengthDe = 'Keine / vernachlässigbare Korrelation';
-  let strengthEn = 'Negligible / no correlation';
+  let strengthDe: string;
+  let strengthEn: string;
   let color = '#64748b'; // Slate
 
-  if (abs >= 0.75) {
-    strengthDe = isPos ? 'Sehr starke positive Korrelation' : 'Sehr starke inverse Korrelation';
-    strengthEn = isPos ? 'Very strong positive correlation' : 'Very strong inverse correlation';
+  if (r2 >= 0.7) {
+    strengthDe = 'sehr stark';
+    strengthEn = 'very strong';
     color = isPos ? '#059669' : '#dc2626'; // Emerald or Red
-  } else if (abs >= 0.5) {
-    strengthDe = isPos ? 'Deutliche positive Korrelation' : 'Deutliche inverse Korrelation';
-    strengthEn = isPos ? 'Moderate to strong correlation' : 'Moderate to strong inverse correlation';
+  } else if (r2 >= 0.5) {
+    strengthDe = 'stark';
+    strengthEn = 'strong';
     color = isPos ? '#0284c7' : '#e11d48'; // Sky or Rose
-  } else if (abs >= 0.3) {
-    strengthDe = isPos ? 'Mäßige positive Korrelation' : 'Mäßige inverse Korrelation';
-    strengthEn = isPos ? 'Weak to moderate correlation' : 'Weak to moderate inverse correlation';
+  } else if (r2 > 0.3) {
+    strengthDe = 'moderat bis stark';
+    strengthEn = 'moderate to strong';
     color = isPos ? '#0d9488' : '#f97316'; // Teal or Orange
-  } else if (abs >= 0.15) {
-    strengthDe = isPos ? 'Geringe positive Tendenz' : 'Geringe inverse Tendenz';
-    strengthEn = isPos ? 'Slight positive tendency' : 'Slight inverse tendency';
+  } else if (r2 === 0.3) {
+    strengthDe = 'moderat';
+    strengthEn = 'moderate';
+    color = isPos ? '#0d9488' : '#f97316';
+  } else if (r2 > 0.1) {
+    strengthDe = 'schwach bis moderat';
+    strengthEn = 'weak to moderate';
+    color = isPos ? '#6366f1' : '#ea580c'; // Indigo or Amber
+  } else if (r2 === 0.1) {
+    strengthDe = 'schwach';
+    strengthEn = 'weak';
+    color = isPos ? '#6366f1' : '#ea580c';
+  } else {
+    strengthDe = 'vernachlässigbar';
+    strengthEn = 'negligible';
     color = '#64748b';
   }
 
@@ -223,8 +237,8 @@ function formatCorrelationResult(val: number, type: 'pearson' | 'spearman'): Cor
 
   return {
     value: val,
-    labelDe: `${type === 'pearson' ? "Pearson's r" : "Spearman's ρ"} = ${formattedVal}`,
-    labelEn: `${type === 'pearson' ? "Pearson's r" : "Spearman's ρ"} = ${formattedVal}`,
+    labelDe: `${type === 'pearson' ? "Pearson's r" : 'Spearmans Rho'} = ${formattedVal}`,
+    labelEn: `${type === 'pearson' ? "Pearson's r" : 'Spearmans Rho'} = ${formattedVal}`,
     strengthDe,
     strengthEn,
     color,

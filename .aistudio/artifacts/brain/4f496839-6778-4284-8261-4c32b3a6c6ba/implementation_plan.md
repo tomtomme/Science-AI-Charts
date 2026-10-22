@@ -119,5 +119,23 @@ A clean accessor maps any dimension index $0..10$ to a numeric score for a given
    - Extend `benchmarkView` union: `'barchart' | 'timeline' | 'correlations'`.
    - Add view switcher button for "Korrelationen" with icon (`GitCompare`).
    - Render `CorrelationsScatterplot` when `activeTab === 'benchmark' && benchmarkView === 'correlations'`.
-4. Verification:
+4. Verification & Calibration:
+   - Cohen (1988) Effect Size Intervals calibrated:
+     - $|r| < 0.1$: negligible ("vernachlässigbar" / "negligible")
+     - $|r| = 0.1$: weak ("schwach" / "weak")
+     - $0.1 < |r| < 0.3$: weak to moderate ("schwach bis moderat" / "weak to moderate")
+     - $|r| = 0.3$: moderate ("moderat" / "moderate")
+     - $0.3 < |r| < 0.5$: moderate to strong ("moderat bis stark" / "moderate to strong")
+     - $|r| \ge 0.5$: strong ("stark" / "strong"), with $\ge 0.7$ very strong ("sehr stark" / "very strong")
+   - Renamed rank correlation badge to "Spearmans Rho".
+   - Compact, Collision-Aware Pop-up:
+     - Made dot hover tooltip ultra-compact (w: 230px, h: ~68px, single-row bivariate metrics).
+     - Implemented dynamic non-overlapping quadrant placement (`getOptimalTooltipPosition`) that calculates candidate positions around the dot and picks the orientation with minimum data point overlaps.
+     - Removed phantom pointer-event blocker pseudo-elements so nearby dots remain effortlessly interactive.
+   - Dual Side-by-Side Rectangular Plots:
+     - Configured 2 rectangular scatterplots side by side (`grid grid-cols-1 lg:grid-cols-2 gap-4`) for direct visual and statistical comparative analysis.
+     - Formatted each plot with golden rectangular aspect ratio (560 x 380).
+     - Removed bulky X and Y axis sliders and buttons from above the charts.
+     - Interactive Clickable Axis Titles: Placed clickable badges directly at the Y-axis (top-left) and X-axis (bottom-center) of each chart, opening an anchored category selector popover.
+     - Each plot features its own independent X and Y dimension selection, quick axis swap (`X ⇄ Y`), Pearson r and Spearmans Rho badges, and regression curve.
    - Run `compile_applet` and `lint_applet` to ensure zero compilation or type issues.

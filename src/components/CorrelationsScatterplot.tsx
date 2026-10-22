@@ -1,11 +1,12 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, ArrowLeftRight, Sparkles } from 'lucide-react';
-import { ModelRecord, RegressionType } from '../types';
+import { ExternalLink, TrendingUp, Plus, Minus, ArrowLeftRight, Sparkles, ChevronDown, Check } from 'lucide-react';
+import { ModelRecord, RegressionType, TimelineDataPoint } from '../types';
 import { calculateRegression, extractFrontierPoints } from '../utils/mathRegression';
 import {
   CORRELATION_DIMENSIONS,
   calculatePearson,
   calculateSpearman,
+  CorrelationDimension,
   CorrelationPoint,
 } from '../utils/correlationUtils';
 
@@ -81,37 +82,259 @@ const CORRELATION_REGRESSION_OPTIONS: RegressionOption[] = [
   },
 ];
 
-export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = ({
+const DEFAULT_CORRELATION_REGRESSION_INDEX = Math.max(
+  0,
+  CORRELATION_REGRESSION_OPTIONS.findIndex((o) => o.id === 'loess')
+);
+
+// Helper to find optimal tooltip position with minimal data-point overlaps
+function getOptimalTooltipPosition(
+  dotX: number,
+  dotY: number,
+  containerW: number,
+  containerH: number,
+  allPoints: Array<{ id: string; x: number; y: number }>,
+  currentPointId: string,
+  tipW = 230,
+  tipH = 68,
+  padding = 8
+): { left: number; top: number } {
+  const candidates = [
+    { left: dotX + 12, top: dotY - tipH - 8, name: 'TR' },
+    { left: dotX - tipW - 12, top: dotY - tipH - 8, name: 'TL' },
+    { left: dotX + 12, top: dotY + 12, name: 'BR' },
+    { left: dotX - tipW - 12, top: dotY + 12, name: 'BL' },
+  ];
+
+  let bestCandidate = candidates[0];
+  let minScore = Infinity;
+
+  for (const c of candidates) {
+    let left = c.left;
+    let top = c.top;
+    let boundaryPenalty = 0;
+
+    if (left < padding) {
+      boundaryPenalty += (padding - left) * 4;
+      left = padding;
+    } else if (left + tipW > containerW - padding) {
+      boundaryPenalty += (left + tipW - (containerW - padding)) * 4;
+      left = Math.max(padding, containerW - padding - tipW);
+    }
+
+    if (top < padding) {
+      boundaryPenalty += (padding - top) * 4;
+      top = padding;
+    } else if (top + tipH > containerH - padding) {
+      boundaryPenalty += (top + tipH - (containerH - padding)) * 4;
+      top = Math.max(padding, containerH - padding - tipH);
+    }
+
+    let overlaps = 0;
+    const rLeft = left - 2;
+    const rRight = left + tipW + 2;
+    const rTop = top - 2;
+    const rBottom = top + tipH + 2;
+
+    for (let i = 0; i < allPoints.length; i++) {
+      const p = allPoints[i];
+      if (p.id === currentPointId) continue;
+      if (p.x >= rLeft && p.x <= rRight && p.y >= rTop && p.y <= rBottom) {
+        overlaps++;
+      }
+    }
+
+    const score = overlaps * 100 + boundaryPenalty;
+
+    if (score < minScore) {
+      minScore = score;
+      bestCandidate = { left, top, name: c.name };
+    }
+  }
+
+  return {
+    left: Math.round(bestCandidate.left),
+    top: Math.round(bestCandidate.top),
+  };
+}
+
+// Dropdown Popover for direct axis title selection
+interface AxisDimensionDropdownProps {
+  currentDimIndex: number;
+  onSelect: (index: number) => void;
+  onClose: () => void;
+  lang: 'de' | 'en';
+  align?: 'left' | 'center' | 'right';
+  direction?: 'up' | 'down';
+}
+
+const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
+  currentDimIndex,
+  onSelect,
+  onClose,
+  lang,
+  align = 'left',
+  direction = 'down',
+}) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const compositeDims = CORRELATION_DIMENSIONS.slice(0, 3);
+  const componentDims = CORRELATION_DIMENSIONS.slice(3);
+
+  const alignClass =
+    align === 'center'
+      ? 'left-1/2 -translate-x-1/2'
+      : align === 'right'
+      ? 'right-0'
+      : 'left-0';
+
+  const positionClass =
+    direction === 'up'
+      ? `bottom-full mb-2 ${alignClass}`
+      : `top-full mt-2 ${alignClass}`;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-black/10 dark:bg-black/40 backdrop-blur-2xs cursor-default"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+      />
+      <div
+        className={`absolute z-50 ${positionClass} w-[270px] sm:w-[290px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl shadow-2xl p-2 select-none animate-in fade-in zoom-in-95 duration-150 max-h-[360px] overflow-y-auto`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-2 py-1 mb-1 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-slate-400">
+            {lang === 'de' ? 'Metrik auswählen' : 'Select Metric'}
+          </span>
+          <span className="text-[10px] font-mono text-slate-400">
+            {CORRELATION_DIMENSIONS.length} {lang === 'de' ? 'Optionen' : 'Options'}
+          </span>
+        </div>
+
+        {/* Section 1: Composite Scores */}
+        <div className="mb-2">
+          <div className="px-2 py-0.5 text-[9.5px] font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
+            {lang === 'de' ? 'Gesamt-Scores (3)' : 'Composite Scores (3)'}
+          </div>
+          <div className="space-y-0.5 mt-0.5">
+            {compositeDims.map((dim) => {
+              const isSelected = dim.index === currentDimIndex;
+              return (
+                <button
+                  key={dim.id}
+                  type="button"
+                  onClick={() => onSelect(dim.index)}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left text-xs font-mono transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 font-bold'
+                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
+                      style={{ backgroundColor: dim.color }}
+                    />
+                    <span className="truncate">{lang === 'de' ? dim.nameDe : dim.nameEn}</span>
+                  </div>
+                  {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0 ml-1" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 2: Component Categories */}
+        <div>
+          <div className="px-2 py-0.5 text-[9.5px] font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
+            {lang === 'de' ? 'Einzel-Kategorien (8)' : 'Benchmark Categories (8)'}
+          </div>
+          <div className="space-y-0.5 mt-0.5">
+            {componentDims.map((dim) => {
+              const isSelected = dim.index === currentDimIndex;
+              return (
+                <button
+                  key={dim.id}
+                  type="button"
+                  onClick={() => onSelect(dim.index)}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left text-xs font-mono transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 font-bold'
+                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
+                      style={{ backgroundColor: dim.color }}
+                    />
+                    <span className="truncate">{lang === 'de' ? dim.nameDe : dim.nameEn}</span>
+                  </div>
+                  {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0 ml-1" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// Sub-component: A single rectangular correlation scatterplot with clickable axis titles
+interface SingleCorrelationPlotProps {
+  plotLabel: string;
+  allModels: ModelRecord[];
+  scope: 'all' | 'frontier';
+  frontierPointIds: Set<string>;
+  activeRegression: RegressionOption;
+  polyDegree: number;
+  loessSpan: number;
+  xAxisDimIndex: number;
+  yAxisDimIndex: number;
+  onXAxisDimChange: (idx: number) => void;
+  onYAxisDimChange: (idx: number) => void;
+  onSwapAxes: () => void;
+  lang: 'de' | 'en';
+}
+
+const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
+  plotLabel,
   allModels,
-  onScrollToParagraph,
-  onScrollToFinalScores,
+  scope,
+  frontierPointIds,
+  activeRegression,
+  polyDegree,
+  loessSpan,
+  xAxisDimIndex,
+  yAxisDimIndex,
+  onXAxisDimChange,
+  onYAxisDimChange,
+  onSwapAxes,
   lang,
 }) => {
-  // Axis Dimension selection: Index 0..10
-  // Default: X = #1 Coding & Math (index 3), Y = #2 Non-Hallucination (index 4)
-  const [xAxisDimIndex, setXAxisDimIndex] = useState<number>(3);
-  const [yAxisDimIndex, setYAxisDimIndex] = useState<number>(4);
+  const xDim: CorrelationDimension = CORRELATION_DIMENSIONS[xAxisDimIndex] || CORRELATION_DIMENSIONS[0];
+  const yDim: CorrelationDimension = CORRELATION_DIMENSIONS[yAxisDimIndex] || CORRELATION_DIMENSIONS[1];
 
-  // Model & Regression State
-  const [regressionIndex, setRegressionIndex] = useState<number>(0); // Default: Linear
-  const [movingAvgDays, setMovingAvgDays] = useState<number>(20); // Window width along X
-  const [polyDegree, setPolyDegree] = useState<number>(2); // Default degree 2
-  const [loessSpan, setLoessSpan] = useState<number>(40); // 40%
-  const [logisticCeiling, setLogisticCeiling] = useState<number>(100); // 100%
-  const [scope, setScope] = useState<'all' | 'frontier'>('all');
-
-  const activeRegression = CORRELATION_REGRESSION_OPTIONS[regressionIndex] || CORRELATION_REGRESSION_OPTIONS[0];
-
-  const xDim = CORRELATION_DIMENSIONS[xAxisDimIndex] || CORRELATION_DIMENSIONS[0];
-  const yDim = CORRELATION_DIMENSIONS[yAxisDimIndex] || CORRELATION_DIMENSIONS[1];
+  const [openAxisMenu, setOpenAxisMenu] = useState<'x' | 'y' | null>(null);
 
   const [hoveredPoint, setHoveredPoint] = useState<{
     point: CorrelationPoint;
-    screenX: number;
-    screenY: number;
+    pos: { left: number; top: number };
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearCloseTimeout = () => {
@@ -121,48 +344,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
     }
   };
 
-  const handleDotMouseEnter = (e: React.MouseEvent, pt: CorrelationPoint) => {
-    clearCloseTimeout();
-    const rect = containerRef.current?.getBoundingClientRect();
-    setHoveredPoint({
-      point: pt,
-      screenX: e.clientX - (rect?.left || 0),
-      screenY: e.clientY - (rect?.top || 0),
-    });
-  };
-
-  const handleDotMouseLeave = () => {
-    clearCloseTimeout();
-    closeTimeoutRef.current = setTimeout(() => {
-      setHoveredPoint(null);
-    }, 1800);
-  };
-
-  const handleTooltipMouseEnter = () => {
-    clearCloseTimeout();
-  };
-
-  const handleTooltipMouseLeave = () => {
-    clearCloseTimeout();
-    closeTimeoutRef.current = setTimeout(() => {
-      setHoveredPoint(null);
-    }, 1000);
-  };
-
-  useEffect(() => {
-    return () => {
-      clearCloseTimeout();
-    };
-  }, []);
-
-  // Swap X and Y axes
-  const handleSwapAxes = () => {
-    const prevX = xAxisDimIndex;
-    setXAxisDimIndex(yAxisDimIndex);
-    setYAxisDimIndex(prevX);
-  };
-
-  // Extract valid correlation points
+  // Extract correlation points for this plot
   const allCorrelationPoints = useMemo(() => {
     const list: CorrelationPoint[] = [];
     for (const m of allModels) {
@@ -187,28 +369,6 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
     return list.sort((a, b) => a.x - b.x);
   }, [allModels, xDim, yDim]);
 
-  // Identify genuine historical SOTA breakthrough models (models that set an all-time record on the composite benchmark score over time)
-  const frontierPointIds = useMemo(() => {
-    const eligible = allModels
-      .filter((m) => {
-        const sc = m.scoreOld ?? m.scoreNewReported;
-        return typeof sc === 'number' && sc > 0;
-      })
-      .map((m) => ({
-        id: m.id,
-        name: m.name,
-        displayName: m.displayName,
-        company: m.creatorClean || m.companyName || 'LLM Lab',
-        releaseDate: m.releaseDate,
-        timestamp: new Date(m.releaseDate).getTime(),
-        score: (m.scoreOld ?? m.scoreNewReported) as number,
-        flag: m.flag,
-        isPaid: m.isPaid,
-      }));
-    const sota = extractFrontierPoints(eligible);
-    return new Set(sota.map((p) => p.id));
-  }, [allModels]);
-
   const activePoints = useMemo(() => {
     if (scope === 'frontier') {
       return allCorrelationPoints.filter((p) => frontierPointIds.has(p.id));
@@ -216,23 +376,16 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
     return allCorrelationPoints;
   }, [allCorrelationPoints, scope, frontierPointIds]);
 
-  // Calculate Pearson & Spearman
-  const pearsonResult = useMemo(() => {
-    return calculatePearson(activePoints);
-  }, [activePoints]);
+  const pearsonResult = useMemo(() => calculatePearson(activePoints), [activePoints]);
+  const spearmanResult = useMemo(() => calculateSpearman(activePoints), [activePoints]);
 
-  const spearmanResult = useMemo(() => {
-    return calculateSpearman(activePoints);
-  }, [activePoints]);
+  // Quadratic 1:1 aspect ratio: 500 x 500 with square inner grid (400 x 400)
+  const svgWidth = 500;
+  const svgHeight = 500;
+  const margin = { top: 42, right: 44, bottom: 58, left: 56 };
+  const innerWidth = svgWidth - margin.left - margin.right; // 400
+  const innerHeight = svgHeight - margin.top - margin.bottom; // 400
 
-  // SVG dimensions
-  const svgWidth = 1000;
-  const svgHeight = 540;
-  const margin = { top: 40, right: 40, bottom: 65, left: 65 };
-  const innerWidth = svgWidth - margin.left - margin.right;
-  const innerHeight = svgHeight - margin.top - margin.bottom;
-
-  // Coordinate scales
   const { minX, maxX, minY, maxY } = useMemo(() => {
     if (activePoints.length === 0) {
       return { minX: 0, maxX: 100, minY: 0, maxY: 100 };
@@ -264,7 +417,6 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
     return margin.top + innerHeight - ((y - minY) / (maxY - minY || 1)) * innerHeight;
   };
 
-  // Generate X-Axis ticks
   const xTicks = useMemo(() => {
     const ticks: number[] = [];
     const span = maxX - minX;
@@ -276,7 +428,6 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
     return ticks;
   }, [minX, maxX]);
 
-  // Generate Y-Axis ticks
   const yTicks = useMemo(() => {
     const ticks: number[] = [];
     const span = maxY - minY;
@@ -288,440 +439,224 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
     return ticks;
   }, [minY, maxY]);
 
-  // Compute Regression Curve
-  const regressionParam =
-    activeRegression.id === 'movingAverage'
-      ? movingAvgDays
-      : activeRegression.id === 'polynomial'
-      ? polyDegree
-      : activeRegression.id === 'loess'
-      ? loessSpan
-      : activeRegression.id === 'logistic'
-      ? logisticCeiling
-      : 60;
+  const regressionParam = useMemo(() => {
+    if (activeRegression.id === 'polynomial') return polyDegree;
+    if (activeRegression.id === 'loess') return loessSpan;
+    return undefined;
+  }, [activeRegression.id, polyDegree, loessSpan]);
 
-  const regression = useMemo(() => {
-    // Map (x, y) to timeline structure so mathRegression can compute fit
-    const regressionInput = activePoints.map((p) => ({
+  const regressionInput: TimelineDataPoint[] = useMemo(() => {
+    return activePoints.map((p) => ({
       id: p.id,
       name: p.name,
       displayName: p.displayName,
       company: p.company,
       releaseDate: p.releaseDate,
-      timestamp: p.x, // x-axis value
-      score: p.y, // y-axis value
+      timestamp: p.x,
+      score: p.y,
       flag: p.flag,
+      chatUrl: p.chatUrl,
       isPaid: p.isPaid,
     }));
+  }, [activePoints]);
 
-    return calculateRegression(regressionInput, activeRegression.id, 120, regressionParam);
-  }, [activePoints, activeRegression.id, regressionParam]);
+  const regression = useMemo(() => {
+    return calculateRegression(regressionInput, activeRegression.id, 50, regressionParam);
+  }, [regressionInput, activeRegression.id, regressionParam]);
 
-  // Format SVG Path for regression line
   const regressionPath = useMemo(() => {
-    if (regression.points.length === 0) return '';
-    return regression.points
+    if (!regression.points || regression.points.length === 0) return '';
+    const valid = regression.points.filter((p) => !isNaN(p.x) && !isNaN(p.y));
+    if (valid.length === 0) return '';
+
+    return valid
       .map((pt, i) => {
-        const x = scaleX(pt.x);
-        const y = scaleY(pt.y);
-        return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+        const sx = scaleX(pt.x);
+        const sy = scaleY(pt.y);
+        return `${i === 0 ? 'M' : 'L'} ${sx.toFixed(1)} ${sy.toFixed(1)}`;
       })
       .join(' ');
-  }, [regression.points, minX, maxX, minY, maxY, innerWidth, innerHeight]);
+  }, [regression.points, minX, maxX, minY, maxY]);
 
-  const handleScroll = (targetId: string) => {
-    if (onScrollToParagraph) {
-      onScrollToParagraph(targetId);
-      return;
-    }
-    if (onScrollToFinalScores) {
-      onScrollToFinalScores();
-      return;
-    }
-    const container = document.getElementById('csv-notes-section');
-    if (container) {
-      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    const doScrollToTarget = () => {
-      const el = document.getElementById(targetId) || document.getElementById('final-scores-section');
-      const box = document.getElementById('section1-scroll-box');
-      if (el) {
-        if (box) {
-          const targetTop = el.offsetTop - box.offsetTop;
-          box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
-        }
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
-        setTimeout(() => {
-          el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15');
-        }, 3000);
-      }
-    };
-    setTimeout(doScrollToTarget, 200);
-    setTimeout(doScrollToTarget, 500);
+  const handleDotMouseEnter = (pt: CorrelationPoint, cx: number, cy: number) => {
+    clearCloseTimeout();
+    const contRect = containerRef.current?.getBoundingClientRect();
+    const svgRect = svgRef.current?.getBoundingClientRect();
+
+    if (!contRect || !svgRect) return;
+
+    const scaleFactorX = svgRect.width / svgWidth;
+    const scaleFactorY = svgRect.height / svgHeight;
+    const offsetX = svgRect.left - contRect.left;
+    const offsetY = svgRect.top - contRect.top;
+
+    const dotScreenX = cx * scaleFactorX + offsetX;
+    const dotScreenY = cy * scaleFactorY + offsetY;
+
+    const screenPoints = activePoints.map((p) => ({
+      id: p.id,
+      x: scaleX(p.x) * scaleFactorX + offsetX,
+      y: scaleY(p.y) * scaleFactorY + offsetY,
+    }));
+
+    const optimalPos = getOptimalTooltipPosition(
+      dotScreenX,
+      dotScreenY,
+      contRect.width,
+      contRect.height,
+      screenPoints,
+      pt.id
+    );
+
+    setHoveredPoint({
+      point: pt,
+      pos: optimalPos,
+    });
+  };
+
+  const handleDotMouseLeave = () => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = setTimeout(() => {
+      setHoveredPoint(null);
+    }, 1800);
+  };
+
+  const handleTooltipMouseEnter = () => clearCloseTimeout();
+  const handleTooltipMouseLeave = () => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = setTimeout(() => {
+      setHoveredPoint(null);
+    }, 800);
   };
 
   const isLinearModel = activeRegression.id === 'linear';
 
   return (
-    <div className="w-full space-y-3.5">
-      {/* Controls Container */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2.5">
-        {/* Row 1: X-Axis Selector + Swap Button + Y-Axis Selector */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          {/* Left: X and Y Dimension Selectors */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* X-Axis Dimension Selector */}
-            <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
-                {lang === 'de' ? 'X-Achse:' : 'X-Axis:'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setXAxisDimIndex((prev) => Math.max(0, prev - 1))}
-                disabled={xAxisDimIndex <= 0}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title="-1"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={CORRELATION_DIMENSIONS.length - 1}
-                step={1}
-                value={xAxisDimIndex}
-                onChange={(e) => setXAxisDimIndex(Number(e.target.value))}
-                className="w-18 sm:w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
-              />
-              <button
-                type="button"
-                onClick={() => setXAxisDimIndex((prev) => Math.min(CORRELATION_DIMENSIONS.length - 1, prev + 1))}
-                disabled={xAxisDimIndex >= CORRELATION_DIMENSIONS.length - 1}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title="+1"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-
-              {/* X Badge Button (links to notes section) */}
-              <div className="w-[140px] sm:w-[170px] shrink-0 overflow-hidden flex items-center">
-                <button
-                  type="button"
-                  onClick={() => handleScroll(xDim.targetId)}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: xDim.color }}
-                  title={lang === 'de' ? xDim.nameDe : xDim.nameEn}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">{lang === 'de' ? xDim.nameDe : xDim.nameEn}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Swap Button */}
-            <button
-              type="button"
-              onClick={handleSwapAxes}
-              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer shrink-0"
-              title={lang === 'de' ? 'Achsen vertauschen (X ⇄ Y)' : 'Swap axes (X ⇄ Y)'}
-            >
-              <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            </button>
-
-            {/* Y-Axis Dimension Selector */}
-            <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
-                {lang === 'de' ? 'Y-Achse:' : 'Y-Axis:'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setYAxisDimIndex((prev) => Math.max(0, prev - 1))}
-                disabled={yAxisDimIndex <= 0}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title="-1"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={CORRELATION_DIMENSIONS.length - 1}
-                step={1}
-                value={yAxisDimIndex}
-                onChange={(e) => setYAxisDimIndex(Number(e.target.value))}
-                className="w-18 sm:w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
-              />
-              <button
-                type="button"
-                onClick={() => setYAxisDimIndex((prev) => Math.min(CORRELATION_DIMENSIONS.length - 1, prev + 1))}
-                disabled={yAxisDimIndex >= CORRELATION_DIMENSIONS.length - 1}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title="+1"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-
-              {/* Y Badge Button (links to notes section) */}
-              <div className="w-[140px] sm:w-[170px] shrink-0 overflow-hidden flex items-center">
-                <button
-                  type="button"
-                  onClick={() => handleScroll(yDim.targetId)}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: yDim.color }}
-                  title={lang === 'de' ? yDim.nameDe : yDim.nameEn}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">{lang === 'de' ? yDim.nameDe : yDim.nameEn}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Model Slider + Fixed Width Param Input */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
-            {/* Regression Model Slider */}
-            <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-                <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setRegressionIndex((prev) => Math.max(0, prev - 1))}
-                disabled={regressionIndex <= 0}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title="-1"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={CORRELATION_REGRESSION_OPTIONS.length - 1}
-                step={1}
-                value={regressionIndex}
-                onChange={(e) => setRegressionIndex(Number(e.target.value))}
-                className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
-              />
-              <button
-                type="button"
-                onClick={() => setRegressionIndex((prev) => Math.min(CORRELATION_REGRESSION_OPTIONS.length - 1, prev + 1))}
-                disabled={regressionIndex >= CORRELATION_REGRESSION_OPTIONS.length - 1}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title="+1"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-
-              {/* Model Badge */}
-              <div className="w-[105px] sm:w-[130px] shrink-0 overflow-hidden flex items-center">
-                <span
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full"
-                  style={{ backgroundColor: activeRegression.color }}
-                  title={lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">
-                    {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
-                  </span>
-                </span>
-              </div>
-            </div>
-
-            {/* Contextual Param Input (Fixed 76px width) */}
-            <div
-              className={`w-[142px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
-                activeRegression.id !== 'polynomial' && activeRegression.id !== 'loess'
-                  ? 'opacity-40 cursor-not-allowed'
-                  : ''
-              }`}
-              title={
-                activeRegression.id === 'polynomial'
-                  ? lang === 'de'
-                    ? 'Polynom-Grad (2, 3 oder 4)'
-                    : 'Polynomial degree (2, 3 or 4)'
-                  : activeRegression.id === 'loess'
-                  ? lang === 'de'
-                    ? 'Bandbreite / Glättungs-Span (15–80%)'
-                    : 'Bandwidth smoothing span (15–80%)'
-                  : lang === 'de'
-                  ? 'Kein variabler Parameter für dieses Modell'
-                  : 'No variable parameter for this model'
-              }
-            >
-              <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
-                Param:
-              </span>
-              <div className="w-[76px] shrink-0 flex items-center justify-end">
-                {activeRegression.id === 'polynomial' ? (
-                  <select
-                    value={polyDegree}
-                    onChange={(e) => setPolyDegree(Number(e.target.value))}
-                    className="w-[76px] h-6 px-1.5 font-mono text-[11px] font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-hidden focus:border-rose-500 text-center"
-                  >
-                    <option value={2}>{lang === 'de' ? 'Grad 2' : 'Deg 2'}</option>
-                    <option value={3}>{lang === 'de' ? 'Grad 3' : 'Deg 3'}</option>
-                    <option value={4}>{lang === 'de' ? 'Grad 4' : 'Deg 4'}</option>
-                  </select>
-                ) : activeRegression.id === 'loess' ? (
-                  <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-amber-500">
-                    <input
-                      type="number"
-                      min={15}
-                      max={80}
-                      step={5}
-                      value={loessSpan}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        if (!isNaN(val) && val >= 15 && val <= 80) setLoessSpan(val);
-                      }}
-                      className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
-                    />
-                    <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
-                      %
-                    </span>
-                  </div>
-                ) : (
-                  <div className="w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
-                    —
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-visible flex flex-col">
+      {/* Plot Header: Label, Swap Button, Pearson & Spearmans Rho Badges */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 rounded-t-2xl">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs">
+            {plotLabel}
+          </span>
+          <button
+            type="button"
+            onClick={onSwapAxes}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-[10.5px] font-mono shadow-2xs"
+            title={lang === 'de' ? 'Achsen vertauschen (X ⇄ Y)' : 'Swap axes (X ⇄ Y)'}
+          >
+            <ArrowLeftRight className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+            <span>{lang === 'de' ? 'X ⇄ Y' : 'X ⇄ Y'}</span>
+          </button>
         </div>
 
-        {/* Row 2: Model Scope Toggle + Side-by-Side Pearson r & Spearman rho Badges */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-          {/* Scope Segmented Control */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-400">
-              {lang === 'de' ? 'Datenbasis:' : 'Scope:'}
+        {/* Side-by-Side Pearson r & Spearmans Rho Badges */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {/* Pearson r Badge */}
+          <div
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+              isLinearModel
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+            }`}
+            title={
+              lang === 'de'
+                ? 'Pearson-Korrelationskoeffizient r (linearer Zusammenhang)'
+                : 'Pearson correlation coefficient r (linear relationship)'
+            }
+          >
+            <span className="text-[10px] font-bold text-slate-500 uppercase">r:</span>
+            <span className="font-mono text-xs font-extrabold" style={{ color: pearsonResult.color }}>
+              {pearsonResult.value >= 0 ? '+' : ''}
+              {pearsonResult.value.toFixed(2)}
             </span>
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => setScope('all')}
-                className={`px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                  scope === 'all'
-                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({allCorrelationPoints.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setScope('frontier')}
-                className={`px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                  scope === 'frontier'
-                    ? 'bg-amber-500 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
-                }`}
-                title={
-                  lang === 'de'
-                    ? 'Nur SOTA-Rekord-Modelle (Pareto-Frontier)'
-                    : 'Only SOTA record models (Pareto frontier)'
-                }
-              >
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                <span>{lang === 'de' ? 'SOTA Frontier' : 'SOTA Frontier'}</span>
-                <span className="text-[10px] opacity-90">({frontierPointIds.size})</span>
-              </button>
-            </div>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden xl:inline">
+              ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
+            </span>
           </div>
 
-          {/* Side-by-Side Pearson r & Spearman rho Badges with Contextual Highlighting */}
-          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            {/* Pearson's r Badge */}
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all ${
-                isLinearModel
-                  ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20 shadow-xs'
-                  : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
-              }`}
-              title={
-                lang === 'de'
-                  ? 'Pearson-Korrelationskoeffizient r (misst die Stärke des linearen Zusammenhangs)'
-                  : 'Pearson correlation coefficient r (measures linear relationship strength)'
-              }
-            >
-              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
-                Pearson r:
-              </span>
-              <span
-                className="font-mono text-xs sm:text-sm font-extrabold"
-                style={{ color: pearsonResult.color }}
-              >
-                {pearsonResult.value >= 0 ? '+' : ''}
-                {pearsonResult.value.toFixed(3)}
-              </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden md:inline">
-                ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
-              </span>
-            </div>
-
-            {/* Spearman's rho Badge */}
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all ${
-                !isLinearModel
-                  ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20 shadow-xs'
-                  : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
-              }`}
-              title={
-                lang === 'de'
-                  ? 'Spearman-Rangkorrelationskoeffizient ρ (misst monotone und nichtlineare Zusammenhänge)'
-                  : 'Spearman rank correlation coefficient ρ (measures monotonic & non-linear relationships)'
-              }
-            >
-              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
-                Spearman ρ:
-              </span>
-              <span
-                className="font-mono text-xs sm:text-sm font-extrabold"
-                style={{ color: spearmanResult.color }}
-              >
-                {spearmanResult.value >= 0 ? '+' : ''}
-                {spearmanResult.value.toFixed(3)}
-              </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden md:inline">
-                ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
-              </span>
-            </div>
-
-            {/* Formula / Curve Hint */}
-            <span
-              className="text-[10px] font-mono text-slate-400 hidden xl:inline max-w-[260px] truncate"
-              title={regression.formula}
-            >
-              {regression.formula}
+          {/* Spearmans Rho Badge */}
+          <div
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+              !isLinearModel
+                ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+            }`}
+            title={
+              lang === 'de'
+                ? 'Spearmans Rho (Rangkorrelationskoeffizient)'
+                : 'Spearmans Rho (rank correlation coefficient)'
+            }
+          >
+            <span className="text-[10px] font-bold text-slate-500 uppercase">Rho:</span>
+            <span className="font-mono text-xs font-extrabold" style={{ color: spearmanResult.color }}>
+              {spearmanResult.value >= 0 ? '+' : ''}
+              {spearmanResult.value.toFixed(2)}
+            </span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden xl:inline">
+              ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
             </span>
           </div>
         </div>
       </div>
 
-      {/* Scatterplot Canvas Container */}
+      {/* Scatterplot Canvas Container (Rectangular) */}
       <div
         ref={containerRef}
-        className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm overflow-hidden select-none"
+        className="relative p-3 pt-2 bg-white dark:bg-slate-900 rounded-b-2xl overflow-visible select-none flex-1 flex flex-col justify-center"
       >
-        {/* SVG Scatterplot */}
+        {/* CLICKABLE Y-AXIS TITLE BUTTON (Directly at the Top-Left of the Y-Axis) */}
+        <div className="absolute top-2.5 left-3 sm:left-4 z-20">
+          <button
+            type="button"
+            onClick={() => {
+              setOpenAxisMenu(openAxisMenu === 'y' ? null : 'y');
+              setHoveredPoint(null);
+            }}
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-mono font-bold text-[10.5px]"
+            style={{ backgroundColor: yDim.color }}
+            title={
+              lang === 'de'
+                ? `Y-Achse: ${yDim.nameDe} (Klicken zum Auswählen der Kategorie)`
+                : `Y-Axis: ${yDim.nameEn} (Click to choose category)`
+            }
+          >
+            <span className="text-[9px] uppercase tracking-wide opacity-80">Y:</span>
+            <span className="truncate max-w-[120px] sm:max-w-[160px]">
+              {lang === 'de' ? yDim.nameDe : yDim.nameEn}
+            </span>
+            <ChevronDown className="w-3 h-3 shrink-0 opacity-80" />
+          </button>
+
+          {/* Y-Axis Dropdown Popover */}
+          {openAxisMenu === 'y' && (
+            <AxisDimensionDropdown
+              currentDimIndex={yAxisDimIndex}
+              onSelect={(idx) => {
+                onYAxisDimChange(idx);
+                setOpenAxisMenu(null);
+              }}
+              onClose={() => setOpenAxisMenu(null)}
+              lang={lang}
+              align="left"
+              direction="down"
+            />
+          )}
+        </div>
+
+        {/* SVG Scatterplot (Quadratic 1:1) */}
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          className="w-full h-auto max-h-[640px] overflow-visible"
+          className="w-full h-auto aspect-square overflow-visible"
         >
           <defs>
-            <linearGradient id="corrRegressionGlow" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor={activeRegression.color} stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#3b82f6" stopOpacity="1" />
-            </linearGradient>
-            <filter id="corrDotGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <filter id={`corrDotGlow-${plotLabel}`} x="-50%" y="-50%" width="200%" height="200%">
               <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.25" />
             </filter>
           </defs>
 
-          {/* Grid lines - X */}
+          {/* X Grid Lines */}
           {xTicks.map((val) => {
             const x = scaleX(val);
             return (
@@ -737,9 +672,9 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                 />
                 <text
                   x={x}
-                  y={margin.top + innerHeight + 18}
+                  y={margin.top + innerHeight + 16}
                   textAnchor="middle"
-                  className="fill-slate-500 dark:fill-slate-400 text-[10px] font-mono font-medium"
+                  className="fill-slate-400 dark:fill-slate-500 text-[9.5px] font-mono font-medium"
                 >
                   {val}
                 </text>
@@ -747,7 +682,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             );
           })}
 
-          {/* Grid lines - Y */}
+          {/* Y Grid Lines */}
           {yTicks.map((val) => {
             const y = scaleY(val);
             return (
@@ -762,10 +697,10 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   strokeDasharray="2,2"
                 />
                 <text
-                  x={margin.left - 10}
-                  y={y + 3.5}
+                  x={margin.left - 8}
+                  y={y + 3}
                   textAnchor="end"
-                  className="fill-slate-500 dark:fill-slate-400 text-[10px] font-mono font-medium"
+                  className="fill-slate-400 dark:fill-slate-500 text-[9.5px] font-mono font-medium"
                 >
                   {val}
                 </text>
@@ -773,14 +708,14 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             );
           })}
 
-          {/* Axes Base Lines */}
+          {/* Main X & Y Axis Lines */}
           <line
             x1={margin.left}
             y1={margin.top + innerHeight}
             x2={margin.left + innerWidth}
             y2={margin.top + innerHeight}
             className="stroke-slate-300 dark:stroke-slate-700"
-            strokeWidth="1.5"
+            strokeWidth="1.2"
           />
           <line
             x1={margin.left}
@@ -788,52 +723,20 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             x2={margin.left}
             y2={margin.top + innerHeight}
             className="stroke-slate-300 dark:stroke-slate-700"
-            strokeWidth="1.5"
+            strokeWidth="1.2"
           />
 
-          {/* X-Axis Dimension Title */}
-          <text
-            x={margin.left + innerWidth / 2}
-            y={margin.top + innerHeight + 42}
-            textAnchor="middle"
-            className="fill-slate-700 dark:fill-slate-300 text-xs font-bold"
-          >
-            {lang === 'de' ? xDim.nameDe : xDim.nameEn}
-          </text>
-
-          {/* Y-Axis Dimension Title (Rotated) */}
-          <text
-            transform={`rotate(-90) translate(-${margin.top + innerHeight / 2}, 20)`}
-            textAnchor="middle"
-            className="fill-slate-700 dark:fill-slate-300 text-xs font-bold"
-          >
-            {lang === 'de' ? yDim.nameDe : yDim.nameEn}
-          </text>
-
-          {/* Regression Trendline */}
+          {/* Fitted Regression Curve */}
           {regressionPath && (
-            <>
-              {/* Outer Glow */}
-              <path
-                d={regressionPath}
-                fill="none"
-                stroke={activeRegression.color}
-                strokeWidth="7"
-                strokeOpacity="0.18"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {/* Inner Curve */}
-              <path
-                d={regressionPath}
-                fill="none"
-                stroke={activeRegression.color}
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeDasharray={activeRegression.id === 'loess' || activeRegression.id === 'movingAverage' ? '5,3' : undefined}
-              />
-            </>
+            <path
+              d={regressionPath}
+              fill="none"
+              stroke={activeRegression.color}
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={activeRegression.id === 'loess' ? '5,3' : undefined}
+            />
           )}
 
           {/* Scatter Points */}
@@ -847,18 +750,18 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
               <g
                 key={pt.id}
                 className="cursor-pointer transition-transform duration-100"
-                onMouseEnter={(e) => handleDotMouseEnter(e, pt)}
+                onMouseEnter={() => handleDotMouseEnter(pt, cx, cy)}
                 onMouseLeave={handleDotMouseLeave}
               >
                 {/* Hit target padding */}
-                <circle cx={cx} cy={cy} r={15} fill="transparent" />
+                <circle cx={cx} cy={cy} r={14} fill="transparent" />
 
                 {/* SOTA Frontier Accent Ring */}
                 {isFrontier && (
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={isHovered ? 11 : 7.5}
+                    r={isHovered ? 10 : 7}
                     fill="none"
                     stroke="#f59e0b"
                     strokeWidth={isHovered ? 2 : 1.5}
@@ -872,10 +775,10 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={13}
+                    r={12}
                     fill="none"
                     stroke="#f43f5e"
-                    strokeWidth="2.5"
+                    strokeWidth="2.2"
                     className="animate-pulse"
                     pointerEvents="none"
                   />
@@ -885,11 +788,11 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={isHovered ? 7 : isFrontier ? 5 : 4.5}
+                  r={isHovered ? 6.5 : isFrontier ? 4.5 : 4}
                   fill={isHovered ? '#f43f5e' : isFrontier ? '#d97706' : xDim.color}
                   stroke="#ffffff"
-                  strokeWidth={isHovered ? 2 : 1.2}
-                  filter="url(#corrDotGlow)"
+                  strokeWidth={isHovered ? 2 : 1}
+                  filter={`url(#corrDotGlow-${plotLabel})`}
                   className="transition-all duration-150 hover:opacity-95"
                   pointerEvents="none"
                 />
@@ -898,79 +801,379 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
           })}
         </svg>
 
-        {/* Hover Tooltip Popup with grace period & bridge */}
+        {/* CLICKABLE X-AXIS TITLE BUTTON (Directly at the Bottom Center of the X-Axis) */}
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-20">
+          <button
+            type="button"
+            onClick={() => {
+              setOpenAxisMenu(openAxisMenu === 'x' ? null : 'x');
+              setHoveredPoint(null);
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-mono font-bold text-[10.5px]"
+            style={{ backgroundColor: xDim.color }}
+            title={
+              lang === 'de'
+                ? `X-Achse: ${xDim.nameDe} (Klicken zum Auswählen der Kategorie)`
+                : `X-Axis: ${xDim.nameEn} (Click to choose category)`
+            }
+          >
+            <span className="text-[9px] uppercase tracking-wide opacity-80">X:</span>
+            <span className="truncate max-w-[140px] sm:max-w-[200px]">
+              {lang === 'de' ? xDim.nameDe : xDim.nameEn}
+            </span>
+            <ChevronDown className="w-3 h-3 shrink-0 opacity-80" />
+          </button>
+
+          {/* X-Axis Dropdown Popover */}
+          {openAxisMenu === 'x' && (
+            <AxisDimensionDropdown
+              currentDimIndex={xAxisDimIndex}
+              onSelect={(idx) => {
+                onXAxisDimChange(idx);
+                setOpenAxisMenu(null);
+              }}
+              onClose={() => setOpenAxisMenu(null)}
+              lang={lang}
+              align="center"
+              direction="up"
+            />
+          )}
+        </div>
+
+        {/* Compact, Collision-Aware Dot Hover Tooltip */}
         {hoveredPoint && (
           <div
             style={{
-              left: `${Math.min(window.innerWidth > 768 ? 750 : 280, Math.max(16, hoveredPoint.screenX - 120))}px`,
-              top: `${Math.max(16, hoveredPoint.screenY - 140)}px`,
+              left: `${hoveredPoint.pos.left}px`,
+              top: `${hoveredPoint.pos.top}px`,
             }}
-            className="absolute z-40 bg-slate-900/95 text-white p-3 rounded-xl shadow-xl border border-slate-700/80 backdrop-blur-md pointer-events-auto min-w-[250px] max-w-[340px] transition-all animate-in fade-in zoom-in-95 duration-150 before:content-[''] before:absolute before:-bottom-6 before:left-0 before:right-0 before:h-8"
+            className="absolute z-40 bg-slate-900/95 dark:bg-slate-950/95 text-white px-2.5 py-2 rounded-lg shadow-xl border border-slate-700/80 backdrop-blur-md pointer-events-auto w-[230px] transition-all animate-in fade-in zoom-in-95 duration-150 select-text"
             onMouseEnter={handleTooltipMouseEnter}
             onMouseLeave={handleTooltipMouseLeave}
           >
-            <div className="flex items-start justify-between gap-2 mb-1.5">
-              <div>
-                <h4 className="font-bold text-sm text-white flex items-center gap-1.5 leading-tight flex-wrap">
-                  <span>{hoveredPoint.point.displayName}</span>
-                  {hoveredPoint.point.flag && <span>{hoveredPoint.point.flag}</span>}
-                  {frontierPointIds.has(hoveredPoint.point.id) && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5">
-                      <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-                      <span>SOTA</span>
-                    </span>
-                  )}
-                </h4>
-                <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                  <Building2 className="w-3 h-3 text-slate-400" />
-                  <span>{hoveredPoint.point.company}</span>
-                </div>
+            {/* Header: Model Name + Flag + SOTA Tag + Chat Link */}
+            <div className="flex items-center justify-between gap-1.5 leading-tight">
+              <div className="flex items-center gap-1 min-w-0">
+                <span
+                  className="font-bold text-xs text-white truncate max-w-[130px]"
+                  title={hoveredPoint.point.displayName}
+                >
+                  {hoveredPoint.point.displayName}
+                </span>
+                {hoveredPoint.point.flag && (
+                  <span className="text-xs shrink-0">{hoveredPoint.point.flag}</span>
+                )}
+                {frontierPointIds.has(hoveredPoint.point.id) && (
+                  <span className="text-[9px] font-mono px-1 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5 shrink-0">
+                    <Sparkles className="w-2.5 h-2.5 text-amber-300" />
+                    <span>SOTA</span>
+                  </span>
+                )}
               </div>
 
-              {/* Chat Link */}
               {hoveredPoint.point.chatUrl && (
                 <a
                   href={hoveredPoint.point.chatUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors"
+                  className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-semibold flex items-center gap-0.5 shrink-0 transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span>Chat</span>
-                  <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="w-2.5 h-2.5" />
                 </a>
               )}
             </div>
 
-            {/* Bivariate X & Y Score Cards */}
-            <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-800">
-              <div className="bg-slate-800/80 p-1.5 rounded">
-                <span className="text-slate-400 block text-[10px] uppercase font-bold truncate" title={lang === 'de' ? xDim.nameDe : xDim.nameEn}>
+            {/* Metadata Subline: Company · Date · Free/Paid */}
+            <div className="flex items-center justify-between text-[10px] text-slate-400 mt-0.5 truncate">
+              <span className="truncate max-w-[125px]" title={hoveredPoint.point.company}>
+                {hoveredPoint.point.company}
+              </span>
+              <span className="shrink-0 text-slate-400 font-mono">
+                {hoveredPoint.point.releaseDate ? hoveredPoint.point.releaseDate.slice(0, 7) : ''}
+                {hoveredPoint.point.isPaid ? ' · Paid' : ''}
+              </span>
+            </div>
+
+            {/* Compact Bivariate Scores */}
+            <div className="grid grid-cols-2 gap-1.5 mt-1.5 pt-1.5 border-t border-slate-800/80">
+              <div className="bg-slate-800/80 px-1.5 py-1 rounded flex items-center justify-between gap-1">
+                <span
+                  className="text-[10px] text-slate-400 font-mono truncate"
+                  title={lang === 'de' ? xDim.nameDe : xDim.nameEn}
+                >
                   X: {lang === 'de' ? xDim.shortDe : xDim.shortEn}
                 </span>
-                <span className="font-mono text-base font-extrabold" style={{ color: xDim.color }}>
+                <span
+                  className="font-mono text-xs font-extrabold shrink-0"
+                  style={{ color: xDim.color }}
+                >
                   {hoveredPoint.point.x.toFixed(1)}
                 </span>
               </div>
-              <div className="bg-slate-800/80 p-1.5 rounded">
-                <span className="text-slate-400 block text-[10px] uppercase font-bold truncate" title={lang === 'de' ? yDim.nameDe : yDim.nameEn}>
+              <div className="bg-slate-800/80 px-1.5 py-1 rounded flex items-center justify-between gap-1">
+                <span
+                  className="text-[10px] text-slate-400 font-mono truncate"
+                  title={lang === 'de' ? yDim.nameDe : yDim.nameEn}
+                >
                   Y: {lang === 'de' ? yDim.shortDe : yDim.shortEn}
                 </span>
-                <span className="font-mono text-base font-extrabold" style={{ color: yDim.color }}>
+                <span
+                  className="font-mono text-xs font-extrabold shrink-0"
+                  style={{ color: yDim.color }}
+                >
                   {hoveredPoint.point.y.toFixed(1)}
                 </span>
               </div>
             </div>
-
-            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 mt-1 border-t border-slate-800/60">
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                <span>{hoveredPoint.point.releaseDate}</span>
-              </div>
-              <span>{hoveredPoint.point.isPaid ? 'Paid' : 'Free API'}</span>
-            </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = ({
+  allModels,
+  onScrollToParagraph,
+  onScrollToFinalScores,
+  lang,
+}) => {
+  // Plot 1 Dimension selection (Default: X = #1 Coding & Math, Y = #2 Non-Hallucination)
+  const [plot1XDimIndex, setPlot1XDimIndex] = useState<number>(3);
+  const [plot1YDimIndex, setPlot1YDimIndex] = useState<number>(4);
+
+  // Plot 2 Dimension selection (Default: X = Old Score, Y = New Score)
+  const [plot2XDimIndex, setPlot2XDimIndex] = useState<number>(1);
+  const [plot2YDimIndex, setPlot2YDimIndex] = useState<number>(0);
+
+  // Model & Regression State: default to LOESS with Param 50%
+  const [regressionIndex, setRegressionIndex] = useState<number>(DEFAULT_CORRELATION_REGRESSION_INDEX);
+  const [polyDegree, setPolyDegree] = useState<number>(2); // Default degree 2
+  const [loessSpan, setLoessSpan] = useState<number>(50); // Default 50%
+  const [scope, setScope] = useState<'all' | 'frontier'>('all');
+
+  const activeRegression = CORRELATION_REGRESSION_OPTIONS[regressionIndex] || CORRELATION_REGRESSION_OPTIONS[0];
+
+  // Identify genuine historical SOTA breakthrough models
+  const frontierPointIds = useMemo(() => {
+    const eligible = allModels
+      .filter((m) => {
+        const sc = m.scoreOld ?? m.scoreNewReported;
+        return typeof sc === 'number' && sc > 0;
+      })
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        displayName: m.displayName,
+        company: m.creatorClean || m.companyName || 'LLM Lab',
+        releaseDate: m.releaseDate,
+        timestamp: new Date(m.releaseDate).getTime(),
+        score: (m.scoreOld ?? m.scoreNewReported) as number,
+        flag: m.flag,
+        isPaid: m.isPaid,
+      }));
+    const sota = extractFrontierPoints(eligible);
+    return new Set(sota.map((p) => p.id));
+  }, [allModels]);
+
+  // Swap handlers for each plot
+  const handleSwapPlot1 = () => {
+    setPlot1XDimIndex((prevX) => {
+      const prevY = plot1YDimIndex;
+      setPlot1YDimIndex(prevX);
+      return prevY;
+    });
+  };
+
+  const handleSwapPlot2 = () => {
+    setPlot2XDimIndex((prevX) => {
+      const prevY = plot2YDimIndex;
+      setPlot2YDimIndex(prevX);
+      return prevY;
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Compact Controls Bar: Scope filter & Regression model controls (Title & Presets removed to save space) */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 shadow-sm flex flex-wrap items-center justify-between gap-2.5">
+        {/* Scope Segmented Control */}
+        <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+          <button
+            type="button"
+            onClick={() => setScope('all')}
+            className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold transition-all cursor-pointer ${
+              scope === 'all'
+                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({allModels.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope('frontier')}
+            className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+              scope === 'frontier'
+                ? 'bg-amber-500 text-white shadow-2xs'
+                : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+            }`}
+            title={
+              lang === 'de'
+                ? 'Nur SOTA-Rekord-Modelle (Pareto-Frontier)'
+                : 'Only SOTA record models (Pareto frontier)'
+            }
+          >
+            <Sparkles className="w-3 h-3 text-amber-300" />
+            <span>SOTA Frontier</span>
+            <span className="text-[10px] opacity-90">({frontierPointIds.size})</span>
+          </button>
+        </div>
+
+        {/* Shared Regression Model Slider & Param Input */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Regression Model Picker */}
+          <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
+            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+              <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setRegressionIndex((prev) => Math.max(0, prev - 1))}
+              disabled={regressionIndex <= 0}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+              title="-1"
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={CORRELATION_REGRESSION_OPTIONS.length - 1}
+              step={1}
+              value={regressionIndex}
+              onChange={(e) => setRegressionIndex(Number(e.target.value))}
+              className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
+            />
+            <button
+              type="button"
+              onClick={() => setRegressionIndex((prev) => Math.min(CORRELATION_REGRESSION_OPTIONS.length - 1, prev + 1))}
+              disabled={regressionIndex >= CORRELATION_REGRESSION_OPTIONS.length - 1}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+              title="+1"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+
+            {/* Model Badge */}
+            <div className="w-[105px] sm:w-[125px] shrink-0 overflow-hidden flex items-center">
+              <span
+                className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full"
+                style={{ backgroundColor: activeRegression.color }}
+                title={lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                <span className="truncate">
+                  {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {/* Contextual Param Input (Fixed 76px width) */}
+          <div
+            className={`w-[140px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
+              activeRegression.id !== 'polynomial' && activeRegression.id !== 'loess'
+                ? 'opacity-40 cursor-not-allowed'
+                : ''
+            }`}
+          >
+            <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400">
+              Param:
+            </span>
+            {activeRegression.id === 'polynomial' ? (
+              <div className="w-[76px] h-6 flex items-center bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-1.5 shadow-2xs">
+                <input
+                  type="number"
+                  min={2}
+                  max={4}
+                  step={1}
+                  value={polyDegree}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) setPolyDegree(Math.min(4, Math.max(2, val)));
+                  }}
+                  className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
+                />
+                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 select-none">
+                  deg
+                </span>
+              </div>
+            ) : activeRegression.id === 'loess' ? (
+              <div className="w-[76px] h-6 flex items-center bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-1.5 shadow-2xs">
+                <input
+                  type="number"
+                  min={10}
+                  max={100}
+                  step={5}
+                  value={loessSpan}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) setLoessSpan(Math.min(100, Math.max(10, val)));
+                  }}
+                  className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
+                />
+                <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
+                  %
+                </span>
+              </div>
+            ) : (
+              <div className="w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
+                —
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 2 CORRELATION PLOTS SIDE-BY-SIDE (Quadratic 1:1 Aspect Ratio) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Plot 1 (Left) */}
+        <SingleCorrelationPlot
+          plotLabel={lang === 'de' ? 'Plot 1' : 'Plot 1'}
+          allModels={allModels}
+          scope={scope}
+          frontierPointIds={frontierPointIds}
+          activeRegression={activeRegression}
+          polyDegree={polyDegree}
+          loessSpan={loessSpan}
+          xAxisDimIndex={plot1XDimIndex}
+          yAxisDimIndex={plot1YDimIndex}
+          onXAxisDimChange={setPlot1XDimIndex}
+          onYAxisDimChange={setPlot1YDimIndex}
+          onSwapAxes={handleSwapPlot1}
+          lang={lang}
+        />
+
+        {/* Plot 2 (Right) */}
+        <SingleCorrelationPlot
+          plotLabel={lang === 'de' ? 'Plot 2' : 'Plot 2'}
+          allModels={allModels}
+          scope={scope}
+          frontierPointIds={frontierPointIds}
+          activeRegression={activeRegression}
+          polyDegree={polyDegree}
+          loessSpan={loessSpan}
+          xAxisDimIndex={plot2XDimIndex}
+          yAxisDimIndex={plot2YDimIndex}
+          onXAxisDimChange={setPlot2XDimIndex}
+          onYAxisDimChange={setPlot2YDimIndex}
+          onSwapAxes={handleSwapPlot2}
+          lang={lang}
+        />
       </div>
     </div>
   );

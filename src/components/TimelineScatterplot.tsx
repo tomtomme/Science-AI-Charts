@@ -70,26 +70,6 @@ const REGRESSION_OPTIONS: RegressionOption[] = [
     color: '#f43f5e', // Rose
   },
   {
-    id: 'movingAverage',
-    labelDe: 'Gleitender Schnitt (MA)',
-    labelEn: 'Moving Average (MA)',
-    shortDe: 'Moving Avg',
-    shortEn: 'Moving Avg',
-    descDe: 'Gleitender Durchschnitt über wählbare Tage (z.B. 60d)',
-    descEn: 'Rolling moving average over selectable days (e.g. 60d)',
-    color: '#10b981', // Emerald
-  },
-  {
-    id: 'logistic',
-    labelDe: 'Logistische S-Kurve',
-    labelEn: 'Logistic S-Curve',
-    shortDe: 'S-Kurve',
-    shortEn: 'S-Curve',
-    descDe: 'Sättigungs-Wachstumsmodell mit oberer Schranke (max 100%)',
-    descEn: 'Saturation growth model with theoretical ceiling',
-    color: '#06b6d4', // Cyan
-  },
-  {
     id: 'loess',
     labelDe: 'LOESS (Smoothing)',
     labelEn: 'LOESS (Smoothing)',
@@ -111,6 +91,11 @@ const REGRESSION_OPTIONS: RegressionOption[] = [
   },
 ];
 
+const DEFAULT_TIMELINE_REGRESSION_INDEX = Math.max(
+  0,
+  REGRESSION_OPTIONS.findIndex((o) => o.id === 'loess')
+);
+
 export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   allModels,
   scoreMode,
@@ -121,12 +106,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   onScrollToFinalScores,
   lang,
 }) => {
-  // Regression Model state: index 0..7 (Default: Moving Average, index 4)
-  const [regressionIndex, setRegressionIndex] = useState<number>(4);
-  const [movingAvgDays, setMovingAvgDays] = useState<number>(60); // Default: 60 days
+  // Regression Model state: default to LOESS (Param 50%)
+  const [regressionIndex, setRegressionIndex] = useState<number>(DEFAULT_TIMELINE_REGRESSION_INDEX);
   const [polyDegree, setPolyDegree] = useState<number>(2); // Default: degree 2
-  const [loessSpan, setLoessSpan] = useState<number>(40); // Default: 40% smoothing span
-  const [logisticCeiling, setLogisticCeiling] = useState<number>(100); // Default: 100% saturation ceiling
+  const [loessSpan, setLoessSpan] = useState<number>(50); // Default: 50% smoothing span
   const [timelineScope, setTimelineScope] = useState<'all' | 'frontier'>('all'); // All Models vs Frontier Only
 
   const activeRegression = REGRESSION_OPTIONS[regressionIndex] || REGRESSION_OPTIONS[0];
@@ -290,15 +273,11 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
 
   // Compute regression curve & R²
   const regressionParam =
-    activeRegression.id === 'movingAverage'
-      ? movingAvgDays
-      : activeRegression.id === 'polynomial'
+    activeRegression.id === 'polynomial'
       ? polyDegree
       : activeRegression.id === 'loess'
       ? loessSpan
-      : activeRegression.id === 'logistic'
-      ? logisticCeiling
-      : 60;
+      : undefined;
 
   const regression = useMemo(() => {
     return calculateRegression(regressionDataPoints, activeRegression.id, 120, regressionParam);
@@ -585,22 +564,15 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               </div>
             </div>
 
-            {/* Contextual Parameter Input (Fixed width, Active for Moving Average, Polynomial, LOESS & Logistic, otherwise grayed-out) */}
+            {/* Contextual Parameter Input (Fixed width, Active for Polynomial & LOESS, otherwise grayed-out) */}
             <div
               className={`w-[142px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
-                activeRegression.id !== 'movingAverage' &&
-                activeRegression.id !== 'polynomial' &&
-                activeRegression.id !== 'loess' &&
-                activeRegression.id !== 'logistic'
+                activeRegression.id !== 'polynomial' && activeRegression.id !== 'loess'
                   ? 'opacity-40 cursor-not-allowed'
                   : ''
               }`}
               title={
-                activeRegression.id === 'movingAverage'
-                  ? lang === 'de'
-                    ? 'Glättungsfenster in Tagen (7–365 Tage)'
-                    : 'Moving window in days (7–365 days)'
-                  : activeRegression.id === 'polynomial'
+                activeRegression.id === 'polynomial'
                   ? lang === 'de'
                     ? 'Polynom-Grad (2, 3 oder 4)'
                     : 'Polynomial degree (2, 3 or 4)'
@@ -608,10 +580,6 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   ? lang === 'de'
                     ? 'Bandbreite / Glättungs-Span (15–80%)'
                     : 'Bandwidth smoothing span (15–80%)'
-                  : activeRegression.id === 'logistic'
-                  ? lang === 'de'
-                    ? 'Sättigungsgrenze / Decke L (80–150%)'
-                    : 'Saturation ceiling L (80–150%)'
                   : lang === 'de'
                   ? 'Kein variabler Parameter für dieses Modell'
                   : 'No variable parameter for this model'
@@ -621,25 +589,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 Param:
               </span>
               <div className="w-[76px] shrink-0 flex items-center justify-end">
-                {activeRegression.id === 'movingAverage' ? (
-                  <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-emerald-500">
-                    <input
-                      type="number"
-                      min={7}
-                      max={365}
-                      step={5}
-                      value={movingAvgDays}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        if (!isNaN(val) && val >= 7 && val <= 365) setMovingAvgDays(val);
-                      }}
-                      className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
-                    />
-                    <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
-                      {lang === 'de' ? 'T' : 'd'}
-                    </span>
-                  </div>
-                ) : activeRegression.id === 'polynomial' ? (
+                {activeRegression.id === 'polynomial' ? (
                   <select
                     value={polyDegree}
                     onChange={(e) => setPolyDegree(Number(e.target.value))}
@@ -660,24 +610,6 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
                         if (!isNaN(val) && val >= 15 && val <= 80) setLoessSpan(val);
-                      }}
-                      className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
-                    />
-                    <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
-                      %
-                    </span>
-                  </div>
-                ) : activeRegression.id === 'logistic' ? (
-                  <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-cyan-500">
-                    <input
-                      type="number"
-                      min={80}
-                      max={150}
-                      step={5}
-                      value={logisticCeiling}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        if (!isNaN(val) && val >= 80 && val <= 150) setLogisticCeiling(val);
                       }}
                       className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
                     />
