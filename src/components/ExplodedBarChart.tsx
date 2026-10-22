@@ -3,6 +3,7 @@ import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode, ScoreMode 
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { matchesSearchQuery } from '../utils/searchUtils';
+import { createModelBreakdown } from '../utils/csvParser';
 import { ExternalLink } from 'lucide-react';
 
 interface ExplodedBarChartProps {
@@ -207,10 +208,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     const m = models[index];
     if (m && currentExplosionMode !== 'off') {
       setPersistentModel(m);
+      const benchmarkDivisor = scoreMode === 'old' ? 5 : 8;
       if (activeComp) {
         const raw = m.rawScores[activeComp.key] ?? 0;
         const breakdown = m.breakdown.find((b) => b.id === activeComp.id);
-        const pts = breakdown?.pointsContribution ?? (activeComp.transform(raw) / 8);
+        const pts = breakdown?.pointsContribution ?? (activeComp.transform(raw) / benchmarkDivisor);
         const segInfo: HoveredSegmentInfo = {
           comp: activeComp,
           model: m,
@@ -225,7 +227,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
           const comp = persistentSegment.comp;
           const raw = m.rawScores[comp.key] ?? 0;
           const breakdown = m.breakdown.find((b) => b.id === comp.id);
-          const pts = breakdown?.pointsContribution ?? (comp.transform(raw) / 8);
+          const pts = breakdown?.pointsContribution ?? (comp.transform(raw) / benchmarkDivisor);
           const segInfo: HoveredSegmentInfo = {
             comp,
             model: m,
@@ -266,7 +268,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       if (comp && persistentModel) {
         const raw = persistentModel.rawScores[comp.key] ?? 0;
         const breakdown = persistentModel.breakdown.find((b) => b.id === comp.id);
-        const pts = breakdown?.pointsContribution ?? (comp.transform(raw) / 8);
+        const pts = breakdown?.pointsContribution ?? (comp.transform(raw) / (scoreMode === 'old' ? 5 : 8));
         setPersistentSegment({
           comp,
           model: persistentModel,
@@ -570,13 +572,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 <>
                   <span className="text-slate-400">·</span>
                   <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
-                    {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated} {t.points} ({t.rank} #{displayedModel.rank})
+                    {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? (scoreMode === 'old' ? (displayedModel.scoreOld ?? displayedModel.scoreOldCalculated) : (displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated))} {t.points} ({t.rank} #{displayedModel.rank})
                   </span>
                   {displayedModel.rawScores.nonHallucination !== null && (
                     <>
                       <span className="text-slate-400">·</span>
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
-                        {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / 8).toFixed(1)} {t.points})
+                        {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / (scoreMode === 'old' ? 5 : 8)).toFixed(1)} {t.points})
                       </span>
                     </>
                   )}
@@ -903,9 +905,16 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             // In single category mode, measure that category's raw score
             const catRaw = activeComp ? (model.rawScores[activeComp.key] ?? 0) : 0;
             const catBreakdown = activeComp ? model.breakdown.find((b) => b.id === activeComp.id) : null;
-            const catPoints = catBreakdown?.pointsContribution ?? (activeComp ? activeComp.transform(catRaw) / 8 : 0);
+            const catPoints = catBreakdown?.pointsContribution ?? (activeComp ? activeComp.transform(catRaw) / (scoreMode === 'old' ? 5 : 8) : 0);
 
-            const score = model.score ?? model.scoreNewReported ?? model.scoreNewCalculated;
+            const score =
+              activeCategoryIndex === 0
+                ? (scoreMode === 'worstCase'
+                    ? (model.scoreWorstCase ?? model.score)
+                    : scoreMode === 'old'
+                    ? (model.scoreOld ?? model.score)
+                    : (model.scoreNew ?? model.scoreNewReported ?? model.score))
+                : (model.score ?? model.scoreNewReported ?? model.scoreNewCalculated);
             const zeroY = isScienceKnowledge ? getYPosForVal(0) : baselineY;
 
             let totalBarHeight: number;
@@ -946,9 +955,16 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               ? 2.2
               : 1.8;
 
+            // Ensure multi-category breakdown segments strictly match the active composite score (NEW Score, Worst Case, OLD):
+            // When values change in the CSV for any benchmark, segments and bar heights are dynamically recalculated.
+            const effectiveBreakdown =
+              activeCategoryIndex === 0
+                ? createModelBreakdown(model.rawScores, score, scoreMode)
+                : model.breakdown;
+
             // Stack segments from bottom to top (for multi-category mode)
             let currentOffset = 0;
-            const segments = model.breakdown.map((comp, segIdx) => {
+            const segments = effectiveBreakdown.map((comp, segIdx) => {
               const segHeight = scaleY(comp.pointsContribution);
               const gapOffset = exploded ? segIdx * explosionGap : 0;
               const segY = baselineY - (currentOffset + segHeight + gapOffset);

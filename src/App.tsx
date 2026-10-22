@@ -35,10 +35,10 @@ export default function App() {
   const [timelineScoreMode, setTimelineScoreMode] = useState<ScoreMode>('old');
 
   // Schalter: 'current' (nur noch verfügbare Chatbots) vs 'all' (alle Chatbots der CSV)
-  const [modelScope, setModelScope] = useState<ModelScope>('current');
+  const [modelScope, setModelScope] = useState<ModelScope>('all');
 
-  // Preis-Filter: 'paid' (Standard), 'free', 'all'
-  const [priceFilter, setPriceFilter] = useState<PriceFilter>('paid');
+  // Preis-Filter: 'all' (Standard), 'free', 'paid'
+  const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
 
   // Pop-Up für Titel / Untertitel bei Mouse-Over
   const [showHeaderInfo, setShowHeaderInfo] = useState<boolean>(false);
@@ -65,8 +65,10 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(new Date());
   
-  // Slider: Anzahl angezeigter Modelle in 5er-Schritten (Standard: 250, damit alle Modelle sichtbar sind)
-  const [topCount, setTopCount] = useState<number>(250);
+  // Slider: Anzahl angezeigter Modelle - standardmäßig immer auf Maximum (alle Modelle),
+  // bis der Benutzer den Slider aktiv mit dem Regler oder +/- verkleinert.
+  const [userAdjustedTopCount, setUserAdjustedTopCount] = useState<boolean>(false);
+  const [userTopCount, setUserTopCount] = useState<number>(9999);
 
   // Explosion Schalter: 'on' (an) | 'hover' (teils) | 'off' (aus) - Standard: 'hover' (wie bisheriges 'aus')
   const [explosionMode, setExplosionMode] = useState<ExplosionMode>('hover');
@@ -213,6 +215,40 @@ export default function App() {
     [searchFilter, selectedFamilies, selectedCompany]
   );
 
+  const matchCount = useMemo(() => {
+    if (!hasFilterActive) return currentModels.length;
+    return currentModels.filter(matchesFilter).length;
+  }, [currentModels, hasFilterActive, matchesFilter]);
+
+  // Max-Bar-Count Slider: Immer auf Maximum (alle Treffer der aktuellen Auswahl/Filter),
+  // unabhängig von Filtern/Auswahlen, bis der Benutzer den Slider aktiv verkleinert.
+  // Wenn Filter oder Auswahlen geändert werden, wird der Slider automatisch wieder auf das Maximum gesetzt.
+  useEffect(() => {
+    setUserAdjustedTopCount(false);
+  }, [
+    searchFilter,
+    selectedFamilies,
+    selectedCompany,
+    priceFilter,
+    effectiveModelScope,
+    scoreMode,
+    selectedCategoryIndex,
+    loadedData,
+  ]);
+
+  const maxAvailableModels = matchCount;
+  const topCount = userAdjustedTopCount ? Math.min(userTopCount, maxAvailableModels) : maxAvailableModels;
+
+  const setTopCount = useCallback((n: number) => {
+    if (n >= matchCount) {
+      setUserAdjustedTopCount(false);
+      setUserTopCount(matchCount);
+    } else {
+      setUserAdjustedTopCount(true);
+      setUserTopCount(n);
+    }
+  }, [matchCount]);
+
   // Beim Setzen eines Schnellfilters: Nicht-gewählte Modelle komplett entfernen!
   // Zudem Sortierung nach Datum (Spalte Y) oder Punktzahl (Gesamt / aktive Kategorie)
   const displayedModels = useMemo(() => {
@@ -249,11 +285,6 @@ export default function App() {
 
     return sorted.slice(0, topCount);
   }, [currentModels, hasFilterActive, matchesFilter, selectedCategoryIndex, sortBy, topCount]);
-
-  const matchCount = useMemo(() => {
-    if (!hasFilterActive) return currentModels.length;
-    return currentModels.filter(matchesFilter).length;
-  }, [currentModels, hasFilterActive, matchesFilter]);
 
   const handleToggleFamily = useCallback((family: string) => {
     setSelectedFamilies((prev) =>
@@ -746,7 +777,7 @@ export default function App() {
               onClearFamilies={handleClearFamilies}
               topCount={topCount}
               onTopCountChange={setTopCount}
-              maxAvailableModels={currentModels.length}
+              maxAvailableModels={maxAvailableModels}
               matchCount={matchCount}
               totalCount={currentModels.length}
               lang={lang}

@@ -61,10 +61,15 @@ export interface ModelRecord {
   // Final scores
   score: number;
   scoreOld: number | null;
+  scoreOldReported?: number | null;
+  scoreOldCalculated?: number | null;
+  hasAll5OldBenchmarks?: boolean;
   scoreNew: number | null;
   scoreNewCalculated: number;
   scoreNewReported: number | null;
   scoreWorstCase: number | null;
+  scoreWorstCaseReported?: number | null;
+  scoreWorstCaseCalculated?: number | null;
   
   // Meta
   storyline: string;

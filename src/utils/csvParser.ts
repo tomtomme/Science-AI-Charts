@@ -334,17 +334,7 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     const valI = parseNum(row[8]);
     const valJ = parseNum(row[9]);
     const valK = parseNum(row[10]);
-
-    const hasAll8 =
-      valD !== null &&
-      valE !== null &&
-      valF !== null &&
-      valG !== null &&
-      valH !== null &&
-      valI !== null &&
-      valJ !== null &&
-      valK !== null;
-
+    // Benchmark raw scores
     const rawScores: RawBenchmarkScores = {
       actCodeReason: valD,
       nonHallucination: valE,
@@ -356,38 +346,52 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       econLegal: valK,
     };
 
-    const scoreOld = parseNum(row[11]);         // Col L
+    // Transformed benchmark values (0-100 scale)
+    const tD = valD !== null ? Math.max(0, Math.min(100, valD)) : null;
+    const tE = valE !== null ? Math.max(0, Math.min(100, valE)) : null;
+    const tF = valF !== null ? Math.max(0, Math.min(100, valF / 2 + 50)) : null;
+    const tG = valG !== null ? Math.max(0, Math.min(100, 1.4085 * (valG - 29))) : null;
+    const tH = valH !== null ? Math.max(0, Math.min(100, valH)) : null;
+    const tI = valI !== null ? Math.max(0, Math.min(100, valI)) : null;
+    const tJ = valJ !== null ? Math.max(0, Math.min(100, 1.2 * (valJ - 16.6666))) : null;
+    const tK = valK !== null ? Math.max(0, Math.min(100, valK)) : null;
+
+    const hasAll8 =
+      tD !== null && tE !== null && tF !== null && tG !== null &&
+      tH !== null && tI !== null && tJ !== null && tK !== null;
+
+    const hasAll5Old =
+      tD !== null && tE !== null && tF !== null && tG !== null && tJ !== null;
+
+    // Dynamically calculate OLD score from 5 benchmarks (averaging Col D, E, F, G, J)
+    const scoreOldCalculated = hasAll5Old
+      ? Math.round((tD! + tE! + tF! + tG! + tJ!) / 5)
+      : null;
+
+    // Dynamically calculate NEW score from all 8 benchmarks (averaging all 8 benchmarks)
+    const scoreNewCalculated = hasAll8
+      ? Math.round((tD! + tE! + tF! + tG! + tH! + tI! + tJ! + tK!) / 8)
+      : null;
+
+    // Dynamically calculate Worst Case score (7-benchmark average multiplied by non-hallucination rate)
+    const scoreWorstCaseCalculated = hasAll8
+      ? Math.round((((tD! + tF! + tG! + tH! + tI! + tJ! + tK!) / 7) * tE!) / 100)
+      : null;
+
+    const scoreOldReported = parseNum(row[11]);         // Col L
     const scoreNewReported = parseNum(row[12]); // Col M
-    const scoreWorstCase = parseNum(row[13]);   // Col N
+    const scoreWorstCaseReported = parseNum(row[13]);   // Col N
 
-    const activeScore = scoreOld ?? scoreNewReported ?? scoreWorstCase ?? 0;
+    // When values in columns change in the CSV (e.g. Cols D, E, F, G, J for Old Score, or H & K for New/WorstCase),
+    // the composite scores dynamically reflect the updated values:
+    const finalScoreOld = scoreOldReported ?? scoreOldCalculated;
+    const finalScoreNew = scoreNewReported ?? scoreNewCalculated;
+    const finalScoreWorstCase = scoreWorstCaseReported ?? scoreWorstCaseCalculated;
 
-    // Component breakdown for bar explosion / tooltips
-    const rawContributions: { comp: typeof BENCHMARK_COMPONENTS[0]; raw: number; transformed: number; pts: number }[] = [];
-    let sumTransformed = 0;
+    const activeScore = finalScoreNew ?? finalScoreOld ?? finalScoreWorstCase ?? 0;
+    const activeMode: ScoreMode = finalScoreNew !== null ? 'new' : finalScoreOld !== null ? 'old' : 'worstCase';
 
-    BENCHMARK_COMPONENTS.forEach((comp) => {
-      const raw = rawScores[comp.key] ?? 0;
-      const transformed = comp.transform(raw);
-      const pts = transformed / 8;
-      rawContributions.push({ comp, raw, transformed, pts });
-      sumTransformed += pts;
-    });
-
-    const normFactor = sumTransformed > 0 && activeScore > 0 ? activeScore / sumTransformed : 1;
-
-    const breakdown: ComponentBreakdown[] = rawContributions.map(({ comp, raw, transformed, pts }) => {
-      const normalizedContribution = parseFloat((pts * normFactor).toFixed(2));
-      return {
-        id: comp.id,
-        name: comp.nameDe,
-        color: comp.color,
-        rawValue: raw,
-        transformedValue: transformed,
-        pointsContribution: normalizedContribution,
-        percentageOfTotal: activeScore > 0 ? parseFloat(((normalizedContribution / activeScore) * 100).toFixed(1)) : 0,
-      };
-    });
+    const breakdown = createModelBreakdown(rawScores, activeScore, activeMode);
 
     const storyline = (row[14] || '').trim();
     const chatLinkRaw = (row[15] || '').trim();
@@ -453,13 +457,18 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       releaseText: cleanedCreator,
       rawScores,
       hasAll8Benchmarks: hasAll8,
+      hasAll5OldBenchmarks: hasAll5Old,
       breakdown,
       score: activeScore,
-      scoreOld,
-      scoreNew: scoreNewReported,
-      scoreNewCalculated: activeScore,
+      scoreOld: finalScoreOld,
+      scoreOldReported,
+      scoreOldCalculated,
+      scoreNew: finalScoreNew,
+      scoreNewCalculated: scoreNewCalculated ?? activeScore,
       scoreNewReported,
-      scoreWorstCase,
+      scoreWorstCase: finalScoreWorstCase,
+      scoreWorstCaseReported,
+      scoreWorstCaseCalculated,
       storyline,
       chatLink: parsedChatLink,
       apiLink: parsedApiLink,
@@ -475,10 +484,77 @@ export function parseAllModels(csvText: string): ModelRecord[] {
 }
 
 /**
+ * Calculates the 8-component segment breakdown strictly tailored to the selected score mode:
+ * - 'new': strictly proportional to all 8 benchmarks (Col D through K, 12.5% each), normalized to targetScore.
+ * - 'worstCase': strictly proportional to all 8 benchmarks scaled down to match the conservative Worst Case score.
+ * - 'old': strictly proportional to the 5 benchmarks of the old score (Col D, E, F, G, J), normalized to targetScore.
+ */
+export function createModelBreakdown(
+  rawScores: RawBenchmarkScores,
+  targetScore: number,
+  mode: ScoreMode = 'new'
+): ComponentBreakdown[] {
+  if (mode === 'old') {
+    const oldKeys = ['actCodeReason', 'nonHallucination', 'scienceKnowledge', 'visionPlot', 'trickQuestions'];
+    const oldComponents = BENCHMARK_COMPONENTS.filter((comp) => oldKeys.includes(comp.id));
+
+    const rawContributions = oldComponents.map((comp) => {
+      const raw = rawScores[comp.key] ?? 0;
+      const transformed = comp.transform(raw);
+      const pts = transformed / 5;
+      return { comp, raw, transformed, pts };
+    });
+
+    const sumTransformed = rawContributions.reduce((acc, c) => acc + c.pts, 0);
+    const effectiveScore = targetScore > 0 ? targetScore : Math.round(sumTransformed);
+    const normFactor = sumTransformed > 0 && effectiveScore > 0 ? effectiveScore / sumTransformed : 1;
+
+    return rawContributions.map(({ comp, raw, transformed, pts }) => {
+      const normalizedContribution = parseFloat((pts * normFactor).toFixed(2));
+      return {
+        id: comp.id,
+        name: comp.nameDe,
+        color: comp.color,
+        rawValue: raw,
+        transformedValue: transformed,
+        pointsContribution: normalizedContribution,
+        percentageOfTotal: effectiveScore > 0 ? parseFloat(((normalizedContribution / effectiveScore) * 100).toFixed(1)) : 0,
+      };
+    });
+  }
+
+  // mode === 'new' or 'worstCase'
+  // When values in columns H (Diagnostics) or K (Vals.ai) change in the CSV,
+  // each segment is recalculated proportionally from its raw value and scaled to targetScore.
+  const rawContributions = BENCHMARK_COMPONENTS.map((comp) => {
+    const raw = rawScores[comp.key] ?? 0;
+    const transformed = comp.transform(raw);
+    const pts = transformed / 8;
+    return { comp, raw, transformed, pts };
+  });
+
+  const sumTransformed = rawContributions.reduce((acc, c) => acc + c.pts, 0);
+  const normFactor = sumTransformed > 0 && targetScore > 0 ? targetScore / sumTransformed : 1;
+
+  return rawContributions.map(({ comp, raw, transformed, pts }) => {
+    const normalizedContribution = parseFloat((pts * normFactor).toFixed(2));
+    return {
+      id: comp.id,
+      name: comp.nameDe,
+      color: comp.color,
+      rawValue: raw,
+      transformedValue: transformed,
+      pointsContribution: normalizedContribution,
+      percentageOfTotal: targetScore > 0 ? parseFloat(((normalizedContribution / targetScore) * 100).toFixed(1)) : 0,
+    };
+  });
+}
+
+/**
  * Parses models filtered and ranked by specific score mode:
- * - 'new': strictly models with Col M ("NEW Score", 73 models)
- * - 'old': strictly models with Col L ("OLD Score", 169 models)
- * - 'worstCase': strictly models with Col N ("Worst Case Score", 73 models)
+ * - 'new': strictly models with Col M ("NEW Score"), recalculating segment breakdown to match target score
+ * - 'old': strictly models with Col L ("OLD Score"), recalculating segment breakdown to match target score
+ * - 'worstCase': strictly models with Col N ("Worst Case Score"), recalculating segment breakdown to match target score
  */
 export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): ModelRecord[] {
   const all = parseAllModels(csvText);
@@ -487,15 +563,39 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
   if (mode === 'old') {
     filtered = all
       .filter((m) => m.scoreOld !== null && m.scoreOld > 0)
-      .map((m) => ({ ...m, score: m.scoreOld as number, scoreNewCalculated: m.scoreOld as number }));
+      .map((m) => {
+        const score = m.scoreOld as number;
+        return {
+          ...m,
+          score,
+          scoreNewCalculated: score,
+          breakdown: createModelBreakdown(m.rawScores, score, 'old'),
+        };
+      });
   } else if (mode === 'worstCase') {
     filtered = all
       .filter((m) => m.scoreWorstCase !== null && m.scoreWorstCase > 0)
-      .map((m) => ({ ...m, score: m.scoreWorstCase as number, scoreNewCalculated: m.scoreWorstCase as number }));
+      .map((m) => {
+        const score = m.scoreWorstCase as number;
+        return {
+          ...m,
+          score,
+          scoreNewCalculated: score,
+          breakdown: createModelBreakdown(m.rawScores, score, 'worstCase'),
+        };
+      });
   } else {
     filtered = all
-      .filter((m) => m.scoreNewReported !== null && m.scoreNewReported > 0)
-      .map((m) => ({ ...m, score: m.scoreNewReported as number, scoreNewCalculated: m.scoreNewReported as number }));
+      .filter((m) => (m.scoreNew !== null && m.scoreNew > 0) || (m.scoreNewReported !== null && m.scoreNewReported > 0))
+      .map((m) => {
+        const score = (m.scoreNew ?? m.scoreNewReported) as number;
+        return {
+          ...m,
+          score,
+          scoreNewCalculated: score,
+          breakdown: createModelBreakdown(m.rawScores, score, 'new'),
+        };
+      });
   }
 
   // Sort descending by target score

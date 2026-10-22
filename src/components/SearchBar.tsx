@@ -90,7 +90,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   const handleTopStep = (step: number) => {
-    const nextVal = Math.max(5, Math.min(maxAvailableModels, topCount + step));
+    const minVal = Math.min(5, Math.max(1, maxAvailableModels));
+    let nextVal: number;
+    if (step < 0) {
+      const lowerMultiple = Math.floor((topCount - 1) / 5) * 5;
+      nextVal = Math.max(minVal, lowerMultiple);
+    } else {
+      const higherMultiple = Math.ceil((topCount + 1) / 5) * 5;
+      nextVal = Math.min(maxAvailableModels, higherMultiple);
+    }
     onTopCountChange(nextVal);
   };
 
@@ -343,41 +351,49 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </div>
 
             {/* Max Bar Count Slider */}
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
-              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                {t.topSliderTop}:
-              </span>
-              <button
-                type="button"
-                onClick={() => handleTopStep(-5)}
-                disabled={topCount <= 5}
-                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-                title={t.stepMinusChatbots}
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <input
-                type="range"
-                min={5}
-                max={Math.max(5, maxAvailableModels)}
-                step={5}
-                value={Math.min(topCount, maxAvailableModels)}
-                onChange={handleTopSliderChange}
-                className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-              />
-              <button
-                type="button"
-                onClick={() => handleTopStep(5)}
-                disabled={topCount >= maxAvailableModels}
-                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-                title={t.stepPlusChatbots}
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-              <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right">
-                {Math.min(topCount, maxAvailableModels)}
-              </span>
-            </div>
+            {(() => {
+              const minVal = Math.min(5, Math.max(1, maxAvailableModels));
+              const displayVal = Math.min(topCount, maxAvailableModels);
+              const sliderMax = Math.max(minVal, maxAvailableModels);
+              return (
+                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
+                  <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                    {t.topSliderTop}:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleTopStep(-5)}
+                    disabled={displayVal <= minVal || maxAvailableModels <= 0}
+                    className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                    title={t.stepMinusChatbots}
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <input
+                    type="range"
+                    min={minVal}
+                    max={sliderMax}
+                    step={1}
+                    value={Math.max(minVal, displayVal)}
+                    onChange={handleTopSliderChange}
+                    disabled={maxAvailableModels <= minVal}
+                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 disabled:opacity-40"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleTopStep(5)}
+                    disabled={displayVal >= maxAvailableModels || maxAvailableModels <= 0}
+                    className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                    title={t.stepPlusChatbots}
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                  <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right">
+                    {displayVal}
+                  </span>
+                </div>
+              );
+            })()}
 
             {/* Sortierung (Score vs Datum) ganz rechts */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
