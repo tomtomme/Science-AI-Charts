@@ -1,6 +1,6 @@
-# Science AI-Top-30: Chatbot „Wissenschafts-IQ“ Ranking
+# Science AI-Arena: Chatbot „Wissenschafts-IQ“ Ranking
 
-🤖 **Hinweis**: Diese README-Dokumentation wurde KI-generiert.  Die **Live-Web-App** wurde ebenfalls KI-generiert. Die Daten auf welchen die App beruht sind allerdings handverlesen.
+🤖 **Hinweis**: Diese README und die **Live-Web-App** wurden KI-generiert. Die Daten auf welchen die App beruht sind allerdings handverlesen.
 
 > **Live-Web-App**: [tomtomme.github.io/Science-AI-Charts](https://tomtomme.github.io/Science-AI-Charts/)  
 > **Original Google Sheet (Benchmarks)**: [Google Sheets Tabelle (gid=170267419)](https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=170267419#gid=170267419)  
@@ -109,18 +109,3 @@ In dieser Datei können Sie sämtliche deutschen (`TRANSLATIONS.de`) und englisc
 * **Grafik**: Reine, barrierefreie SVG-Vektorgrafiken für ultraschnelles Rendern ohne externe Charting-Abhängigkeiten
 * **Icons**: Lucide React
 * **Parser**: Eigener robuster RFC-4180 CSV-Streaming-Parser mit Anführungszeichen- und Sonderzeichenunterstützung
-
----
-
-## 🚀 Lokale Entwicklung
-
-```bash
-# Abhängigkeiten installieren
-npm install
-
-# Entwicklungsserver starten (Port 3000)
-npm run dev
-
-# Produktions-Build erstellen
-npm run build
-```
