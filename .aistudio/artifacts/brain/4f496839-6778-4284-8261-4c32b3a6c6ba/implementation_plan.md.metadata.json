@@ -1,6 +1,6 @@
 {
-  "summary":  "Comprehensive implementation plan for the new Correlations Tab: interactive bivariate scatterplot with selectable X- and Y-axes (all 8 categories + composite scores), side-by-side Pearson r and Spearman rho metrics, regression model fitting, and persistent hover cards.",
-  "updatedAt":  "2026-10-20T17:13:24.158950590Z",
+  "summary":  "Architectural plan to overhaul the LLM Labs & Model Ecosystem view with vertical top-to-bottom model size stacking, beginner-friendly tier labels with visual mini scale meters, hover parameter tooltips, an Open vs. Closed weights toggle, 'All' as the default selection, and responsive country filter pills.",
+  "updatedAt":  "2026-10-26T13:16:51.317498693Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

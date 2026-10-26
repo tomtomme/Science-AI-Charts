@@ -21,15 +21,19 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": false
     },
     "parameterSizes": {
-      "medium": "Instant; Haiku",
+      "small": "",
+      "medium": "Haiku",
+      "large": "",
       "massive": "Sonnet",
+      "colossal": "",
       "planetary": "Opus",
-      "singularity": "Fable; Mythos"
+      "singularity": "Fable (Mythos)",
+      "godTier": ""
     },
     "subscriptionTiers": "Pro, Max, Team, Enterprise",
     "harnessSdk": "Claude SDK +Managed Agents",
-    "dailyAgent": "Claude Cowork",
-    "codingAgent": "Claude Code"
+    "dailyAgent": "Claude Duet",
+    "codingAgent": "Claude Code & Cowork"
   },
   {
     "id": "google",
@@ -51,13 +55,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": "Gemma",
       "medium": "Flash-Lite",
       "large": "Flash (Cyber)",
+      "massive": "",
       "colossal": "Pro",
-      "singularity": "Argon/Carbon"
+      "planetary": "",
+      "singularity": "Argon",
+      "godTier": ""
     },
     "subscriptionTiers": "Plus, Pro, Ultra",
     "harnessSdk": "Antigravity +Jules Async Engine",
-    "dailyAgent": "Spark; Deep Research; Build",
-    "codingAgent": "Jules Tools; Antigravity"
+    "dailyAgent": "Spark; Deep Research",
+    "codingAgent": "Jules Tools; Antigravity; Build"
   },
   {
     "id": "meta",
@@ -76,9 +83,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "Glimmer",
+      "medium": "",
       "large": "Spark",
+      "massive": "",
       "colossal": "Wonder",
-      "singularity": "Wonder Full"
+      "planetary": "",
+      "singularity": "Wonder Full",
+      "godTier": ""
     },
     "subscriptionTiers": "Core, Premium, Essential, Advanced, Expert, Max",
     "harnessSdk": "Muse Hatch",
@@ -102,7 +113,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "parameterSizes": {
       "small": "Lightning",
       "medium": "Bolt; Super",
-      "colossal": "Ultra"
+      "large": "",
+      "massive": "",
+      "colossal": "Ultra",
+      "planetary": "",
+      "singularity": "",
+      "godTier": ""
     },
     "subscriptionTiers": "",
     "harnessSdk": "NemoClaw +NeMo Toolkit",
@@ -127,10 +143,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "gpt-oss",
-      "large": "Instant; Luna",
+      "medium": "",
+      "large": "Luna",
       "massive": "Terra",
-      "planetary": "Sol; Cyber",
-      "singularity": "Astra; Bel"
+      "colossal": "",
+      "planetary": "Sol (Cyber)",
+      "singularity": "Astra",
+      "godTier": ""
     },
     "subscriptionTiers": "Go, Plus, Pro, Business, Ent.",
     "harnessSdk": "Codex Harness",
@@ -152,14 +171,19 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "colossal": false
     },
     "parameterSizes": {
-      "medium": "0",
-      "massive": "1; 2",
-      "colossal": "3; 4"
+      "small": "",
+      "medium": "v0",
+      "large": "",
+      "massive": "v1 - v2",
+      "colossal": "v3 - v4",
+      "planetary": "",
+      "singularity": "",
+      "godTier": ""
     },
     "subscriptionTiers": "Supergrok Lite, Plus, Heavy, Bus., Ent.",
     "harnessSdk": "Cursor Engine",
-    "dailyAgent": "Grok Bot, Grok Build",
-    "codingAgent": "Cursor Agent"
+    "dailyAgent": "Grok Bot",
+    "codingAgent": "Cursor Agent, Grok Build"
   },
   {
     "id": "alibaba",
@@ -178,11 +202,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "planetary": true
     },
     "parameterSizes": {
-      "small": "27B / 2.5",
+      "small": "27B / v2,5",
       "medium": "Next",
       "large": "Flash",
-      "massive": "Plus / 3",
-      "planetary": "Max"
+      "massive": "Plus / v3",
+      "colossal": "",
+      "planetary": "Max",
+      "singularity": "",
+      "godTier": ""
     },
     "subscriptionTiers": "Lite, Essential, Standard, Pro, Team Pro & Max",
     "harnessSdk": "Qoder Cloud Agents; Tongyi Harness",
@@ -205,10 +232,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "planetary": true
     },
     "parameterSizes": {
-      "small": "Lite; Distill",
+      "small": "",
+      "medium": "",
+      "large": "",
       "massive": "Flash",
-      "colossal": "R1",
-      "planetary": "Pro"
+      "colossal": "",
+      "planetary": "Pro",
+      "singularity": "",
+      "godTier": ""
     },
     "subscriptionTiers": "per token price",
     "harnessSdk": "DeepSeek Harness",
@@ -231,10 +262,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "planetary": true
     },
     "parameterSizes": {
-      "medium": "Linear",
+      "small": "",
+      "medium": "",
       "large": "K1",
+      "massive": "",
       "colossal": "K2",
-      "planetary": "K3"
+      "planetary": "K3",
+      "singularity": "",
+      "godTier": ""
     },
     "subscriptionTiers": "Plus, Pro, Max, Ultra, Prem.",
     "harnessSdk": "Kimi Code & Work Harness",
@@ -256,9 +291,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "colossal": true
     },
     "parameterSizes": {
+      "small": "",
+      "medium": "",
       "large": "V",
       "massive": "Flash",
-      "colossal": "GLM"
+      "colossal": "GLM",
+      "planetary": "",
+      "singularity": "",
+      "godTier": ""
     },
     "subscriptionTiers": "Lite, Pro, Max, Team Standard & Premium",
     "harnessSdk": "ZCode Harness",
@@ -282,7 +322,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "parameterSizes": {
       "small": "Micro; Lite; Sonic",
       "medium": "Omni; Pro",
-      "massive": "Premier"
+      "large": "",
+      "massive": "Premier",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": "Alexa, Kiro on AWS"
   },
@@ -300,8 +343,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "large": false
     },
     "parameterSizes": {
-      "medium": "1",
-      "large": "2"
+      "small": "",
+      "medium": "v1",
+      "large": "v2",
+      "massive": "",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -321,8 +368,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "Phi",
+      "medium": "",
       "large": "Flash",
-      "colossal": "Thinking"
+      "massive": "",
+      "colossal": "Thinking",
+      "planetary": ""
     },
     "specialties": "Copilot"
   },
@@ -339,7 +389,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": true
     },
     "parameterSizes": {
-      "massive": "1"
+      "small": "",
+      "medium": "",
+      "large": "",
+      "massive": "v1",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": "https://reflection.ai/blog/introducing-beam"
   },
@@ -357,8 +412,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "colossal": true
     },
     "parameterSizes": {
+      "small": "",
+      "medium": "",
+      "large": "",
       "massive": "Small",
-      "colossal": "Inkling"
+      "colossal": "Inkling",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -375,7 +434,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": false
     },
     "parameterSizes": {
-      "small": "incoming 2026"
+      "small": "incoming 2026",
+      "medium": "",
+      "large": "",
+      "massive": "",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -396,7 +460,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "parameterSizes": {
       "small": "Command R",
       "medium": "Kolibri",
-      "large": "Command A"
+      "large": "Command A",
+      "massive": "",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": "merged with Aleph-Alpha"
   },
@@ -405,7 +472,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "group": "contender",
     "country": "China",
     "countryFlag": "🇨🇳",
-    "creator": "Ant Group/InclusionAI",
+    "creator": "Ant Group / InclusionAI",
     "engineName": "Ling",
     "famousFor": "",
     "weightsType": "open",
@@ -415,9 +482,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": true
     },
     "parameterSizes": {
-      "small": "3 Tiny; 2 Mini; 1 Lite",
-      "medium": "3 Flash",
-      "massive": "3.1 Flash; 2 Plus"
+      "small": "Tiny; Mini; Lite",
+      "medium": "Flash",
+      "large": "",
+      "massive": "Plus",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -439,10 +509,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "ERNIE",
-      "medium": "1",
-      "large": "2; 3",
-      "massive": "4",
-      "colossal": "5"
+      "medium": "v1",
+      "large": "v2 - v3",
+      "massive": "v4",
+      "colossal": "v5",
+      "planetary": ""
     },
     "specialties": "Chinas Google"
   },
@@ -461,9 +532,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "planetary": true
     },
     "parameterSizes": {
+      "small": "",
       "medium": "Flash-Lite",
+      "large": "",
+      "massive": "",
       "colossal": "Flash-Thinking",
-      "planetary": "2"
+      "planetary": "v2"
     },
     "specialties": ""
   },
@@ -481,8 +555,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": true
     },
     "parameterSizes": {
-      "large": "2",
-      "massive": "1; 3"
+      "small": "",
+      "medium": "",
+      "large": "v2",
+      "massive": "v1; v3",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -501,8 +579,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "planetary": true
     },
     "parameterSizes": {
+      "small": "",
       "medium": "Mini",
+      "large": "",
       "massive": "Pro",
+      "colossal": "",
       "planetary": "Max"
     },
     "specialties": ""
@@ -521,8 +602,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": false
     },
     "parameterSizes": {
-      "medium": "1",
-      "massive": "2"
+      "small": "",
+      "medium": "v1",
+      "large": "",
+      "massive": "v2",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -543,9 +628,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "VL",
-      "medium": "1",
-      "large": "3",
-      "colossal": "2; 5"
+      "medium": "v1",
+      "large": "v3",
+      "massive": "",
+      "colossal": "v2; v5",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -565,10 +652,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "colossal": true
     },
     "parameterSizes": {
-      "medium": "1",
-      "large": "2",
-      "massive": "3",
-      "colossal": "4"
+      "small": "",
+      "medium": "v1",
+      "large": "v2",
+      "massive": "v3",
+      "colossal": "v4",
+      "planetary": ""
     },
     "specialties": "Chinas WhatsApp"
   },
@@ -588,8 +677,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "V1",
+      "medium": "",
+      "large": "",
       "massive": "Flash",
-      "colossal": "Pro"
+      "colossal": "Pro",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -609,8 +701,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "Small",
+      "medium": "",
       "large": "Medium",
-      "colossal": "Large"
+      "massive": "",
+      "colossal": "Large",
+      "planetary": ""
     },
     "specialties": "DeepResearch"
   },
@@ -628,8 +723,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": true
     },
     "parameterSizes": {
+      "small": "",
       "medium": "Mini",
-      "massive": "Large"
+      "large": "",
+      "massive": "Large",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -647,8 +746,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": false
     },
     "parameterSizes": {
+      "small": "",
       "medium": "Flash",
-      "massive": "Pro"
+      "large": "",
+      "massive": "Pro",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": "Wide Research"
   },
@@ -666,8 +769,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "colossal": true
     },
     "parameterSizes": {
-      "large": "1",
-      "colossal": "2"
+      "small": "",
+      "medium": "",
+      "large": "v1",
+      "massive": "",
+      "colossal": "v2",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -686,9 +793,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": true
     },
     "parameterSizes": {
-      "small": "2",
-      "medium": "1",
-      "massive": "3"
+      "small": "v2",
+      "medium": "v1",
+      "large": "",
+      "massive": "v3",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -705,7 +815,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "colossal": true
     },
     "parameterSizes": {
-      "colossal": "K2"
+      "small": "",
+      "medium": "",
+      "large": "",
+      "massive": "",
+      "colossal": "K2",
+      "planetary": ""
     },
     "specialties": ""
   },
@@ -726,9 +841,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "Mini",
-      "medium": "1; 3",
-      "large": "2",
-      "massive": "4"
+      "medium": "v1; v3",
+      "large": "v2",
+      "massive": "v4",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": "Reasoning"
   },
@@ -745,9 +862,33 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": true
     },
     "parameterSizes": {
-      "small": "Think; Horizon"
+      "small": "Think; Horizon",
+      "medium": "",
+      "large": "",
+      "massive": "",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": "*Institute of Foundation Models"
+  },
+  {
+    "id": "contender-25",
+    "group": "contender",
+    "country": "UAE",
+    "countryFlag": "🇦🇪",
+    "creator": "",
+    "engineName": "",
+    "famousFor": "",
+    "weightsType": "open",
+    "parameterSizes": {
+      "small": "",
+      "medium": "",
+      "large": "",
+      "massive": "",
+      "colossal": "",
+      "planetary": ""
+    },
+    "specialties": ""
   },
   {
     "id": "tweaker-1",
@@ -765,7 +906,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "Mini",
-      "massive": "1"
+      "medium": "",
+      "large": "",
+      "massive": "v1",
+      "colossal": ""
     },
     "specialties": "Based on Qwen"
   },
@@ -785,7 +929,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "OpenELM",
-      "medium": "Gemini trained AFM model famility only available on EN locales for now, DE locale end of 2026"
+      "medium": "Gemini trained AFM model famility only available on EN locales for now, DE locale end of 2026",
+      "large": "",
+      "massive": "",
+      "colossal": ""
     },
     "specialties": "Based on Gemini"
   },
@@ -803,7 +950,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": false
     },
     "parameterSizes": {
-      "small": "orchestrates a mix of openweight models"
+      "small": "orchestrates a mix of openweight models",
+      "medium": "",
+      "large": "",
+      "massive": "",
+      "colossal": ""
     },
     "specialties": "Based on various"
   },
@@ -821,7 +972,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": true
     },
     "parameterSizes": {
-      "small": "1"
+      "small": "v1",
+      "medium": "",
+      "large": "",
+      "massive": "",
+      "colossal": ""
     },
     "specialties": "Based on Qwen / Gemma"
   },
@@ -841,7 +996,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "small": "Llama, Mistral",
-      "massive": "Llama 3.1"
+      "medium": "",
+      "large": "",
+      "massive": "Llama 3.1",
+      "colossal": ""
     },
     "specialties": "Based on Llama, Mistral"
   },
@@ -859,6 +1017,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "colossal": true
     },
     "parameterSizes": {
+      "small": "",
+      "medium": "",
+      "large": "",
+      "massive": "",
       "colossal": "Namazu; Fugu"
     },
     "specialties": "Based on Kimi, Qwen"
@@ -879,9 +1041,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": false
     },
     "parameterSizes": {
-      "small": "1",
-      "medium": "2",
-      "massive": "3"
+      "small": "v1",
+      "medium": "v2",
+      "large": "",
+      "massive": "v3",
+      "colossal": ""
     },
     "specialties": "Based on MiniMax"
   },
@@ -900,8 +1064,11 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": false
     },
     "parameterSizes": {
+      "small": "",
       "medium": "HyperNova",
-      "massive": "Quasar"
+      "large": "",
+      "massive": "Quasar",
+      "colossal": ""
     },
     "specialties": "Based on GLM"
   },
@@ -912,14 +1079,14 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "countryFlag": "🇺🇸",
     "creator": "Abacus AI",
     "engineName": "Abacus AI",
-    "basedOn": "Alibaba / Qwen",
+    "basedOn": "Alibaba (Qwen)",
     "famousFor": "The Smaug series re-spins Qwen.",
     "weightsType": "open",
     "openWeights": {
       "small": true
     },
     "parameterSizes": {
-      "small": "Alibaba / Qwen"
+      "small": "Alibaba (Qwen)"
     },
     "specialties": "The Smaug series re-spins Qwen."
   },
@@ -931,7 +1098,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "creator": "Arcee AI",
     "engineName": "Arcee AI",
     "basedOn": "Meta / Mistral / Alibaba",
-    "famousFor": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins.",
+    "famousFor": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins (SuperNova, Virtuoso).",
     "weightsType": "open",
     "openWeights": {
       "small": true
@@ -939,7 +1106,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "parameterSizes": {
       "small": "Meta / Mistral / Alibaba"
     },
-    "specialties": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins."
+    "specialties": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins (SuperNova, Virtuoso)."
   },
   {
     "id": "tweaker-extra-3",
@@ -967,7 +1134,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "creator": "Nous Research",
     "engineName": "Nous Research",
     "basedOn": "Meta / Alibaba",
-    "famousFor": "Hermes Agent family of fine-tuned Llama and Qwen re-spins",
+    "famousFor": "Hermes Agent family of fine-tuned Llama and Qwen re-spins.",
     "weightsType": "open",
     "openWeights": {
       "small": true
@@ -975,7 +1142,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "parameterSizes": {
       "small": "Meta / Alibaba"
     },
-    "specialties": "Hermes Agent family of fine-tuned Llama and Qwen re-spins"
+    "specialties": "Hermes Agent family of fine-tuned Llama and Qwen re-spins."
   },
   {
     "id": "tweaker-extra-5",
@@ -984,16 +1151,16 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "countryFlag": "🇺🇸",
     "creator": "Fireworks AI",
     "engineName": "Fireworks AI",
-    "basedOn": "Moonshot / Kimi",
-    "famousFor": "Kimi K3 efficiency re-spin named Ember",
+    "basedOn": "Moonshot (Kimi)",
+    "famousFor": "Kimi K3 efficiency re-spin named Ember.",
     "weightsType": "open",
     "openWeights": {
       "small": true
     },
     "parameterSizes": {
-      "small": "Moonshot / Kimi"
+      "small": "Moonshot (Kimi)"
     },
-    "specialties": "Kimi K3 efficiency re-spin named Ember"
+    "specialties": "Kimi K3 efficiency re-spin named Ember."
   },
   {
     "id": "small-1",
@@ -1008,7 +1175,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "micro": true
     },
     "parameterSizes": {
-      "micro": "SmolLM"
+      "micro": "SmolLM",
+      "mini": "",
+      "tiny": "",
+      "small": "",
+      "medium": "",
+      "large": ""
     },
     "specialties": ""
   },
@@ -1025,7 +1197,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "micro": true
     },
     "parameterSizes": {
-      "micro": "Granite"
+      "micro": "Granite",
+      "mini": "",
+      "tiny": "",
+      "small": "",
+      "medium": "",
+      "large": ""
     },
     "specialties": "Watson, SPSS"
   },
@@ -1043,8 +1220,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "medium": false
     },
     "parameterSizes": {
-      "micro": "2",
-      "medium": "1"
+      "micro": "v2",
+      "mini": "",
+      "tiny": "",
+      "small": "",
+      "medium": "v1",
+      "large": ""
     },
     "specialties": ""
   },
@@ -1062,8 +1243,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "tiny": false
     },
     "parameterSizes": {
-      "micro": "1",
-      "tiny": "2"
+      "micro": "v1",
+      "mini": "",
+      "tiny": "v2",
+      "small": "",
+      "medium": "",
+      "large": ""
     },
     "specialties": "Scam?"
   },
@@ -1084,7 +1269,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "parameterSizes": {
       "micro": "Reflexes",
       "mini": "Warp Grep",
-      "tiny": "Fast Apply"
+      "tiny": "Fast Apply",
+      "small": "",
+      "medium": "",
+      "large": ""
     },
     "specialties": ""
   },
@@ -1103,6 +1291,9 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "large": true
     },
     "parameterSizes": {
+      "micro": "",
+      "mini": "",
+      "tiny": "",
       "small": "XS",
       "medium": "S",
       "large": "M"
@@ -1123,8 +1314,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": true
     },
     "parameterSizes": {
+      "micro": "",
       "mini": "v1",
-      "small": "Qwen3.x re-spins"
+      "tiny": "",
+      "small": "Qwen3.x re-spins",
+      "medium": "",
+      "large": ""
     },
     "specialties": ""
   },
@@ -1142,8 +1337,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "medium": false
     },
     "parameterSizes": {
-      "tiny": "1",
-      "medium": "Lightning & Large"
+      "micro": "",
+      "mini": "",
+      "tiny": "v1",
+      "small": "",
+      "medium": "Lightning & Large",
+      "large": ""
     },
     "specialties": ""
   },
@@ -1163,6 +1362,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "large": false
     },
     "parameterSizes": {
+      "micro": "",
+      "mini": "",
       "tiny": "X / Coder",
       "small": "Mini & OSS",
       "medium": "Lite & Code",
@@ -1185,7 +1386,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "large": false
     },
     "parameterSizes": {
-      "mini": "V1 to 4",
+      "micro": "",
+      "mini": "V1 - V4",
+      "tiny": "",
+      "small": "",
       "medium": "X1",
       "large": "X2"
     },
@@ -1204,7 +1408,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "mini": true
     },
     "parameterSizes": {
-      "mini": "1 to 4"
+      "micro": "",
+      "mini": "v1 - v4",
+      "tiny": "",
+      "small": "",
+      "medium": "",
+      "large": ""
     },
     "specialties": ""
   },
@@ -1222,8 +1431,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "medium": true
     },
     "parameterSizes": {
-      "mini": "LM 1 & 2",
-      "medium": "LM 3; VL"
+      "micro": "",
+      "mini": "LM 1 - LM 2",
+      "tiny": "",
+      "small": "",
+      "medium": "LM 3; VL",
+      "large": ""
     },
     "specialties": "big GLM 5.x re-spin"
   },
@@ -1231,7 +1444,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-13",
     "group": "small",
     "country": "India",
-    "countryFlag": "🇮🇳",
+    "countryFlag": "🌐",
     "creator": "Sarvam AI",
     "engineName": "Sarvam",
     "famousFor": "",
@@ -1241,8 +1454,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": true
     },
     "parameterSizes": {
-      "mini": "1",
-      "small": "2"
+      "micro": "",
+      "mini": "v1",
+      "tiny": "",
+      "small": "v2",
+      "medium": "",
+      "large": ""
     },
     "specialties": ""
   },
@@ -1262,8 +1479,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "large": false
     },
     "parameterSizes": {
+      "micro": "",
       "mini": "Image",
       "tiny": "Language",
+      "small": "",
       "medium": "Cloud Server",
       "large": "Code"
     },
@@ -1272,8 +1491,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
   {
     "id": "small-16",
     "group": "small",
-    "country": "Small LLMs from Labs that also have BIG models; not counted again",
-    "countryFlag": "🌐",
+    "country": "China",
+    "countryFlag": "🇨🇳",
     "creator": "Alibaba",
     "engineName": "Qwen",
     "famousFor": "community driven",
@@ -1282,15 +1501,20 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "micro": true
     },
     "parameterSizes": {
-      "micro": "1 to 4"
+      "micro": "v1 - v4",
+      "mini": "",
+      "tiny": "",
+      "small": "",
+      "medium": "",
+      "large": ""
     },
     "specialties": "community driven"
   },
   {
     "id": "small-17",
     "group": "small",
-    "country": "Small LLMs from Labs that also have BIG models; not counted again",
-    "countryFlag": "🌐",
+    "country": "China",
+    "countryFlag": "🇨🇳",
     "creator": "DeepSeek",
     "engineName": "R1 Distill",
     "famousFor": "community driven",
@@ -1300,16 +1524,20 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "medium": true
     },
     "parameterSizes": {
+      "micro": "",
       "mini": "Qwen based",
-      "medium": "Llama based"
+      "tiny": "",
+      "small": "",
+      "medium": "Llama based",
+      "large": ""
     },
     "specialties": "community driven"
   },
   {
     "id": "small-18",
     "group": "small",
-    "country": "Small LLMs from Labs that also have BIG models; not counted again",
-    "countryFlag": "🌐",
+    "country": "America (US)",
+    "countryFlag": "🇺🇸",
     "creator": "Google",
     "engineName": "Gemma",
     "famousFor": "for Android",
@@ -1320,17 +1548,20 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": true
     },
     "parameterSizes": {
-      "micro": "3",
-      "mini": "1 to 4",
-      "small": "2 to 4"
+      "micro": "v3",
+      "mini": "v1 - v4",
+      "tiny": "",
+      "small": "v2 - v4",
+      "medium": "",
+      "large": ""
     },
     "specialties": "for Android"
   },
   {
     "id": "small-19",
     "group": "small",
-    "country": "Small LLMs from Labs that also have BIG models; not counted again",
-    "countryFlag": "🌐",
+    "country": "America (US)",
+    "countryFlag": "🇺🇸",
     "creator": "Meta",
     "engineName": "Llama",
     "famousFor": "discontinued",
@@ -1339,15 +1570,20 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "mini": true
     },
     "parameterSizes": {
-      "mini": "1 to 3"
+      "micro": "",
+      "mini": "v1 - v3",
+      "tiny": "",
+      "small": "",
+      "medium": "",
+      "large": ""
     },
     "specialties": "discontinued"
   },
   {
     "id": "small-20",
     "group": "small",
-    "country": "Small LLMs from Labs that also have BIG models; not counted again",
-    "countryFlag": "🌐",
+    "country": "America (US)",
+    "countryFlag": "🇺🇸",
     "creator": "Microsoft",
     "engineName": "Phi (Mini)",
     "famousFor": "for Copilot",
@@ -1358,17 +1594,20 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": true
     },
     "parameterSizes": {
-      "mini": "1 & 2",
-      "tiny": "4",
-      "small": "3"
+      "micro": "",
+      "mini": "v1 - v2",
+      "tiny": "v4",
+      "small": "v3",
+      "medium": "",
+      "large": ""
     },
     "specialties": "for Copilot"
   },
   {
     "id": "small-21",
     "group": "small",
-    "country": "Small LLMs from Labs that also have BIG models; not counted again",
-    "countryFlag": "🌐",
+    "country": "French",
+    "countryFlag": "🇫🇷",
     "creator": "Mistral AI",
     "engineName": "Ministral",
     "famousFor": "",
@@ -1378,8 +1617,12 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "small": true
     },
     "parameterSizes": {
-      "tiny": "1",
-      "small": "3"
+      "micro": "",
+      "mini": "",
+      "tiny": "v1",
+      "small": "v3",
+      "medium": "",
+      "large": ""
     },
     "specialties": ""
   },
@@ -1389,14 +1632,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Aider",
-    "engineName": "Aider",
-    "famousFor": "Aider Git Harness",
+    "famousFor": "Canadian origin (Paul Gauthier)",
+    "engineName": "Aider Git Harness",
     "harness": "Aider Git Harness",
     "form": "CLI",
     "note": "Canadian origin (Paul Gauthier)",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "CLI (Canadian origin (Paul Gauthier))"
   },
   {
     "id": "harness-2",
@@ -1404,14 +1646,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "All Hands AI",
-    "engineName": "All Hands AI",
-    "famousFor": "OpenHands",
+    "famousFor": "formerly OpenDevin",
+    "engineName": "OpenHands",
     "harness": "OpenHands",
     "form": "CLI + Web SDK",
     "note": "formerly OpenDevin",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "CLI + Web SDK (formerly OpenDevin)"
   },
   {
     "id": "harness-3",
@@ -1419,14 +1660,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Augment Code",
-    "engineName": "Augment Code",
-    "famousFor": "Context Engine",
+    "famousFor": "",
+    "engineName": "Context Engine",
     "harness": "Context Engine",
     "form": "IDE",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "IDE"
   },
   {
     "id": "harness-4",
@@ -1434,14 +1674,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "CodeRabbit",
+    "famousFor": "",
     "engineName": "CodeRabbit",
-    "famousFor": "CodeRabbit",
     "harness": "CodeRabbit",
     "form": "IDE + CLI + Git",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "IDE + CLI + Git"
   },
   {
     "id": "harness-5",
@@ -1449,14 +1688,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Coder",
-    "engineName": "Coder",
-    "famousFor": "Coder Agents",
+    "famousFor": "",
+    "engineName": "Coder Agents",
     "harness": "Coder Agents",
     "form": "Web",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "Web"
   },
   {
     "id": "harness-6",
@@ -1464,14 +1702,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Cognition AI",
-    "engineName": "Cognition AI",
-    "famousFor": "Devin",
+    "famousFor": "formerly Windsurf",
+    "engineName": "Devin",
     "harness": "Devin",
     "form": "IDE + CLI + Web",
     "note": "formerly Windsurf",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "IDE + CLI + Web (formerly Windsurf)"
   },
   {
     "id": "harness-7",
@@ -1479,14 +1716,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Factory AI",
-    "engineName": "Factory AI",
-    "famousFor": "Droid",
+    "famousFor": "",
+    "engineName": "Droid",
     "harness": "Droid",
     "form": "CLI",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "CLI"
   },
   {
     "id": "harness-8",
@@ -1494,14 +1730,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "LangChain",
-    "engineName": "LangChain",
-    "famousFor": "Deep Agents+LangGraph",
-    "harness": "Deep Agents+LangGraph",
+    "famousFor": "",
+    "engineName": "Deep Agents + LangGraph",
+    "harness": "Deep Agents + LangGraph",
     "form": "SDK",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "SDK"
   },
   {
     "id": "harness-9",
@@ -1509,14 +1744,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Nous Research",
-    "engineName": "Nous Research",
-    "famousFor": "Hermes",
+    "famousFor": "",
+    "engineName": "Hermes",
     "harness": "Hermes",
     "form": "CLI",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "CLI"
   },
   {
     "id": "harness-10",
@@ -1524,14 +1758,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "OpenClaw Foundation",
-    "engineName": "OpenClaw Foundation",
-    "famousFor": "OpenClaw/Code",
-    "harness": "OpenClaw/Code",
+    "famousFor": "Austrian origin",
+    "engineName": "OpenClaw / Code",
+    "harness": "OpenClaw / Code",
     "form": "CLI über Messenger",
     "note": "Austrian origin",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "CLI über Messenger (Austrian origin)"
   },
   {
     "id": "harness-11",
@@ -1539,14 +1772,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Pydantic AI",
-    "engineName": "Pydantic AI",
-    "famousFor": "Pyd.-AI Harness",
+    "famousFor": "UK origin",
+    "engineName": "Pyd.-AI Harness",
     "harness": "Pyd.-AI Harness",
     "form": "SDK",
     "note": "UK origin",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "SDK (UK origin)"
   },
   {
     "id": "harness-12",
@@ -1554,14 +1786,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Replit",
-    "engineName": "Replit",
-    "famousFor": "Replit Agent",
+    "famousFor": "",
+    "engineName": "Replit Agent",
     "harness": "Replit Agent",
     "form": "Web",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "Web"
   },
   {
     "id": "harness-13",
@@ -1569,14 +1800,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Sourcegraph",
-    "engineName": "Sourcegraph",
-    "famousFor": "Amp +CodyAssist.",
+    "famousFor": "",
+    "engineName": "Amp +CodyAssist.",
     "harness": "Amp +CodyAssist.",
     "form": "CLI + IDE",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "CLI + IDE"
   },
   {
     "id": "harness-14",
@@ -1584,14 +1814,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Warp",
-    "engineName": "Warp",
-    "famousFor": "Warp+Factories",
+    "famousFor": "",
+    "engineName": "Warp+Factories",
     "harness": "Warp+Factories",
-    "form": "CLI/IDE-Hybrid",
+    "form": "CLI / IDE-Hybrid",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "CLI / IDE-Hybrid"
   },
   {
     "id": "harness-15",
@@ -1599,14 +1828,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Zed Industries",
-    "engineName": "Zed Industries",
-    "famousFor": "Zed +Threads",
+    "famousFor": "",
+    "engineName": "Zed +Threads",
     "harness": "Zed +Threads",
     "form": "IDE",
     "note": "",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "IDE"
   },
   {
     "id": "harness-16",
@@ -1614,28 +1842,26 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "Israel",
     "countryFlag": "🇮🇱",
     "creator": "Qodo",
-    "engineName": "Qodo",
-    "famousFor": "Gen/Review",
-    "harness": "Gen/Review",
+    "famousFor": "formerly CodiumAI",
+    "engineName": "Gen / Review",
+    "harness": "Gen / Review",
     "form": "IDE + CLI + Git",
     "note": "formerly CodiumAI",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "IDE + CLI + Git (formerly CodiumAI)"
   },
   {
     "id": "harness-17",
     "group": "harness",
     "country": "Singapur",
-    "countryFlag": "🇸🇬",
+    "countryFlag": "🌐",
     "creator": "Butterfly Effect",
-    "engineName": "Butterfly Effect",
-    "famousFor": "Manus",
+    "famousFor": "China origin",
+    "engineName": "Manus",
     "harness": "Manus",
     "form": "Web",
     "note": "China origin",
-    "weightsType": "open",
-    "openWeights": {},
-    "parameterSizes": {}
+    "parameterSizes": {},
+    "specialties": "Web (China origin)"
   }
 ];

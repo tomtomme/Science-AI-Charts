@@ -310,9 +310,15 @@ export default function App() {
   const refreshData = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const result = await loadModelsData();
+      const [result, labRes] = await Promise.all([
+        loadModelsData(),
+        fetchLiveLabEntries(),
+      ]);
       if (result.newModels.length > 0 || result.oldModels.length > 0) {
         setLoadedData(result);
+      }
+      if (labRes.entries && labRes.entries.length > 0) {
+        setLabs(labRes.entries);
       }
       setLastSyncedAt(new Date());
       setCountdown(SYNC_INTERVAL);

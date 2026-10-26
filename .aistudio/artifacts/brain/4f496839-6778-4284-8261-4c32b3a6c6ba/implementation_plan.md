@@ -1,25 +1,26 @@
-# New Correlations Tab: Bivariate Scatterplot & Correlation Analysis
+# LLM Labs & Model Ecosystem Redesign
 
-Architects and implements a new **Correlations** tab within the benchmark section, enabling deep analysis of bivariate relationships (linear, monotonic, and non-linear) between any two benchmark dimensions or composite scores.
+Overhaul the **LLM Labs & Ecosystem** view into an intuitive, visually structured catalog by stacking vendor models vertically from smallest to largest, replacing raw billion/trillion counts with beginner-friendly tier names, introducing visual mini scale meters with parameter hover tooltips, setting 'All' as the default tab, and adding Open/Closed and Country filter controls.
+
+---
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following product requirements and architectural choices have been aligned:
+> The following design decisions were aligned during the interactive clarification phase:
 
-- **Navigation**: Integrated as a **third view button** in the Benchmark toolbar: `Balkendiagramm` (Bar Chart) | `Zeitachse` (Timeline) | `Korrelationen` (Correlations).
-- **Dimension Selectors (X & Y)**: Both X- and Y-axes support all 8 individual benchmark categories (Columns D–K) as well as the 3 composite scores (New Score, Old Score, Worst Case), giving 11 selectable dimensions for each axis (121 cross-comparison combinations).
-- **Correlation Metrics**: Displays **Pearson's $r$** (linear correlation) and **Spearman's $\rho$** (rank/monotonic correlation) side-by-side in high-contrast badges above the chart. The active regression model contextually highlights the most appropriate metric (e.g., Pearson for Linear, Spearman for non-linear/monotonic fits).
-- **Regression Modeling**: Reuses the mathematical curve fitting engine from the Timeline tab (Linear, Polynomial, Power, Exponential, Moving Average, LOESS, Logistic), complete with the stable `w-[76px]` Param input for tunable hyperparameters.
-- **Interactive Experience**: Leverages the smooth 1800ms hover persistence and invisible bridge so model details and chat links in tooltips remain effortlessly clickable.
+- **Vertical Model Stacking**: Models inside each vendor card are stacked in a single vertical column from smallest (e.g. Micro / Small) to largest (e.g. Planetary / Singularity), creating an unambiguous ladder of scale.
+- **Beginner-Friendly Tiers & Visual Scale Meters**: Tier names from the Google Sheet (*Small*, *Medium*, *Large*, *Massive*, *Colossal*, *Planetary*, etc.) are used instead of intimidating billion/trillion parameter counts. Each tier features a mini visual gauge/scale meter icon with a hover tooltip showing the exact parameter count.
+- **Default Tab & Country Navigation**: **"All Labs"** is positioned as the first, default active tab on the far left. A country filter strip allows quick filtering by nation (US, China, France, etc.) with real-time lab counts.
+- **Weights Architecture Filter**: A high-level toggle allows filtering labs by **Open Weights**, **Closed Weights**, or **All**.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Delivers**: A high-density analytical playground to explore trade-offs and emergent correlations across LLM capabilities—e.g., *Does high reasoning (MLCR-AA) correlate with low hallucination?*, *How strongly does Code (10 Evals) predict overall Old Score?*, or *Do models that excel at Trick Questions underperform on Excel Agent tasks?*
-- **Target Audience**: AI researchers, benchmark evaluators, and engineers seeking empirical insight into capability trade-offs and non-linear clustering.
-- **Key Value**: Moves beyond single-dimensional leaderboards to reveal multidimensional trade-offs with mathematically rigorous rank and linear correlation statistics.
+- **What It Does**: Transforms the dense, multi-column ecosystem matrix into a clean, card-based catalog where users can explore 75+ AI labs and their model families.
+- **Target Audience**: AI researchers, enterprise teams, and casual users seeking to understand which lab develops which models, how large those models are, and whether they are open or closed.
+- **Key Value**: Eliminates cognitive overload by replacing cluttered 2D grids with a vertical hierarchy, human-readable labels, and instant multi-dimensional filtering (category, country, and open/closed weights).
 
 ---
 
@@ -27,115 +28,105 @@ Architects and implements a new **Correlations** tab within the benchmark sectio
 
 ### Key User Flows
 
-1. **Accessing the Tab**:
-   - In the top sub-navigation, the user clicks the new **Korrelationen / Correlations** button (`GitCompare` / `ScatterChart` icon).
-   - The view initializes by default with **X = Col D (Coding & Math)** and **Y = Col E (Non-Hallucination)**, or **X = Old Score** and **Y = New Score**, instantly rendering all models with scores on both axes.
-2. **Configuring Axes**:
-   - The toolbar provides two compact dimension pickers: **X-Achse** and **Y-Achse**, each offering:
-     - Composite Scores: *New Score (8 Benchmarks)*, *Old Score (5 Benchmarks)*, *Worst Case*
-     - Component Categories: *#1 Coding & Math*, *#2 Non-Hallucination*, *#3 Science Knowledge*, *#4 Vision & Plotting*, *#5 Medical Reasoning*, *#6 Excel Agent*, *#7 Trick Questions*, *#8 Economics & Legal*
-   - Each axis displays its custom color badge matching the benchmark palette.
-3. **Evaluating Correlation Metrics**:
-   - Directly above the scatter canvas, two badges display side-by-side:
-     - **Pearson $r$**: Color-coded by strength (e.g., $r = +0.78$ Strong Positive, emerald; $r = +0.32$ Moderate, sky; $r = -0.45$ Inverse, rose).
-     - **Spearman $\rho$**: Captures non-linear monotonic trends regardless of whether data follows a straight line.
-   - An intuitive interpretive label clarifies the relationship in plain language (e.g., *"Starke monotone Korrelation"* / *"Moderate lineale Beziehung"*).
-4. **Fitting Non-Linear Curves**:
-   - Users can toggle through the regression model slider (Linear, Polynomial, Moving Average, LOESS, Logistic, Power, Exponential).
-   - The curve recalculates instantly against $(x_i, y_i)$ pairs, with the Param input adjusting degree, span, or window.
-5. **Inspecting Models**:
-   - Hovering any dot opens the persistent card showing Model Name, Company Flag, Release Date, exact X and Y scores, and clickable Chat/Paper links.
+1. **Default Landing**: User enters the tab and immediately sees **"All Labs"** selected by default, displaying a responsive grid of AI lab cards with country flags, primary chatbot engine, and ecosystem tooling.
+2. **Filter by Country or Weights**: User clicks a country pill (e.g., `🇺🇸 America (US)`, `🇨🇳 China`, `🇫🇷 France`) or toggles `Open Weights` to instantly narrow the visible labs with zero layout shift.
+3. **Inspect Model Ladders**: Inside any lab card (e.g. Google, Anthropic, Meta, DeepSeek), models are arranged top-to-bottom from smallest to largest.
+4. **Hover for Parameter Precision**: Hovering over any tier label (e.g., *Small* or *Massive*) reveals a micro-tooltip displaying the exact parameter range (e.g., `< 32B Parameters: Gemma 2 27B, Gemma 3`).
+5. **Cross-Reference Benchmark**: Clicking a lab name or model links directly to that model's benchmark performance in the main Bar Chart or Timeline views.
+
+### Visual Identity & Theme
+
+- **Aesthetic Direction**: High-density, professional technical dashboard adhering to the *SaaS & Dashboard Guidelines* and *Universal Frontend Design Constitution*.
+- **Color Palette & Scale Meter Hierarchy**:
+  - *Lightweight / Edge (<32B)*: Cool emerald / teal accents (`bg-emerald-500`) with level-1 meter.
+  - *Mid-Tier (<128B–256B)*: Royal blue / cyan accents (`bg-blue-500`) with level-2 meter.
+  - *Massive / Frontier (<512B–1.5T)*: Indigo / violet accents (`bg-indigo-500`) with level-3 meter.
+  - *Planetary / Singularity (>5T)*: Rose / crimson accents (`bg-rose-500`) with level-4 meter.
+- **Mini Scale Meter Component**: A refined 4-bar SVG/CSS stepped gauge `[ ▂▃▅]` indicating size tier at a glance.
+- **Single-Elevation Depth**: Flat card surfaces with crisp hairline borders (`border border-slate-200 dark:border-slate-800`), avoiding nested cards within cards.
 
 ---
 
-## 3. Mathematical & Data Strategy
+## 3. Key Product Decisions & Trade-Offs
 
-### Correlation Formulas
+### Decision 1: Single-Column Vertical Model Stacking vs. 2-Column Grid
+- **Chosen Approach**: Single-column vertical list ordered strictly from smallest to largest tier.
+- **Why**: Eliminates the zig-zag scanning problem where users had to read left-to-right and top-to-bottom simultaneously. Vertical stacking creates a natural cognitive "ladder" of model power.
+- **Alternatives Considered**: 2-column grid was rejected because it placed small and massive models side-by-side, breaking visual hierarchy.
 
-1. **Pearson Correlation ($r$)**:
-   $$\bar{x} = \frac{1}{n} \sum x_i, \quad \bar{y} = \frac{1}{n} \sum y_i$$
-   $$r = \frac{\sum (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum (x_i - \bar{x})^2 \sum (y_i - \bar{y})^2}}$$
-2. **Spearman Rank Correlation ($\rho$)**:
-   - Convert $x_i$ and $y_i$ into fractional ranks $R(x_i)$ and $R(y_i)$ (accurately averaging tied ranks).
-   - Compute Pearson correlation over the rank arrays:
-     $$\rho = \frac{\text{Cov}(R_x, R_y)}{\sigma(R_x)\sigma(R_y)}$$
-   - Resilient against outliers, saturation ceilings, and non-linear monotonic pacing.
+### Decision 2: Beginner Tier Names with Hover Parameter Tooltips
+- **Chosen Approach**: Primary label displays the friendly tier name (e.g., *Small*, *Medium*, *Massive*) alongside the mini scale meter. Hovering reveals the exact parameter specification (`< 32B`, `< 512B`).
+- **Why**: Protects non-technical users from confusing parameter terminology while retaining full precision for advanced researchers via instant hover.
 
-### Dimension Data Extractor
-
-A clean accessor maps any dimension index $0..10$ to a numeric score for a given `ModelRecord`:
-- Index 0: `scoreNew`
-- Index 1: `scoreOld`
-- Index 2: `scoreWorstCase`
-- Index 3..10: Component raw/transformed score from `model.rawScores` or `model.breakdown[idx - 3]`
+### Decision 3: Country Filter Pills vs. Slider
+- **Chosen Approach**: Segmented horizontal pill buttons with country flags and count badges.
+- **Why**: Discrete countries (US, China, France, etc.) are categorical data with no natural continuous order; a linear slider would be unintuitive and awkward for discrete national entities.
 
 ---
 
-## 4. Technical Architecture & Component Hierarchy
+## 4. Technical Architecture & Data Strategy
+
+### Component Architecture & State Flow
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        App.tsx (Root State)                            │
-│  - benchmarkView: 'barchart' | 'timeline' | 'correlations'             │
-│  - fullTimelineModels: 224+ historical models                          │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼ (when benchmarkView === 'correlations')
-┌────────────────────────────────────────────────────────────────────────┐
-│                 CorrelationsScatterplot.tsx                            │
-│  State:                                                                │
-│  - xAxisDimension: 3 (Col D - Coding & Math)                           │
-│  - yAxisDimension: 4 (Col E - Non-Hallucination)                       │
-│  - regressionIndex: 0 (Linear) or 3 (Polynomial)                       │
-│  - movingAvgDays / polyDegree / loessSpan / logisticCeiling            │
-│  - timelineScope: 'all' | 'frontier'                                   │
-├───────────────────────────────────┬────────────────────────────────────┤
-│   Controls Toolbar                │   Scatterplot SVG Canvas           │
-│   ├── X-Axis Dimension Selector   │   ├── X-Axis Ticks & Label         │
-│   ├── Y-Axis Dimension Selector   │   ├── Y-Axis Ticks & Label         │
-│   ├── Model Slider + Param Input  │   ├── Scatter Circles (x, y)       │
-│   └── Pearson r + Spearman rho    │   ├── Fitted Curve SVG Path        │
-│                                   │   └── Persistent Hover Card        │
-└───────────────────────────────────┴────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                   mathRegression.ts & correlationUtils.ts              │
-│  - calculatePearsonR(points): number                                   │
-│  - calculateSpearmanRho(points): number                                │
-│  - calculateRegression(points, type, steps, param): RegressionResult   │
+│                        LabMatrixView Container                         │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ Controls & Filter Toolbar                                        │  │
+│  │ ┌─────────────────────────┐  ┌──────────────┐  ┌──────────────┐  │  │
+│  │ │ Group Tabs: All | Top10 │  │ Open/Closed  │  │ Search Bar   │  │  │
+│  │ └─────────────────────────┘  └──────────────┘  └──────────────┘  │  │
+│  │ ┌──────────────────────────────────────────────────────────────┐ │  │
+│  │ │ Country Filter Strip: All (75) | 🇺🇸 US (38) | 🇨🇳 China (22) │ │  │
+│  │ └──────────────────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ Responsive Lab Card Grid (1 to 4 cols)                           │  │
+│  │                                                                  │  │
+│  │  ┌────────────────────────────┐  ┌────────────────────────────┐  │  │
+│  │  │ Lab Card (e.g. Anthropic)  │  │ Lab Card (e.g. Google)     │  │  │
+│  │  │ • Flag + Lab Name + Open   │  │ • Flag + Lab Name + Hybrid │  │  │
+│  │  │ • Engine / Chatbot Name    │  │ • Engine / Chatbot Name    │  │  │
+│  │  │ • Vertical Model Ladder:   │  │ • Vertical Model Ladder:   │  │  │
+│  │  │   [ ▂] Medium: Haiku       │  │   [ ] Small: Gemma         │  │  │
+│  │  │   [ ▃] Massive: Sonnet     │  │   [ ▂] Medium: Flash-Lite  │  │  │
+│  │  │   [ ▄] Planetary: Opus     │  │   [ ▃] Large: Flash        │  │  │
+│  │  │   [ ▅] Singularity: Fable  │  │   [ ▄] Colossal: Pro       │  │  │
+│  │  │ • Tooling: SDK & Agents    │  │ • Tooling: SDK & Agents    │  │  │
+│  │  └────────────────────────────┘  └────────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Proposed Files & Modifications:
+### Data Pipeline & State Management
 
-1. `src/utils/correlationUtils.ts` (New):
-   - `calculatePearson(x: number[], y: number[]): { r: number; labelDe: string; labelEn: string }`
-   - `calculateSpearman(x: number[], y: number[]): { rho: number; labelDe: string; labelEn: string }`
-   - Fast fractional rank calculator for tied scores.
-2. `src/components/CorrelationsScatterplot.tsx` (New Component):
-   - Full scatterplot implementation with two dimension selectors (X & Y), regression model slider, side-by-side Pearson & Spearman badges, dynamic SVG axis scaling, and persistent hover tooltips.
-3. `src/App.tsx`:
-   - Extend `benchmarkView` union: `'barchart' | 'timeline' | 'correlations'`.
-   - Add view switcher button for "Korrelationen" with icon (`GitCompare`).
-   - Render `CorrelationsScatterplot` when `activeTab === 'benchmark' && benchmarkView === 'correlations'`.
-4. Verification & Calibration:
-   - Cohen (1988) Effect Size Intervals calibrated:
-     - $|r| < 0.1$: negligible ("vernachlässigbar" / "negligible")
-     - $|r| = 0.1$: weak ("schwach" / "weak")
-     - $0.1 < |r| < 0.3$: weak to moderate ("schwach bis moderat" / "weak to moderate")
-     - $|r| = 0.3$: moderate ("moderat" / "moderate")
-     - $0.3 < |r| < 0.5$: moderate to strong ("moderat bis stark" / "moderate to strong")
-     - $|r| \ge 0.5$: strong ("stark" / "strong"), with $\ge 0.7$ very strong ("sehr stark" / "very strong")
-   - Renamed rank correlation badge to "Spearmans Rho".
-   - Compact, Collision-Aware Pop-up:
-     - Made dot hover tooltip ultra-compact (w: 230px, h: ~68px, single-row bivariate metrics).
-     - Implemented dynamic non-overlapping quadrant placement (`getOptimalTooltipPosition`) that calculates candidate positions around the dot and picks the orientation with minimum data point overlaps.
-     - Removed phantom pointer-event blocker pseudo-elements so nearby dots remain effortlessly interactive.
-   - Dual Side-by-Side Rectangular Plots:
-     - Configured 2 rectangular scatterplots side by side (`grid grid-cols-1 lg:grid-cols-2 gap-4`) for direct visual and statistical comparative analysis.
-     - Formatted each plot with golden rectangular aspect ratio (560 x 380).
-     - Removed bulky X and Y axis sliders and buttons from above the charts.
-     - Interactive Clickable Axis Titles: Placed clickable badges directly at the Y-axis (top-left) and X-axis (bottom-center) of each chart, opening an anchored category selector popover.
-     - Each plot features its own independent X and Y dimension selection, quick axis swap (`X ⇄ Y`), Pearson r and Spearmans Rho badges, and regression curve.
-   - Run `compile_applet` and `lint_applet` to ensure zero compilation or type issues.
+- **Dataset**: `FALLBACK_LAB_ENTRIES` and live sync from Google Sheets GID `355721692`.
+- **Tier Definitions**:
+  - Micro: `< 0.5B` (Level 1)
+  - Mini: `< 2B` (Level 1)
+  - Tiny: `< 8B` (Level 1)
+  - Small: `< 32B` (Level 1)
+  - Medium: `< 128B` (Level 2)
+  - Large: `< 256B` (Level 2)
+  - Massive: `< 512B` (Level 3)
+  - Colossal: `< 1.5T` (Level 3)
+  - Planetary: `< 5T` (Level 4)
+  - Singularity: `< 15T` (Level 4)
+  - God Tier: `< 45T` (Level 4)
+- **Active State Store**:
+  - `activeGroup`: `'all' | 'top10' | 'contender' | 'tweakers' | 'small' | 'harness'` (default: `'all'`)
+  - `activeWeightsFilter`: `'all' | 'open' | 'closed'`
+  - `selectedCountry`: `'all' | string`
+  - `searchQuery`: `string`
+
+---
+
+## 5. Verification & Testing Plan
+
+1. **Layout Integrity**: Verify that cards render cleanly in responsive 1, 2, 3, and 4-column desktop grids without clipping or horizontal overflow.
+2. **Ladder Ordering**: Confirm that models within every vendor card are strictly ordered from smallest parameter tier to largest.
+3. **Hover Tooltip Fidelity**: Verify that hovering over tier names or scale meters displays the parameter bounds with high contrast and zero delay.
+4. **Filtering Accuracy**: Test combinations of Group Tab + Country Pill + Open/Closed Toggle to ensure filtered counts and results match expectations.
+5. **Compilation & Linting**: Run `lint_applet` and `compile_applet` to confirm zero TypeScript warnings or errors.

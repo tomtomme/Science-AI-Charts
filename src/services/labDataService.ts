@@ -12,6 +12,7 @@ const flagMap: Record<string, string> = {
   'France': '🇫🇷',
   'Israel': '🇮🇱',
   'Singapore': '🇸🇬',
+  'Singapur': '🇸🇬',
   'South Korea': '🇰🇷',
   'UAE': '🇦🇪',
   'Japan': '🇯🇵',
@@ -19,7 +20,28 @@ const flagMap: Record<string, string> = {
   'Spain': '🇪🇸',
   'Germany': '🇩🇪',
   'UK': '🇬🇧',
+  'India': '🇮🇳',
 };
+
+export function normalizeCountry(raw: string): { country: string; flag: string } {
+  const trimmed = raw ? raw.trim() : '';
+  if (trimmed === 'Singapur' || trimmed === 'Singapore') {
+    return { country: 'Singapore', flag: '🇸🇬' };
+  }
+  if (trimmed === 'French' || trimmed === 'France') {
+    return { country: 'France', flag: '🇫🇷' };
+  }
+  if (trimmed === 'US' || trimmed === 'USA' || trimmed === 'America (US)') {
+    return { country: 'America (US)', flag: '🇺🇸' };
+  }
+  if (trimmed === 'South Korea' || trimmed.startsWith('South Korea')) {
+    return { country: 'South Korea', flag: '🇰🇷' };
+  }
+  return {
+    country: trimmed,
+    flag: flagMap[trimmed] || '🌐',
+  };
+}
 
 export function parseLabCsv(csvText: string): LabEntry[] {
   const rows = parseCsvRows(csvText);
@@ -42,7 +64,7 @@ export function parseLabCsv(csvText: string): LabEntry[] {
   };
 
   // 1. Top 10 Labs (Default row 1)
-  const rTop10 = findRow('top 10') !== -1 ? findRow('top 10') : 1;
+  const rTop10 = findRow('top') !== -1 ? findRow('top') : 1;
   const top10Specs: Array<{ id: string; defaultName: string; cols: number[]; country: string }> = [
     { id: 'anthropic', defaultName: 'Anthropic', cols: [1], country: 'America (US)' },
     { id: 'google', defaultName: 'Google', cols: [2], country: 'America (US)' },
@@ -70,12 +92,13 @@ export function parseLabCsv(csvText: string): LabEntry[] {
         : getCell(rTop10 + 1, spec.cols[0]) || spec.defaultName;
 
     const fb = fallbackMap.get(spec.id);
+    const { country, flag } = normalizeCountry(spec.country);
 
     return {
       id: spec.id,
       group: 'top10',
-      country: spec.country,
-      countryFlag: flagMap[spec.country] || '🌐',
+      country,
+      countryFlag: flag,
       creator: dynamicCreator,
       famousFor: getCombined(2),
       engineName: getCombined(3),
@@ -107,12 +130,14 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     const countryHeader = getCell(rContenders, c);
     if (countryHeader) curCountryContender = countryHeader;
     const creator = getCell(rContenders + 1, c);
+    if (!creator) continue;
     const fb = fallbackMap.get(`contender-${c}`);
+    const { country, flag } = normalizeCountry(curCountryContender);
     contenders.push({
       id: `contender-${c}`,
       group: 'contender',
-      country: curCountryContender,
-      countryFlag: flagMap[curCountryContender] || '🌐',
+      country,
+      countryFlag: flag,
       creator: creator,
       engineName: getCell(rContenders + 2, c),
       famousFor: getCell(rContenders + 9, c),
@@ -140,11 +165,12 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     const creator = getCell(rTweakers + 1, c);
     if (!creator) continue;
     const fb = fallbackMap.get(`tweaker-${c}`);
+    const { country, flag } = normalizeCountry(curCountryTweaker);
     tweakers.push({
       id: `tweaker-${c}`,
       group: 'tweakers',
-      country: curCountryTweaker,
-      countryFlag: flagMap[curCountryTweaker] || '🌐',
+      country,
+      countryFlag: flag,
       creator: creator,
       engineName: getCell(rTweakers + 2, c),
       basedOn: getCell(rTweakers + 3, c),
@@ -193,15 +219,56 @@ export function parseLabCsv(csvText: string): LabEntry[] {
   let curCountrySmall = 'America (US)';
   for (let c = 1; c <= 22; c++) {
     const countryHeader = getCell(rSmall, c);
-    if (countryHeader && !countryHeader.includes('Small LLMs')) curCountrySmall = countryHeader.trim();
+    if (countryHeader && !countryHeader.toLowerCase().includes('small llm')) {
+      curCountrySmall = countryHeader.trim();
+    }
     const creator = getCell(rSmall + 1, c);
+    // If col 15 is Samsung Gauss 2 (creator cell blank, but part of Samsung), merge into col 14
+    if (c === 15) continue;
     if (!creator) continue;
+
     const fb = fallbackMap.get(`small-${c}`);
+    const { country, flag } = normalizeCountry(curCountrySmall);
+
+    // If Samsung (col 14), combine Gauss 1 & Gauss 2 (from col 15)
+    if (c === 14 && creator.toLowerCase().includes('samsung')) {
+      const g2Mini = getCell(rSmall + 4, 15);
+      const g2Tiny = getCell(rSmall + 5, 15);
+      const g2Medium = getCell(rSmall + 7, 15);
+
+      const combineModels = (m1: string, m2: string) => {
+        if (m1 && m2) return `${m1} / ${m2}`;
+        return m1 || m2 || '';
+      };
+
+      smallLabs.push({
+        id: `small-${c}`,
+        group: 'small',
+        country,
+        countryFlag: flag,
+        creator: 'Samsung',
+        engineName: 'Gauss 1 / Gauss 2',
+        famousFor: getCell(rSmall + 9, c) || 'for Galaxy AI',
+        weightsType: fb?.weightsType || 'open',
+        openWeights: fb?.openWeights,
+        parameterSizes: {
+          micro: getCell(rSmall + 3, c),
+          mini: combineModels(getCell(rSmall + 4, c), g2Mini),
+          tiny: combineModels(getCell(rSmall + 5, c), g2Tiny),
+          small: getCell(rSmall + 6, c),
+          medium: combineModels(getCell(rSmall + 7, c), g2Medium),
+          large: getCell(rSmall + 8, c),
+        },
+        specialties: getCell(rSmall + 9, c) || 'for Galaxy AI',
+      });
+      continue;
+    }
+
     smallLabs.push({
       id: `small-${c}`,
       group: 'small',
-      country: curCountrySmall,
-      countryFlag: flagMap[curCountrySmall] || '🌐',
+      country,
+      countryFlag: flag,
       creator: creator,
       engineName: getCell(rSmall + 2, c),
       famousFor: getCell(rSmall + 9, c),
@@ -229,11 +296,12 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     if (countryHeader) curCountryHarness = countryHeader.trim();
     const creator = getCell(rHarness + 1, c);
     if (!creator) continue;
+    const { country, flag } = normalizeCountry(curCountryHarness);
     harnessLabs.push({
       id: `harness-${c}`,
       group: 'harness',
-      country: curCountryHarness,
-      countryFlag: flagMap[curCountryHarness] || '🌐',
+      country,
+      countryFlag: flag,
       creator: creator,
       famousFor: getCell(rHarness + 4, c),
       engineName: getCell(rHarness + 2, c),
@@ -254,15 +322,16 @@ export async function fetchLiveLabEntries(): Promise<{
   isLive: boolean;
 }> {
   const cacheBuster = `_t=${Date.now()}`;
+  // Prioritize published CSV URL first as it consistently allows cross-origin requests
   const endpoints = [
-    `${DIRECT_EXPORT_LAB_CSV_URL}&${cacheBuster}`,
     `${RAW_LAB_CSV_URL}&${cacheBuster}`,
+    `${DIRECT_EXPORT_LAB_CSV_URL}&${cacheBuster}`,
   ];
 
   for (const url of endpoints) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(url, {
         signal: controller.signal,
