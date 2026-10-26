@@ -39,7 +39,7 @@ function renderTextWithLinks(text: string) {
  */
 function getBenchmarkHeadingColor(heading?: string): string {
   if (!heading) return '#10B981';
-  const clean = heading.toLowerCase().replace(/[:=.]/g, '').trim();
+  const clean = heading.toLowerCase().replace(/^[-–—\s]+/, '').replace(/[:=.]/g, '').trim();
 
   // 1. IQ (Col D)
   if (clean === 'iq' || clean.startsWith('iq ') || clean.includes('aa-ii')) return '#8B5CF6';
@@ -65,9 +65,11 @@ function getBenchmarkHeadingColor(heading?: string): string {
   // 8. Real Econ & Legal Work (Col K)
   if (clean.includes('real econ') || clean.includes('econ & legal') || clean.includes('wirtschaft') || clean.includes('vals')) return '#EA580C';
 
-  // Non-benchmark headings from C34
-  if (clean === 'current' || clean.startsWith('current')) return '#3B82F6';
-  if (clean === 'history' || clean.startsWith('history')) return '#6366F1';
+  // Sub-headings under Chatbot Ranking
+  if (clean === 'current' || clean.startsWith('current')) return '#2563EB';
+  if (clean === 'history' || clean.startsWith('history')) return '#7C3AED';
+
+  // Final scores & other sub-headings
   if (clean === 'old' || clean.startsWith('old') || clean.includes('spalte l') || clean.includes('column l')) return '#D97706';
   if (clean === 'new' || clean.startsWith('new') || clean.includes('spalte m') || clean.includes('column m')) return '#10B981';
   if (clean.includes('worst-case') || clean.includes('worst case') || clean.includes('spalte n') || clean.includes('column n') || clean.includes('why') || clean.includes('warum')) return '#F43F5E';
@@ -81,7 +83,11 @@ function getBenchmarkHeadingColor(heading?: string): string {
  */
 export function getParagraphAnchorId(heading?: string): string | undefined {
   if (!heading) return undefined;
-  const h = heading.toLowerCase().trim();
+  const h = heading.toLowerCase().replace(/^[-–—\s]+/, '').trim();
+
+  // Sub-headings under Chatbot Ranking
+  if (h === 'current' || h.startsWith('current')) return 'note-current';
+  if (h === 'history' || h.startsWith('history')) return 'note-history';
 
   // Cat 1: IQ (Col D)
   if (h.includes('spalte d') || h.includes('column d') || h.startsWith('iq') || h.includes('aa-ii')) return 'note-col-d';
@@ -134,7 +140,7 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
   }
   const cuts: Cut[] = [];
 
-  // 1. Major section dividers with 3+ dashes (e.g. 'The different benchmarks which comprise the "Final Scores"------------------')
+  // 1. Major section dividers with 3+ dashes (e.g. 'Chatbot Ranking------------------', 'The different benchmarks which comprise the "Final Scores"------------------')
   const secRegex = /([A-Za-z0-9"'\s]+?)\s*-{3,}\s*/g;
   let match: RegExpExecArray | null;
   while ((match = secRegex.exec(rawText)) !== null) {
@@ -146,9 +152,29 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     });
   }
 
-  // 2. Bullets starting with '-' followed by label with ':' or '=' or action verbs
-  // Matches: '- Current is...', '- History shows...', '- IQ =...', '- Non-Hallu-Rate:...', '- Diagnostic:...', etc.
-  const bulletRegex = /(?:^|[.!?)]|\bquestions)\s*-+\s*([A-Z(][A-Za-z0-9()&'" \/-]*?)([:=]|(?=\s+(?:is limited|shows)))\s*/g;
+  // 2. Sub-headings: Current & History under Chatbot Ranking
+  const currentRegex = /(?:^|\r?\n|[:.!?)]|[^\w\s])\s*-+\s*(Current)\b(?:\s*[:=]|\s*\r?\n|\s+(?=is\b))/gi;
+  while ((match = currentRegex.exec(rawText)) !== null) {
+    cuts.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      heading: 'Current',
+      isMajor: false,
+    });
+  }
+
+  const historyRegex = /(?:^|\r?\n|[:.!?)]|[^\w\s])\s*-+\s*(History)\b(?:\s*[:=]|\s*\r?\n|\s+(?=shows\b))/gi;
+  while ((match = historyRegex.exec(rawText)) !== null) {
+    cuts.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      heading: 'History',
+      isMajor: false,
+    });
+  }
+
+  // 3. Bullets starting with '-' followed by label with ':' or '='
+  const bulletRegex = /(?:^|\r?\n|[.!?):]|\bquestions|[^\w\s])\s*-+\s*([A-Z(][A-Za-z0-9()&'" \/-]*?)([:=])\s*/g;
   while ((match = bulletRegex.exec(rawText)) !== null) {
     cuts.push({
       start: match.index,
@@ -158,7 +184,7 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     });
   }
 
-  // 3. Match 'OLD:' right after Final Scores divider
+  // 4. Match 'OLD:' right after Final Scores divider
   const idxOld = rawText.indexOf('OLD:');
   if (idxOld !== -1) {
     cuts.push({
@@ -354,19 +380,24 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
               // Differentiate between Header 1 (categories explainer: "The different benchmarks which comprise the Final Scores")
               // and Header 2 (the actual final scores section: "Final Scores")
               const cleanHeading = (p.heading || '').toLowerCase().trim();
-              const isCategoriesHeading =
-                p.isMajor &&
-                (cleanHeading.includes('comprise') ||
-                 cleanHeading.includes('kategorie') ||
-                 (cleanHeading.includes('benchmark') && !cleanHeading.startsWith('final score')));
-
               const isFinalScoresHeading =
                 p.isMajor &&
-                !isCategoriesHeading &&
-                (cleanHeading === 'final scores' ||
-                 cleanHeading === 'final score' ||
-                 cleanHeading === 'finale scores' ||
-                 cleanHeading.startsWith('final score'));
+                (cleanHeading.includes('final score') ||
+                 cleanHeading.includes('final scores') ||
+                 cleanHeading.includes('finale scores')) &&
+                !cleanHeading.includes('result in the');
+
+              const isCategoriesHeading =
+                p.isMajor &&
+                !isFinalScoresHeading &&
+                (cleanHeading.includes('comprise') ||
+                 cleanHeading.includes('result') ||
+                 cleanHeading.includes('kategorie') ||
+                 cleanHeading.includes('benchmark'));
+
+              const isRankingHeading =
+                p.isMajor &&
+                (cleanHeading.includes('ranking') || cleanHeading.includes('chatbot'));
 
               const isFirstScoreParagraph =
                 !p.isMajor &&
@@ -378,33 +409,31 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
               const hasActualFinalScoresMajor = paragraphs1.some(
                 (x) =>
                   x.isMajor &&
-                  !x.heading?.toLowerCase().includes('comprise') &&
-                  !x.heading?.toLowerCase().includes('benchmark') &&
-                  (x.heading?.toLowerCase().trim() === 'final scores' ||
+                  !x.heading?.toLowerCase().includes('result in the') &&
+                  (x.heading?.toLowerCase().includes('final scores') ||
                    x.heading?.toLowerCase().trim() === 'final score' ||
                    x.heading?.toLowerCase().trim() === 'finale scores')
               );
               const isFinalScoresAnchor = isFinalScoresHeading || (!hasActualFinalScoresMajor && isFirstScoreParagraph);
               const paragraphAnchor = getParagraphAnchorId(p.heading);
-              const anchorId = paragraphAnchor || (isFinalScoresAnchor ? 'final-scores-section' : undefined);
+              const anchorId = paragraphAnchor || (isFinalScoresAnchor ? 'final-scores-section' : isCategoriesHeading ? 'categories-section' : isRankingHeading ? 'ranking-section' : undefined);
 
               if (p.isMajor) {
                 return (
                   <div
                     key={idx}
                     id={anchorId}
-                    className={`pt-3 pb-1 border-t-2 border-emerald-500/30 dark:border-emerald-400/20 first:border-t-0 first:pt-0 ${
-                      anchorId ? 'scroll-mt-6 p-2 rounded-lg' : ''
+                    className={`mt-4 pt-3.5 pb-1 border-t border-slate-200 dark:border-slate-800 first:border-t-0 first:pt-0 first:mt-0 ${
+                      anchorId ? 'scroll-mt-6 rounded-lg' : ''
                     }`}
                   >
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                      <h4 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
+                    <div className="px-3 py-2 bg-slate-100 dark:bg-slate-800/90 rounded-lg border-l-4 border-slate-700 dark:border-slate-300 border-y border-r border-slate-200/90 dark:border-slate-700/80 mb-2 shadow-2xs">
+                      <h4 className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-[13px] tracking-tight leading-snug">
                         {p.heading}
                       </h4>
                     </div>
                     {p.text && (
-                      <p className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line pl-3.5 border-l-2 border-emerald-500/20 dark:border-emerald-400/10 mb-2">
+                      <p className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line px-1 mb-2.5 text-xs">
                         {renderTextWithLinks(p.text)}
                       </p>
                     )}

@@ -295,29 +295,77 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       .join(' ');
   }, [regression, minTime, maxTime, minScore, maxScore]);
 
-  // Generate X-Axis ticks (Months/Quarters)
+  // Generate adaptive, non-overlapping X-Axis ticks (Months/Quarters/Years)
   const xTicks = useMemo(() => {
     const ticks: Array<{ time: number; label: string }> = [];
+    const spanMs = maxTime - minTime;
+    if (spanMs <= 0) return ticks;
+
+    const spanMonths = spanMs / (1000 * 60 * 60 * 24 * 30.4375);
+
+    // Calculate maximum allowable ticks such that each label has at least 80px horizontal spacing
+    const maxPossibleTicks = Math.max(3, Math.floor(innerWidth / 80));
+
+    // Candidate standard calendar intervals in months (1m, 2m, 3m, 4m, 6m, 12m, 24m, 36m, 48m)
+    const standardSteps = [1, 2, 3, 4, 6, 12, 24, 36, 48];
+    let stepMonths = 1;
+    for (const step of standardSteps) {
+      if (spanMonths / step <= maxPossibleTicks) {
+        stepMonths = step;
+        break;
+      }
+    }
+
     const start = new Date(minTime);
     start.setDate(1);
+    start.setHours(0, 0, 0, 0);
 
-    const end = new Date(maxTime);
-    const cur = new Date(start);
-
-    while (cur <= end) {
-      const month = cur.getMonth();
-      // Tick every 2-3 months or quarters
-      if (month % 2 === 0) {
-        const label = cur.toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', {
-          month: 'short',
-          year: '2-digit',
-        });
-        ticks.push({ time: cur.getTime(), label });
+    // Align start to the chosen calendar step
+    if (stepMonths >= 12) {
+      start.setMonth(0);
+      const yrStep = Math.floor(stepMonths / 12);
+      if (yrStep > 1) {
+        const year = start.getFullYear();
+        start.setFullYear(year - (year % yrStep));
       }
-      cur.setMonth(cur.getMonth() + 1);
+    } else if (stepMonths === 6) {
+      start.setMonth(start.getMonth() < 6 ? 0 : 6);
+    } else if (stepMonths === 3) {
+      start.setMonth(Math.floor(start.getMonth() / 3) * 3);
+    } else if (stepMonths === 2) {
+      start.setMonth(Math.floor(start.getMonth() / 2) * 2);
     }
+
+    const cur = new Date(start);
+    let lastX = -999;
+
+    while (cur.getTime() <= maxTime) {
+      const timeVal = cur.getTime();
+      if (timeVal >= minTime) {
+        const xPos = scaleX(timeVal);
+
+        // Keep labels within inner bounds and ensure minimum 70px spacing
+        if (xPos >= margin.left + 5 && xPos <= svgWidth - margin.right - 5) {
+          if (xPos - lastX >= 70) {
+            let label = '';
+            if (stepMonths >= 12) {
+              label = cur.getFullYear().toString();
+            } else {
+              label = cur.toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', {
+                month: 'short',
+                year: '2-digit',
+              });
+            }
+            ticks.push({ time: timeVal, label });
+            lastX = xPos;
+          }
+        }
+      }
+      cur.setMonth(cur.getMonth() + stepMonths);
+    }
+
     return ticks;
-  }, [minTime, maxTime, lang]);
+  }, [minTime, maxTime, innerWidth, margin.left, margin.right, svgWidth, lang]);
 
   // Generate Y-Axis ticks (0, 20, 40, 60, 80, 100)
   const yTicks = useMemo(() => {

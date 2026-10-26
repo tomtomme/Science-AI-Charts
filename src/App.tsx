@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent, PriceFilter, LabEntry, ExplosionMode } from './types';
-import { FALLBACK_CSV_CONTENT, SHEET_HTML_URL, CHART_HTML_URL, GITHUB_REPO_URL } from './data/rawCsvFallback';
+import { FALLBACK_CSV_CONTENT, SHEET_HTML_URL, GITHUB_REPO_URL } from './data/rawCsvFallback';
 import { FALLBACK_LAB_ENTRIES } from './data/rawLabCsvFallback';
 import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset, parseAllModels } from './utils/csvParser';
 import { LoadedDatasets, loadModelsData } from './services/dataService';
@@ -485,16 +485,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Statisches Diagramm als Icon neben Google Sheets & GitHub */}
-            <a
-              href={CHART_HTML_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-              title={t.staticChartOpen}
-            >
-              <BarChart2 className="w-4 h-4" />
-            </a>
 
             <a
               href={SHEET_HTML_URL}
@@ -823,6 +813,7 @@ export default function App() {
                 priceFilter={priceFilter}
                 onPriceFilterChange={setPriceFilter}
                 categoryNames={loadedData.headerMeta?.categoryNames}
+                onScrollToParagraph={scrollToParagraph}
               />
             </div>
 

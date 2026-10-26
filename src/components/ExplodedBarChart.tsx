@@ -28,7 +28,22 @@ interface ExplodedBarChartProps {
   priceFilter?: PriceFilter;
   onPriceFilterChange?: (filter: PriceFilter) => void;
   categoryNames?: string[];
+  onScrollToParagraph?: (targetId: string) => void;
 }
+
+/**
+ * Mapping between benchmark component IDs and the corresponding explanation anchor IDs in 'How to read this'
+ */
+export const BENCHMARK_ANCHOR_MAP: Record<string, string> = {
+  actCodeReason: 'note-col-d',
+  nonHallucination: 'note-col-e',
+  scienceKnowledge: 'note-col-f',
+  visionPlot: 'note-col-g',
+  medReasoning: 'note-col-h',
+  excelAgent: 'note-col-i',
+  trickQuestions: 'note-col-j',
+  econLegal: 'note-col-k',
+};
 
 interface HoveredSegmentInfo {
   comp: BenchmarkComponent;
@@ -59,6 +74,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   priceFilter = 'paid',
   onPriceFilterChange,
   categoryNames,
+  onScrollToParagraph,
 }) => {
   const t = TRANSLATIONS[lang];
 
@@ -88,6 +104,37 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     setPersistentSegment(null);
     setHoveredSegment(null);
   }, [activeCategoryIndex, hoveredCategoryComp, scoreMode, currentExplosionMode]);
+
+  // Smooth scroll down to "How to read this" section at the exact anchor explaining this category
+  const scrollToCategoryExplanation = (compOrId: BenchmarkComponent | string) => {
+    const compId = typeof compOrId === 'string' ? compOrId : compOrId.id;
+    const anchorId = BENCHMARK_ANCHOR_MAP[compId] || (compId.startsWith('note-') ? compId : 'final-scores-section');
+    if (onScrollToParagraph) {
+      onScrollToParagraph(anchorId);
+    } else {
+      const container = document.getElementById('csv-notes-section');
+      if (container) {
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      const doScrollToTarget = () => {
+        const el = document.getElementById(anchorId) || document.getElementById('final-scores-section');
+        const box = document.getElementById('section1-scroll-box');
+        if (el) {
+          if (box) {
+            const targetTop = el.offsetTop - box.offsetTop;
+            box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
+          }
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
+          setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15');
+          }, 3000);
+        }
+      };
+      setTimeout(doScrollToTarget, 200);
+      setTimeout(doScrollToTarget, 500);
+    }
+  };
 
   // Score details for default banner state (when no individual category is selected)
   const currentScoreInfo = useMemo(() => {
@@ -532,13 +579,22 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {displayedSegment ? (
                 <>
                   <span className="text-slate-400">·</span>
-                  <div className="flex items-center gap-1.5 font-bold shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => scrollToCategoryExplanation(displayedSegment.comp.id)}
+                    className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
+                    title={
+                      lang === 'de'
+                        ? `${displayedSegment.comp.nameDe}: Zur Erläuterung in „How to read this“ springen`
+                        : `${displayedSegment.comp.nameEn}: Jump to explanation in "How to read this"`
+                    }
+                  >
                     <span
-                      className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
+                      className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
                       style={{ backgroundColor: displayedSegment.comp.color }}
                     />
                     <span style={{ color: displayedSegment.comp.color }}>
-                      {lang === 'en' ? displayedSegment.comp.nameEn : displayedSegment.comp.nameDe}
+                      {lang === 'de' ? displayedSegment.comp.nameDe : displayedSegment.comp.nameEn}
                     </span>
                     <span className="font-mono text-slate-900 dark:text-white font-bold">
                       {displayedSegment.comp.id === 'scienceKnowledge'
@@ -548,7 +604,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     <span className="font-mono text-slate-500 dark:text-slate-400 font-normal">
                       (+{displayedSegment.points.toFixed(1)} {t.points})
                     </span>
-                  </div>
+                  </button>
 
                   <span className="text-slate-400">·</span>
                   {displayedSegment.comp.sourceUrl ? (
@@ -587,16 +643,26 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             </div>
           ) : displayedCategoryComp ? (
             <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
-              <div className="flex items-center gap-1.5 font-bold shrink-0" style={{ color: displayedCategoryComp.color }}>
+              <button
+                type="button"
+                onClick={() => scrollToCategoryExplanation(displayedCategoryComp.id)}
+                className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
+                style={{ color: displayedCategoryComp.color }}
+                title={
+                  lang === 'de'
+                    ? `${(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) || displayedCategoryComp.nameDe}: Zur Erläuterung in „How to read this“ springen`
+                    : `${(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) || displayedCategoryComp.nameEn}: Jump to explanation in "How to read this"`
+                }
+              >
                 <span
-                  className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
+                  className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
                   style={{ backgroundColor: displayedCategoryComp.color }}
                 />
                 <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
                   {(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) ||
-                   (lang === 'en' ? displayedCategoryComp.nameEn : displayedCategoryComp.nameDe)}
+                   (lang === 'de' ? displayedCategoryComp.nameDe : displayedCategoryComp.nameEn)}
                 </span>
-              </div>
+              </button>
 
               <span className="text-slate-400">·</span>
               {displayedCategoryComp.sourceUrl ? (
@@ -636,26 +702,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
-              <div className="flex items-center gap-1.5 font-bold shrink-0" style={{ color: currentScoreInfo.color }}>
-                <span
-                  className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10"
-                  style={{ backgroundColor: currentScoreInfo.color }}
-                />
-                <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
-                  {currentScoreInfo.name}
-                </span>
-              </div>
-
-              <span className="text-slate-400">·</span>
-              <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
-                {currentScoreInfo.badgeLabel}
-              </span>
-
-              <span className="text-slate-400">·</span>
-              <a
-                href={`#${currentScoreInfo.targetId}`}
-                onClick={(e) => {
-                  e.preventDefault();
+              <button
+                type="button"
+                onClick={() => {
                   const el = document.getElementById(currentScoreInfo.targetId) || document.getElementById('final-scores-section');
                   const box = document.getElementById('section1-scroll-box');
                   const container = document.getElementById('csv-notes-section');
@@ -670,12 +719,27 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15'), 3000);
                   }
                 }}
-                className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
-                title={lang === 'de' ? 'Zum Textabschnitt springen' : 'Jump to explanation'}
+                className="flex items-center gap-1.5 font-bold shrink-0 hover:opacity-80 transition-opacity cursor-pointer group text-left"
+                style={{ color: currentScoreInfo.color }}
+                title={
+                  lang === 'de'
+                    ? `${currentScoreInfo.name}: Zur Erläuterung in „How to read this“ springen`
+                    : `${currentScoreInfo.name}: Jump to explanation in "How to read this"`
+                }
               >
-                <span>{t.sourceLabel} <strong className="underline">{currentScoreInfo.sourceName}</strong></span>
-                <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-              </a>
+                <span
+                  className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
+                  style={{ backgroundColor: currentScoreInfo.color }}
+                />
+                <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                  {currentScoreInfo.name}
+                </span>
+              </button>
+
+              <span className="text-slate-400">·</span>
+              <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                {currentScoreInfo.badgeLabel}
+              </span>
 
               <span className="text-slate-400">·</span>
               <span
@@ -1030,7 +1094,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
                 {/* Render either single category bar or the 8 multi-category segments */}
                 {activeComp ? (
-                  <g>
+                  <g
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      scrollToCategoryExplanation(activeComp.id);
+                    }}
+                  >
                     <rect
                       x={barX}
                       y={barTopY}
@@ -1044,7 +1114,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       style={{
                         transition: 'y 0.25s ease-out, height 0.25s ease-out',
                       }}
-                    />
+                    >
+                      <title>
+                        {lang === 'de'
+                          ? `${activeComp.nameDe}: Klicken, um die Erklärung in „How to read this“ anzuzeigen`
+                          : `${activeComp.nameEn}: Click to view explanation in "How to read this"`}
+                      </title>
+                    </rect>
 
                     {/* Centered raw score inside bar if height >= 18 */}
                     {totalBarHeight >= 18 && (
@@ -1077,9 +1153,21 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     const opacity = isOtherFocused && exploded ? 0.35 : 1;
                     const isTop = sIdx === segments.length - 1;
                     const benchMeta = BENCHMARK_COMPONENTS.find((b) => b.id === seg.comp.id);
+                    const categoryTitle = benchMeta
+                      ? (lang === 'de' ? benchMeta.nameDe : benchMeta.nameEn)
+                      : seg.comp.id;
 
                     return (
-                      <g key={seg.comp.id}>
+                      <g
+                        key={seg.comp.id}
+                        className={exploded ? 'cursor-pointer' : undefined}
+                        onClick={(e) => {
+                          if (exploded) {
+                            e.stopPropagation();
+                            scrollToCategoryExplanation(seg.comp.id);
+                          }
+                        }}
+                      >
                         <rect
                           x={barX}
                           y={seg.segY}
@@ -1115,7 +1203,15 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               setPersistentModel(model);
                             }
                           }}
-                        />
+                        >
+                          {exploded && (
+                            <title>
+                              {lang === 'de'
+                                ? `${categoryTitle}: Klicken, um die Erklärung in „How to read this“ anzuzeigen`
+                                : `${categoryTitle}: Click to view explanation in "How to read this"`}
+                            </title>
+                          )}
+                        </rect>
 
                         {/* Seamless hit area covering the segment and explosion gap to eliminate any dead zones */}
                         {exploded && benchMeta && (
@@ -1132,6 +1228,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               pointerEvents: 'all',
                               transition: 'y 0.25s ease-out, height 0.25s ease-out',
                             }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              scrollToCategoryExplanation(seg.comp.id);
+                            }}
                             onMouseEnter={() => {
                               const segInfo: HoveredSegmentInfo = {
                                 comp: benchMeta,
@@ -1143,7 +1243,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               setPersistentSegment(segInfo);
                               setPersistentModel(model);
                             }}
-                          />
+                          >
+                            <title>
+                              {lang === 'de'
+                                ? `${categoryTitle}: Klicken, um die Erklärung in „How to read this“ anzuzeigen`
+                                : `${categoryTitle}: Click to view explanation in "How to read this"`}
+                            </title>
+                          </rect>
                         )}
 
                         {/* Originale Prozentzahl mittig im jeweiligen Balkenteil bei Explosion (auch Nachbarbalken & volle Explosion) */}
