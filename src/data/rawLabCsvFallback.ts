@@ -688,7 +688,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
   {
     "id": "contender-17",
     "group": "contender",
-    "country": "French",
+    "country": "France",
     "countryFlag": "🇫🇷",
     "creator": "MIstral AI",
     "engineName": "Mistral",
@@ -870,25 +870,6 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "planetary": ""
     },
     "specialties": "*Institute of Foundation Models"
-  },
-  {
-    "id": "contender-25",
-    "group": "contender",
-    "country": "UAE",
-    "countryFlag": "🇦🇪",
-    "creator": "",
-    "engineName": "",
-    "famousFor": "",
-    "weightsType": "open",
-    "parameterSizes": {
-      "small": "",
-      "medium": "",
-      "large": "",
-      "massive": "",
-      "colossal": "",
-      "planetary": ""
-    },
-    "specialties": ""
   },
   {
     "id": "tweaker-1",
@@ -1444,7 +1425,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "id": "small-13",
     "group": "small",
     "country": "India",
-    "countryFlag": "🌐",
+    "countryFlag": "🇮🇳",
     "creator": "Sarvam AI",
     "engineName": "Sarvam",
     "famousFor": "",
@@ -1469,7 +1450,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "South Korea",
     "countryFlag": "🇰🇷",
     "creator": "Samsung",
-    "engineName": "Gauss 1",
+    "engineName": "Gauss 1 / Gauss 2",
     "famousFor": "for Galaxy AI",
     "weightsType": "closed",
     "openWeights": {
@@ -1480,10 +1461,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     },
     "parameterSizes": {
       "micro": "",
-      "mini": "Image",
-      "tiny": "Language",
+      "mini": "Image / Compact (Local)",
+      "tiny": "Language / Balanced (Hybrid)",
       "small": "",
-      "medium": "Cloud Server",
+      "medium": "Cloud Server / Supreme (Cloud)",
       "large": "Code"
     },
     "specialties": "for Galaxy AI"
@@ -1606,7 +1587,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
   {
     "id": "small-21",
     "group": "small",
-    "country": "French",
+    "country": "France",
     "countryFlag": "🇫🇷",
     "creator": "Mistral AI",
     "engineName": "Ministral",
@@ -1632,13 +1613,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Aider",
-    "famousFor": "Canadian origin (Paul Gauthier)",
+    "famousFor": "",
     "engineName": "Aider Git Harness",
     "harness": "Aider Git Harness",
     "form": "CLI",
     "note": "Canadian origin (Paul Gauthier)",
-    "parameterSizes": {},
-    "specialties": "CLI (Canadian origin (Paul Gauthier))"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-2",
@@ -1646,13 +1627,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "All Hands AI",
-    "famousFor": "formerly OpenDevin",
+    "famousFor": "",
     "engineName": "OpenHands",
     "harness": "OpenHands",
     "form": "CLI + Web SDK",
     "note": "formerly OpenDevin",
-    "parameterSizes": {},
-    "specialties": "CLI + Web SDK (formerly OpenDevin)"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-3",
@@ -1665,8 +1646,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "Context Engine",
     "form": "IDE",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "IDE"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-4",
@@ -1679,8 +1660,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "CodeRabbit",
     "form": "IDE + CLI + Git",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "IDE + CLI + Git"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-5",
@@ -1693,8 +1674,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "Coder Agents",
     "form": "Web",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "Web"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-6",
@@ -1702,13 +1683,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Cognition AI",
-    "famousFor": "formerly Windsurf",
+    "famousFor": "",
     "engineName": "Devin",
     "harness": "Devin",
     "form": "IDE + CLI + Web",
     "note": "formerly Windsurf",
-    "parameterSizes": {},
-    "specialties": "IDE + CLI + Web (formerly Windsurf)"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-7",
@@ -1721,8 +1702,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "Droid",
     "form": "CLI",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "CLI"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-8",
@@ -1735,8 +1716,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "Deep Agents + LangGraph",
     "form": "SDK",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "SDK"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-9",
@@ -1749,8 +1730,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "Hermes",
     "form": "CLI",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "CLI"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-10",
@@ -1758,13 +1739,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "OpenClaw Foundation",
-    "famousFor": "Austrian origin",
+    "famousFor": "",
     "engineName": "OpenClaw / Code",
     "harness": "OpenClaw / Code",
     "form": "CLI über Messenger",
     "note": "Austrian origin",
-    "parameterSizes": {},
-    "specialties": "CLI über Messenger (Austrian origin)"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-11",
@@ -1772,13 +1753,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "America (US)",
     "countryFlag": "🇺🇸",
     "creator": "Pydantic AI",
-    "famousFor": "UK origin",
+    "famousFor": "",
     "engineName": "Pyd.-AI Harness",
     "harness": "Pyd.-AI Harness",
     "form": "SDK",
     "note": "UK origin",
-    "parameterSizes": {},
-    "specialties": "SDK (UK origin)"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-12",
@@ -1791,8 +1772,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "Replit Agent",
     "form": "Web",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "Web"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-13",
@@ -1805,8 +1786,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "Amp +CodyAssist.",
     "form": "CLI + IDE",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "CLI + IDE"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-14",
@@ -1819,8 +1800,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "Warp+Factories",
     "form": "CLI / IDE-Hybrid",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "CLI / IDE-Hybrid"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-15",
@@ -1833,8 +1814,8 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "harness": "Zed +Threads",
     "form": "IDE",
     "note": "",
-    "parameterSizes": {},
-    "specialties": "IDE"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-16",
@@ -1842,26 +1823,26 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "country": "Israel",
     "countryFlag": "🇮🇱",
     "creator": "Qodo",
-    "famousFor": "formerly CodiumAI",
+    "famousFor": "",
     "engineName": "Gen / Review",
     "harness": "Gen / Review",
     "form": "IDE + CLI + Git",
     "note": "formerly CodiumAI",
-    "parameterSizes": {},
-    "specialties": "IDE + CLI + Git (formerly CodiumAI)"
+    "specialties": "",
+    "parameterSizes": {}
   },
   {
     "id": "harness-17",
     "group": "harness",
-    "country": "Singapur",
-    "countryFlag": "🌐",
+    "country": "Singapore",
+    "countryFlag": "🇸🇬",
     "creator": "Butterfly Effect",
-    "famousFor": "China origin",
+    "famousFor": "",
     "engineName": "Manus",
     "harness": "Manus",
     "form": "Web",
     "note": "China origin",
-    "parameterSizes": {},
-    "specialties": "Web (China origin)"
+    "specialties": "",
+    "parameterSizes": {}
   }
 ];

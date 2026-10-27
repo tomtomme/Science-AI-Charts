@@ -31,7 +31,7 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'nonHallucination',
     key: 'nonHallucination',
-    nameDe: 'Non-Hallu-Rate',
+    nameDe: 'Faktentreue',
     nameEn: 'Non-Hallu-Rate',
     sourceName: 'Non-Hallu-Rate',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/omniscience#aa-omniscience-hallucination-rate',
@@ -47,7 +47,7 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'scienceKnowledge',
     key: 'scienceKnowledge',
-    nameDe: 'Science Knowledge',
+    nameDe: 'Faktenwissen',
     nameEn: 'Science Knowledge',
     sourceName: 'AA-Omniscience',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/omniscience',
@@ -63,7 +63,7 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'visionPlot',
     key: 'visionPlot',
-    nameDe: 'Plot Reading',
+    nameDe: 'Diagrammanalyse',
     nameEn: 'Plot Reading',
     sourceName: 'MMMU-Pro',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/mmmu-pro',
@@ -79,7 +79,7 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'medReasoning',
     key: 'medReasoning',
-    nameDe: 'Diagnostics',
+    nameDe: 'Diagnostik',
     nameEn: 'Diagnostics',
     sourceName: 'MLCR-AA',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/mlcr-aa',
@@ -95,7 +95,7 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'excelAgent',
     key: 'excelAgent',
-    nameDe: 'Excel Analyst',
+    nameDe: 'Excel-Analyst',
     nameEn: 'Excel Analyst',
     sourceName: 'ExcelAgent',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/aa-analyst-agent',
@@ -111,7 +111,7 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'trickQuestions',
     key: 'trickQuestions',
-    nameDe: '(3D) Trick Questions',
+    nameDe: '(3D) Trickfragen',
     nameEn: '(3D) Trick Questions',
     sourceName: 'SimpleBench',
     sourceUrl: 'https://simple-bench.com',
@@ -127,7 +127,7 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'econLegal',
     key: 'econLegal',
-    nameDe: 'Real Econ & Legal Work',
+    nameDe: 'Wirtschaft & Recht',
     nameEn: 'Real Econ & Legal Work',
     sourceName: 'Vals Econ 2',
     sourceUrl: 'https://www.vals.ai',
@@ -141,3 +141,40 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
     transform: (val: number) => Math.max(0, Math.min(100, val)),
   },
 ];
+
+/**
+ * Resolves a bilingual score/category label given an optional raw CSV string or BenchmarkComponent.
+ * Keeps in sync with original CSV strings while providing precise German translations when German is active.
+ */
+export function getBenchmarkCategoryLabel(
+  rawCsvOrKey: string | undefined,
+  lang: 'de' | 'en',
+  compFallback?: BenchmarkComponent | null
+): string {
+  if (!rawCsvOrKey && !compFallback) return '';
+  const raw = (rawCsvOrKey || compFallback?.key || '').trim();
+  const lower = raw.toLowerCase();
+
+  if (lang === 'en') {
+    // English: return raw CSV string or English component name
+    if (raw && raw !== '-' && !raw.startsWith('Col ')) {
+      return raw;
+    }
+    return compFallback?.nameEn || raw;
+  }
+
+  // German: translate score label into German
+  if (lower.includes('iq') || lower.includes('aa-ii')) return 'IQ';
+  if (lower.includes('non-hallu') || lower.includes('faktentreue')) return 'Faktentreue';
+  if (lower.includes('science knowledge') || lower.includes('faktenwissen') || lower.includes('omniscience')) return 'Faktenwissen';
+  if (lower.includes('plot reading') || lower.includes('plot') || lower.includes('diagramm') || lower.includes('vision') || lower.includes('mmmu')) return 'Diagrammanalyse';
+  if (lower.includes('diagnostic') || lower.includes('diagnostik') || lower.includes('medical') || lower.includes('mlcr')) return 'Diagnostik';
+  if (lower.includes('excel')) return 'Excel-Analyst';
+  if (lower.includes('trick') || lower.includes('simplebench') || lower.includes('(3d)')) return '(3D) Trickfragen';
+  if (lower.includes('econ') || lower.includes('legal') || lower.includes('wirtschaft') || lower.includes('recht') || lower.includes('vals')) return 'Wirtschaft & Recht';
+
+  if (compFallback) {
+    return compFallback.nameDe;
+  }
+  return raw;
+}

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Search, X, Plus, Minus, BarChart2, Calendar } from 'lucide-react';
 import { Language, TRANSLATIONS } from '../utils/i18n';
-import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
+import { BENCHMARK_COMPONENTS, getBenchmarkCategoryLabel } from '../data/benchmarks';
 import { SortField, ModelScope, ScoreMode, BenchmarkComponent } from '../types';
 
 interface SearchBarProps {
@@ -145,8 +145,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     selectedCategoryIndex > 0 ? BENCHMARK_COMPONENTS[selectedCategoryIndex - 1] : null;
 
   const activeCategoryName = activeCategoryComp
-    ? ((categoryNames && selectedCategoryIndex > 0 && categoryNames[selectedCategoryIndex - 1]) ||
-       (lang === 'en' ? activeCategoryComp.nameEn : activeCategoryComp.nameDe))
+    ? getBenchmarkCategoryLabel(
+        categoryNames && selectedCategoryIndex > 0 ? categoryNames[selectedCategoryIndex - 1] : undefined,
+        lang,
+        activeCategoryComp
+      )
     : null;
 
   // Scroll targets for all 3 composite scores + all 8 benchmark categories (clean labels without Spalte/Col strings)

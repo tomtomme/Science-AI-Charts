@@ -303,13 +303,13 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       country,
       countryFlag: flag,
       creator: creator,
-      famousFor: getCell(rHarness + 4, c),
+      famousFor: '',
       engineName: getCell(rHarness + 2, c),
       harness: getCell(rHarness + 2, c),
       form: getCell(rHarness + 3, c),
       note: getCell(rHarness + 4, c),
+      specialties: '',
       parameterSizes: {},
-      specialties: getCell(rHarness + 4, c) ? `${getCell(rHarness + 3, c)} (${getCell(rHarness + 4, c)})` : getCell(rHarness + 3, c),
     });
   }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode, ScoreMode } from '../types';
-import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
+import { BENCHMARK_COMPONENTS, getBenchmarkCategoryLabel } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { matchesSearchQuery } from '../utils/searchUtils';
 import { createModelBreakdown } from '../utils/csvParser';
@@ -650,8 +650,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 style={{ color: displayedCategoryComp.color }}
                 title={
                   lang === 'de'
-                    ? `${(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) || displayedCategoryComp.nameDe}: Zur Erläuterung in „How to read this“ springen`
-                    : `${(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) || displayedCategoryComp.nameEn}: Jump to explanation in "How to read this"`
+                    ? `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'de', displayedCategoryComp)}: Zur Erläuterung in „How to read this“ springen`
+                    : `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'en', displayedCategoryComp)}: Jump to explanation in "How to read this"`
                 }
               >
                 <span
@@ -659,8 +659,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   style={{ backgroundColor: displayedCategoryComp.color }}
                 />
                 <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
-                  {(categoryNames && activeCategoryIndex > 0 && categoryNames[activeCategoryIndex - 1]) ||
-                   (lang === 'de' ? displayedCategoryComp.nameDe : displayedCategoryComp.nameEn)}
+                  {getBenchmarkCategoryLabel(
+                    categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined,
+                    lang,
+                    displayedCategoryComp
+                  )}
                 </span>
               </button>
 

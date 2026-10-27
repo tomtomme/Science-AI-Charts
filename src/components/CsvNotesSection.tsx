@@ -83,17 +83,23 @@ function getBenchmarkHeadingColor(heading?: string): string {
  */
 export function getParagraphAnchorId(heading?: string): string | undefined {
   if (!heading) return undefined;
-  const h = heading.toLowerCase().replace(/^[-–—\s]+/, '').trim();
+  const h = heading.toLowerCase().replace(/^[-–—\s]+/, '').replace(/[:=.]/g, '').trim();
+
+  // Major section: Chatbot Ranking
+  if (h.includes('chatbot ranking') || h.includes('chatbot-rangliste') || h.includes('chatbot rangliste') || h === 'ranking') return 'ranking-section';
 
   // Sub-headings under Chatbot Ranking
   if (h === 'current' || h.startsWith('current')) return 'note-current';
   if (h === 'history' || h.startsWith('history')) return 'note-history';
 
+  // Major section: Benchmarks explainer
+  if (h.includes('different benchmarks') || h.includes('verschiedenen benchmarks') || h.includes('result in the') || h.includes('comprise')) return 'categories-section';
+
   // Cat 1: IQ (Col D)
   if (h.includes('spalte d') || h.includes('column d') || h.startsWith('iq') || h.includes('aa-ii')) return 'note-col-d';
 
   // Cat 2: Non-Hallu-Rate (Col E)
-  if (h.includes('spalte e') || h.includes('column e') || h.includes('non-hallu') || h.includes('faktentreue')) return 'note-col-e';
+  if (h.includes('spalte e') || h.includes('column e') || h.includes('non-hallu') || h.includes('non-hallucination') || h.includes('faktentreue')) return 'note-col-e';
 
   // Cat 3: Science Knowledge (Col F)
   if (h.includes('spalte f') || h.includes('column f') || h.includes('science knowledge') || h.includes('omniscience') || h.includes('faktenwissen')) return 'note-col-f';
@@ -113,14 +119,20 @@ export function getParagraphAnchorId(heading?: string): string | undefined {
   // Cat 8: Real Econ & Legal Work (Col K)
   if (h.includes('spalte k') || h.includes('column k') || h.includes('real econ') || h.includes('econ & legal') || h.includes('vals') || h.includes('wirtschaft')) return 'note-col-k';
 
+  // Major section: Final Scores
+  if ((h.includes('final scores') || h.includes('final score') || h.includes('finale scores')) && (h.includes('comprised') || h.includes('zusammensetzen') || (!h.includes('old') && !h.includes('new') && !h.includes('worst')))) return 'final-scores-section';
+
   // Final Score OLD (Col L)
-  if (h.includes('spalte l') || h.includes('column l') || h.includes('score old') || h === 'old' || h.startsWith('old:')) return 'note-col-l';
+  if (h.includes('spalte l') || h.includes('column l') || h.includes('score old') || h === 'old' || h.startsWith('old ') || h.startsWith('old:')) return 'note-col-l';
 
   // Final Score NEW (Col M)
-  if (h.includes('spalte m') || h.includes('column m') || h.includes('score new') || h === 'new' || h.startsWith('new:')) return 'note-col-m';
+  if (h.includes('spalte m') || h.includes('column m') || h.includes('score new') || h === 'new' || h.startsWith('new ') || h.startsWith('new:')) return 'note-col-m';
 
   // Worst-Case (Col N)
   if (h.includes('spalte n') || h.includes('column n') || h.includes('worst-case') || h.includes('worst case') || h.startsWith('worst')) return 'note-col-n';
+
+  // Storyline
+  if (h.includes('storyline')) return 'note-storyline';
 
   return undefined;
 }
@@ -195,12 +207,12 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     });
   }
 
-  // 5. Match 'Storyline contains' note
-  const idxStory = rawText.indexOf('Storyline contains');
-  if (idxStory !== -1) {
+  // 5. Match 'Storyline' note (with or without dash or colon)
+  const storyRegex = /(?:^|\r?\n)\s*(?:-+\s*)?Storyline\b(?:\s*[:=]|\s+contains\b)?/gi;
+  while ((match = storyRegex.exec(rawText)) !== null) {
     cuts.push({
-      start: idxStory,
-      end: idxStory + 'Storyline contains'.length,
+      start: match.index,
+      end: match.index + match[0].length,
       heading: 'Storyline',
       isMajor: false,
     });
@@ -320,24 +332,131 @@ function parseSection2Text(rawText: string): CsvParagraph[] {
   return result;
 }
 
+/**
+ * Maps dynamically parsed paragraphs from cell C34 to German when DE is active.
+ * Retains full synchronization with CSV while providing high-quality German translations.
+ */
+function getBilingualSection1Paragraphs(
+  dynamicParagraphs: CsvParagraph[],
+  curatedDe: CsvParagraph[],
+  curatedEn: CsvParagraph[],
+  isDe: boolean
+): CsvParagraph[] {
+  if (!isDe) {
+    return dynamicParagraphs.length > 0 ? dynamicParagraphs : curatedEn;
+  }
+
+  if (dynamicParagraphs.length === 0) {
+    return curatedDe;
+  }
+
+  return dynamicParagraphs.map((p, idx) => {
+    const anchorId = getParagraphAnchorId(p.heading);
+
+    // 1. Try to find match in curatedDe by anchor ID
+    if (anchorId) {
+      const match = curatedDe.find((c) => getParagraphAnchorId(c.heading) === anchorId);
+      if (match) {
+        return {
+          ...match,
+          isMajor: p.isMajor ?? match.isMajor,
+          link: p.link || match.link,
+        };
+      }
+    }
+
+    // 2. Keyword match by heading
+    if (p.heading) {
+      const pClean = p.heading.toLowerCase();
+      const match = curatedDe.find((c) => {
+        const cClean = (c.heading || '').toLowerCase();
+        if (pClean.includes('ranking') && (cClean.includes('ranking') || cClean.includes('rangliste'))) return true;
+        if (pClean.includes('benchmark') && (cClean.includes('benchmark') || cClean.includes('kategorie'))) return true;
+        if (pClean.includes('final score') && (cClean.includes('final score') || cClean.includes('finale score'))) return true;
+        if (pClean.includes('storyline') && cClean.includes('storyline')) return true;
+        if (pClean === 'current' && cClean === 'current') return true;
+        if (pClean === 'history' && cClean === 'history') return true;
+        return false;
+      });
+      if (match) {
+        return {
+          ...match,
+          isMajor: p.isMajor ?? match.isMajor,
+          link: p.link || match.link,
+        };
+      }
+    }
+
+    // 3. Fallback to index match if available
+    if (curatedDe[idx]) {
+      return {
+        ...curatedDe[idx],
+        isMajor: p.isMajor ?? curatedDe[idx].isMajor,
+      };
+    }
+
+    // 4. Return paragraph with original content
+    return p;
+  });
+}
+
+function getBilingualSection2Paragraphs(
+  dynamicParagraphs: CsvParagraph[],
+  curatedDe: CsvParagraph[],
+  curatedEn: CsvParagraph[],
+  isDe: boolean
+): CsvParagraph[] {
+  // If German is requested:
+  // Cell O34 in the sheet is written in German. If dynamic paragraphs are in German, use them!
+  if (isDe) {
+    if (dynamicParagraphs.length > 0) {
+      const firstHeading = (dynamicParagraphs[0]?.heading || '').toLowerCase();
+      const isDynamicDe =
+        firstHeading.includes('zensur') ||
+        firstHeading.includes('sparfuchs') ||
+        firstHeading.includes('konversation') ||
+        firstHeading.includes('wann');
+      if (isDynamicDe) {
+        return dynamicParagraphs;
+      }
+    }
+    return curatedDe;
+  }
+
+  // If English is requested (!isDe):
+  // Check if dynamic is already English (e.g. if the sheet was updated to English in the future)
+  if (dynamicParagraphs.length > 0) {
+    const firstHeading = (dynamicParagraphs[0]?.heading || '').toLowerCase();
+    const isDynamicEn =
+      firstHeading.includes('censor') ||
+      firstHeading.includes('privacy') ||
+      firstHeading.includes('frugal') ||
+      firstHeading.includes('conversation');
+    if (isDynamicEn) {
+      return dynamicParagraphs;
+    }
+  }
+
+  // Since cell O34 in the sheet is German only, return curatedEn for English users
+  return curatedEn;
+}
+
 export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notesMeta }) => {
   const { columnsGuide, practicalGuide } = CSV_NOTES_DATA;
   const isDe = appLang === 'de';
 
   // Section 1 Title: dynamically from Cell A34 (synced from CSV)
   const dynamicSec1Title = notesMeta?.section1Title?.trim();
+  const isSec1TitleEn = !dynamicSec1Title || dynamicSec1Title.toLowerCase().includes('how to');
   const title1 = isDe
-    ? (dynamicSec1Title && dynamicSec1Title !== 'How To Read' && dynamicSec1Title !== 'How to read this'
-        ? dynamicSec1Title
-        : columnsGuide.titleDe)
+    ? (isSec1TitleEn ? columnsGuide.titleDe : dynamicSec1Title)
     : (dynamicSec1Title || columnsGuide.titleEn);
 
   // Section 2 Title: dynamically from Cell N34 (synced from CSV)
   const dynamicSec2Title = notesMeta?.section2Title?.trim();
+  const isSec2TitleEn = !dynamicSec2Title || dynamicSec2Title.toLowerCase().includes('what bot');
   const title2 = isDe
-    ? (dynamicSec2Title && dynamicSec2Title !== "What Bots can & can't do for you" && dynamicSec2Title !== 'What Bots can & cannot do for you'
-        ? dynamicSec2Title
-        : practicalGuide.titleDe)
+    ? (isSec2TitleEn ? practicalGuide.titleDe : dynamicSec2Title)
     : (dynamicSec2Title || practicalGuide.titleEn);
 
   // Dynamically parse live CSV strings from C34 and O34
@@ -349,16 +468,22 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
     : [];
 
   // Paragraphs for Box 1 (Cell C34):
-  // When live CSV string from C34 is loaded, ALWAYS use dynamicP1 so user edits in Google Sheets appear!
-  const paragraphs1 = dynamicP1.length > 0
-    ? dynamicP1
-    : (isDe ? columnsGuide.paragraphsDe : columnsGuide.paragraphsEn);
+  // Synchronized with live CSV, presenting German when 'de' is selected and English when 'en' is selected
+  const paragraphs1 = getBilingualSection1Paragraphs(
+    dynamicP1,
+    columnsGuide.paragraphsDe,
+    columnsGuide.paragraphsEn,
+    isDe
+  );
 
   // Paragraphs for Box 2 (Cell O34):
-  // When live CSV string from O34 is loaded, ALWAYS use dynamicP2 so user edits in Google Sheets appear!
-  const paragraphs2 = dynamicP2.length > 0
-    ? dynamicP2
-    : (isDe ? practicalGuide.paragraphsDe : practicalGuide.paragraphsEn);
+  // Synchronized with live CSV, presenting German when 'de' is selected and English when 'en' is selected
+  const paragraphs2 = getBilingualSection2Paragraphs(
+    dynamicP2,
+    practicalGuide.paragraphsDe,
+    practicalGuide.paragraphsEn,
+    isDe
+  );
 
   return (
     <section id="csv-notes-section" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">

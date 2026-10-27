@@ -11,8 +11,8 @@ export type Language = 'de' | 'en';
 export const TRANSLATIONS = {
   de: {
     // Titel & Untertitel (Zellen A1+B2 sowie C1 der CSV)
-    title: 'Science-IQ von ChatBots | Paid Chat 💲 Free Chat & API 🌐',
-    subtitle: 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding.',
+    title: 'Science-IQ von ChatBots | Free Chat | Paid Chat 💲 | Free Chat & API 🌐',
+    subtitle: 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding. Die Bots absolvierten Tests von ArtificialAnalysis.ai, Simple-Bench.com und Vals.ai.',
     headerPopupIntro:
       'Im Gegensatz zu herkömmlichen Benchmarks, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen, legt dieser Benchmark-Parcours den Fokus gezielt auf Forschungs- und Wissenschaftsrelevanz:',
     headerPopupItems: [
@@ -132,8 +132,8 @@ export const TRANSLATIONS = {
   },
   en: {
     // Title & Subtitle (Cells A1+B2 and C1 of CSV)
-    title: 'Science-IQ of ChatBots | Paid Chat 💲 Free Chat & API 🌐',
-    subtitle: 'The scoring focusses on factual accuracy (non-hallucination), scientific expertise, and data analysis skills instead of coding.',
+    title: 'Science-IQ of ChatBots | Free Chat | Paid Chat 💲 | Free Chat & API 🌐',
+    subtitle: 'The scoring focusses on factual accuracy (non-hallucination), scientific expertise, and data analysis skills instead of coding. Bots completed tests from artificialanalysis.ai, simple-bench.com and vals.ai.',
     headerPopupIntro:
       'Unlike conventional benchmarks that primarily measure text-based coding tasks or pure language skills, this benchmark suite focuses specifically on research and scientific relevance:',
     headerPopupItems: [

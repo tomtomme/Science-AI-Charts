@@ -370,11 +370,11 @@ export default function App() {
           >
             <div className="cursor-help inline-block max-w-full">
               <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-1.5">
-                <span>{loadedData.headerMeta?.combinedTitle || t.title}</span>
+                <span>{lang === 'de' ? t.title : (loadedData.headerMeta?.combinedTitle || t.title)}</span>
                 <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 shrink-0 opacity-70 group-hover:opacity-100 transition-all" />
               </h1>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal font-sans line-clamp-2 transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-300">
-                {loadedData.headerMeta?.subtitle || t.subtitle}
+                {lang === 'de' ? t.subtitle : (loadedData.headerMeta?.subtitle || t.subtitle)}
               </p>
             </div>
 
