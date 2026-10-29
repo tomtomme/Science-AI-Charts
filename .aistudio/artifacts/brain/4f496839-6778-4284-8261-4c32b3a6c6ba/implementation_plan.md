@@ -40,10 +40,12 @@ Overhaul the **LLM Labs & Ecosystem** view into an intuitive, visually structure
   - `Paid`: Paid Chat only (`isPaid`, indicated with 💲)
   - `All`: All models (Kostenlos & Bezahlt)
   with active state highlighting and bilingual tooltips.
-- **Light / Dark Mode Switcher with Timezone Auto-Switching**: A compact segmented switcher is located next to the DE/EN language switcher:
-  - **Auto-Switching by Timezone**: Automatically activates Light Mode during local daytime (07:00 to 19:59) and Dark Mode during nighttime (20:00 to 06:59), with periodic evaluation every 60 seconds.
+- **Light / Dark Mode Switcher with GPS & Timezone Auto-Switching (`☀️ | 🌙 | Auto | 📍`)**: A compact segmented switcher is located next to the DE/EN language switcher:
+  - **Browser Geolocation API (`📍`)**: Integrated `navigator.geolocation.getCurrentPosition()`. Clicking the location pin (`📍`) or switching to `Auto` actively triggers the browser's native location permission dialog ("Darf die Website auf Ihren Standort zugreifen?").
+  - **Exact Astronomical Solar Calculation**: Using exact latitude & longitude, the app calculates the precise sunrise and sunset times for the user's location based on astronomical solar declination (e.g. ~17:10 sunset in late October in Germany).
+  - **Firefox Privacy / Anti-Fingerprinting Fallback**: Standard JavaScript time reading in Firefox on Linux (Manjaro) and Android is often spoofed to UTC by privacy protections (e.g. `privacy.resistFingerprinting`). If location is not granted, the app automatically checks `window.matchMedia('(prefers-color-scheme: dark)')` to match the OS theme schedule (which Android & Linux desktops trigger at sunset), followed by seasonal clock estimation.
   - **Manual Override Anytime**: Users can click the Sun (`☀️`) or Moon (`🌙`) buttons to override the automatic mode at any time, with persistence in `localStorage`.
-  - **Activate Auto Mode**: Clicking the `Auto` button strictly activates timezone-based automatic switching (idempotent). To deactivate Auto, the user clicks the Sun (`☀️`) or Moon (`🌙`) button.
+  - **Activate Auto Mode**: Clicking the `Auto` button strictly activates automatic mode (idempotent).
   - **Anti-FOUC & Tailwind v4 Custom Variant**: Configured `@custom-variant dark (&:where(.dark, .dark *));` in `index.css` and a lightweight pre-hydration inline script in `index.html` to prevent any flash of unstyled theme on initial load.
 
 ---

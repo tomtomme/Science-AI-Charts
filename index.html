@@ -19,8 +19,45 @@
           } else if (pref === 'light') {
             isDark = false;
           } else {
-            var h = new Date().getHours();
-            isDark = (h < 7 || h >= 20);
+            // Auto mode: check GPS solar calculation, system theme, or seasonal clock
+            var rawCoords = localStorage.getItem('science_iq_user_coords');
+            var evaluated = false;
+            if (rawCoords) {
+              try {
+                var c = JSON.parse(rawCoords);
+                if (c && typeof c.lat === 'number' && typeof c.lng === 'number') {
+                  var now = new Date();
+                  var startOfYear = new Date(now.getFullYear(), 0, 0);
+                  var dayOfYear = Math.floor((now - startOfYear) / 86400000);
+                  var declination = 23.45 * Math.sin(((2 * Math.PI) / 365) * (dayOfYear - 81));
+                  var latRad = (c.lat * Math.PI) / 180;
+                  var decRad = (declination * Math.PI) / 180;
+                  var cosH = Math.max(-1, Math.min(1, -Math.tan(latRad) * Math.tan(decRad)));
+                  var hourAngle = (Math.acos(cosH) * 180) / Math.PI;
+                  var b = ((2 * Math.PI) / 365) * (dayOfYear - 81);
+                  var eot = 9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b);
+                  var solarNoonUtc = 12 - c.lng / 15 - eot / 60;
+                  var sunriseUtc = solarNoonUtc - hourAngle / 15;
+                  var sunsetUtc = solarNoonUtc + hourAngle / 15;
+                  var sunrise = new Date(now);
+                  sunrise.setUTCHours(Math.floor(sunriseUtc), Math.round((sunriseUtc % 1) * 60), 0, 0);
+                  var sunset = new Date(now);
+                  sunset.setUTCHours(Math.floor(sunsetUtc), Math.round((sunsetUtc % 1) * 60), 0, 0);
+                  isDark = now.getTime() < sunrise.getTime() || now.getTime() >= sunset.getTime();
+                  evaluated = true;
+                }
+              } catch(e) {}
+            }
+            if (!evaluated) {
+              if (window.matchMedia && (window.matchMedia('(prefers-color-scheme: dark)').matches || window.matchMedia('(prefers-color-scheme: light)').matches)) {
+                isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+              } else {
+                var h = new Date().getHours() + new Date().getMinutes() / 60;
+                var month = new Date().getMonth();
+                var isWinter = month >= 9 || month <= 2;
+                isDark = h < 7 || h >= (isWinter ? 17.5 : 20.5);
+              }
+            }
           }
           if (isDark) {
             document.documentElement.classList.add('dark');
