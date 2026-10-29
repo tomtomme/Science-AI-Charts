@@ -40,6 +40,11 @@ Overhaul the **LLM Labs & Ecosystem** view into an intuitive, visually structure
   - `Paid`: Paid Chat only (`isPaid`, indicated with 💲)
   - `All`: All models (Kostenlos & Bezahlt)
   with active state highlighting and bilingual tooltips.
+- **Light / Dark Mode Switcher with Timezone Auto-Switching**: A compact segmented switcher is located next to the DE/EN language switcher:
+  - **Auto-Switching by Timezone**: Automatically activates Light Mode during local daytime (07:00 to 19:59) and Dark Mode during nighttime (20:00 to 06:59), with periodic evaluation every 60 seconds.
+  - **Manual Override Anytime**: Users can click the Sun (`☀️`) or Moon (`🌙`) buttons to override the automatic mode at any time, with persistence in `localStorage`.
+  - **Activate Auto Mode**: Clicking the `Auto` button strictly activates timezone-based automatic switching (idempotent). To deactivate Auto, the user clicks the Sun (`☀️`) or Moon (`🌙`) button.
+  - **Anti-FOUC & Tailwind v4 Custom Variant**: Configured `@custom-variant dark (&:where(.dark, .dark *));` in `index.css` and a lightweight pre-hydration inline script in `index.html` to prevent any flash of unstyled theme on initial load.
 
 ---
 

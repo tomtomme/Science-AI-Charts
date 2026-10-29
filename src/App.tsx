@@ -19,11 +19,82 @@ import { TimelineScatterplot } from './components/TimelineScatterplot';
 import { CorrelationsScatterplot } from './components/CorrelationsScatterplot';
 import { Language, TRANSLATIONS } from './utils/i18n';
 import { matchesSearchQuery } from './utils/searchUtils';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp, GitCompare } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon } from 'lucide-react';
 
+export type ThemePreference = 'auto' | 'light' | 'dark';
 
+/**
+ * Determines whether the user's current local time corresponds to daytime (7:00 - 19:59)
+ * or nighttime (20:00 - 6:59).
+ */
+function getTimezoneTheme(): 'light' | 'dark' {
+  const hours = new Date().getHours();
+  // Daytime: 07:00 to 19:59 (7 AM to 8 PM) -> light mode
+  // Nighttime: 20:00 to 06:59 (8 PM to 7 AM) -> dark mode
+  return hours >= 7 && hours < 20 ? 'light' : 'dark';
+}
+
+function getTimezoneInfo(): { timezone: string; timeStr: string } {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return { timezone: tz, timeStr };
+  } catch {
+    return { timezone: 'Local', timeStr: '' };
+  }
+}
+
+function getStoredThemePref(): ThemePreference {
+  try {
+    const stored = localStorage.getItem('science_iq_theme_preference');
+    if (stored === 'light' || stored === 'dark' || stored === 'auto') {
+      return stored;
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+  return 'auto';
+}
 
 export default function App() {
+  // Theme state: 'auto' | 'light' | 'dark' with automatic timezone switching & manual override
+  const [themePref, setThemePref] = useState<ThemePreference>(getStoredThemePref);
+  const [timezoneTheme, setTimezoneTheme] = useState<'light' | 'dark'>(getTimezoneTheme);
+  const [tzInfo, setTzInfo] = useState<{ timezone: string; timeStr: string }>(getTimezoneInfo);
+
+  // Effective active theme (user override or automatic timezone)
+  const effectiveTheme: 'light' | 'dark' = themePref === 'auto' ? timezoneTheme : themePref;
+
+  // Apply effective theme to document.documentElement (<html class="dark">)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (effectiveTheme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [effectiveTheme]);
+
+  // Periodic timezone check every 60s for automatic sunrise/sunset transitions
+  useEffect(() => {
+    const checkTime = () => {
+      setTimezoneTheme(getTimezoneTheme());
+      setTzInfo(getTimezoneInfo());
+    };
+    const timer = setInterval(checkTime, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleSelectTheme = (mode: ThemePreference) => {
+    setThemePref(mode);
+    try {
+      localStorage.setItem('science_iq_theme_preference', mode);
+    } catch {
+      // ignore
+    }
+  };
+
   // Standardeinstellung: Englisch
   const [lang, setLang] = useState<Language>('en');
   const t = TRANSLATIONS[lang];
@@ -490,6 +561,75 @@ export default function App() {
                 title={lang === 'de' ? 'Auf Englisch umschalten' : 'Switch to English'}
               >
                 EN
+              </button>
+            </div>
+
+            {/* Theme Mode Switcher (Light / Dark / Auto by timezone) */}
+            <div
+              className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5"
+              role="group"
+              aria-label={lang === 'de' ? 'Designmodus (Hell, Dunkel oder Automatisch)' : 'Theme mode (Light, Dark or Automatic)'}
+            >
+              <button
+                type="button"
+                onClick={() => handleSelectTheme('light')}
+                className={`p-1 sm:px-1.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center ${
+                  themePref === 'light'
+                    ? 'bg-white dark:bg-slate-700 text-amber-500 shadow-2xs'
+                    : themePref === 'auto' && effectiveTheme === 'light'
+                    ? 'text-amber-500/80 hover:text-amber-500'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+                title={
+                  lang === 'de'
+                    ? 'Hellmodus erzwingen (Auto-Modus überschreiben)'
+                    : 'Force Light Mode (Override Auto)'
+                }
+                aria-pressed={themePref === 'light'}
+              >
+                <Sun className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectTheme('dark')}
+                className={`p-1 sm:px-1.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center ${
+                  themePref === 'dark'
+                    ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-2xs'
+                    : themePref === 'auto' && effectiveTheme === 'dark'
+                    ? 'text-blue-400/80 hover:text-blue-400'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+                title={
+                  lang === 'de'
+                    ? 'Dunkelmodus erzwingen (Auto-Modus überschreiben)'
+                    : 'Force Dark Mode (Override Auto)'
+                }
+                aria-pressed={themePref === 'dark'}
+              >
+                <Moon className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectTheme('auto')}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                  themePref === 'auto'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+                title={
+                  themePref === 'auto'
+                    ? lang === 'de'
+                      ? `Auto-Modus aktiv: Gesteuert nach Ortszeit (${tzInfo.timeStr}, Zeitzone ${tzInfo.timezone} = ${effectiveTheme === 'dark' ? 'Dunkelmodus' : 'Hellmodus'}). Zum Deaktivieren auf Sonne oder Mond klicken.`
+                      : `Auto mode active: Controlled by local time (${tzInfo.timeStr}, timezone ${tzInfo.timezone} = ${effectiveTheme === 'dark' ? 'Dark Mode' : 'Light Mode'}). Click Sun or Moon to deactivate.`
+                    : lang === 'de'
+                    ? `Manuell überschrieben (${themePref === 'dark' ? 'Dunkel' : 'Hell'}). Klicken, um Auto-Modus (Zeitzonen-Steuerung) zu aktivieren.`
+                    : `Manually overridden (${themePref === 'dark' ? 'Dark' : 'Light'}). Click to activate Auto mode (timezone control).`
+                }
+                aria-pressed={themePref === 'auto'}
+              >
+                Auto
               </button>
             </div>
 

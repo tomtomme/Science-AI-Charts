@@ -9,6 +9,27 @@
     <meta property="og:description" content="Interaktives Balkendiagramm der Top-Chatbots für Wissenschaft und Analyse mit technischer Explosionszeichnung, dynamischer Dekomposition der Benchmark-Kriterien und Live-Aktualisierung." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function() {
+        try {
+          var pref = localStorage.getItem('science_iq_theme_preference');
+          var isDark = false;
+          if (pref === 'dark') {
+            isDark = true;
+          } else if (pref === 'light') {
+            isDark = false;
+          } else {
+            var h = new Date().getHours();
+            isDark = (h < 7 || h >= 20);
+          }
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
