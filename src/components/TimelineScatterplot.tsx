@@ -3,6 +3,7 @@ import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, Sparkles } 
 import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { calculateRegression, extractFrontierPoints } from '../utils/mathRegression';
+import { Tooltip } from './Tooltip';
 import { TRANSLATIONS } from '../utils/i18n';
 
 interface TimelineScatterplotProps {
@@ -587,7 +588,6 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 onClick={() => setRegressionIndex((prev) => Math.max(0, prev - 1))}
                 disabled={regressionIndex <= 0}
                 className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title="-1"
               >
                 <Minus className="w-3 h-3" />
               </button>
@@ -605,34 +605,34 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 onClick={() => setRegressionIndex((prev) => Math.min(REGRESSION_OPTIONS.length - 1, prev + 1))}
                 disabled={regressionIndex >= REGRESSION_OPTIONS.length - 1}
                 className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                title="+1"
               >
                 <Plus className="w-3 h-3" />
               </button>
 
               {/* Regression Badge */}
               <div className="w-[105px] sm:w-[130px] shrink-0 overflow-hidden flex items-center">
-                <span
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full"
-                  style={{ backgroundColor: activeRegression.color }}
-                  title={lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
+                <Tooltip
+                  title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
+                  content={lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
+                  align="right"
+                  width="w-64"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">
-                    {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
+                  <span
+                    className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                    style={{ backgroundColor: activeRegression.color }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="truncate">
+                      {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
+                    </span>
                   </span>
-                </span>
+                </Tooltip>
               </div>
             </div>
 
             {/* Contextual Parameter Input (Fixed width, Active for Polynomial & LOESS, otherwise grayed-out) */}
-            <div
-              className={`w-[142px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
-                activeRegression.id !== 'polynomial' && activeRegression.id !== 'loess'
-                  ? 'opacity-40 cursor-not-allowed'
-                  : ''
-              }`}
-              title={
+            <Tooltip
+              content={
                 activeRegression.id === 'polynomial'
                   ? lang === 'de'
                     ? 'Polynom-Grad (2, 3 oder 4)'
@@ -645,14 +645,23 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   ? 'Kein variabler Parameter für dieses Modell'
                   : 'No variable parameter for this model'
               }
+              align="right"
+              width="w-56"
             >
-              <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
-                Param:
-              </span>
-              <div className="w-[76px] shrink-0 flex items-center justify-end">
-                {activeRegression.id === 'polynomial' ? (
-                  <select
-                    value={polyDegree}
+              <div
+                className={`w-[142px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
+                  activeRegression.id !== 'polynomial' && activeRegression.id !== 'loess'
+                    ? 'opacity-40 cursor-not-allowed'
+                    : ''
+                }`}
+              >
+                <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
+                  Param:
+                </span>
+                <div className="w-[76px] shrink-0 flex items-center justify-end">
+                  {activeRegression.id === 'polynomial' ? (
+                    <select
+                      value={polyDegree}
                     onChange={(e) => setPolyDegree(Number(e.target.value))}
                     className="w-[76px] h-6 px-1.5 font-mono text-[11px] font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-hidden focus:border-rose-500 text-center"
                   >
@@ -685,6 +694,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 )}
               </div>
             </div>
+            </Tooltip>
           </div>
         </div>
 

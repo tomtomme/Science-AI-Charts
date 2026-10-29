@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ExternalLink, TrendingUp, Plus, Minus, ArrowLeftRight, Sparkles, ChevronDown, Check } from 'lucide-react';
 import { ModelRecord, RegressionType, TimelineDataPoint } from '../types';
 import { calculateRegression, extractFrontierPoints } from '../utils/mathRegression';
+import { Tooltip } from './Tooltip';
 import {
   CORRELATION_DIMENSIONS,
   calculatePearson,
@@ -539,64 +540,83 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
           <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs">
             {plotLabel}
           </span>
-          <button
-            type="button"
-            onClick={onSwapAxes}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-[10.5px] font-mono shadow-2xs"
-            title={lang === 'de' ? 'Achsen vertauschen (X ⇄ Y)' : 'Swap axes (X ⇄ Y)'}
+          <Tooltip
+            content={lang === 'de' ? 'Achsen vertauschen (X ⇄ Y)' : 'Swap axes (X ⇄ Y)'}
+            align="left"
+            width="w-48"
           >
-            <ArrowLeftRight className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-            <span>{lang === 'de' ? 'X ⇄ Y' : 'X ⇄ Y'}</span>
-          </button>
+            <button
+              type="button"
+              onClick={onSwapAxes}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-[10.5px] font-mono shadow-2xs"
+            >
+              <ArrowLeftRight className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+              <span>{lang === 'de' ? 'X ⇄ Y' : 'X ⇄ Y'}</span>
+            </button>
+          </Tooltip>
         </div>
 
         {/* Side-by-Side Pearson r & Spearmans Rho Badges */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           {/* Pearson r Badge */}
-          <div
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
-              isLinearModel
-                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
-                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
-            }`}
-            title={
+          <Tooltip
+            title="Pearson r"
+            badge="Linear"
+            align="center"
+            width="w-64"
+            content={
               lang === 'de'
-                ? 'Pearson-Korrelationskoeffizient r (linearer Zusammenhang)'
-                : 'Pearson correlation coefficient r (linear relationship)'
+                ? 'Pearson-Korrelationskoeffizient r misst den linearen Zusammenhang zwischen den beiden Benchmarks.'
+                : 'Pearson correlation coefficient r measures the linear relationship between both benchmarks.'
             }
           >
-            <span className="text-[10px] font-bold text-slate-500 uppercase">r:</span>
-            <span className="font-mono text-xs font-extrabold" style={{ color: pearsonResult.color }}>
-              {pearsonResult.value >= 0 ? '+' : ''}
-              {pearsonResult.value.toFixed(2)}
-            </span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden xl:inline">
-              ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
-            </span>
-          </div>
+            <div
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                isLinearModel
+                  ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
+                  : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              <span className="text-[10px] font-bold text-slate-500 uppercase">r:</span>
+              <span className="font-mono text-xs font-extrabold" style={{ color: pearsonResult.color }}>
+                {pearsonResult.value >= 0 ? '+' : ''}
+                {pearsonResult.value.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden xl:inline">
+                ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
+              </span>
+            </div>
+          </Tooltip>
 
           {/* Spearmans Rho Badge */}
-          <div
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
-              !isLinearModel
-                ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
-                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
-            }`}
-            title={
+          <Tooltip
+            title="Spearman Rho"
+            badge="Rangfolge"
+            align="center"
+            width="w-64"
+            content={
               lang === 'de'
-                ? 'Spearmans Rho (Rangkorrelationskoeffizient)'
-                : 'Spearmans Rho (rank correlation coefficient)'
+                ? 'Spearmans Rho misst den monotonen Rangzusammenhang, unempfindlicher gegenüber Ausreißern.'
+                : 'Spearman rank correlation measures monotonic rank relationship, more robust against outliers.'
             }
           >
-            <span className="text-[10px] font-bold text-slate-500 uppercase">Rho:</span>
-            <span className="font-mono text-xs font-extrabold" style={{ color: spearmanResult.color }}>
-              {spearmanResult.value >= 0 ? '+' : ''}
-              {spearmanResult.value.toFixed(2)}
-            </span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden xl:inline">
-              ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
-            </span>
-          </div>
+            <div
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                !isLinearModel
+                  ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
+                  : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Rho:</span>
+              <span className="font-mono text-xs font-extrabold" style={{ color: spearmanResult.color }}>
+                {spearmanResult.value >= 0 ? '+' : ''}
+                {spearmanResult.value.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden xl:inline">
+                ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
+              </span>
+            </div>
+          </Tooltip>
         </div>
       </div>
 

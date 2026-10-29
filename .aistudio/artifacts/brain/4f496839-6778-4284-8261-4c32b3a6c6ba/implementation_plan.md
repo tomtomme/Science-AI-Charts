@@ -47,6 +47,12 @@ Overhaul the **LLM Labs & Ecosystem** view into an intuitive, visually structure
   - **Manual Override Anytime**: Users can click the Sun (`☀️`) or Moon (`🌙`) buttons to override the automatic mode at any time, with persistence in `localStorage`.
   - **Activate Auto Mode**: Clicking the `Auto` button strictly activates automatic mode (idempotent).
   - **Anti-FOUC & Tailwind v4 Custom Variant**: Configured `@custom-variant dark (&:where(.dark, .dark *));` in `index.css` and a lightweight pre-hydration inline script in `index.html` to prevent any flash of unstyled theme on initial load.
+- **Universal Tooltip & Popover Architecture Across All 4 Tabs (`Tooltip.tsx`)**:
+  - Replaced erratic CSS-only hover states and native `title="..."` attributes (which spawn under the cursor and instantly close when the pointer moves diagonally) with a unified, accessible `Tooltip` component across all 4 application tabs (Bar Chart, Timeline, Correlations, and LLM-Labs).
+  - **Grace Period (280ms debounce)**: When moving the cursor away from a pill or button toward interactive links inside the popover (such as the API Glossary link or Weights Details jump marks), the popover remains open seamlessly. Entering the popover clears the close timer, keeping it open indefinitely during interaction.
+  - **Cursor Clearance**: Ample vertical clearance (`mt-2.5 sm:mt-3` or `mb-2.5 sm:mb-3`) and upward indicator arrows ensure the cursor never covers or obscures text.
+  - **Unified Styling**: Sleek dark glassmorphism card (`bg-slate-900/95 dark:bg-slate-950/95 border-slate-700/80 shadow-2xl backdrop-blur-md z-50 text-xs text-slate-100`).
+  - **Applied Everywhere**: Model Size combined pills, Country pills, Open/Hybrid/Closed weights pills, Free(API|Chat)Paid|All switchers, Explosion toggle, Scope buttons, Sort buttons, Timeline regression badges, and Correlation coefficient badges.
 
 ---
 

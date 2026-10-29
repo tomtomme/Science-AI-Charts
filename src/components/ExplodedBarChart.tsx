@@ -5,6 +5,7 @@ import { Language, TRANSLATIONS } from '../utils/i18n';
 import { matchesSearchQuery } from '../utils/searchUtils';
 import { createModelBreakdown } from '../utils/csvParser';
 import { ExternalLink } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 
 interface ExplodedBarChartProps {
   models: ModelRecord[];
@@ -643,29 +644,34 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             </div>
           ) : displayedCategoryComp ? (
             <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
-              <button
-                type="button"
-                onClick={() => scrollToCategoryExplanation(displayedCategoryComp.id)}
-                className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
-                style={{ color: displayedCategoryComp.color }}
-                title={
+              <Tooltip
+                content={
                   lang === 'de'
                     ? `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'de', displayedCategoryComp)}: Zur Erläuterung in „How to read this“ springen`
                     : `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'en', displayedCategoryComp)}: Jump to explanation in "How to read this"`
                 }
+                align="left"
+                width="w-64"
               >
-                <span
-                  className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
-                  style={{ backgroundColor: displayedCategoryComp.color }}
-                />
-                <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
-                  {getBenchmarkCategoryLabel(
-                    categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined,
-                    lang,
-                    displayedCategoryComp
-                  )}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => scrollToCategoryExplanation(displayedCategoryComp.id)}
+                  className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
+                  style={{ color: displayedCategoryComp.color }}
+                >
+                  <span
+                    className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
+                    style={{ backgroundColor: displayedCategoryComp.color }}
+                  />
+                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                    {getBenchmarkCategoryLabel(
+                      categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined,
+                      lang,
+                      displayedCategoryComp
+                    )}
+                  </span>
+                </button>
+              </Tooltip>
 
               <span className="text-slate-400">·</span>
               {displayedCategoryComp.sourceUrl ? (
@@ -705,39 +711,44 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
-              <button
-                type="button"
-                onClick={() => {
-                  const el = document.getElementById(currentScoreInfo.targetId) || document.getElementById('final-scores-section');
-                  const box = document.getElementById('section1-scroll-box');
-                  const container = document.getElementById('csv-notes-section');
-                  if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  if (el) {
-                    if (box) {
-                      const targetTop = el.offsetTop - box.offsetTop;
-                      box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
-                    }
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
-                    setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15'), 3000);
-                  }
-                }}
-                className="flex items-center gap-1.5 font-bold shrink-0 hover:opacity-80 transition-opacity cursor-pointer group text-left"
-                style={{ color: currentScoreInfo.color }}
-                title={
+              <Tooltip
+                content={
                   lang === 'de'
                     ? `${currentScoreInfo.name}: Zur Erläuterung in „How to read this“ springen`
                     : `${currentScoreInfo.name}: Jump to explanation in "How to read this"`
                 }
+                align="left"
+                width="w-64"
               >
-                <span
-                  className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
-                  style={{ backgroundColor: currentScoreInfo.color }}
-                />
-                <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
-                  {currentScoreInfo.name}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById(currentScoreInfo.targetId) || document.getElementById('final-scores-section');
+                    const box = document.getElementById('section1-scroll-box');
+                    const container = document.getElementById('csv-notes-section');
+                    if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (el) {
+                      if (box) {
+                        const targetTop = el.offsetTop - box.offsetTop;
+                        box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
+                      }
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
+                      setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15'), 3000);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 font-bold shrink-0 hover:opacity-80 transition-opacity cursor-pointer group text-left"
+                  style={{ color: currentScoreInfo.color }}
+                >
+                  <span
+                    className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
+                    style={{ backgroundColor: currentScoreInfo.color }}
+                  />
+                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                    {currentScoreInfo.name}
+                  </span>
+                </button>
+              </Tooltip>
 
               <span className="text-slate-400">·</span>
               <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">

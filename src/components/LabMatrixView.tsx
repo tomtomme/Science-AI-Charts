@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { LabEntry, ModelRecord } from '../types';
 import { Search, ExternalLink, Cpu, Wrench, Terminal, Layers, HelpCircle, BookOpen, Minus, Plus } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 
 interface LabMatrixViewProps {
   labs: LabEntry[];
@@ -865,15 +866,25 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 px-2 flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-slate-400" />
                 <span>{lang === 'de' ? 'Gewichte:' : 'Weights:'}</span>
-                <button
-                  type="button"
-                  onClick={() => scrollToWeightsExplainer()}
-                  className="text-slate-400 hover:text-blue-500 transition-colors cursor-pointer"
-                  title={lang === 'de' ? 'Erklärung zu Open, Hybrid und Closed anzeigen' : 'Show explanation of Open, Hybrid, and Closed'}
-                  aria-label="Weights explanation"
+                <Tooltip
+                  title={lang === 'de' ? 'Modellgewichte' : 'Model Weights'}
+                  align="center"
+                  width="w-60"
+                  content={
+                    lang === 'de'
+                      ? 'Erklärung zu Open, Hybrid und Closed anzeigen.'
+                      : 'Show explanation of Open, Hybrid, and Closed weights.'
+                  }
                 >
-                  <HelpCircle className="w-3.5 h-3.5" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollToWeightsExplainer()}
+                    className="text-slate-400 hover:text-blue-500 transition-colors cursor-pointer"
+                    aria-label="Weights explanation"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
               </span>
               <button
                 type="button"
@@ -888,7 +899,34 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               </button>
 
               {/* Open Button with Tooltip */}
-              <div className="relative group/tip inline-flex">
+              <Tooltip
+                title={
+                  <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>{lang === 'de' ? WEIGHTS_CONCEPTS.open.titleDe : WEIGHTS_CONCEPTS.open.titleEn}</span>
+                  </span>
+                }
+                badge={lang === 'de' ? 'Offen' : 'Open'}
+                align="center"
+                width="w-64"
+                content={
+                  <div>
+                    <p className="text-slate-300 leading-snug mb-2">
+                      {lang === 'de' ? WEIGHTS_CONCEPTS.open.tooltipDe : WEIGHTS_CONCEPTS.open.tooltipEn}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        scrollToWeightsExplainer('weights-open');
+                      }}
+                      className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
+                    >
+                      <span>{lang === 'de' ? 'Ausführliche Erklärung anzeigen ↓' : 'Show full explanation ↓'}</span>
+                    </button>
+                  </div>
+                }
+              >
                 <button
                   type="button"
                   onClick={() => setWeightsFilter('open')}
@@ -900,31 +938,37 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 >
                   {lang === 'de' ? 'Offen' : 'Open'}
                 </button>
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 hidden group-hover/tip:flex flex-col gap-1 w-56 p-2.5 bg-slate-900 text-white dark:bg-slate-800 border border-slate-700 rounded-lg shadow-xl text-[11px] z-50 pointer-events-auto">
-                  <div className="flex items-center justify-between text-slate-200 font-semibold border-b border-slate-700 pb-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span>{lang === 'de' ? WEIGHTS_CONCEPTS.open.titleDe : WEIGHTS_CONCEPTS.open.titleEn}</span>
-                    </span>
+              </Tooltip>
+
+              {/* Hybrid Button with Tooltip */}
+              <Tooltip
+                title={
+                  <span className="flex items-center gap-1.5 text-purple-400 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-purple-500" />
+                    <span>{lang === 'de' ? WEIGHTS_CONCEPTS.hybrid.titleDe : WEIGHTS_CONCEPTS.hybrid.titleEn}</span>
+                  </span>
+                }
+                badge="Hybrid"
+                align="center"
+                width="w-64"
+                content={
+                  <div>
+                    <p className="text-slate-300 leading-snug mb-2">
+                      {lang === 'de' ? WEIGHTS_CONCEPTS.hybrid.tooltipDe : WEIGHTS_CONCEPTS.hybrid.tooltipEn}
+                    </p>
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        scrollToWeightsExplainer('weights-open');
+                        scrollToWeightsExplainer('weights-hybrid');
                       }}
-                      className="text-[10px] text-blue-400 hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
                     >
-                      {lang === 'de' ? 'Details ↓' : 'Details ↓'}
+                      <span>{lang === 'de' ? 'Ausführliche Erklärung anzeigen ↓' : 'Show full explanation ↓'}</span>
                     </button>
                   </div>
-                  <p className="text-slate-300 leading-snug pt-0.5">
-                    {lang === 'de' ? WEIGHTS_CONCEPTS.open.tooltipDe : WEIGHTS_CONCEPTS.open.tooltipEn}
-                  </p>
-                </div>
-              </div>
-
-              {/* Hybrid Button with Tooltip */}
-              <div className="relative group/tip inline-flex">
+                }
+              >
                 <button
                   type="button"
                   onClick={() => setWeightsFilter('hybrid')}
@@ -936,31 +980,37 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 >
                   Hybrid
                 </button>
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 hidden group-hover/tip:flex flex-col gap-1 w-56 p-2.5 bg-slate-900 text-white dark:bg-slate-800 border border-slate-700 rounded-lg shadow-xl text-[11px] z-50 pointer-events-auto">
-                  <div className="flex items-center justify-between text-slate-200 font-semibold border-b border-slate-700 pb-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-purple-500" />
-                      <span>{lang === 'de' ? WEIGHTS_CONCEPTS.hybrid.titleDe : WEIGHTS_CONCEPTS.hybrid.titleEn}</span>
-                    </span>
+              </Tooltip>
+
+              {/* Closed Button with Tooltip */}
+              <Tooltip
+                title={
+                  <span className="flex items-center gap-1.5 text-slate-300 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-slate-500" />
+                    <span>{lang === 'de' ? WEIGHTS_CONCEPTS.closed.titleDe : WEIGHTS_CONCEPTS.closed.titleEn}</span>
+                  </span>
+                }
+                badge={lang === 'de' ? 'Geschlossen' : 'Closed'}
+                align="center"
+                width="w-64"
+                content={
+                  <div>
+                    <p className="text-slate-300 leading-snug mb-2">
+                      {lang === 'de' ? WEIGHTS_CONCEPTS.closed.tooltipDe : WEIGHTS_CONCEPTS.closed.tooltipEn}
+                    </p>
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        scrollToWeightsExplainer('weights-hybrid');
+                        scrollToWeightsExplainer('weights-closed');
                       }}
-                      className="text-[10px] text-blue-400 hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
                     >
-                      {lang === 'de' ? 'Details ↓' : 'Details ↓'}
+                      <span>{lang === 'de' ? 'Ausführliche Erklärung anzeigen ↓' : 'Show full explanation ↓'}</span>
                     </button>
                   </div>
-                  <p className="text-slate-300 leading-snug pt-0.5">
-                    {lang === 'de' ? WEIGHTS_CONCEPTS.hybrid.tooltipDe : WEIGHTS_CONCEPTS.hybrid.tooltipEn}
-                  </p>
-                </div>
-              </div>
-
-              {/* Closed Button with Tooltip */}
-              <div className="relative group/tip inline-flex">
+                }
+              >
                 <button
                   type="button"
                   onClick={() => setWeightsFilter('closed')}
@@ -972,40 +1022,29 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 >
                   {lang === 'de' ? 'Geschlossen' : 'Closed'}
                 </button>
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 hidden group-hover/tip:flex flex-col gap-1 w-56 p-2.5 bg-slate-900 text-white dark:bg-slate-800 border border-slate-700 rounded-lg shadow-xl text-[11px] z-50 pointer-events-auto">
-                  <div className="flex items-center justify-between text-slate-200 font-semibold border-b border-slate-700 pb-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-slate-500" />
-                      <span>{lang === 'de' ? WEIGHTS_CONCEPTS.closed.titleDe : WEIGHTS_CONCEPTS.closed.titleEn}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        scrollToWeightsExplainer('weights-closed');
-                      }}
-                      className="text-[10px] text-blue-400 hover:underline cursor-pointer"
-                    >
-                      {lang === 'de' ? 'Details ↓' : 'Details ↓'}
-                    </button>
-                  </div>
-                  <p className="text-slate-300 leading-snug pt-0.5">
-                    {lang === 'de' ? WEIGHTS_CONCEPTS.closed.tooltipDe : WEIGHTS_CONCEPTS.closed.tooltipEn}
-                  </p>
-                </div>
-              </div>
+              </Tooltip>
             </div>
 
             {/* Quick Link to Glossary */}
-            <button
-              type="button"
-              onClick={() => scrollToGlossary()}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
-              title={lang === 'de' ? 'Glossar & Begriffs-Erklärungen anzeigen (ADE, Harness, Agent, LLM, CLI etc.)' : 'Show glossary & concept definitions (ADE, Harness, Agent, LLM, CLI etc.)'}
+            <Tooltip
+              title={lang === 'de' ? 'Glossar' : 'Glossary'}
+              align="center"
+              width="w-60"
+              content={
+                lang === 'de'
+                  ? 'Glossar & Begriffs-Erklärungen anzeigen (ADE, Harness, Agent, LLM, CLI etc.)'
+                  : 'Show glossary & concept definitions (ADE, Harness, Agent, LLM, CLI etc.)'
+              }
             >
-              <BookOpen className="w-3.5 h-3.5 text-blue-500" />
-              <span>{lang === 'de' ? 'Glossar' : 'Glossary'}</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => scrollToGlossary()}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+                <span>{lang === 'de' ? 'Glossar' : 'Glossary'}</span>
+              </button>
+            </Tooltip>
 
             {/* Search Input */}
             <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -1110,40 +1149,52 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               const isSelected = isExact || isSubSelected;
               const count = sizeCategoryCounts[cat.key] ?? 0;
               return (
-                <button
+                <Tooltip
                   key={cat.key}
-                  type="button"
-                  onClick={() => setSizeFilter(isExact && cat.key !== 'all' ? 'all' : cat.key)}
-                  title={lang === 'de' ? cat.descDe : cat.descEn}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                    isExact
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : isSubSelected
-                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-2 border-blue-500 shadow-2xs'
-                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
+                  title={lang === 'de' ? cat.nameDe : cat.nameEn}
+                  badge={`${count} ${lang === 'de' ? 'Modelle' : 'models'}`}
+                  align="center"
+                  width="w-64"
+                  content={lang === 'de' ? cat.descDe : cat.descEn}
                 >
-                  {cat.key !== 'all' && (
-                    <span className={`w-2 h-2 rounded-full ${cat.dotClass} shrink-0`} />
-                  )}
-                  <span>{lang === 'de' ? cat.nameDe : cat.nameEn}</span>
-                  <span className={`text-[10px] ${isExact ? 'text-blue-100' : isSubSelected ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400'}`}>
-                    ({count})
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setSizeFilter(isExact && cat.key !== 'all' ? 'all' : cat.key)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      isExact
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : isSubSelected
+                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-2 border-blue-500 shadow-2xs'
+                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    {cat.key !== 'all' && (
+                      <span className={`w-2 h-2 rounded-full ${cat.dotClass} shrink-0`} />
+                    )}
+                    <span>{lang === 'de' ? cat.nameDe : cat.nameEn}</span>
+                    <span className={`text-[10px] ${isExact ? 'text-blue-100' : isSubSelected ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400'}`}>
+                      ({count})
+                    </span>
+                  </button>
+                </Tooltip>
               );
             })}
 
             {/* Clear size filter button if active */}
             {sizeFilter !== 'all' && (
-              <button
-                type="button"
-                onClick={() => setSizeFilter('all')}
-                className="px-2 py-1 text-xs text-rose-600 dark:text-rose-400 hover:underline font-semibold cursor-pointer shrink-0"
-                title={lang === 'de' ? 'Größenfilter aufheben' : 'Clear size filter'}
+              <Tooltip
+                content={lang === 'de' ? 'Größenfilter aufheben' : 'Clear size filter'}
+                align="center"
+                width="w-40"
               >
-                ✕ {lang === 'de' ? 'Zurücksetzen' : 'Reset'}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setSizeFilter('all')}
+                  className="px-2 py-1 text-xs text-rose-600 dark:text-rose-400 hover:underline font-semibold cursor-pointer shrink-0"
+                >
+                  ✕ {lang === 'de' ? 'Zurücksetzen' : 'Reset'}
+                </button>
+              </Tooltip>
             )}
           </div>
         </div>
@@ -1164,20 +1215,25 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() => setSimplifiedSizeView((prev) => !prev)}
-                  className="px-2 py-0.5 text-[11px] font-semibold rounded bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
-                  title={
+                <Tooltip
+                  content={
                     lang === 'de'
                       ? 'Karten auf Vendor, Modellfamilie & gewähltes Modell reduzieren oder Vollansicht anzeigen'
                       : 'Toggle reduced cards (Vendor, Model Family & selected model) vs. full cards'
                   }
+                  align="right"
+                  width="w-64"
                 >
-                  {simplifiedSizeView
-                    ? (lang === 'de' ? 'Kompakte Ansicht: An' : 'Compact View: On')
-                    : (lang === 'de' ? 'Vollansicht: An' : 'Full View: On')}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setSimplifiedSizeView((prev) => !prev)}
+                    className="px-2 py-0.5 text-[11px] font-semibold rounded bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
+                  >
+                    {simplifiedSizeView
+                      ? (lang === 'de' ? 'Kompakte Ansicht: An' : 'Compact View: On')
+                      : (lang === 'de' ? 'Vollansicht: An' : 'Full View: On')}
+                  </button>
+                </Tooltip>
                 <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
                   {filteredLabs.length} {lang === 'de' ? 'Labore' : 'labs'}
                 </span>
@@ -1192,37 +1248,59 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             <span>🌐</span>
             <span>{lang === 'de' ? 'Land:' : 'Country:'}</span>
           </span>
-          <button
-            type="button"
-            onClick={() => setSelectedCountry('all')}
-            title={lang === 'de' ? 'Alle Länder (alphabetisch nach Vendor-Name sortiert)' : 'All Countries (sorted alphabetically by vendor name)'}
-            className={`px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-              selectedCountry === 'all'
-                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-            }`}
+          <Tooltip
+            title={lang === 'de' ? 'Alle Länder' : 'All Countries'}
+            align="left"
+            width="w-60"
+            content={
+              lang === 'de'
+                ? 'Alle Labore weltweit anzeigen (alphabetisch nach Vendor-Name sortiert).'
+                : 'Show all AI labs globally (sorted alphabetically by vendor name).'
+            }
           >
-            {lang === 'de' ? 'Alle Länder (A-Z)' : 'All Countries (A-Z)'}
-          </button>
+            <button
+              type="button"
+              onClick={() => setSelectedCountry('all')}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                selectedCountry === 'all'
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {lang === 'de' ? 'Alle Länder (A-Z)' : 'All Countries (A-Z)'}
+            </button>
+          </Tooltip>
           {countries.map((c) => {
             const isSelected = selectedCountry === c.country;
             return (
-              <button
+              <Tooltip
                 key={c.country}
-                type="button"
-                onClick={() => setSelectedCountry(isSelected ? 'all' : c.country)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                title={`${c.flag} ${c.country}`}
+                badge={`${c.count} ${lang === 'de' ? 'Labore' : 'labs'}`}
+                align="center"
+                width="w-56"
+                content={
+                  lang === 'de'
+                    ? `Nur KI-Labore aus ${c.country} anzeigen (alphabetisch sortiert).`
+                    : `Filter AI labs from ${c.country} (alphabetically sorted).`
+                }
               >
-                <span>{c.flag}</span>
-                <span>{c.country}</span>
-                <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                  ({c.count})
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCountry(isSelected ? 'all' : c.country)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <span>{c.flag}</span>
+                  <span>{c.country}</span>
+                  <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                    ({c.count})
+                  </span>
+                </button>
+              </Tooltip>
             );
           })}
         </div>

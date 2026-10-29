@@ -3,6 +3,7 @@ import { Search, X, Plus, Minus, BarChart2, Calendar } from 'lucide-react';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { BENCHMARK_COMPONENTS, getBenchmarkCategoryLabel } from '../data/benchmarks';
 import { SortField, ModelScope, ScoreMode, BenchmarkComponent } from '../types';
+import { Tooltip } from './Tooltip';
 
 interface SearchBarProps {
   value: string;
@@ -327,30 +328,42 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <div className="flex flex-wrap items-center gap-1.5 shrink-0 xl:ml-auto">
             {/* Current vs All Chatbots */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => onModelScopeChange('current')}
-                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                  modelScope === 'current'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={t.scopeCurrentDesc}
+              <Tooltip
+                title={t.scopeCurrent}
+                content={t.scopeCurrentDesc}
+                align="left"
+                width="w-56"
               >
-                {t.scopeCurrent}
-              </button>
-              <button
-                type="button"
-                onClick={() => onModelScopeChange('all')}
-                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                  modelScope === 'all'
-                    ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={t.scopeAllDesc}
+                <button
+                  type="button"
+                  onClick={() => onModelScopeChange('current')}
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    modelScope === 'current'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {t.scopeCurrent}
+                </button>
+              </Tooltip>
+              <Tooltip
+                title={t.scopeAll}
+                content={t.scopeAllDesc}
+                align="left"
+                width="w-56"
               >
-                {t.scopeAll}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => onModelScopeChange('all')}
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    modelScope === 'all'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {t.scopeAll}
+                </button>
+              </Tooltip>
             </div>
 
             {/* Max Bar Count Slider */}
@@ -363,15 +376,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
                     {t.topSliderTop}:
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => handleTopStep(-5)}
-                    disabled={displayVal <= minVal || maxAvailableModels <= 0}
-                    className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-                    title={t.stepMinusChatbots}
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
+                  <Tooltip content={t.stepMinusChatbots} align="center" width="w-24">
+                    <button
+                      type="button"
+                      onClick={() => handleTopStep(-5)}
+                      disabled={displayVal <= minVal || maxAvailableModels <= 0}
+                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                  </Tooltip>
                   <input
                     type="range"
                     min={minVal}
@@ -382,15 +396,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     disabled={maxAvailableModels <= minVal}
                     className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 disabled:opacity-40"
                   />
-                  <button
-                    type="button"
-                    onClick={() => handleTopStep(5)}
-                    disabled={displayVal >= maxAvailableModels || maxAvailableModels <= 0}
-                    className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-                    title={t.stepPlusChatbots}
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
+                  <Tooltip content={t.stepPlusChatbots} align="center" width="w-24">
+                    <button
+                      type="button"
+                      onClick={() => handleTopStep(5)}
+                      disabled={displayVal >= maxAvailableModels || maxAvailableModels <= 0}
+                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </Tooltip>
                   <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right">
                     {displayVal}
                   </span>
@@ -400,32 +415,44 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
             {/* Sortierung (Score vs Datum) ganz rechts */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => onSortByChange('score')}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                  sortBy === 'score'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={t.sortScoreDesc}
+              <Tooltip
+                title={t.sortScore}
+                content={t.sortScoreDesc}
+                align="right"
+                width="w-56"
               >
-                <BarChart2 className="w-3 h-3" />
-                <span>{t.sortScore}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onSortByChange('date')}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                  sortBy === 'date'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={t.sortDateDesc}
+                <button
+                  type="button"
+                  onClick={() => onSortByChange('score')}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    sortBy === 'score'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <BarChart2 className="w-3 h-3" />
+                  <span>{t.sortScore}</span>
+                </button>
+              </Tooltip>
+              <Tooltip
+                title={t.sortDate}
+                content={t.sortDateDesc}
+                align="right"
+                width="w-56"
               >
-                <Calendar className="w-3 h-3" />
-                <span>{t.sortDate}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => onSortByChange('date')}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    sortBy === 'date'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Calendar className="w-3 h-3" />
+                  <span>{t.sortDate}</span>
+                </button>
+              </Tooltip>
             </div>
           </div>
         </div>

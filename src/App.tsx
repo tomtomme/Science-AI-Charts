@@ -19,7 +19,8 @@ import { TimelineScatterplot } from './components/TimelineScatterplot';
 import { CorrelationsScatterplot } from './components/CorrelationsScatterplot';
 import { Language, TRANSLATIONS } from './utils/i18n';
 import { matchesSearchQuery } from './utils/searchUtils';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen } from 'lucide-react';
+import { Tooltip } from './components/Tooltip';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
 
@@ -361,6 +362,27 @@ export default function App() {
     setPriceFilter('all');
     setActiveTab('benchmark');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Jump smoothly to a specific term in the Glossary on the LLM-Labs tab & highlight it
+  const navigateToGlossaryTerm = useCallback((termId: string = 'term-api') => {
+    setActiveTab('labs');
+    const tryHighlight = (attemptsLeft: number) => {
+      const el = document.getElementById(termId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2', 'dark:ring-offset-slate-900', 'transition-all');
+        setTimeout(() => {
+          el.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-2', 'dark:ring-offset-slate-900');
+        }, 3500);
+      } else if (attemptsLeft > 0) {
+        setTimeout(() => tryHighlight(attemptsLeft - 1), 100);
+      } else {
+        const sec = document.getElementById('glossary-section');
+        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+    setTimeout(() => tryHighlight(6), 100);
   }, []);
 
   // Smooth scroll down to exact paragraph in notes below chart (Columns D to N)
@@ -716,30 +738,40 @@ export default function App() {
 
             {/* Language Switcher DE / EN - rechts vom Datum des letzten Syncs */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => setLang('de')}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
-                  lang === 'de'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={lang === 'de' ? 'Auf Deutsch umschalten' : 'Switch to German'}
+              <Tooltip
+                content={lang === 'de' ? 'Auf Deutsch umschalten' : 'Switch to German'}
+                align="center"
+                width="w-40"
               >
-                DE
-              </button>
-              <button
-                type="button"
-                onClick={() => setLang('en')}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
-                  lang === 'en'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title={lang === 'de' ? 'Auf Englisch umschalten' : 'Switch to English'}
+                <button
+                  type="button"
+                  onClick={() => setLang('de')}
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+                    lang === 'de'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  DE
+                </button>
+              </Tooltip>
+              <Tooltip
+                content={lang === 'de' ? 'Auf Englisch umschalten' : 'Switch to English'}
+                align="center"
+                width="w-40"
               >
-                EN
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setLang('en')}
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+                    lang === 'en'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  EN
+                </button>
+              </Tooltip>
             </div>
 
             {/* Theme Mode Switcher (Light / Dark / Auto by timezone/GPS) */}
@@ -748,55 +780,62 @@ export default function App() {
               role="group"
               aria-label={lang === 'de' ? 'Designmodus (Hell, Dunkel oder Automatisch)' : 'Theme mode (Light, Dark or Automatic)'}
             >
-              <button
-                type="button"
-                onClick={() => handleSelectTheme('light')}
-                className={`p-1 sm:px-1.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center ${
-                  themePref === 'light'
-                    ? 'bg-white dark:bg-slate-700 text-amber-500 shadow-2xs'
-                    : themePref === 'auto' && effectiveTheme === 'light'
-                    ? 'text-amber-500/80 hover:text-amber-500'
-                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}
-                title={
+              <Tooltip
+                title={lang === 'de' ? 'Hellmodus' : 'Light Mode'}
+                content={
                   lang === 'de'
-                    ? 'Hellmodus erzwingen (Auto-Modus überschreiben)'
-                    : 'Force Light Mode (Override Auto)'
+                    ? 'Hellmodus erzwingen (Auto-Modus überschreiben).'
+                    : 'Force Light Mode (Override Auto mode).'
                 }
-                aria-pressed={themePref === 'light'}
+                align="center"
+                width="w-48"
               >
-                <Sun className="w-3.5 h-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectTheme('light')}
+                  className={`p-1 sm:px-1.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center ${
+                    themePref === 'light'
+                      ? 'bg-white dark:bg-slate-700 text-amber-500 shadow-2xs'
+                      : themePref === 'auto' && effectiveTheme === 'light'
+                      ? 'text-amber-500/80 hover:text-amber-500'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                  aria-pressed={themePref === 'light'}
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
 
-              <button
-                type="button"
-                onClick={() => handleSelectTheme('dark')}
-                className={`p-1 sm:px-1.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center ${
-                  themePref === 'dark'
-                    ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-2xs'
-                    : themePref === 'auto' && effectiveTheme === 'dark'
-                    ? 'text-blue-400/80 hover:text-blue-400'
-                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}
-                title={
+              <Tooltip
+                title={lang === 'de' ? 'Dunkelmodus' : 'Dark Mode'}
+                content={
                   lang === 'de'
-                    ? 'Dunkelmodus erzwingen (Auto-Modus überschreiben)'
-                    : 'Force Dark Mode (Override Auto)'
+                    ? 'Dunkelmodus erzwingen (Auto-Modus überschreiben).'
+                    : 'Force Dark Mode (Override Auto mode).'
                 }
-                aria-pressed={themePref === 'dark'}
+                align="center"
+                width="w-48"
               >
-                <Moon className="w-3.5 h-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectTheme('dark')}
+                  className={`p-1 sm:px-1.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center ${
+                    themePref === 'dark'
+                      ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-2xs'
+                      : themePref === 'auto' && effectiveTheme === 'dark'
+                      ? 'text-blue-400/80 hover:text-blue-400'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                  aria-pressed={themePref === 'dark'}
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
 
-              <button
-                type="button"
-                onClick={() => handleSelectTheme('auto')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                  themePref === 'auto'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}
-                title={
+              <Tooltip
+                title="Auto Mode"
+                badge={themePref === 'auto' ? 'Aktiv' : 'Inaktiv'}
+                content={
                   themePref === 'auto'
                     ? lang === 'de'
                       ? `Auto-Modus aktiv: ${autoThemeInfo.detail}. Zum Deaktivieren auf Sonne oder Mond klicken.`
@@ -805,34 +844,52 @@ export default function App() {
                     ? `Manuell überschrieben (${themePref === 'dark' ? 'Dunkel' : 'Hell'}). Klicken, um Auto-Modus (Zeitzonen- & GPS-Steuerung) zu aktivieren.`
                     : `Manually overridden (${themePref === 'dark' ? 'Dark' : 'Light'}). Click to activate Auto mode (timezone & GPS control).`
                 }
-                aria-pressed={themePref === 'auto'}
+                align="center"
+                width="w-60"
               >
-                Auto
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectTheme('auto')}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                    themePref === 'auto'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                  aria-pressed={themePref === 'auto'}
+                >
+                  Auto
+                </button>
+              </Tooltip>
 
               {/* GPS Location Pin Button - triggers native browser permission dialog */}
-              <button
-                type="button"
-                onClick={requestGeoLocation}
-                disabled={isLocating}
-                className={`p-1 py-0.5 rounded text-[11px] transition-all cursor-pointer flex items-center justify-center ${
-                  geoCoords
-                    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
-                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                } ${isLocating ? 'animate-pulse opacity-75' : ''}`}
-                title={
+              <Tooltip
+                title={geoCoords ? 'GPS: Aktiv' : 'GPS: Standort'}
+                content={
                   geoCoords
                     ? lang === 'de'
-                      ? `📍 GPS-Standort aktiv (${geoCoords.lat}° N, ${geoCoords.lng}° O)\nSonnenaufgang: ${autoThemeInfo.sunriseStr || '-'}, Sonnenuntergang: ${autoThemeInfo.sunsetStr || '-'}\nKlicken zum erneuten Abfragen.`
-                      : `📍 GPS location active (${geoCoords.lat}° N, ${geoCoords.lng}° E)\nSunrise: ${autoThemeInfo.sunriseStr || '-'}, Sunset: ${autoThemeInfo.sunsetStr || '-'}\nClick to re-query.`
+                      ? `📍 GPS-Standort aktiv (${geoCoords.lat}° N, ${geoCoords.lng}° O). Sonnenaufgang: ${autoThemeInfo.sunriseStr || '-'}, Sonnenuntergang: ${autoThemeInfo.sunsetStr || '-'}. Klicken zum erneuten Abfragen.`
+                      : `📍 GPS location active (${geoCoords.lat}° N, ${geoCoords.lng}° E). Sunrise: ${autoThemeInfo.sunriseStr || '-'}, Sunset: ${autoThemeInfo.sunsetStr || '-'}. Click to re-query.`
                     : lang === 'de'
                     ? '📍 Standort abfragen (GPS): Klicken, damit der Browser um Erlaubnis fragt. Berechnet exakte Sonnenauf- & -untergangszeiten für Ihren Standort.'
                     : '📍 Query location (GPS): Click to trigger browser location permission dialog. Calculates exact sunrise & sunset for your location.'
                 }
-                aria-label={lang === 'de' ? 'Standort via GPS abfragen' : 'Query location via GPS'}
+                align="right"
+                width="w-64"
               >
-                <MapPin className="w-3.5 h-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={requestGeoLocation}
+                  disabled={isLocating}
+                  className={`p-1 py-0.5 rounded text-[11px] transition-all cursor-pointer flex items-center justify-center ${
+                    geoCoords
+                      ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  } ${isLocating ? 'animate-pulse opacity-75' : ''}`}
+                  aria-label={lang === 'de' ? 'Standort via GPS abfragen' : 'Query location via GPS'}
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
             </div>
 
             {locationStatus && (
@@ -959,20 +1016,26 @@ export default function App() {
               <div className="flex items-center gap-1.5 shrink-0">
 
                 {/* Advanced Button */}
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced((prev) => !prev)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
-                    showAdvanced
-                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
-                      : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                  }`}
-                  title={t.advancedDesc}
+                <Tooltip
+                  title={t.advanced}
+                  align="left"
+                  width="w-60"
+                  content={t.advancedDesc}
                 >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span>{t.advanced}</span>
-                  <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((prev) => !prev)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
+                      showAdvanced
+                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
+                        : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>{t.advanced}</span>
+                    <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
+                  </button>
+                </Tooltip>
 
                 {/* Price Filter Switcher: Free(API|Chat)Paid|All */}
                 <div
@@ -982,45 +1045,98 @@ export default function App() {
                 >
                   {/* Free Group: Free(API|Chat) */}
                   <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => setPriceFilter(priceFilter === 'free_api' ? 'free_chat' : 'free_api')}
-                      className={`pl-1 font-bold text-[10px] sm:text-[11px] select-none cursor-pointer transition-colors ${
-                        priceFilter === 'free_api' || priceFilter === 'free_chat'
-                          ? 'text-emerald-700 dark:text-emerald-300'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                      title={lang === 'de' ? 'Kostenlose Modelle: Zwischen Free API und Free Chat OR API umschalten' : 'Free models: Toggle between Free API and Free Chat OR API'}
+                    {/* Free( prefix */}
+                    <Tooltip
+                      title={<span className="text-emerald-400">Free ({lang === 'de' ? 'Kostenlos' : 'Free'})</span>}
+                      align="left"
+                      width="w-60"
+                      content={
+                        lang === 'de'
+                          ? 'Kostenlose Modelle: Zwischen Free API und Free Chat OR API umschalten.'
+                          : 'Free models: Toggle between Free API and Free Chat OR API.'
+                      }
                     >
-                      Free(
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPriceFilter('free_api')}
-                      className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
-                        priceFilter === 'free_api'
-                          ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
-                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                      title={t.priceFreeApiDesc}
-                      aria-pressed={priceFilter === 'free_api'}
+                      <button
+                        type="button"
+                        onClick={() => setPriceFilter(priceFilter === 'free_api' ? 'free_chat' : 'free_api')}
+                        className={`pl-1 font-bold text-[10px] sm:text-[11px] select-none cursor-pointer transition-colors ${
+                          priceFilter === 'free_api' || priceFilter === 'free_chat'
+                            ? 'text-emerald-700 dark:text-emerald-300'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        Free(
+                      </button>
+                    </Tooltip>
+
+                    {/* API Button with detailed explanation and Glossary link */}
+                    <Tooltip
+                      title={<span className="text-emerald-400">🌐 Free API</span>}
+                      badge={lang === 'de' ? 'Schnittstelle' : 'Interface'}
+                      align="left"
+                      width="w-72"
+                      content={
+                        <div>
+                          <div className="mb-2">
+                            {lang === 'de'
+                              ? 'Nur Modelle mit kostenlosem API-Zugriff (🌐). Ermöglicht den direkten programmatischen Zugriff über Netzwerk-Endpunkte – z. B. für JASP, Python-Skripte oder automatisierte KI-Agenten ohne monatliche Grundgebühr.'
+                              : 'Only models offering free API access (🌐). Provides direct programmatic access over network endpoints – e.g. for JASP, Python scripts, or automated AI agent workflows without monthly subscription fees.'}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToGlossaryTerm('term-api');
+                            }}
+                            className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-blue-400 hover:text-blue-300 hover:underline pt-1.5 border-t border-slate-800/90 w-full cursor-pointer transition-colors"
+                          >
+                            <BookOpen className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                            <span>{lang === 'de' ? 'Ausführliche Erklärung im Glossar öffnen →' : 'Read full explanation in Glossary →'}</span>
+                          </button>
+                        </div>
+                      }
                     >
-                      API
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setPriceFilter('free_api')}
+                        className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
+                          priceFilter === 'free_api'
+                            ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
+                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                        aria-pressed={priceFilter === 'free_api'}
+                      >
+                        API
+                      </button>
+                    </Tooltip>
+
                     <span className="text-slate-400 dark:text-slate-600 text-[10px] px-0.5 select-none">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setPriceFilter('free_chat')}
-                      className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
-                        priceFilter === 'free_chat'
-                          ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
-                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                      title={t.priceFreeChatDesc}
-                      aria-pressed={priceFilter === 'free_chat'}
+
+                    {/* Chat Button */}
+                    <Tooltip
+                      title={<span className="text-emerald-400">Free Chat OR API</span>}
+                      align="center"
+                      width="w-64"
+                      content={
+                        lang === 'de'
+                          ? 'Kostenlos im Web-Chat nutzbar ODER mit kostenloser API verfügbar.'
+                          : 'Free to use in web chat OR available with a free API tier.'
+                      }
                     >
-                      Chat
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setPriceFilter('free_chat')}
+                        className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
+                          priceFilter === 'free_chat'
+                            ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
+                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                        aria-pressed={priceFilter === 'free_chat'}
+                      >
+                        Chat
+                      </button>
+                    </Tooltip>
+
                     <span
                       className={`pr-1 font-bold text-[10px] sm:text-[11px] select-none ${
                         priceFilter === 'free_api' || priceFilter === 'free_chat'
@@ -1033,36 +1149,56 @@ export default function App() {
                   </div>
 
                   {/* Paid Chat */}
-                  <button
-                    type="button"
-                    onClick={() => setPriceFilter('paid')}
-                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                      priceFilter === 'paid'
-                        ? 'bg-amber-600 text-white shadow-2xs font-extrabold'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                    title={t.pricePaidDesc}
-                    aria-pressed={priceFilter === 'paid'}
+                  <Tooltip
+                    title={<span className="text-amber-400">Paid Chat 💲</span>}
+                    align="center"
+                    width="w-64"
+                    content={
+                      lang === 'de'
+                        ? 'Nur kostenpflichtige Chatbots, die ein aktives kostenpflichtiges Abonnement (Plus/Pro/Abo) voraussetzen.'
+                        : 'Paid chatbots only (requiring a subscription tier like Plus/Pro or paid billing).'
+                    }
                   >
-                    Paid 💲
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setPriceFilter('paid')}
+                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                        priceFilter === 'paid'
+                          ? 'bg-amber-600 text-white shadow-2xs font-extrabold'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      aria-pressed={priceFilter === 'paid'}
+                    >
+                      Paid 💲
+                    </button>
+                  </Tooltip>
 
                   <span className="text-slate-300 dark:text-slate-600 text-[10px] px-0.5 select-none">|</span>
 
                   {/* All */}
-                  <button
-                    type="button"
-                    onClick={() => setPriceFilter('all')}
-                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                      priceFilter === 'all'
-                        ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                    title={t.priceAllDesc}
-                    aria-pressed={priceFilter === 'all'}
+                  <Tooltip
+                    title={<span className="text-blue-400">{lang === 'de' ? 'Alle Modelle' : 'All Models'}</span>}
+                    align="right"
+                    width="w-56"
+                    content={
+                      lang === 'de'
+                        ? 'Alle Chatbots anzeigen (kostenlos & bezahlt).'
+                        : 'Show all chatbots (free & paid).'
+                    }
                   >
-                    {t.priceAll}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setPriceFilter('all')}
+                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                        priceFilter === 'all'
+                          ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      aria-pressed={priceFilter === 'all'}
+                    >
+                      {t.priceAll}
+                    </button>
+                  </Tooltip>
                 </div>
 
                 {/* Explosion Button: an / teils / aus (on / hover / off) */}
@@ -1071,42 +1207,77 @@ export default function App() {
                     {t.explosionToggle}
                   </span>
                   <div className="flex items-center bg-slate-200/60 dark:bg-slate-900/50 rounded p-0.5 gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => handleExplosionModeChange('on')}
-                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                        explosionMode === 'on'
-                          ? 'bg-emerald-600 text-white shadow-2xs'
-                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                      title={t.explosionOnDesc}
+                    {/* an */}
+                    <Tooltip
+                      title={<span className="text-emerald-400">{lang === 'de' ? 'Explosion: an' : 'Explosion: on'}</span>}
+                      align="right"
+                      width="w-60"
+                      content={
+                        lang === 'de'
+                          ? 'Alle Balken werden permanent voll in 8 Kriterien aufgefächert dargestellt.'
+                          : 'All bars are permanently expanded into their 8 benchmark criteria.'
+                      }
                     >
-                      {t.explosionOn}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleExplosionModeChange('hover')}
-                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                        explosionMode === 'hover'
-                          ? 'bg-blue-600 text-white shadow-2xs'
-                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                      title={t.explosionHoverDesc}
+                      <button
+                        type="button"
+                        onClick={() => handleExplosionModeChange('on')}
+                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                          explosionMode === 'on'
+                            ? 'bg-emerald-600 text-white shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        {t.explosionOn}
+                      </button>
+                    </Tooltip>
+
+                    {/* teils */}
+                    <Tooltip
+                      title={<span className="text-blue-400">{lang === 'de' ? 'Explosion: teils (Hover)' : 'Explosion: hover'}</span>}
+                      align="right"
+                      width="w-60"
+                      content={
+                        lang === 'de'
+                          ? 'Nur der Balken unter dem Mauszeiger und seine direkten Nachbarn fächern auf.'
+                          : 'Only the bar under the mouse cursor and adjacent neighbors expand.'
+                      }
                     >
-                      {t.explosionHover}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleExplosionModeChange('off')}
-                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                        explosionMode === 'off'
-                          ? 'bg-slate-600 text-white shadow-2xs'
-                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                      title={t.explosionOffDesc}
+                      <button
+                        type="button"
+                        onClick={() => handleExplosionModeChange('hover')}
+                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                          explosionMode === 'hover'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        {t.explosionHover}
+                      </button>
+                    </Tooltip>
+
+                    {/* aus */}
+                    <Tooltip
+                      title={<span className="text-slate-300">{lang === 'de' ? 'Explosion: aus' : 'Explosion: off'}</span>}
+                      align="right"
+                      width="w-56"
+                      content={
+                        lang === 'de'
+                          ? 'Balken bleiben immer kompakt und fächern auch bei Mausberührung nicht auf.'
+                          : 'Bars stay compact as single bars and never expand on hover.'
+                      }
                     >
-                      {t.explosionOff}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExplosionModeChange('off')}
+                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                          explosionMode === 'off'
+                            ? 'bg-slate-600 text-white shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        {t.explosionOff}
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               </div>
