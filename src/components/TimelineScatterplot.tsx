@@ -81,11 +81,11 @@ const REGRESSION_OPTIONS: RegressionOption[] = [
   },
   {
     id: 'frontier',
-    labelDe: 'SOTA Frontier (Rekorde)',
+    labelDe: 'Pioniere (Rekorde)',
     labelEn: 'SOTA Frontier (Records)',
-    shortDe: 'Frontier',
+    shortDe: 'Pioniere',
     shortEn: 'Frontier',
-    descDe: 'Verlauf der historischen Höchststände (Pareto-Frontier)',
+    descDe: 'Verlauf der historischen Höchststände (Pioniere / Rekordhalter)',
     descEn: 'Cumulative maximum state-of-the-art breakthroughs',
     color: '#d97706', // Gold / Bronze
   },
@@ -452,6 +452,19 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       : activeComponent.nameDe
     : null;
 
+  // Bilingual Y-Axis label matching the score slider labels without superfluous points suffix
+  const yAxisLabel = useMemo(() => {
+    if (selectedCategoryIndex === 0) {
+      if (scoreMode === 'old') return t.scoreModeOld;
+      if (scoreMode === 'worstCase') return t.scoreModeWorstCase;
+      return t.scoreModeNew;
+    }
+    if (activeCategoryName) {
+      return activeCategoryName;
+    }
+    return t.score;
+  }, [selectedCategoryIndex, scoreMode, t, activeCategoryName]);
+
   // Scroll targets for all 3 composite scores + all 8 benchmark categories
   const scoreScrollTargets = useMemo(() => {
     if (unifiedSliderValue === 0) return { targetId: 'note-col-m' };
@@ -704,12 +717,12 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 }`}
                 title={
                   lang === 'de'
-                    ? 'Nur Modelle, die zum Release-Zeitpunkt einen neuen Rekord-Highscore erzielten (Pareto-Frontier)'
+                    ? 'Nur Modelle, die zum Release-Zeitpunkt einen neuen Rekord-Highscore erzielten (Pioniere)'
                     : 'Only models setting a new record score at release date (Pareto frontier)'
                 }
               >
                 <Sparkles className="w-3 h-3 text-amber-300" />
-                <span>{lang === 'de' ? 'SOTA Frontier' : 'SOTA Frontier'}</span>
+                <span>{lang === 'de' ? 'Pioniere' : 'SOTA Frontier'}</span>
                 <span className="text-[10px] opacity-90">({frontierPointIds.size})</span>
               </button>
             </div>
@@ -735,7 +748,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 title={
                   activeRegression.id === 'frontier'
                     ? lang === 'de'
-                      ? 'Bestimmtheitsmaß R² ist für die SOTA-Frontier-Hüllkurve nicht definiert'
+                      ? 'Bestimmtheitsmaß R² ist für die Pioniere-Hüllkurve nicht definiert'
                       : 'R² metric does not apply to the SOTA frontier envelope'
                     : lang === 'de'
                     ? 'Bestimmtheitsmaß R² für dieses Modell nicht anwendbar'
@@ -865,22 +878,16 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             textAnchor="middle"
             className="text-xs font-bold fill-slate-600 dark:fill-slate-400 uppercase tracking-wider"
           >
-            {lang === 'de' ? 'Veröffentlichungsdatum (Spalte Y)' : 'Release Date (Column Y)'}
+            {lang === 'de' ? 'Veröffentlichungsdatum' : 'Release Date'}
           </text>
           <text
             transform={`rotate(-90 ${margin.left - 42} ${margin.top + innerHeight / 2})`}
             x={margin.left - 42}
             y={margin.top + innerHeight / 2}
             textAnchor="middle"
-            className="text-xs font-bold fill-slate-600 dark:fill-slate-400 uppercase tracking-wider"
+            className="text-xs font-bold fill-slate-600 dark:fill-slate-400 tracking-wider"
           >
-            {selectedCategoryIndex === 0
-              ? lang === 'de'
-                ? 'Final Score (Punkte)'
-                : 'Final Score (Points)'
-              : activeComponent
-              ? activeComponent.nameEn
-              : 'Score'}
+            {yAxisLabel}
           </text>
 
           {/* Fitted Regression Curve */}
@@ -988,7 +995,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   {frontierPointIds.has(hoveredPoint.point.id) && (
                     <span className="text-[10px] font-mono px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5">
                       <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-                      <span>SOTA</span>
+                      <span>{lang === 'de' ? 'Pionier' : 'SOTA'}</span>
                     </span>
                   )}
                 </h4>

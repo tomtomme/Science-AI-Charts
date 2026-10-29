@@ -1,6 +1,6 @@
 {
-  "summary":  "Architectural plan to overhaul the LLM Labs & Model Ecosystem view with vertical top-to-bottom model size stacking, beginner-friendly tier labels with visual mini scale meters, hover parameter tooltips, an Open vs. Closed weights toggle, 'All' as the default selection, and responsive country filter pills.",
-  "updatedAt":  "2026-10-26T13:16:51.317498693Z",
+  "summary":  "Updated implementation plan for LLM Labs model size filtering: granular slider now features separate Micro (<0.5B), Mini (<2B), and Tiny (<8B) steps (0 to 10), and the 2-category-combined pills feature Small / Tiny and Mini / Micro brackets.",
+  "updatedAt":  "2026-10-29T08:36:24.997254833Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

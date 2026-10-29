@@ -94,7 +94,7 @@ export type SortOption = 'newScore' | 'nonHallu' | 'vision' | 'science' | 'worst
 export type SortField = 'score' | 'date';
 export type ScoreMode = 'new' | 'old' | 'worstCase';
 export type ModelScope = 'current' | 'all';
-export type PriceFilter = 'free' | 'paid' | 'all';
+export type PriceFilter = 'free_api' | 'free_chat' | 'paid' | 'all' | 'free';
 export type ExplosionMode = 'on' | 'hover' | 'off';
 
 export interface CsvParagraph {

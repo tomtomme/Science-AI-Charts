@@ -167,9 +167,11 @@ export default function App() {
 
     let list = effectiveModelScope === 'current' ? base.filter((m) => m.isAvailable) : base;
 
-    // Preis-Filter: Default 'paid', sonst 'free' oder 'all'
-    if (priceFilter === 'free') {
-      list = list.filter((m) => !m.isPaid);
+    // Preis-Filter: 'free_api' | 'free_chat' | 'paid' | 'all'
+    if (priceFilter === 'free_api') {
+      list = list.filter((m) => m.isFreeApi);
+    } else if (priceFilter === 'free_chat' || priceFilter === 'free') {
+      list = list.filter((m) => !m.isPaid || m.isFreeApi);
     } else if (priceFilter === 'paid') {
       list = list.filter((m) => m.isPaid);
     }
@@ -624,41 +626,92 @@ export default function App() {
                   <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
                 </button>
 
-                {/* Price Filter Switcher: Free / Paid / All */}
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setPriceFilter('free')}
-                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                      priceFilter === 'free'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                    title={t.priceFreeDesc}
-                  >
-                    {t.priceFree}
-                  </button>
+                {/* Price Filter Switcher: Free(API|Chat)Paid|All */}
+                <div
+                  className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0"
+                  role="group"
+                  aria-label={t.priceFilterDesc}
+                >
+                  {/* Free Group: Free(API|Chat) */}
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setPriceFilter(priceFilter === 'free_api' ? 'free_chat' : 'free_api')}
+                      className={`pl-1 font-bold text-[10px] sm:text-[11px] select-none cursor-pointer transition-colors ${
+                        priceFilter === 'free_api' || priceFilter === 'free_chat'
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title={lang === 'de' ? 'Kostenlose Modelle: Zwischen Free API und Free Chat OR API umschalten' : 'Free models: Toggle between Free API and Free Chat OR API'}
+                    >
+                      Free(
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPriceFilter('free_api')}
+                      className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
+                        priceFilter === 'free_api'
+                          ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title={t.priceFreeApiDesc}
+                      aria-pressed={priceFilter === 'free_api'}
+                    >
+                      API
+                    </button>
+                    <span className="text-slate-400 dark:text-slate-600 text-[10px] px-0.5 select-none">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setPriceFilter('free_chat')}
+                      className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
+                        priceFilter === 'free_chat'
+                          ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title={t.priceFreeChatDesc}
+                      aria-pressed={priceFilter === 'free_chat'}
+                    >
+                      Chat
+                    </button>
+                    <span
+                      className={`pr-1 font-bold text-[10px] sm:text-[11px] select-none ${
+                        priceFilter === 'free_api' || priceFilter === 'free_chat'
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : 'text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      )
+                    </span>
+                  </div>
+
+                  {/* Paid Chat */}
                   <button
                     type="button"
                     onClick={() => setPriceFilter('paid')}
                     className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                       priceFilter === 'paid'
-                        ? 'bg-amber-600 text-white shadow-2xs'
+                        ? 'bg-amber-600 text-white shadow-2xs font-extrabold'
                         : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title={t.pricePaidDesc}
+                    aria-pressed={priceFilter === 'paid'}
                   >
-                    {t.pricePaid} 💲
+                    Paid 💲
                   </button>
+
+                  <span className="text-slate-300 dark:text-slate-600 text-[10px] px-0.5 select-none">|</span>
+
+                  {/* All */}
                   <button
                     type="button"
                     onClick={() => setPriceFilter('all')}
                     className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                       priceFilter === 'all'
-                        ? 'bg-blue-600 text-white shadow-2xs'
+                        ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
                         : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title={t.priceAllDesc}
+                    aria-pressed={priceFilter === 'all'}
                   >
                     {t.priceAll}
                   </button>
