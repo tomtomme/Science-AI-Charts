@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Search, X, Plus, Minus, BarChart2, Calendar } from 'lucide-react';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { BENCHMARK_COMPONENTS, getBenchmarkCategoryLabel } from '../data/benchmarks';
-import { SortField, ModelScope, ScoreMode, BenchmarkComponent } from '../types';
+import { SortField, ModelScope, ScoreMode, BenchmarkComponent, ExplosionMode } from '../types';
 import { Tooltip } from './Tooltip';
 
 interface SearchBarProps {
@@ -30,6 +30,8 @@ interface SearchBarProps {
   onModelScopeChange: (scope: ModelScope) => void;
   showAdvanced?: boolean;
   categoryNames?: string[];
+  explosionMode?: ExplosionMode;
+  onExplosionModeChange?: (mode: ExplosionMode) => void;
 }
 
 // 12 alphabetische Hersteller-Familien (ohne 'Ling')
@@ -71,6 +73,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onModelScopeChange,
   showAdvanced = false,
   categoryNames,
+  explosionMode,
+  onExplosionModeChange,
 }) => {
   const t = TRANSLATIONS[lang];
 
@@ -179,10 +183,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2.5">
-      {/* ZEILE 1: Filter-Suchfeld (links) + Score-Slider (rechts) - innerhalb des erweiterten Bereichs */}
+      {/* ZEILE 1: Filter-Suchfeld (links) + Explosions-Schalter (mittig) + Score-Slider (rechts) */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        {/* 1. Filter/Suchfeld ("filter by company ...") */}
-        <div className="relative flex-1 min-w-[190px] max-w-full sm:max-w-xs md:max-w-sm flex items-center">
+        {/* 1. Filter/Suchfeld ("filter by company ...") (links) */}
+        <div className="relative flex-1 min-w-[170px] max-w-full sm:max-w-[220px] md:max-w-[260px] flex items-center">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
           <input
             type="text"
@@ -203,8 +207,90 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           )}
         </div>
 
-        {/* Merged Score Slider */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0 ml-auto">
+        {/* 2. Explosions-Schalter: an / teils / aus (mittig erste Zeile) */}
+        {explosionMode && onExplosionModeChange && (
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 font-mono text-[10px] sm:text-[11px] self-center">
+            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+              {t.explosionToggle}:
+            </span>
+            <div className="flex items-center bg-slate-200/60 dark:bg-slate-800/60 rounded p-0.5 gap-0.5">
+              {/* an */}
+              <Tooltip
+                title={<span className="text-emerald-400">{lang === 'de' ? 'Explosion: an' : 'Explosion: on'}</span>}
+                align="center"
+                width="w-60"
+                content={
+                  lang === 'de'
+                    ? 'Alle Balken werden permanent voll in 8 Kriterien aufgefächert dargestellt.'
+                    : 'All bars are permanently expanded into their 8 benchmark criteria.'
+                }
+              >
+                <button
+                  type="button"
+                  onClick={() => onExplosionModeChange('on')}
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    explosionMode === 'on'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {t.explosionOn}
+                </button>
+              </Tooltip>
+
+              {/* teils */}
+              <Tooltip
+                title={<span className="text-blue-400">{lang === 'de' ? 'Explosion: teils (Hover)' : 'Explosion: hover'}</span>}
+                align="center"
+                width="w-60"
+                content={
+                  lang === 'de'
+                    ? 'Nur der Balken unter dem Mauszeiger und seine direkten Nachbarn fächern auf.'
+                    : 'Only the bar under the mouse cursor and adjacent neighbors expand.'
+                }
+              >
+                <button
+                  type="button"
+                  onClick={() => onExplosionModeChange('hover')}
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    explosionMode === 'hover'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {t.explosionHover}
+                </button>
+              </Tooltip>
+
+              {/* aus */}
+              <Tooltip
+                title={<span className="text-slate-300">{lang === 'de' ? 'Explosion: aus' : 'Explosion: off'}</span>}
+                align="center"
+                width="w-56"
+                content={
+                  lang === 'de'
+                    ? 'Balken bleiben immer kompakt und fächern auch bei Mausberührung nicht auf.'
+                    : 'Bars stay compact as single bars and never expand on hover.'
+                }
+              >
+                <button
+                  type="button"
+                  onClick={() => onExplosionModeChange('off')}
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    explosionMode === 'off'
+                      ? 'bg-slate-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {t.explosionOff}
+                </button>
+              </Tooltip>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Merged Score Slider (rechts) */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
           <div
             className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0"
           >
@@ -237,52 +323,60 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <Plus className="w-3 h-3" />
             </button>
 
-            {/* Feste Box für das Badge: New Score / Old Score / Worst Case oder Kategorie 1..8 (klickbar als Sprungmarke, ohne störende Popups) */}
-            <div className="w-[155px] sm:w-[195px] shrink-0 overflow-hidden flex items-center">
-              {unifiedSliderValue === 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleScroll('note-col-m')}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">{t.scoreModeNew}</span>
-                </button>
-              )}
-              {unifiedSliderValue === 1 && (
-                <button
-                  type="button"
-                  onClick={() => handleScroll('note-col-l')}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">{t.scoreModeOld}</span>
-                </button>
-              )}
-              {unifiedSliderValue === 2 && (
-                <button
-                  type="button"
-                  onClick={() => handleScroll('note-col-n')}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">{t.scoreModeWorstCase}</span>
-                </button>
-              )}
-              {unifiedSliderValue >= 3 && activeCategoryComp && activeCategoryName && (
-                <button
-                  type="button"
-                  onClick={() => handleScroll(scoreScrollTargets.targetId)}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: activeCategoryComp.color }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">
-                    #{unifiedSliderValue - 2} {activeCategoryName}
-                  </span>
-                </button>
-              )}
-            </div>
+            {/* Feste Box für das Badge: Knopf mit den bunten Labels (zentriert mit Tooltip "Klick mich" darüber) */}
+            <Tooltip
+              content={lang === 'de' ? 'Klick mich' : 'Click me'}
+              position="top"
+              align="center"
+              width="w-max"
+              popupClassName="px-2.5 py-1 text-[11px] font-semibold tracking-wide whitespace-nowrap"
+            >
+              <div className="w-[155px] sm:w-[195px] shrink-0 overflow-hidden flex items-center">
+                {unifiedSliderValue === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleScroll('note-col-m')}
+                    className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="truncate">{t.scoreModeNew}</span>
+                  </button>
+                )}
+                {unifiedSliderValue === 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleScroll('note-col-l')}
+                    className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="truncate">{t.scoreModeOld}</span>
+                  </button>
+                )}
+                {unifiedSliderValue === 2 && (
+                  <button
+                    type="button"
+                    onClick={() => handleScroll('note-col-n')}
+                    className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="truncate">{t.scoreModeWorstCase}</span>
+                  </button>
+                )}
+                {unifiedSliderValue >= 3 && activeCategoryComp && activeCategoryName && (
+                  <button
+                    type="button"
+                    onClick={() => handleScroll(scoreScrollTargets.targetId)}
+                    className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
+                    style={{ backgroundColor: activeCategoryComp.color }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="truncate">
+                      #{unifiedSliderValue - 2} {activeCategoryName}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </Tooltip>
           </div>
         </div>
       </div>

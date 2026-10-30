@@ -255,12 +255,8 @@ export default function App() {
       (err) => {
         setIsLocating(false);
         console.warn('Geolocation prompt error / denied:', err);
-        setLocationStatus(
-          lang === 'de'
-            ? 'Standort-Berechtigung abgelehnt. Verwende System-/Uhrzeit-Modus.'
-            : 'Location permission denied. Using system/clock mode.'
-        );
-        setTimeout(() => setLocationStatus(null), 5000);
+        // Silently fallback without noisy warning toast
+        setLocationStatus(null);
       },
       { timeout: 10000, enableHighAccuracy: false }
     );
@@ -690,51 +686,35 @@ export default function App() {
 
           {/* Controls, sync, date, language toggle & external link icons */}
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono shrink-0 self-start xl:self-center">
-            {/* Synchronisieren-Button mit Popup für Datum der letzten Synchronisierung */}
-            <div className="relative group">
+            {/* Synchronisieren-Button mit einheitlichem Tooltip */}
+            <Tooltip
+              title="Google Sheets Sync"
+              badge={isSyncing ? t.syncingText : (loadedData.isLive ? 'Live' : 'Fallback')}
+              content={
+                <div className="flex flex-col gap-1.5 text-[11px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-400 font-medium">{t.lastSync}:</span>
+                    <span className="font-mono text-emerald-400 font-bold">{formatSyncDate(lastSyncedAt)}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 border-t border-slate-700/60 pt-1 leading-normal">
+                    {t.autoSyncNotice}
+                  </div>
+                </div>
+              }
+              align="center"
+              width="w-60"
+            >
               <button
+                type="button"
                 onClick={refreshData}
                 disabled={isSyncing}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer disabled:opacity-50"
-                title={`${t.syncButtonTitle}\n${t.lastSync} ${formatSyncDate(lastSyncedAt)}`}
+                aria-label={t.syncButtonTitle}
               >
                 <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-blue-500' : ''}`} />
                 <span>{t.sync}</span>
               </button>
-
-              {/* Hover-Popup mit Datum der letzten Synchronisierung */}
-              <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 min-w-[220px] p-2.5 bg-slate-900/95 text-white dark:bg-slate-800/95 backdrop-blur-xs border border-slate-700/80 rounded-lg shadow-xl text-[11px] z-50 pointer-events-none transition-all">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-700/60 pb-1.5">
-                  <span className="font-semibold text-slate-200 flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3 text-emerald-400" />
-                    Google Sheets Sync
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono font-bold">
-                    {isSyncing ? t.syncingText : (loadedData.isLive ? 'Live' : 'Fallback')}
-                  </span>
-                </div>
-
-                {/* Datum der letzten Synchronisierung (nur Datum ohne Uhrzeit) */}
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                    {t.lastSync}
-                  </span>
-                  <span className="font-mono text-emerald-300 font-bold text-[11.5px]">
-                    {formatSyncDate(lastSyncedAt)}
-                  </span>
-                </div>
-
-                <div className="text-[10px] text-slate-400 border-t border-slate-800/60 pt-1">
-                  {t.autoSyncNotice}
-                </div>
-              </div>
-            </div>
-
-            {/* Datum der letzten Synchronisierung */}
-            <span className="text-slate-500 dark:text-slate-400 text-[11px] font-mono whitespace-nowrap">
-              <span className="hidden sm:inline">{t.lastSync} </span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{formatSyncDate(lastSyncedAt)}</span>
-            </span>
+            </Tooltip>
 
             {/* Language Switcher DE / EN - rechts vom Datum des letzten Syncs */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
@@ -899,25 +879,37 @@ export default function App() {
             )}
 
 
-            <a
-              href={SHEET_HTML_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-              title={t.googleSheetOpen}
+            <Tooltip
+              content={t.googleSheetOpen}
+              align="right"
+              width="w-44"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-            </a>
+              <a
+                href={SHEET_HTML_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
+                aria-label={t.googleSheetOpen}
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+              </a>
+            </Tooltip>
 
-            <a
-              href={GITHUB_REPO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-              title={t.githubRepoOpen}
+            <Tooltip
+              content={t.githubRepoOpen}
+              align="right"
+              width="w-36"
             >
-              <Github className="w-4 h-4" />
-            </a>
+              <a
+                href={GITHUB_REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
+                aria-label={t.githubRepoOpen}
+              >
+                <Github className="w-4 h-4" />
+              </a>
+            </Tooltip>
           </div>
         </div>
       </header>
@@ -1200,86 +1192,6 @@ export default function App() {
                     </button>
                   </Tooltip>
                 </div>
-
-                {/* Explosion Button: an / teils / aus (on / hover / off) */}
-                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0">
-                  <span className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-mono font-medium px-1.5 whitespace-nowrap">
-                    {t.explosionToggle}
-                  </span>
-                  <div className="flex items-center bg-slate-200/60 dark:bg-slate-900/50 rounded p-0.5 gap-0.5">
-                    {/* an */}
-                    <Tooltip
-                      title={<span className="text-emerald-400">{lang === 'de' ? 'Explosion: an' : 'Explosion: on'}</span>}
-                      align="right"
-                      width="w-60"
-                      content={
-                        lang === 'de'
-                          ? 'Alle Balken werden permanent voll in 8 Kriterien aufgefächert dargestellt.'
-                          : 'All bars are permanently expanded into their 8 benchmark criteria.'
-                      }
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleExplosionModeChange('on')}
-                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                          explosionMode === 'on'
-                            ? 'bg-emerald-600 text-white shadow-2xs'
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        {t.explosionOn}
-                      </button>
-                    </Tooltip>
-
-                    {/* teils */}
-                    <Tooltip
-                      title={<span className="text-blue-400">{lang === 'de' ? 'Explosion: teils (Hover)' : 'Explosion: hover'}</span>}
-                      align="right"
-                      width="w-60"
-                      content={
-                        lang === 'de'
-                          ? 'Nur der Balken unter dem Mauszeiger und seine direkten Nachbarn fächern auf.'
-                          : 'Only the bar under the mouse cursor and adjacent neighbors expand.'
-                      }
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleExplosionModeChange('hover')}
-                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                          explosionMode === 'hover'
-                            ? 'bg-blue-600 text-white shadow-2xs'
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        {t.explosionHover}
-                      </button>
-                    </Tooltip>
-
-                    {/* aus */}
-                    <Tooltip
-                      title={<span className="text-slate-300">{lang === 'de' ? 'Explosion: aus' : 'Explosion: off'}</span>}
-                      align="right"
-                      width="w-56"
-                      content={
-                        lang === 'de'
-                          ? 'Balken bleiben immer kompakt und fächern auch bei Mausberührung nicht auf.'
-                          : 'Bars stay compact as single bars and never expand on hover.'
-                      }
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleExplosionModeChange('off')}
-                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                          explosionMode === 'off'
-                            ? 'bg-slate-600 text-white shadow-2xs'
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        {t.explosionOff}
-                      </button>
-                    </Tooltip>
-                  </div>
-                </div>
               </div>
             )}
           </div>
@@ -1369,6 +1281,8 @@ export default function App() {
               onModelScopeChange={setModelScope}
               showAdvanced={showAdvanced}
               categoryNames={loadedData.headerMeta?.categoryNames}
+              explosionMode={explosionMode}
+              onExplosionModeChange={handleExplosionModeChange}
             />
 
             {/* Balkendiagramm: Breit dargestellt, die volle Containerbreite nutzend */}

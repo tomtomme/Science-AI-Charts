@@ -78,8 +78,9 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     { id: 'zhipu', defaultName: 'Z.ai / Zhipu', cols: [11], country: 'China' },
   ];
 
-  // Map of fallback entries by ID for open weights metadata
+  // Map of fallback entries by ID and by creator name for open weights metadata
   const fallbackMap = new Map<string, LabEntry>(FALLBACK_LAB_ENTRIES.map((l) => [l.id, l]));
+  const fallbackByCreator = new Map<string, LabEntry>(FALLBACK_LAB_ENTRIES.map((l) => [l.creator.toLowerCase().trim(), l]));
 
   const top10Entries: LabEntry[] = top10Specs.map((spec) => {
     const getCombined = (offset: number) => {
@@ -126,12 +127,13 @@ export function parseLabCsv(csvText: string): LabEntry[] {
   const rContenders = findRow('contender') !== -1 ? findRow('contender') : 18;
   let curCountryContender = 'America (US)';
   const contenders: LabEntry[] = [];
-  for (let c = 1; c <= 25; c++) {
+  const contendersMaxCols = rows[rContenders + 1]?.length || 35;
+  for (let c = 1; c < contendersMaxCols; c++) {
     const countryHeader = getCell(rContenders, c);
     if (countryHeader) curCountryContender = countryHeader;
     const creator = getCell(rContenders + 1, c);
     if (!creator) continue;
-    const fb = fallbackMap.get(`contender-${c}`);
+    const fb = fallbackMap.get(`contender-${c}`) || fallbackByCreator.get(creator.toLowerCase());
     const { country, flag } = normalizeCountry(curCountryContender);
     contenders.push({
       id: `contender-${c}`,
@@ -159,12 +161,13 @@ export function parseLabCsv(csvText: string): LabEntry[] {
   const rTweakers = findRow('tweaker') !== -1 ? findRow('tweaker') : 29;
   const tweakers: LabEntry[] = [];
   let curCountryTweaker = 'America (US)';
-  for (let c = 1; c <= 8; c++) {
+  const tweakersMaxCols = rows[rTweakers + 1]?.length || 30;
+  for (let c = 1; c < tweakersMaxCols; c++) {
     const countryHeader = getCell(rTweakers, c);
     if (countryHeader) curCountryTweaker = countryHeader;
     const creator = getCell(rTweakers + 1, c);
     if (!creator) continue;
-    const fb = fallbackMap.get(`tweaker-${c}`);
+    const fb = fallbackMap.get(`tweaker-${c}`) || fallbackByCreator.get(creator.toLowerCase());
     const { country, flag } = normalizeCountry(curCountryTweaker);
     tweakers.push({
       id: `tweaker-${c}`,
@@ -183,43 +186,20 @@ export function parseLabCsv(csvText: string): LabEntry[] {
         large: getCell(rTweakers + 6, c),
         massive: getCell(rTweakers + 7, c),
         colossal: getCell(rTweakers + 8, c),
+        planetary: getCell(rTweakers + 9, c),
       },
       specialties: getCell(rTweakers + 3, c) ? `Based on ${getCell(rTweakers + 3, c)}` : '',
     });
   }
 
-  // Add the 5 additional tweakers from notes
-  const moreTweakers = [
-    { name: 'Abacus AI', based: 'Alibaba (Qwen)', note: 'The Smaug series re-spins Qwen.' },
-    { name: 'Arcee AI', based: 'Meta / Mistral / Alibaba', note: 'Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins (SuperNova, Virtuoso).' },
-    { name: 'Cognitive Computations', based: 'Meta / Mistral / Alibaba', note: 'Dolphin family for uncensored post-trained re-spins of Llama, Mistral, and Qwen.' },
-    { name: 'Nous Research', based: 'Meta / Alibaba', note: 'Hermes Agent family of fine-tuned Llama and Qwen re-spins.' },
-    { name: 'Fireworks AI', based: 'Moonshot (Kimi)', note: 'Kimi K3 efficiency re-spin named Ember.' },
-  ];
-  moreTweakers.forEach((mt, idx) => {
-    tweakers.push({
-      id: `tweaker-extra-${idx + 1}`,
-      group: 'tweakers',
-      country: 'America (US)',
-      countryFlag: '🇺🇸',
-      creator: mt.name,
-      engineName: mt.name,
-      basedOn: mt.based,
-      famousFor: mt.note,
-      weightsType: 'open',
-      openWeights: { small: true },
-      parameterSizes: { small: mt.based },
-      specialties: mt.note,
-    });
-  });
-
-  // 4. Small Model Labs (Default row 39)
-  const rSmall = findRow('small model') !== -1 ? findRow('small model') : 39;
+  // 4. Small Model Labs (Default row 40)
+  const rSmall = findRow('small model') !== -1 ? findRow('small model') : 40;
   const smallLabs: LabEntry[] = [];
   let curCountrySmall = 'America (US)';
-  for (let c = 1; c <= 22; c++) {
+  const smallMaxCols = rows[rSmall + 1]?.length || 30;
+  for (let c = 1; c < smallMaxCols; c++) {
     const countryHeader = getCell(rSmall, c);
-    if (countryHeader && !countryHeader.toLowerCase().includes('small llm')) {
+    if (countryHeader && !countryHeader.toLowerCase().includes('small llm') && !countryHeader.toLowerCase().includes('small model')) {
       curCountrySmall = countryHeader.trim();
     }
     const creator = getCell(rSmall + 1, c);
@@ -227,7 +207,7 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     if (c === 15) continue;
     if (!creator) continue;
 
-    const fb = fallbackMap.get(`small-${c}`);
+    const fb = fallbackMap.get(`small-${c}`) || fallbackByCreator.get(creator.toLowerCase());
     const { country, flag } = normalizeCountry(curCountrySmall);
 
     // If Samsung (col 14), combine Gauss 1 & Gauss 2 (from col 15)
@@ -286,12 +266,12 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     });
   }
 
-
-  // 5. Harness Only Labs (Default row 51)
-  const rHarness = findRow('harness only') !== -1 ? findRow('harness only') : 51;
+  // 5. Harness Only Labs (Default row 52)
+  const rHarness = findRow('harness only') !== -1 ? findRow('harness only') : 52;
   const harnessLabs: LabEntry[] = [];
   let curCountryHarness = 'America (US)';
-  for (let c = 1; c <= 17; c++) {
+  const harnessMaxCols = rows[rHarness + 1]?.length || 30;
+  for (let c = 1; c < harnessMaxCols; c++) {
     const countryHeader = getCell(rHarness, c);
     if (countryHeader) curCountryHarness = countryHeader.trim();
     const creator = getCell(rHarness + 1, c);

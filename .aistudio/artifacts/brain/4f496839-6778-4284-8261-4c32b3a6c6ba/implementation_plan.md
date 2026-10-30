@@ -53,6 +53,15 @@ Overhaul the **LLM Labs & Ecosystem** view into an intuitive, visually structure
   - **Cursor Clearance**: Ample vertical clearance (`mt-2.5 sm:mt-3` or `mb-2.5 sm:mb-3`) and upward indicator arrows ensure the cursor never covers or obscures text.
   - **Unified Styling**: Sleek dark glassmorphism card (`bg-slate-900/95 dark:bg-slate-950/95 border-slate-700/80 shadow-2xl backdrop-blur-md z-50 text-xs text-slate-100`).
   - **Applied Everywhere**: Model Size combined pills, Country pills, Open/Hybrid/Closed weights pills, Free(API|Chat)Paid|All switchers, Explosion toggle, Scope buttons, Sort buttons, Timeline regression badges, and Correlation coefficient badges.
+- **Header Pop-Up & Tooltip Cleanups**:
+  - **Sync-Button Popover Unification**: Replaced the native browser `title` and old inline hover div with our unified `Tooltip` component. Removed the redundant static date text next to the sync button. The sync popover now displays a single, clean card with the live sync badge, last sync date, and auto-sync notice.
+  - **Google Sheet & GitHub Popover**: Replaced native `title="..."` attributes with the unified `Tooltip` component (`align="right"` with ample cursor clearance), preventing the mouse pointer from overlapping or obscuring the text.
+  - **Suppressed Geolocation Warning Toast**: In environments like Firefox on Manjaro (where privacy/anti-fingerprinting settings reject geolocation without prompting), the noisy "Location permission denied" message is completely suppressed; the app silently and seamlessly relies on system theme and clock fallback.
+- **Bar Chart "Erweitert" Controls Restructuring**:
+  - **Explosion Switch Relocation**: Moved the Explosion Switch (`an` | `teils` | `aus`) from the sticky top bar into the first row of the expanded "Erweitert" panel (`SearchBar.tsx`), positioned centered between the Search input and the Score-Slider.
+  - **Style Harmonization**: Aligned its padding (`px-2 py-1`), font sizes (`text-[10px] sm:text-[11px]`), font families (`font-mono`), and container border styling to match the Score-Slider and surrounding button groups.
+  - **Score-Slider "Klick mich" Popover**: Positioned a compact, focused `Tooltip` pop-up displaying strictly `"Klick mich"` centered directly above the clickable colored score label button (`position="top"`).
+
 
 ---
 

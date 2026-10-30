@@ -119,7 +119,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
           role="tooltip"
           onMouseEnter={handleTooltipMouseEnter}
           onMouseLeave={handleMouseLeave}
-          className={`absolute ${positionClass} ${alignClass} ${width} max-w-[90vw] p-3 rounded-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 shadow-2xl backdrop-blur-md z-50 text-left text-xs pointer-events-auto transition-all animate-in fade-in-0 zoom-in-95 duration-150 ${popupClassName}`}
+          className={`absolute ${positionClass} ${alignClass} ${width} max-w-[90vw] p-3 rounded-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 shadow-2xl backdrop-blur-md z-50 text-left text-xs whitespace-normal break-words pointer-events-auto transition-all animate-in fade-in-0 zoom-in-95 duration-150 ${popupClassName}`}
         >
           {/* Hover bridge spanning the vertical gap between trigger and popover */}
           {position === 'bottom' ? (
@@ -142,7 +142,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
           {/* Optional Title Bar with Badge */}
           {(title || badge) && (
             <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-slate-800">
-              {title && <div className="font-bold text-xs text-slate-100">{title}</div>}
+              {title && <div className="font-bold text-xs text-slate-100 whitespace-normal break-words">{title}</div>}
               {badge && (
                 <div className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                   {badge}
@@ -152,7 +152,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
           )}
 
           {/* Body Content */}
-          <div className="text-[11px] font-normal leading-relaxed text-slate-300">
+          <div className="text-[11px] font-normal leading-relaxed text-slate-300 whitespace-normal break-words">
             {content}
           </div>
         </div>

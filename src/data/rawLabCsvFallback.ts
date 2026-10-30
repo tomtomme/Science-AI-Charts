@@ -876,21 +876,23 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "group": "tweakers",
     "country": "America (US)",
     "countryFlag": "🇺🇸",
-    "creator": "Apodex (Alibaba)",
-    "engineName": "Apodex",
+    "creator": "Abacus AI",
+    "engineName": "Smaug",
     "basedOn": "Qwen",
     "famousFor": "Based on Qwen",
-    "weightsType": "hybrid",
+    "weightsType": "open",
     "openWeights": {
       "small": true,
-      "massive": false
+      "medium": true,
+      "massive": true
     },
     "parameterSizes": {
       "small": "Mini",
       "medium": "",
       "large": "",
-      "massive": "v1",
-      "colossal": ""
+      "massive": "Flash",
+      "colossal": "",
+      "planetary": "Agentic"
     },
     "specialties": "Based on Qwen"
   },
@@ -899,119 +901,232 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "group": "tweakers",
     "country": "America (US)",
     "countryFlag": "🇺🇸",
-    "creator": "Apple (Google)",
-    "engineName": "Siri AI",
-    "basedOn": "Gemini",
-    "famousFor": "Based on Gemini",
+    "creator": "Apodex",
+    "engineName": "Apodex",
+    "basedOn": "Qwen",
+    "famousFor": "Based on Qwen",
     "weightsType": "hybrid",
     "openWeights": {
       "small": true,
-      "medium": false
+      "medium": false,
+      "massive": true
     },
     "parameterSizes": {
-      "small": "OpenELM",
-      "medium": "Gemini trained AFM model famility only available on EN locales for now, DE locale end of 2026",
+      "small": "Mini",
+      "medium": "",
       "large": "",
-      "massive": "",
-      "colossal": ""
+      "massive": "v1",
+      "colossal": "",
+      "planetary": ""
     },
-    "specialties": "Based on Gemini"
+    "specialties": "Based on Qwen"
   },
   {
     "id": "tweaker-3",
     "group": "tweakers",
     "country": "America (US)",
     "countryFlag": "🇺🇸",
-    "creator": "Circuit & Chisel / Unbiased.ai",
-    "engineName": "Pareto",
-    "basedOn": "various",
-    "famousFor": "Based on various",
-    "weightsType": "closed",
+    "creator": "Apple",
+    "engineName": "Siri AI for macOS",
+    "basedOn": "Gemini trained Apple Foundation models",
+    "famousFor": "Based on Gemini trained Apple Foundation models",
+    "weightsType": "hybrid",
     "openWeights": {
-      "small": false
+      "small": true,
+      "medium": false,
+      "massive": true
     },
     "parameterSizes": {
-      "small": "orchestrates a mix of openweight models",
-      "medium": "",
+      "small": "OpenELM",
+      "medium": "Flash-Lite trained AFM",
       "large": "",
-      "massive": "",
-      "colossal": ""
+      "massive": "Flash trained AFM",
+      "colossal": "",
+      "planetary": "Pro trained AFM"
     },
-    "specialties": "Based on various"
+    "specialties": "Based on Gemini trained Apple Foundation models"
   },
   {
     "id": "tweaker-4",
     "group": "tweakers",
     "country": "America (US)",
     "countryFlag": "🇺🇸",
-    "creator": "DeepReinforce (Alibaba, Google)",
-    "engineName": "Ornith",
-    "basedOn": "Qwen / Gemma",
-    "famousFor": "Based on Qwen / Gemma",
+    "creator": "Arcee AI",
+    "engineName": "Trinity",
+    "basedOn": "Llama, Mistral, Qwen",
+    "famousFor": "Based on Llama, Mistral, Qwen",
     "weightsType": "open",
     "openWeights": {
-      "small": true
+      "small": true,
+      "medium": true,
+      "massive": true
     },
     "parameterSizes": {
-      "small": "v1",
-      "medium": "",
+      "small": "SuperNova-Medius",
+      "medium": "Virtuoso-Large",
       "large": "",
-      "massive": "",
-      "colossal": ""
+      "massive": "Trinity-Large-Thinking",
+      "colossal": "",
+      "planetary": ""
     },
-    "specialties": "Based on Qwen / Gemma"
+    "specialties": "Based on Llama, Mistral, Qwen"
   },
   {
     "id": "tweaker-5",
     "group": "tweakers",
     "country": "America (US)",
     "countryFlag": "🇺🇸",
-    "creator": "Perplexity (Meta, Mistral)",
-    "engineName": "Sonar",
-    "basedOn": "Llama, Mistral",
-    "famousFor": "Based on Llama, Mistral",
-    "weightsType": "open",
+    "creator": "Circuit & Chisel / Unbiased.ai",
+    "engineName": "Pareto",
+    "basedOn": "Various",
+    "famousFor": "Based on Various",
+    "weightsType": "closed",
     "openWeights": {
-      "small": true,
-      "massive": true
+      "small": false,
+      "medium": false,
+      "massive": false
     },
     "parameterSizes": {
-      "small": "Llama, Mistral",
+      "small": "noname orchestrator",
       "medium": "",
       "large": "",
-      "massive": "Llama 3.1",
-      "colossal": ""
+      "massive": "",
+      "colossal": "",
+      "planetary": ""
     },
-    "specialties": "Based on Llama, Mistral"
+    "specialties": "Based on Various"
   },
   {
     "id": "tweaker-6",
     "group": "tweakers",
-    "country": "Japan",
-    "countryFlag": "🇯🇵",
-    "creator": "Sakana AI (Moonshot, Alibaba)",
-    "engineName": "Sakana",
-    "basedOn": "Kimi, Qwen",
-    "famousFor": "Based on Kimi, Qwen",
+    "country": "America (US)",
+    "countryFlag": "🇺🇸",
+    "creator": "Cognitive Computations",
+    "engineName": "Dolphin",
+    "basedOn": "uncensored Llama, Mistral, Qwen",
+    "famousFor": "Based on uncensored Llama, Mistral, Qwen",
     "weightsType": "open",
     "openWeights": {
-      "colossal": true
+      "small": true,
+      "medium": true,
+      "massive": true
+    },
+    "parameterSizes": {
+      "small": "R1",
+      "medium": "",
+      "large": "",
+      "massive": "X1",
+      "colossal": "",
+      "planetary": ""
+    },
+    "specialties": "Based on uncensored Llama, Mistral, Qwen"
+  },
+  {
+    "id": "tweaker-7",
+    "group": "tweakers",
+    "country": "America (US)",
+    "countryFlag": "🇺🇸",
+    "creator": "DeepReinforce",
+    "engineName": "Ornith",
+    "basedOn": "Qwen, Gemma",
+    "famousFor": "Based on Qwen, Gemma",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "massive": true
+    },
+    "parameterSizes": {
+      "small": "",
+      "medium": "",
+      "large": "",
+      "massive": "v1",
+      "colossal": "",
+      "planetary": ""
+    },
+    "specialties": "Based on Qwen, Gemma"
+  },
+  {
+    "id": "tweaker-8",
+    "group": "tweakers",
+    "country": "America (US)",
+    "countryFlag": "🇺🇸",
+    "creator": "Fireworks AI",
+    "engineName": "Ember",
+    "basedOn": "Kimi K3",
+    "famousFor": "Based on Kimi K3",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "massive": true
     },
     "parameterSizes": {
       "small": "",
       "medium": "",
       "large": "",
       "massive": "",
-      "colossal": "Namazu; Fugu"
+      "colossal": "",
+      "planetary": "Ember-1"
+    },
+    "specialties": "Based on Kimi K3"
+  },
+  {
+    "id": "tweaker-9",
+    "group": "tweakers",
+    "country": "America (US)",
+    "countryFlag": "🇺🇸",
+    "creator": "Perplexity",
+    "engineName": "Sonar",
+    "basedOn": "Llama, Mistral",
+    "famousFor": "Based on Llama, Mistral",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "massive": true
+    },
+    "parameterSizes": {
+      "small": "Mistral",
+      "medium": "Llama",
+      "large": "",
+      "massive": "Llama",
+      "colossal": "",
+      "planetary": ""
+    },
+    "specialties": "Based on Llama, Mistral"
+  },
+  {
+    "id": "tweaker-10",
+    "group": "tweakers",
+    "country": "Japan",
+    "countryFlag": "🇯🇵",
+    "creator": "Sakana AI",
+    "engineName": "Sakana",
+    "basedOn": "Kimi, Qwen",
+    "famousFor": "Based on Kimi, Qwen",
+    "weightsType": "open",
+    "openWeights": {
+      "small": true,
+      "medium": true,
+      "massive": true
+    },
+    "parameterSizes": {
+      "small": "Fugu orchestrator",
+      "medium": "",
+      "large": "",
+      "massive": "Namazu",
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": "Based on Kimi, Qwen"
   },
   {
-    "id": "tweaker-7",
+    "id": "tweaker-11",
     "group": "tweakers",
     "country": "Saudi Arabia",
     "countryFlag": "🇸🇦",
-    "creator": "HUMAIN (MiniMax)",
+    "creator": "HUMAIN",
     "engineName": "M",
     "basedOn": "MiniMax",
     "famousFor": "Based on MiniMax",
@@ -1026,21 +1141,23 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "medium": "v2",
       "large": "",
       "massive": "v3",
-      "colossal": ""
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": "Based on MiniMax"
   },
   {
-    "id": "tweaker-8",
+    "id": "tweaker-12",
     "group": "tweakers",
     "country": "Spain",
     "countryFlag": "🇪🇸",
-    "creator": "Multiverse Computing (Z.ai)",
+    "creator": "Multiverse Computing",
     "engineName": "-",
     "basedOn": "GLM",
     "famousFor": "Based on GLM",
     "weightsType": "closed",
     "openWeights": {
+      "small": false,
       "medium": false,
       "massive": false
     },
@@ -1049,99 +1166,10 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "medium": "HyperNova",
       "large": "",
       "massive": "Quasar",
-      "colossal": ""
+      "colossal": "",
+      "planetary": ""
     },
     "specialties": "Based on GLM"
-  },
-  {
-    "id": "tweaker-extra-1",
-    "group": "tweakers",
-    "country": "America (US)",
-    "countryFlag": "🇺🇸",
-    "creator": "Abacus AI",
-    "engineName": "Abacus AI",
-    "basedOn": "Alibaba (Qwen)",
-    "famousFor": "The Smaug series re-spins Qwen.",
-    "weightsType": "open",
-    "openWeights": {
-      "small": true
-    },
-    "parameterSizes": {
-      "small": "Alibaba (Qwen)"
-    },
-    "specialties": "The Smaug series re-spins Qwen."
-  },
-  {
-    "id": "tweaker-extra-2",
-    "group": "tweakers",
-    "country": "America (US)",
-    "countryFlag": "🇺🇸",
-    "creator": "Arcee AI",
-    "engineName": "Arcee AI",
-    "basedOn": "Meta / Mistral / Alibaba",
-    "famousFor": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins (SuperNova, Virtuoso).",
-    "weightsType": "open",
-    "openWeights": {
-      "small": true
-    },
-    "parameterSizes": {
-      "small": "Meta / Mistral / Alibaba"
-    },
-    "specialties": "Evolutionary model merging for domain-adapted Llama, Mistral, and Qwen re-spins (SuperNova, Virtuoso)."
-  },
-  {
-    "id": "tweaker-extra-3",
-    "group": "tweakers",
-    "country": "America (US)",
-    "countryFlag": "🇺🇸",
-    "creator": "Cognitive Computations",
-    "engineName": "Cognitive Computations",
-    "basedOn": "Meta / Mistral / Alibaba",
-    "famousFor": "Dolphin family for uncensored post-trained re-spins of Llama, Mistral, and Qwen.",
-    "weightsType": "open",
-    "openWeights": {
-      "small": true
-    },
-    "parameterSizes": {
-      "small": "Meta / Mistral / Alibaba"
-    },
-    "specialties": "Dolphin family for uncensored post-trained re-spins of Llama, Mistral, and Qwen."
-  },
-  {
-    "id": "tweaker-extra-4",
-    "group": "tweakers",
-    "country": "America (US)",
-    "countryFlag": "🇺🇸",
-    "creator": "Nous Research",
-    "engineName": "Nous Research",
-    "basedOn": "Meta / Alibaba",
-    "famousFor": "Hermes Agent family of fine-tuned Llama and Qwen re-spins.",
-    "weightsType": "open",
-    "openWeights": {
-      "small": true
-    },
-    "parameterSizes": {
-      "small": "Meta / Alibaba"
-    },
-    "specialties": "Hermes Agent family of fine-tuned Llama and Qwen re-spins."
-  },
-  {
-    "id": "tweaker-extra-5",
-    "group": "tweakers",
-    "country": "America (US)",
-    "countryFlag": "🇺🇸",
-    "creator": "Fireworks AI",
-    "engineName": "Fireworks AI",
-    "basedOn": "Moonshot (Kimi)",
-    "famousFor": "Kimi K3 efficiency re-spin named Ember.",
-    "weightsType": "open",
-    "openWeights": {
-      "small": true
-    },
-    "parameterSizes": {
-      "small": "Moonshot (Kimi)"
-    },
-    "specialties": "Kimi K3 efficiency re-spin named Ember."
   },
   {
     "id": "small-1",

@@ -93,11 +93,8 @@ export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
     .replace(/\s+/g, ' ')
     .trim();
   const cellC1 = (rows[0]?.[2] || '').trim();
-  let combinedTitle = cellA1;
-  if (cellB2) {
-    const strippedB2 = cellB2.replace(/^\|\s*/, '');
-    combinedTitle = cellA1 ? `${cellA1} | ${strippedB2}` : strippedB2;
-  }
+  // Title is strictly cell A1 (cell B2 is excluded as requested)
+  const combinedTitle = cellA1;
 
   // Extract category names from row 1, cols 3 to 10 (cells D2 to K2)
   const categoryNames: string[] = [];

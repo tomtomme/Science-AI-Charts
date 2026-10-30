@@ -95,6 +95,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [hoveredSegment, setHoveredSegment] = useState<HoveredSegmentInfo | null>(null);
 
+  // Floating segment tooltip with cursor offset (zero mouse obstruction)
+  const [segmentTooltip, setSegmentTooltip] = useState<{
+    data: HoveredSegmentInfo;
+    x: number;
+    y: number;
+  } | null>(null);
+
   // Persistent model & segment detail to keep showing the info even after the mouse leaves the bar
   const [persistentModel, setPersistentModel] = useState<ModelRecord | null>(null);
   const [persistentSegment, setPersistentSegment] = useState<HoveredSegmentInfo | null>(null);
@@ -104,6 +111,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     setPersistentModel(null);
     setPersistentSegment(null);
     setHoveredSegment(null);
+    setSegmentTooltip(null);
   }, [activeCategoryIndex, hoveredCategoryComp, scoreMode, currentExplosionMode]);
 
   // Smooth scroll down to "How to read this" section at the exact anchor explaining this category
@@ -299,6 +307,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       setHoveredIndex(null);
     }
     setHoveredSegment(null);
+    setSegmentTooltip(null);
     // Behalte persistentModel und persistentSegment nur bei, wenn Explosion aktiv ist
     if (currentExplosionMode === 'off') {
       setPersistentModel(null);
@@ -512,37 +521,43 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
-      {/* Sleek one-row explainer & info bar above chart: locked 38px height for zero layout shift */}
-      <div className="flex items-center h-[38px] min-h-[38px] max-h-[38px] px-3 mb-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-hidden">
-        <div className="w-full min-w-0 overflow-hidden">
+      {/* Sleek one-row explainer & info bar above chart: locked 38px height for zero layout shift with overflow-visible tooltips */}
+      <div className="relative z-20 flex items-center h-[38px] min-h-[38px] max-h-[38px] px-3 mb-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-visible">
+        <div className="w-full min-w-0 overflow-visible">
           {displayedModel ? (
-            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
+            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] whitespace-nowrap overflow-visible">
               {/* Model Name & Favicon (Clickable link if modelUrl is available) */}
               {displayedModel.modelUrl ? (
-                <a
-                  href={displayedModel.modelUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors group cursor-pointer shrink-0"
-                  title={`${displayedModel.displayName} · ${t.openChatbotApp}`}
+                <Tooltip
+                  content={`${displayedModel.displayName} · ${t.openChatbotApp}`}
+                  position="bottom"
+                  align="left"
+                  width="w-auto max-w-xs"
                 >
-                  <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
-                    <img
-                      src={displayedModel.faviconUrl}
-                      alt=""
-                      className={`w-full h-full object-contain ${
-                        isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
-                      }`}
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  </span>
-                  <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 group-hover:decoration-blue-500">
-                    {displayedModel.displayName}
-                  </span>
-                  <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
-                </a>
+                  <a
+                    href={displayedModel.modelUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors group cursor-pointer shrink-0"
+                  >
+                    <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
+                      <img
+                        src={displayedModel.faviconUrl}
+                        alt=""
+                        className={`w-full h-full object-contain ${
+                          isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
+                        }`}
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </span>
+                    <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 group-hover:decoration-blue-500">
+                      {displayedModel.displayName}
+                    </span>
+                    <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                  </a>
+                </Tooltip>
               ) : (
                 <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 shrink-0">
                   <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
@@ -580,45 +595,57 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {displayedSegment ? (
                 <>
                   <span className="text-slate-400">·</span>
-                  <button
-                    type="button"
-                    onClick={() => scrollToCategoryExplanation(displayedSegment.comp.id)}
-                    className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
-                    title={
+                  <Tooltip
+                    content={
                       lang === 'de'
                         ? `${displayedSegment.comp.nameDe}: Zur Erläuterung in „How to read this“ springen`
                         : `${displayedSegment.comp.nameEn}: Jump to explanation in "How to read this"`
                     }
+                    position="bottom"
+                    align="left"
+                    width="w-72 max-w-sm"
                   >
-                    <span
-                      className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
-                      style={{ backgroundColor: displayedSegment.comp.color }}
-                    />
-                    <span style={{ color: displayedSegment.comp.color }}>
-                      {lang === 'de' ? displayedSegment.comp.nameDe : displayedSegment.comp.nameEn}
-                    </span>
-                    <span className="font-mono text-slate-900 dark:text-white font-bold">
-                      {displayedSegment.comp.id === 'scienceKnowledge'
-                        ? (displayedSegment.raw > 0 ? `+${Math.round(displayedSegment.raw)} pts` : `${Math.round(displayedSegment.raw)} pts`)
-                        : `${Math.round(displayedSegment.raw)}%`}
-                    </span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400 font-normal">
-                      (+{displayedSegment.points.toFixed(1)} {t.points})
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollToCategoryExplanation(displayedSegment.comp.id)}
+                      className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
+                    >
+                      <span
+                        className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
+                        style={{ backgroundColor: displayedSegment.comp.color }}
+                      />
+                      <span style={{ color: displayedSegment.comp.color }}>
+                        {lang === 'de' ? displayedSegment.comp.nameDe : displayedSegment.comp.nameEn}
+                      </span>
+                      <span className="font-mono text-slate-900 dark:text-white font-bold">
+                        {displayedSegment.comp.id === 'scienceKnowledge'
+                          ? (displayedSegment.raw > 0 ? `+${Math.round(displayedSegment.raw)} pts` : `${Math.round(displayedSegment.raw)} pts`)
+                          : `${Math.round(displayedSegment.raw)}%`}
+                      </span>
+                      <span className="font-mono text-slate-500 dark:text-slate-400 font-normal">
+                        (+{displayedSegment.points.toFixed(1)} {t.points})
+                      </span>
+                    </button>
+                  </Tooltip>
 
                   <span className="text-slate-400">·</span>
                   {displayedSegment.comp.sourceUrl ? (
-                    <a
-                      href={displayedSegment.comp.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
-                      title={`${displayedSegment.comp.sourceName} ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
+                    <Tooltip
+                      content={`${displayedSegment.comp.sourceName} · ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
+                      position="bottom"
+                      align="left"
+                      width="w-auto max-w-sm"
                     >
-                      <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
-                      <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                    </a>
+                      <a
+                        href={displayedSegment.comp.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                      >
+                        <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                      </a>
+                    </Tooltip>
                   ) : (
                     <span className="font-mono text-[11px] text-slate-400 shrink-0">
                       {t.sourceLabel} {displayedSegment.comp.sourceName}
@@ -643,7 +670,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               )}
             </div>
           ) : displayedCategoryComp ? (
-            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
+            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] whitespace-nowrap overflow-visible">
               <Tooltip
                 content={
                   lang === 'de'
@@ -651,7 +678,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     : `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'en', displayedCategoryComp)}: Jump to explanation in "How to read this"`
                 }
                 align="left"
-                width="w-64"
+                position="bottom"
+                width="w-72 max-w-sm"
               >
                 <button
                   type="button"
@@ -675,16 +703,22 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
               <span className="text-slate-400">·</span>
               {displayedCategoryComp.sourceUrl ? (
-                <a
-                  href={displayedCategoryComp.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
-                  title={`${displayedCategoryComp.sourceName} ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
+                <Tooltip
+                  content={`${displayedCategoryComp.sourceName} · ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
+                  position="bottom"
+                  align="left"
+                  width="w-auto max-w-sm"
                 >
-                  <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
-                  <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                </a>
+                  <a
+                    href={displayedCategoryComp.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                  >
+                    <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
+                    <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                  </a>
+                </Tooltip>
               ) : (
                 <span className="font-mono text-xs text-slate-400 shrink-0">
                   {t.sourceLabel} {displayedCategoryComp.sourceName}
@@ -692,12 +726,16 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               )}
 
               <span className="text-slate-400">·</span>
-              <span
-                className="text-slate-600 dark:text-slate-300 truncate min-w-0 flex-1 leading-snug"
-                title={lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
+              <Tooltip
+                content={lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
+                position="bottom"
+                align="left"
+                width="w-80"
               >
-                {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
-              </span>
+                <span className="text-slate-600 dark:text-slate-300 truncate min-w-0 flex-1 leading-snug cursor-help">
+                  {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
+                </span>
+              </Tooltip>
 
               {sortBy === 'date' && (
                 <>
@@ -710,7 +748,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] overflow-hidden whitespace-nowrap">
+            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] whitespace-nowrap overflow-visible">
               <Tooltip
                 content={
                   lang === 'de'
@@ -718,7 +756,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     : `${currentScoreInfo.name}: Jump to explanation in "How to read this"`
                 }
                 align="left"
-                width="w-64"
+                position="bottom"
+                width="w-72 max-w-sm"
               >
                 <button
                   type="button"
@@ -756,12 +795,16 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </span>
 
               <span className="text-slate-400">·</span>
-              <span
-                className="text-slate-600 dark:text-slate-300 truncate min-w-0 flex-1 leading-snug"
-                title={currentScoreInfo.description}
+              <Tooltip
+                content={currentScoreInfo.description}
+                position="bottom"
+                align="left"
+                width="w-80"
               >
-                {currentScoreInfo.description}
-              </span>
+                <span className="text-slate-600 dark:text-slate-300 truncate min-w-0 flex-1 leading-snug cursor-help">
+                  {currentScoreInfo.description}
+                </span>
+              </Tooltip>
 
               {sortBy === 'date' && (
                 <>
@@ -785,7 +828,15 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             className="block w-full h-auto"
             style={{ minWidth: `${Math.round(chartWidth * 0.75)}px` }}
             preserveAspectRatio="xMidYMid meet"
-            onMouseLeave={() => handleMouseLeave()}
+            onMouseMove={(e) => {
+              if (segmentTooltip) {
+                setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+              }
+            }}
+            onMouseLeave={() => {
+              handleMouseLeave();
+              setSegmentTooltip(null);
+            }}
           >
             <defs>
               {/* USA: Blau mit weißen Sternen - Stärker gezoomt & dezent verteilt */}
@@ -1128,13 +1179,29 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       style={{
                         transition: 'y 0.25s ease-out, height 0.25s ease-out',
                       }}
-                    >
-                      <title>
-                        {lang === 'de'
-                          ? `${activeComp.nameDe}: Klicken, um die Erklärung in „How to read this“ anzuzeigen`
-                          : `${activeComp.nameEn}: Click to view explanation in "How to read this"`}
-                      </title>
-                    </rect>
+                      onMouseEnter={(e) => {
+                        const segInfo: HoveredSegmentInfo = {
+                          comp: activeComp,
+                          model,
+                          points: catPoints,
+                          raw: catRaw,
+                        };
+                        setHoveredSegment(segInfo);
+                        setPersistentSegment(segInfo);
+                        setPersistentModel(model);
+                        setSegmentTooltip({
+                          data: segInfo,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
+                      }}
+                      onMouseMove={(e) => {
+                        setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                      }}
+                      onMouseLeave={() => {
+                        setSegmentTooltip(null);
+                      }}
+                    />
 
                     {/* Centered raw score inside bar if height >= 18 */}
                     {totalBarHeight >= 18 && (
@@ -1167,9 +1234,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     const opacity = isOtherFocused && exploded ? 0.35 : 1;
                     const isTop = sIdx === segments.length - 1;
                     const benchMeta = BENCHMARK_COMPONENTS.find((b) => b.id === seg.comp.id);
-                    const categoryTitle = benchMeta
-                      ? (lang === 'de' ? benchMeta.nameDe : benchMeta.nameEn)
-                      : seg.comp.id;
 
                     return (
                       <g
@@ -1204,7 +1268,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           style={{
                             transition: 'y 0.25s ease-out, fill 0.25s ease-out, opacity 0.2s',
                           }}
-                          onMouseEnter={() => {
+                          onMouseEnter={(e) => {
                             if (exploded && benchMeta) {
                               const segInfo: HoveredSegmentInfo = {
                                 comp: benchMeta,
@@ -1215,17 +1279,22 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               setHoveredSegment(segInfo);
                               setPersistentSegment(segInfo);
                               setPersistentModel(model);
+                              setSegmentTooltip({
+                                data: segInfo,
+                                x: e.clientX,
+                                y: e.clientY,
+                              });
                             }
                           }}
-                        >
-                          {exploded && (
-                            <title>
-                              {lang === 'de'
-                                ? `${categoryTitle}: Klicken, um die Erklärung in „How to read this“ anzuzeigen`
-                                : `${categoryTitle}: Click to view explanation in "How to read this"`}
-                            </title>
-                          )}
-                        </rect>
+                          onMouseMove={(e) => {
+                            if (exploded && benchMeta) {
+                              setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            setSegmentTooltip(null);
+                          }}
+                        />
 
                         {/* Seamless hit area covering the segment and explosion gap to eliminate any dead zones */}
                         {exploded && benchMeta && (
@@ -1246,7 +1315,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               e.stopPropagation();
                               scrollToCategoryExplanation(seg.comp.id);
                             }}
-                            onMouseEnter={() => {
+                            onMouseEnter={(e) => {
                               const segInfo: HoveredSegmentInfo = {
                                 comp: benchMeta,
                                 model,
@@ -1256,14 +1325,19 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               setHoveredSegment(segInfo);
                               setPersistentSegment(segInfo);
                               setPersistentModel(model);
+                              setSegmentTooltip({
+                                data: segInfo,
+                                x: e.clientX,
+                                y: e.clientY,
+                              });
                             }}
-                          >
-                            <title>
-                              {lang === 'de'
-                                ? `${categoryTitle}: Klicken, um die Erklärung in „How to read this“ anzuzeigen`
-                                : `${categoryTitle}: Click to view explanation in "How to read this"`}
-                            </title>
-                          </rect>
+                            onMouseMove={(e) => {
+                              setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                            }}
+                            onMouseLeave={() => {
+                              setSegmentTooltip(null);
+                            }}
+                          />
                         )}
 
                         {/* Originale Prozentzahl mittig im jeweiligen Balkenteil bei Explosion (auch Nachbarbalken & volle Explosion) */}
@@ -1457,7 +1531,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         fontSize="10"
                         fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '500'}
                       >
-                        <title>{`${model.displayName}${model.releaseDate ? ` (${model.releaseDate})` : ''} · ${t.openChatbotApp}`}</title>
                         {model.displayName}
                         {model.isNew && (
                           <tspan fill="#F59E0B" fontWeight="bold"> ✦ NEW</tspan>
@@ -1481,7 +1554,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       fontSize="10"
                       fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '500'}
                     >
-                      <title>{`${model.displayName}${model.releaseDate ? ` (${model.releaseDate})` : ''}`}</title>
                       {model.displayName}
                       {model.isNew && (
                         <tspan fill="#F59E0B" fontWeight="bold"> ✦ NEW</tspan>
@@ -1501,6 +1573,48 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
           </svg>
         </div>
       </div>
+
+      {/* Floating compact segment tooltip with cursor offset (zero redundancy, zero mouse obstruction) */}
+      {segmentTooltip && (
+        <div
+          className="pointer-events-none fixed z-50 transition-opacity duration-100"
+          style={{
+            left: `${Math.max(12, Math.min(window.innerWidth - 210, segmentTooltip.x - 90))}px`,
+            top: `${segmentTooltip.y < 110 ? segmentTooltip.y + 22 : segmentTooltip.y - 12}px`,
+            transform: segmentTooltip.y < 110 ? 'translateY(0)' : 'translateY(-100%)',
+          }}
+        >
+          <div className="w-auto min-w-[155px] max-w-[210px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-[11px] font-sans">
+            {/* Category Name & Raw Score */}
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className="w-2.5 h-2.5 rounded-xs shrink-0 shadow-2xs border border-white/20"
+                  style={{ backgroundColor: segmentTooltip.data.comp.color }}
+                />
+                <span className="font-bold truncate text-[11px]" style={{ color: segmentTooltip.data.comp.color }}>
+                  {lang === 'de' ? segmentTooltip.data.comp.nameDe : segmentTooltip.data.comp.nameEn}
+                </span>
+              </div>
+              <span className="font-mono font-bold text-white shrink-0 text-xs">
+                {segmentTooltip.data.comp.id === 'scienceKnowledge'
+                  ? (segmentTooltip.data.raw > 0 ? `+${Math.round(segmentTooltip.data.raw)} pts` : `${Math.round(segmentTooltip.data.raw)} pts`)
+                  : `${Math.round(segmentTooltip.data.raw)}%`}
+              </span>
+            </div>
+
+            {/* Score points contribution & subtle click hint */}
+            <div className="flex items-center justify-between gap-2 mt-1 pt-1 border-t border-slate-800 text-[10px] font-mono text-slate-400">
+              <span className="text-emerald-400 font-semibold">
+                +{segmentTooltip.data.points.toFixed(1)} {t.points}
+              </span>
+              <span className="text-[9.5px] text-slate-400">
+                {lang === 'de' ? '👉 Details' : '👉 Details'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
