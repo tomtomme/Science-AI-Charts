@@ -280,11 +280,11 @@ export default function App() {
   // Score-Modus für die Timeline: Default 'old' (umfasst bis zu 224 historische Modelle)
   const [timelineScoreMode, setTimelineScoreMode] = useState<ScoreMode>('old');
 
-  // Schalter: 'current' (nur noch verfügbare Chatbots) vs 'all' (alle Chatbots der CSV)
-  const [modelScope, setModelScope] = useState<ModelScope>('all');
+  // Schalter: 'current' (nur noch verfügbare Chatbots) vs 'all' (alle Chatbots der CSV) - Standard: 'current'
+  const [modelScope, setModelScope] = useState<ModelScope>('current');
 
-  // Preis-Filter: 'all' (Standard), 'free', 'paid'
-  const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
+  // Preis-Filter: 'paid' (Standard), 'free', 'all'
+  const [priceFilter, setPriceFilter] = useState<PriceFilter>('paid');
 
   // Pop-Up für Titel / Untertitel bei Mouse-Over
   const [showHeaderInfo, setShowHeaderInfo] = useState<boolean>(false);
@@ -350,7 +350,7 @@ export default function App() {
   // Filter: Freitext-Suche und Schnellfilter mit Standard-Vorauswahl 'All' (alle Modell-Familien)
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [selectedFamilies, setSelectedFamilies] = useState<string[]>([]);
-  const [selectedCompany] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
 
   const handleSelectLabFromMatrix = useCallback((creatorName: string) => {
     setSearchFilter(creatorName);
@@ -563,6 +563,11 @@ export default function App() {
 
   const handleClearFamilies = useCallback(() => {
     setSelectedFamilies([]);
+    setSelectedCompany(null);
+  }, []);
+
+  const handleSelectCompany = useCallback((company: string) => {
+    setSelectedCompany((prev) => (prev?.toLowerCase() === company.toLowerCase() ? null : company));
   }, []);
 
   const handleExplosionModeChange = useCallback((mode: ExplosionMode) => {
@@ -1283,6 +1288,8 @@ export default function App() {
               categoryNames={loadedData.headerMeta?.categoryNames}
               explosionMode={explosionMode}
               onExplosionModeChange={handleExplosionModeChange}
+              selectedCompany={selectedCompany}
+              onSelectCompany={setSelectedCompany}
             />
 
             {/* Balkendiagramm: Breit dargestellt, die volle Containerbreite nutzend */}
@@ -1299,6 +1306,7 @@ export default function App() {
                 searchFilter={searchFilter}
                 selectedFamilies={selectedFamilies}
                 selectedCompany={selectedCompany}
+                onSelectCompany={handleSelectCompany}
                 lang={lang}
                 showAdvanced={showAdvanced}
                 onToggleAdvanced={() => setShowAdvanced((prev) => !prev)}

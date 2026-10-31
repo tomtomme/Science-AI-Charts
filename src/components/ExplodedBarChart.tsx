@@ -30,6 +30,7 @@ interface ExplodedBarChartProps {
   onPriceFilterChange?: (filter: PriceFilter) => void;
   categoryNames?: string[];
   onScrollToParagraph?: (targetId: string) => void;
+  onSelectCompany?: (company: string) => void;
 }
 
 /**
@@ -76,6 +77,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   onPriceFilterChange,
   categoryNames,
   onScrollToParagraph,
+  onSelectCompany,
 }) => {
   const t = TRANSLATIONS[lang];
 
@@ -1370,9 +1372,20 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   const imgSize = isZoomed ? 27 : 19;
                   const clipId = `clip-unexp-${model.id}`;
                   const iconCenterY = activeComp && totalBarHeight >= 48 ? barCenterY - 10 : barCenterY;
+                  const isSelected = selectedCompany && (
+                    model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
+                    model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase())
+                  );
 
                   return (
-                    <g pointerEvents="none" className="transition-opacity duration-200">
+                    <g
+                      className="cursor-pointer transition-transform duration-150 hover:scale-125"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectCompany?.(model.companyName);
+                      }}
+                    >
+                      <title>{lang === 'de' ? `Nach Hersteller filtern: ${model.companyName}` : `Filter by manufacturer: ${model.companyName}`}</title>
                       <defs>
                         <clipPath id={clipId}>
                           <circle cx={barCenterX} cy={iconCenterY} r={circleRadius - 0.75} />
@@ -1383,8 +1396,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         cy={iconCenterY}
                         r={circleRadius}
                         fill="#FFFFFF"
-                        stroke="rgba(0,0,0,0.35)"
-                        strokeWidth="1"
+                        stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.35)'}
+                        strokeWidth={isSelected ? 2.5 : 1}
                       />
                       <image
                         href={model.faviconUrl}
@@ -1443,14 +1456,23 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   const circleRadius = 13;
                   const imgSize = isZoomed ? 33 : 23;
                   const clipId = `clip-exp-hov-${model.id}`;
+                  const isSelected = selectedCompany && (
+                    model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
+                    model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase())
+                  );
 
                   return (
                     <g
-                      pointerEvents="none"
+                      className="cursor-pointer transition-transform duration-150 hover:scale-120"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectCompany?.(model.companyName);
+                      }}
                       style={{
                         transition: 'opacity 0.2s ease-out',
                       }}
                     >
+                      <title>{lang === 'de' ? `Nach Hersteller filtern: ${model.companyName}` : `Filter by manufacturer: ${model.companyName}`}</title>
                       <defs>
                         <clipPath id={clipId}>
                           <circle cx={barCenterX} cy={barTopY - 38} r={circleRadius - 0.75} />
@@ -1461,8 +1483,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         cy={barTopY - 38}
                         r={circleRadius}
                         fill="#FFFFFF"
-                        stroke="rgba(0,0,0,0.2)"
-                        strokeWidth="1"
+                        stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.2)'}
+                        strokeWidth={isSelected ? 2.5 : 1}
                       />
                       <image
                         href={model.faviconUrl}
@@ -1478,14 +1500,26 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 })()}
 
                 {/* Companion Mini-Favicon above Neighbor Exploded Bars */}
-                {exploded && !isHovered && !fullExplosionEnabled && (() => {
+                {exploded && !isHovered && (() => {
                   const isZoomed = isZoomedCompany(model);
                   const circleRadius = 10;
                   const imgSize = isZoomed ? 25 : 17;
                   const clipId = `clip-exp-nbr-${model.id}`;
+                  const isSelected = selectedCompany && (
+                    model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
+                    model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase())
+                  );
 
                   return (
-                    <g pointerEvents="none" opacity="0.9">
+                    <g
+                      className="cursor-pointer transition-transform duration-150 hover:scale-130"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectCompany?.(model.companyName);
+                      }}
+                      opacity={isSelected ? '1' : '0.9'}
+                    >
+                      <title>{lang === 'de' ? `Nach Hersteller filtern: ${model.companyName}` : `Filter by manufacturer: ${model.companyName}`}</title>
                       <defs>
                         <clipPath id={clipId}>
                           <circle cx={barCenterX} cy={barTopY - 32} r={circleRadius - 0.75} />
@@ -1496,8 +1530,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         cy={barTopY - 32}
                         r={circleRadius}
                         fill="#FFFFFF"
-                        stroke="rgba(0,0,0,0.15)"
-                        strokeWidth="0.75"
+                        stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.15)'}
+                        strokeWidth={isSelected ? 2 : 0.75}
                       />
                       <image
                         href={model.faviconUrl}

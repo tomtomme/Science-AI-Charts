@@ -39,7 +39,7 @@ export const CSV_NOTES_DATA: {
         link: { url: 'https://artificialanalysis.ai', label: 'artificialanalysis.ai' },
       },
       {
-        heading: 'Non-Hallu-Rate',
+        heading: 'Non-Hallucination-Rate',
         text: 'Non-Hallucination Rate in %: The Bots were trained on a fixed set of data / knowledge. There are many things unknown to humanity and thus the bots. If you ask the bot unknown stuff it tends to invent answers / hallucinate. Lower non-hallucination-rate prevents this. This rate is already included in the IQ benchmark, but its weight there is only 5 %. For science it is much more important that a bot sincerely tells us if he does not know something.',
       },
       {
@@ -116,7 +116,7 @@ export const CSV_NOTES_DATA: {
         link: { url: 'https://artificialanalysis.ai', label: 'artificialanalysis.ai' },
       },
       {
-        heading: 'Non-Hallu-Rate',
+        heading: 'Non-Hallucination-Rate',
         text: 'Non-Hallucination-Rate in %: Die Bots wurden auf einem festen Satz von Daten / Wissen trainiert. Es gibt viele Dinge, die der Menschheit und somit auch den Bots unbekannt sind. Fragt man den Bot nach unbekannten Dingen, neigt er dazu, Antworten zu erfinden / zu halluzinieren. Eine hohe Non-Hallucination-Rate verhindert dies. Diese Rate ist bereits im IQ-Benchmark enthalten, aber ihr Gewicht liegt dort bei lediglich 5 %. Für die Wissenschaft ist es viel wichtiger, dass ein Bot uns aufrichtig sagt, wenn er etwas nicht weiß.',
       },
       {

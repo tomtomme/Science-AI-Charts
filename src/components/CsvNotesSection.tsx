@@ -185,8 +185,20 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     });
   }
 
-  // 3. Bullets starting with '-' followed by label with ':' or '='
-  const bulletRegex = /(?:^|\r?\n|[.!?):]|\bquestions|[^\w\s])\s*-+\s*([A-Z(][A-Za-z0-9()&'" \/-]*?)([:=])\s*/g;
+  // 3. Explicit known benchmark keywords (e.g. IQ, Non-Hallucination-Rate, Science Knowledge, etc.)
+  // Handles punctuation boundaries, optional dashes, spaces, and 'in %' suffixes
+  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])\s*/gi;
+  while ((match = benchmarkKeywordsRegex.exec(rawText)) !== null) {
+    cuts.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      heading: match[1].trim(),
+      isMajor: false,
+    });
+  }
+
+  // 4. General bullets starting with '-' followed by label with ':' or '=' (now supporting %, /, &, and unicode dashes)
+  const bulletRegex = /(?:^|\r?\n|[.!?):]|\bquestions|[^\w\s])\s*-+\s*([A-Z(][A-Za-z0-9()&'"\/%\s–—-]*?)([:=])\s*/g;
   while ((match = bulletRegex.exec(rawText)) !== null) {
     cuts.push({
       start: match.index,
@@ -359,6 +371,7 @@ function getBilingualSection1Paragraphs(
       if (match) {
         return {
           ...match,
+          heading: p.heading ? p.heading.replace(/[:=]+$/, '').trim() : match.heading,
           isMajor: p.isMajor ?? match.isMajor,
           link: p.link || match.link,
         };

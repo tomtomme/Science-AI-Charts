@@ -32,6 +32,8 @@ interface SearchBarProps {
   categoryNames?: string[];
   explosionMode?: ExplosionMode;
   onExplosionModeChange?: (mode: ExplosionMode) => void;
+  selectedCompany?: string | null;
+  onSelectCompany?: (company: string | null) => void;
 }
 
 // 12 alphabetische Hersteller-Familien (ohne 'Ling')
@@ -75,6 +77,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   categoryNames,
   explosionMode,
   onExplosionModeChange,
+  selectedCompany,
+  onSelectCompany,
 }) => {
   const t = TRANSLATIONS[lang];
 
@@ -416,6 +420,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 </button>
               );
             })}
+
+            {/* Aktiver Hersteller-Filter per Klick auf Firmen-Logo */}
+            {selectedCompany && (
+              <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono bg-blue-600 text-white font-bold shadow-2xs ring-1 ring-blue-400">
+                <span>{lang === 'de' ? 'Hersteller' : 'Company'}: {selectedCompany}</span>
+                <button
+                  type="button"
+                  onClick={() => onSelectCompany?.(null)}
+                  className="hover:text-blue-200 cursor-pointer ml-0.5 p-0.5 rounded hover:bg-blue-700/80"
+                  title={lang === 'de' ? 'Hersteller-Filter aufheben' : 'Clear company filter'}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
           </div>
 
           {/* Rechte Kontroll-Gruppe: Current/All Switcher + Max Bar Count Slider + Sortierung ganz rechts */}

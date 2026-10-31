@@ -217,6 +217,54 @@ export const GLOSSARY_TERMS: GlossaryTermDef[] = [
     category: 'infrastructure',
   },
   {
+    id: 'term-neural-network',
+    termEn: 'Neural Network',
+    termDe: 'Neuronales Netz',
+    badgeEn: 'Foundations',
+    badgeDe: 'Grundlagen',
+    shortEn: 'Layered computational graph inspired by biological neurons learning features and token relationships.',
+    shortDe: 'Schichtenweises mathematisches Rechennetzwerk, das Muster und Beziehungen zwischen Daten lernt.',
+    detailEn: 'Consists of interconnected nodes (neurons) organized in layers. Deep learning architectures (especially Transformers) form the mathematical basis of modern generative models and LLMs.',
+    detailDe: 'Besteht aus vernetzten Knoten (Neuronen) in mehreren Schichten. Moderne Deep-Learning-Architekturen (insbesondere Transformer) bilden das mathematische Fundament aller aktuellen Sprachmodelle.',
+    category: 'architecture',
+  },
+  {
+    id: 'term-model',
+    termEn: 'Model',
+    termDe: 'Modell',
+    badgeEn: 'Artifact',
+    badgeDe: 'Artefakt',
+    shortEn: 'Trained mathematical artifact containing learned weights that maps input prompts to output tokens.',
+    shortDe: 'Trainiertes Software-Artefakt aus gelernten Gewichten, das Eingaben (Prompts) auf Ausgaben abbildet.',
+    detailEn: 'The resulting mathematical representation saved after extensive training on GPU clusters. Can be distributed as downloadable files (Open Weights) or operated exclusively in the cloud (Closed Weights).',
+    detailDe: 'Das Ergebnis eines Trainingslaufs auf Rechenclustern. Enthält Millionen bis Billionen Parameter und kann als Datei herunterladbar (Open Weights) oder ausschließlich über Cloud-APIs nutzbar sein (Closed Weights).',
+    category: 'architecture',
+  },
+  {
+    id: 'term-chatbot',
+    termEn: 'Chatbot',
+    termDe: 'Chatbot',
+    badgeEn: 'Interface',
+    badgeDe: 'Oberfläche',
+    shortEn: 'Conversational dialogue application allowing humans to interact naturally with an underlying model.',
+    shortDe: 'Dialogorientierte Anwendung, über die Anwender per natürlicher Sprache mit einem Modell kommunizieren.',
+    detailEn: 'The interactive front-end experience (e.g. ChatGPT, Claude.ai, Le Chat) that manages chat history, context windows, markdown formatting, and streaming responses from the model.',
+    detailDe: 'Die interaktive Benutzeroberfläche (z. B. ChatGPT, Claude.ai, Le Chat), die den Chatverlauf verwaltet, Kontext an das Modell übergibt und gestreamte Antworten darstellt.',
+    category: 'infrastructure',
+  },
+  {
+    id: 'term-generative-ai',
+    termEn: 'Generative AI',
+    termDe: 'Generative KI',
+    badgeEn: 'Technology',
+    badgeDe: 'Technologie',
+    shortEn: 'Subfield of AI focused on synthesizing original content such as text, code, imagery, or audio.',
+    shortDe: 'Teilgebiet der KI, das eigenständig neue Inhalte wie Texte, Programmcode, Bilder oder Sprache erzeugt.',
+    detailEn: 'Unlike discriminative systems that merely classify or filter inputs, generative AI learns probability distributions to produce novel, coherent outputs conditioned on user prompts.',
+    detailDe: 'Im Gegensatz zu rein klassifizierenden Systemen lernen generative Modelle Wahrscheinlichkeitsverteilungen, um auf Basis von Prompts neue, kontextuell passende Antworten und Medien zu synthetisieren.',
+    category: 'architecture',
+  },
+  {
     id: 'term-stack',
     termEn: 'Tooling & Agent-Stack',
     termDe: 'Werkzeuge & Agenten-Stack',
@@ -730,6 +778,22 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
     );
   }, [labs, activeGroup, weightsFilter, sizeFilter, selectedCountry, searchQuery]);
 
+  // Alphabetically sorted glossary terms according to active language (A-Z)
+  const sortedGlossaryTerms = useMemo(() => {
+    return [...GLOSSARY_TERMS].sort((a, b) => {
+      const nameA = lang === 'de' ? a.termDe : a.termEn;
+      const nameB = lang === 'de' ? b.termDe : b.termEn;
+      return nameA.localeCompare(nameB, lang === 'de' ? 'de' : 'en', { sensitivity: 'base' });
+    });
+  }, [lang]);
+
+  // Horizontal mouse wheel scrolling for overflow button strips
+  const handleHorizontalWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.deltaY !== 0) {
+      e.currentTarget.scrollLeft += e.deltaY;
+    }
+  };
+
   const scrollToWeightsExplainer = (targetId?: string) => {
     const targetElementId = targetId || 'weights-explainer-section';
     const el = document.getElementById(targetElementId);
@@ -772,8 +836,28 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
           </p>
         </div>
 
-        {/* Source Link */}
+        {/* Header Action Buttons: Glossary & Original Sheet Link */}
         <div className="shrink-0 flex items-center gap-2">
+          <Tooltip
+            title={lang === 'de' ? 'Glossar & Fachbegriffe' : 'Glossary & Terms'}
+            align="right"
+            width="w-64"
+            content={
+              lang === 'de'
+                ? 'Zu den Definitionen springen (Neuronales Netz, Modell, Chatbot, Generative KI, Harness etc.)'
+                : 'Jump to definitions (Neural Network, Model, Chatbot, Generative AI, Harness etc.)'
+            }
+          >
+            <button
+              type="button"
+              onClick={() => scrollToGlossary()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs cursor-pointer"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+              <span>{lang === 'de' ? 'Glossar' : 'Glossary'}</span>
+            </button>
+          </Tooltip>
+
           <a
             href="https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=355721692#gid=355721692"
             target="_blank"
@@ -791,7 +875,10 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
       <div className="flex flex-col gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
         <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
           {/* Segmented Filter: "All Labs" is first / default on the far left */}
-          <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div
+            className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs overflow-x-auto scrollbar-none sm:scrollbar-thin max-w-full"
+            onWheel={handleHorizontalWheel}
+          >
             <button
               type="button"
               onClick={() => handleGroupChange('all')}
@@ -847,17 +934,43 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             >
               {lang === 'de' ? `Labore kleiner Modelle (${smallCount})` : `Small Model Labs (${smallCount})`}
             </button>
-            <button
-              type="button"
-              onClick={() => handleGroupChange('harness')}
-              className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
-                activeGroup === 'harness'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+            <Tooltip
+              title={lang === 'de' ? 'Eval- & Test-Harness' : 'Evaluation & Test Harness'}
+              badge={lang === 'de' ? 'Glossar' : 'Glossary'}
+              align="center"
+              width="w-64"
+              content={
+                <div>
+                  <p className="text-slate-300 leading-snug mb-2">
+                    {lang === 'de'
+                      ? 'Labore & Entwickler von Test-Frameworks, Benchmarks und Agent-Laufzeitumgebungen, die selbst keine eigenen Modellgewichte trainieren.'
+                      : 'Developers of testing frameworks, benchmarks, and agent execution harnesses that do not train their own model weights.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      scrollToGlossary('term-harness');
+                    }}
+                    className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
+                  >
+                    <span>{lang === 'de' ? 'Harness im Glossar nachschlagen ↓' : 'View Harness in Glossary ↓'}</span>
+                  </button>
+                </div>
+              }
             >
-              {lang === 'de' ? `Reine Harness-Labore (${harnessCount})` : `Harness Only Labs (${harnessCount})`}
-            </button>
+              <button
+                type="button"
+                onClick={() => handleGroupChange('harness')}
+                className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                  activeGroup === 'harness'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                {lang === 'de' ? `Nur Eval-Harness (${harnessCount})` : `Harness Only (${harnessCount})`}
+              </button>
+            </Tooltip>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
@@ -1025,27 +1138,6 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               </Tooltip>
             </div>
 
-            {/* Quick Link to Glossary */}
-            <Tooltip
-              title={lang === 'de' ? 'Glossar' : 'Glossary'}
-              align="center"
-              width="w-60"
-              content={
-                lang === 'de'
-                  ? 'Glossar & Begriffs-Erklärungen anzeigen (ADE, Harness, Agent, LLM, CLI etc.)'
-                  : 'Show glossary & concept definitions (ADE, Harness, Agent, LLM, CLI etc.)'
-              }
-            >
-              <button
-                type="button"
-                onClick={() => scrollToGlossary()}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
-              >
-                <BookOpen className="w-3.5 h-3.5 text-blue-500" />
-                <span>{lang === 'de' ? 'Glossar' : 'Glossary'}</span>
-              </button>
-            </Tooltip>
-
             {/* Search Input */}
             <div className="relative flex-1 min-w-[200px] max-w-md">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1077,10 +1169,22 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
           {/* Left: Size Slider with [-] and [+] step buttons and active size indicator */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-              <Cpu className="w-3.5 h-3.5 text-blue-500" />
-              <span>{lang === 'de' ? 'Modellgröße:' : 'Model Size:'}</span>
-            </div>
+            <Tooltip
+              title={lang === 'de' ? 'Modellgröße (Parameter)' : 'Model Size (Parameters)'}
+              align="left"
+              width="w-64"
+              content={
+                lang === 'de'
+                  ? 'Filtert Modelle nach Parameteranzahl: von On-Device (< 0,5 Mrd. / Micro) bis zu Frontier-Giganten (≥ 15 Bio. / Singularity). Stufenlos über Schieberegler oder Schnellwahl-Kategorien wählbar.'
+                  : 'Filter models by parameter count: from on-device (< 0.5B / Micro) to frontier megascale (≥ 15T / Singularity). Adjust via slider steps or quick-select categories.'
+              }
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-help">
+                <Cpu className="w-3.5 h-3.5 text-blue-500" />
+                <span>{lang === 'de' ? 'Modellgröße:' : 'Model Size:'}</span>
+                <HelpCircle className="w-3 h-3 text-slate-400" />
+              </div>
+            </Tooltip>
 
             {/* Range slider with step buttons */}
             <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-2xs">
@@ -1137,7 +1241,10 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
           </div>
 
           {/* Right: Quick filter buttons for the 5 primary 2-category-combined pills + All */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
+          <div
+            className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin"
+            onWheel={handleHorizontalWheel}
+          >
             {SIZE_CATEGORIES.map((cat) => {
               const isExact = sizeFilter === cat.key;
               const isSubSelected =
@@ -1149,52 +1256,38 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               const isSelected = isExact || isSubSelected;
               const count = sizeCategoryCounts[cat.key] ?? 0;
               return (
-                <Tooltip
+                <button
                   key={cat.key}
-                  title={lang === 'de' ? cat.nameDe : cat.nameEn}
-                  badge={`${count} ${lang === 'de' ? 'Modelle' : 'models'}`}
-                  align="center"
-                  width="w-64"
-                  content={lang === 'de' ? cat.descDe : cat.descEn}
+                  type="button"
+                  onClick={() => setSizeFilter(isExact && cat.key !== 'all' ? 'all' : cat.key)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    isExact
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : isSubSelected
+                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-2 border-blue-500 shadow-2xs'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setSizeFilter(isExact && cat.key !== 'all' ? 'all' : cat.key)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                      isExact
-                        ? 'bg-blue-600 text-white shadow-2xs'
-                        : isSubSelected
-                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-2 border-blue-500 shadow-2xs'
-                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
-                    }`}
-                  >
-                    {cat.key !== 'all' && (
-                      <span className={`w-2 h-2 rounded-full ${cat.dotClass} shrink-0`} />
-                    )}
-                    <span>{lang === 'de' ? cat.nameDe : cat.nameEn}</span>
-                    <span className={`text-[10px] ${isExact ? 'text-blue-100' : isSubSelected ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400'}`}>
-                      ({count})
-                    </span>
-                  </button>
-                </Tooltip>
+                  {cat.key !== 'all' && (
+                    <span className={`w-2 h-2 rounded-full ${cat.dotClass} shrink-0`} />
+                  )}
+                  <span>{lang === 'de' ? cat.nameDe : cat.nameEn}</span>
+                  <span className={`text-[10px] ${isExact ? 'text-blue-100' : isSubSelected ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400'}`}>
+                    ({count})
+                  </span>
+                </button>
               );
             })}
 
             {/* Clear size filter button if active */}
             {sizeFilter !== 'all' && (
-              <Tooltip
-                content={lang === 'de' ? 'Größenfilter aufheben' : 'Clear size filter'}
-                align="center"
-                width="w-40"
+              <button
+                type="button"
+                onClick={() => setSizeFilter('all')}
+                className="px-2 py-1 text-xs text-rose-600 dark:text-rose-400 hover:underline font-semibold cursor-pointer shrink-0"
               >
-                <button
-                  type="button"
-                  onClick={() => setSizeFilter('all')}
-                  className="px-2 py-1 text-xs text-rose-600 dark:text-rose-400 hover:underline font-semibold cursor-pointer shrink-0"
-                >
-                  ✕ {lang === 'de' ? 'Zurücksetzen' : 'Reset'}
-                </button>
-              </Tooltip>
+                ✕ {lang === 'de' ? 'Zurücksetzen' : 'Reset'}
+              </button>
             )}
           </div>
         </div>
@@ -1243,64 +1336,44 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
         })()}
 
         {/* Country Filter Strip (Pills) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 text-xs scrollbar-thin">
+        <div
+          className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 text-xs scrollbar-thin"
+          onWheel={handleHorizontalWheel}
+        >
           <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 shrink-0 mr-1 flex items-center gap-1">
             <span>🌐</span>
             <span>{lang === 'de' ? 'Land:' : 'Country:'}</span>
           </span>
-          <Tooltip
-            title={lang === 'de' ? 'Alle Länder' : 'All Countries'}
-            align="left"
-            width="w-60"
-            content={
-              lang === 'de'
-                ? 'Alle Labore weltweit anzeigen (alphabetisch nach Vendor-Name sortiert).'
-                : 'Show all AI labs globally (sorted alphabetically by vendor name).'
-            }
+          <button
+            type="button"
+            onClick={() => setSelectedCountry('all')}
+            className={`px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              selectedCountry === 'all'
+                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs'
+                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
+            }`}
           >
-            <button
-              type="button"
-              onClick={() => setSelectedCountry('all')}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                selectedCountry === 'all'
-                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              {lang === 'de' ? 'Alle Länder (A-Z)' : 'All Countries (A-Z)'}
-            </button>
-          </Tooltip>
+            {lang === 'de' ? 'Alle Länder (A-Z)' : 'All Countries (A-Z)'}
+          </button>
           {countries.map((c) => {
             const isSelected = selectedCountry === c.country;
             return (
-              <Tooltip
+              <button
                 key={c.country}
-                title={`${c.flag} ${c.country}`}
-                badge={`${c.count} ${lang === 'de' ? 'Labore' : 'labs'}`}
-                align="center"
-                width="w-56"
-                content={
-                  lang === 'de'
-                    ? `Nur KI-Labore aus ${c.country} anzeigen (alphabetisch sortiert).`
-                    : `Filter AI labs from ${c.country} (alphabetically sorted).`
-                }
+                type="button"
+                onClick={() => setSelectedCountry(isSelected ? 'all' : c.country)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
+                }`}
               >
-                <button
-                  type="button"
-                  onClick={() => setSelectedCountry(isSelected ? 'all' : c.country)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <span>{c.flag}</span>
-                  <span>{c.country}</span>
-                  <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                    ({c.count})
-                  </span>
-                </button>
-              </Tooltip>
+                <span>{c.flag}</span>
+                <span>{c.country}</span>
+                <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                  ({c.count})
+                </span>
+              </button>
             );
           })}
         </div>
@@ -1393,7 +1466,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   <div className="mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
                       {lab.group === 'harness'
-                        ? (lang === 'de' ? 'Reines Harness-Lab' : 'Harness Only Lab')
+                        ? (lang === 'de' ? 'Eval-Harness-Lab' : 'Eval Harness Lab')
                         : lang === 'de'
                         ? 'Modell-Familie'
                         : 'Model Family'}
@@ -1761,7 +1834,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {GLOSSARY_TERMS.map((term) => (
+          {sortedGlossaryTerms.map((term) => (
             <div
               key={term.id}
               id={term.id}
