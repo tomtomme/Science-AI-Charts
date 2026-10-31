@@ -1247,7 +1247,7 @@ export default function App() {
             </div>
           </main>
         ) : (
-          <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-3 sm:py-3.5 flex flex-col space-y-3.5">
+          <main className="flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-5 py-2.5 sm:py-3 flex flex-col space-y-2.5">
             {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategorie-Slider, 5er-Schritt-Slider, NEW/OLD Score, Current/All Scope, Volle Explosion und alphabetischen Hersteller-Filtern */}
             <SearchBar
               value={searchFilter}
@@ -1318,7 +1318,7 @@ export default function App() {
             </div>
 
             {/* Textfeld-Bereich unter dem Balkendiagramm: CSV-Zellen B34/C34 & N34/O34 */}
-            <div className="w-full pt-1 pb-4">
+            <div className="w-full pt-0 pb-2">
               <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
             </div>
           </main>

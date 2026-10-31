@@ -566,7 +566,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                     }`}
                   >
                     <div className="px-3 py-2 bg-slate-100 dark:bg-slate-800/90 rounded-lg border-l-4 border-slate-700 dark:border-slate-300 border-y border-r border-slate-200/90 dark:border-slate-700/80 mb-2 shadow-2xs">
-                      <h4 className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-[13px] tracking-tight leading-snug">
+                      <h4 className="font-normal text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] tracking-tight leading-snug">
                         {p.heading}
                       </h4>
                     </div>
@@ -590,13 +590,13 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                   {p.heading && (() => {
                     const headingColor = getBenchmarkHeadingColor(p.heading);
                     return (
-                      <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-xs mb-1 flex items-center gap-1.5">
+                      <h4 className="font-normal text-slate-800 dark:text-slate-200 text-xs mb-1 flex items-center gap-1.5">
                         <span
                           className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
                           style={{ backgroundColor: headingColor }}
                         />
                         <span
-                          className="font-bold font-mono text-xs tracking-tight"
+                          className="font-normal font-mono text-xs tracking-tight"
                           style={{ color: headingColor }}
                         >
                           {p.heading}
@@ -645,7 +645,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                 className={p.heading ? 'pt-2 border-t border-slate-200/60 dark:border-slate-800/60 first:border-t-0 first:pt-0' : ''}
               >
                 {p.heading && (
-                  <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-xs mb-1 flex items-center gap-1.5">
+                  <h4 className="font-normal text-slate-800 dark:text-slate-200 text-xs mb-1 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
                     <span>{p.heading}</span>
                   </h4>

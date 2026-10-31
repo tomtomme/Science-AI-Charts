@@ -192,18 +192,21 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     ? 100
     : Math.max(70, ...models.map((m) => m.score ?? m.scoreNewReported ?? 0));
   const maxAxisScore = activeComp ? 100 : Math.ceil((maxScoreInPlot + 2) / 10) * 10;
-  const chartHeight = 500;
-  const topPadding = 65; // Streamlined headroom now that the popup is integrated into the header bar
-  const bottomPadding = 165; // Generous space below baseline for rotated model names with badges without clipping
-  const availablePlotHeight = chartHeight - topPadding - bottomPadding; // 270px
-  const baselineY = chartHeight - bottomPadding; // 335px
+  // Proportional, streamlined layout: reduced vertical & horizontal whitespace
+  const chartHeight = 390;
+  const topPadding = 40; // Streamlined headroom for score & favicon
+  const bottomPadding = 125; // Space below baseline for rotated model names with badges without wasted gap
+  const availablePlotHeight = chartHeight - topPadding - bottomPadding; // 225px
+  const baselineY = chartHeight - bottomPadding; // 265px
 
-  const barWidth = 26;
-  const barGap = 12;
-  const totalBarSlot = barWidth + barGap; // 38px
-  const marginLeft = 100; // Generous left margin so rotated text for bar 0 never clips off the left edge
-  const marginRight = 40; // Right margin so the last bar and label are never clipped
-  const chartWidth = Math.max(1050, marginLeft + models.length * totalBarSlot + marginRight);
+  // Dynamic bar width and gap based on model count: clean & prominent for small sets, compact for large sets
+  const barWidth = models.length <= 12 ? 30 : models.length <= 24 ? 26 : 22;
+  const barGap = models.length <= 12 ? 14 : models.length <= 24 ? 11 : 8;
+  const totalBarSlot = barWidth + barGap;
+  const marginLeft = 58; // Streamlined left margin so rotated text for bar 0 never clips
+  const marginRight = 26; // Right margin for neat grid termination
+  const calculatedWidth = marginLeft + models.length * totalBarSlot + marginRight;
+  const chartWidth = Math.max(380, calculatedWidth);
 
   // Height formula strictly proportional to score
   const scaleY = (val: number) => {
@@ -522,12 +525,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
-      {/* Sleek one-row explainer & info bar above chart: locked 38px height for zero layout shift with overflow-visible tooltips */}
-      <div className="relative z-20 flex items-center h-[38px] min-h-[38px] max-h-[38px] px-3 mb-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-visible">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 sm:p-3.5 shadow-xs transition-colors">
+      {/* Sleek one-row explainer & info bar above chart: locked 34px height for zero layout shift with overflow-visible tooltips */}
+      <div className="relative z-20 flex items-center h-[34px] min-h-[34px] max-h-[34px] px-2.5 mb-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-visible">
         <div className="w-full min-w-0 overflow-visible">
           {displayedModel ? (
-            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] whitespace-nowrap overflow-visible">
+            <div className="flex items-center gap-x-2 text-slate-700 dark:text-slate-300 h-[34px] whitespace-nowrap overflow-visible">
               {/* Model Name & Favicon (Clickable link if modelUrl is available) */}
               {displayedModel.modelUrl ? (
                 <Tooltip
@@ -579,9 +582,14 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               )}
 
               <span className="text-slate-400">·</span>
-              <span className="font-mono text-slate-600 dark:text-slate-400 shrink-0">
-                {t.company} <strong>{displayedModel.companyName}</strong>
-              </span>
+              <button
+                type="button"
+                onClick={() => onSelectCompany?.(displayedModel.companyName)}
+                className="font-mono text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 cursor-pointer text-left transition-colors"
+                title={lang === 'de' ? `Nach Hersteller filtern: ${displayedModel.companyName}` : `Filter by company: ${displayedModel.companyName}`}
+              >
+                {t.company} <strong className="underline decoration-dotted underline-offset-2">{displayedModel.companyName}</strong>
+              </button>
 
               {displayedModel.releaseDate && (
                 <>
@@ -822,24 +830,33 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         </div>
       </div>
 
-      {/* SVG Chart Container: Zoom-out capped at 75% original size + horizontal scrollbar for discoverability */}
-      <div className="relative select-none w-full overflow-x-auto pb-2 custom-scrollbar">
-        <div style={{ minWidth: `${Math.round(chartWidth * 0.75)}px` }} className="w-full">
-          <svg
-            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-            className="block w-full h-auto"
-            style={{ minWidth: `${Math.round(chartWidth * 0.75)}px` }}
-            preserveAspectRatio="xMidYMid meet"
-            onMouseMove={(e) => {
-              if (segmentTooltip) {
-                setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-              }
+      {/* SVG Chart Container: Compact & centered for fewer models, horizontal scrollbar for large sets */}
+      <div className="relative select-none w-full overflow-x-auto pb-1 custom-scrollbar">
+        {models.length === 0 ? (
+          <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">
+            {lang === 'de' ? 'Keine Modelle für die aktuelle Filterauswahl gefunden.' : 'No models match the current filter selection.'}
+          </div>
+        ) : (
+          <div
+            style={{
+              maxWidth: `${chartWidth}px`,
             }}
-            onMouseLeave={() => {
-              handleMouseLeave();
-              setSegmentTooltip(null);
-            }}
+            className="mx-auto w-full"
           >
+            <svg
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              className="block w-full h-auto"
+              preserveAspectRatio="xMidYMid meet"
+              onMouseMove={(e) => {
+                if (segmentTooltip) {
+                  setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                }
+              }}
+              onMouseLeave={() => {
+                handleMouseLeave();
+                setSegmentTooltip(null);
+              }}
+            >
             <defs>
               {/* USA: Blau mit weißen Sternen - Stärker gezoomt & dezent verteilt */}
               <pattern
@@ -1001,9 +1018,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             return (
               <g key={`tick-${tick}`}>
                 <line
-                  x1={marginLeft - 12}
+                  x1={marginLeft - 8}
                   y1={yPos}
-                  x2={chartWidth - 25}
+                  x2={chartWidth - 14}
                   y2={yPos}
                   stroke={isZero ? '#64748B' : '#E2E8F0'}
                   className={isZero ? 'dark:stroke-slate-400' : 'dark:stroke-slate-800'}
@@ -1011,7 +1028,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   strokeDasharray={isScienceKnowledge && !isZero ? '2,2' : undefined}
                 />
                 <text
-                  x={marginLeft - 18}
+                  x={marginLeft - 12}
                   y={yPos + 4}
                   textAnchor="end"
                   fill={isZero ? '#475569' : '#94A3B8'}
@@ -1379,8 +1396,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
                   return (
                     <g
-                      className="cursor-pointer transition-transform duration-150 hover:scale-125"
+                      className="cursor-pointer group/fav"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         onSelectCompany?.(model.companyName);
                       }}
@@ -1398,6 +1416,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         fill="#FFFFFF"
                         stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.35)'}
                         strokeWidth={isSelected ? 2.5 : 1}
+                        className="transition-colors duration-150 group-hover/fav:stroke-blue-500 group-hover/fav:stroke-2"
+                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
                       />
                       <image
                         href={model.faviconUrl}
@@ -1407,6 +1427,14 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         height={imgSize}
                         preserveAspectRatio="xMidYMid meet"
                         clipPath={`url(#${clipId})`}
+                        pointerEvents="none"
+                      />
+                      {/* Transparent hit area to make clicking 100% reliable without any jump */}
+                      <circle
+                        cx={barCenterX}
+                        cy={iconCenterY}
+                        r={circleRadius + 5}
+                        fill="transparent"
                       />
                     </g>
                   );
@@ -1453,9 +1481,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 {/* Company Favicon shifted high enough and larger above exploded bar */}
                 {exploded && isHovered && (() => {
                   const isZoomed = isZoomedCompany(model);
-                  const circleRadius = 13;
-                  const imgSize = isZoomed ? 33 : 23;
+                  const circleRadius = 12.5;
+                  const imgSize = isZoomed ? 31 : 22;
                   const clipId = `clip-exp-hov-${model.id}`;
+                  const logoY = Math.max(16, barTopY - 26);
                   const isSelected = selectedCompany && (
                     model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
                     model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase())
@@ -1463,37 +1492,45 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
                   return (
                     <g
-                      className="cursor-pointer transition-transform duration-150 hover:scale-120"
+                      className="cursor-pointer group/fav"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         onSelectCompany?.(model.companyName);
-                      }}
-                      style={{
-                        transition: 'opacity 0.2s ease-out',
                       }}
                     >
                       <title>{lang === 'de' ? `Nach Hersteller filtern: ${model.companyName}` : `Filter by manufacturer: ${model.companyName}`}</title>
                       <defs>
                         <clipPath id={clipId}>
-                          <circle cx={barCenterX} cy={barTopY - 38} r={circleRadius - 0.75} />
+                          <circle cx={barCenterX} cy={logoY} r={circleRadius - 0.75} />
                         </clipPath>
                       </defs>
                       <circle
                         cx={barCenterX}
-                        cy={barTopY - 38}
+                        cy={logoY}
                         r={circleRadius}
                         fill="#FFFFFF"
-                        stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.2)'}
+                        stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.25)'}
                         strokeWidth={isSelected ? 2.5 : 1}
+                        className="transition-colors duration-150 group-hover/fav:stroke-blue-500 group-hover/fav:stroke-2"
+                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.25))' }}
                       />
                       <image
                         href={model.faviconUrl}
                         x={barCenterX - imgSize / 2}
-                        y={barTopY - 38 - imgSize / 2}
+                        y={logoY - imgSize / 2}
                         width={imgSize}
                         height={imgSize}
                         preserveAspectRatio="xMidYMid meet"
                         clipPath={`url(#${clipId})`}
+                        pointerEvents="none"
+                      />
+                      {/* Transparent hit area to make clicking 100% reliable without any jump */}
+                      <circle
+                        cx={barCenterX}
+                        cy={logoY}
+                        r={circleRadius + 5}
+                        fill="transparent"
                       />
                     </g>
                   );
@@ -1502,9 +1539,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 {/* Companion Mini-Favicon above Neighbor Exploded Bars */}
                 {exploded && !isHovered && (() => {
                   const isZoomed = isZoomedCompany(model);
-                  const circleRadius = 10;
-                  const imgSize = isZoomed ? 25 : 17;
+                  const circleRadius = 9.5;
+                  const imgSize = isZoomed ? 24 : 16;
                   const clipId = `clip-exp-nbr-${model.id}`;
+                  const logoY = Math.max(14, barTopY - 22);
                   const isSelected = selectedCompany && (
                     model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
                     model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase())
@@ -1512,8 +1550,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
                   return (
                     <g
-                      className="cursor-pointer transition-transform duration-150 hover:scale-130"
+                      className="cursor-pointer group/fav"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         onSelectCompany?.(model.companyName);
                       }}
@@ -1522,32 +1561,42 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       <title>{lang === 'de' ? `Nach Hersteller filtern: ${model.companyName}` : `Filter by manufacturer: ${model.companyName}`}</title>
                       <defs>
                         <clipPath id={clipId}>
-                          <circle cx={barCenterX} cy={barTopY - 32} r={circleRadius - 0.75} />
+                          <circle cx={barCenterX} cy={logoY} r={circleRadius - 0.75} />
                         </clipPath>
                       </defs>
                       <circle
                         cx={barCenterX}
-                        cy={barTopY - 32}
+                        cy={logoY}
                         r={circleRadius}
                         fill="#FFFFFF"
-                        stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.15)'}
+                        stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.2)'}
                         strokeWidth={isSelected ? 2 : 0.75}
+                        className="transition-colors duration-150 group-hover/fav:stroke-blue-500 group-hover/fav:stroke-2"
+                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
                       />
                       <image
                         href={model.faviconUrl}
                         x={barCenterX - imgSize / 2}
-                        y={barTopY - 32 - imgSize / 2}
+                        y={logoY - imgSize / 2}
                         width={imgSize}
                         height={imgSize}
                         preserveAspectRatio="xMidYMid meet"
                         clipPath={`url(#${clipId})`}
+                        pointerEvents="none"
+                      />
+                      {/* Transparent hit area to make clicking 100% reliable without any jump */}
+                      <circle
+                        cx={barCenterX}
+                        cy={logoY}
+                        r={circleRadius + 5}
+                        fill="transparent"
                       />
                     </g>
                   );
                 })()}
 
                 {/* Rotated Model Name below Baseline: OHNE Flagge, mit vergrößerten 💲, 🌐 Symbolen & klickbar falls modelUrl vorhanden */}
-                <g transform={`translate(${barCenterX}, ${baselineY + 12})`}>
+                <g transform={`translate(${barCenterX}, ${baselineY + 10})`}>
                   {model.modelUrl ? (
                     <a
                       href={model.modelUrl}
@@ -1559,7 +1608,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         x="0"
                         y="0"
                         textAnchor="end"
-                        transform="rotate(-52)"
+                        transform="rotate(-50)"
                         fill={isHovered || (hasActiveHighlight && highlighted) ? '#2563EB' : '#475569'}
                         className="dark:fill-slate-300 transition-colors hover:fill-blue-600 dark:hover:fill-blue-400 cursor-pointer"
                         fontSize="10"
@@ -1582,7 +1631,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       x="0"
                       y="0"
                       textAnchor="end"
-                      transform="rotate(-52)"
+                      transform="rotate(-50)"
                       fill={isHovered || (hasActiveHighlight && highlighted) ? '#0F172A' : '#475569'}
                       className="dark:fill-slate-300 transition-colors"
                       fontSize="10"
@@ -1606,6 +1655,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
           })}
           </svg>
         </div>
+        )}
       </div>
 
       {/* Floating compact segment tooltip with cursor offset (zero redundancy, zero mouse obstruction) */}

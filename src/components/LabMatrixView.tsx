@@ -92,7 +92,7 @@ export interface GlossaryTermDef {
   shortDe: string;
   detailEn: string;
   detailDe: string;
-  category: 'architecture' | 'agentic' | 'infrastructure';
+  category: 'architecture' | 'agentic' | 'infrastructure' | 'evaluation';
 }
 
 export const GLOSSARY_TERMS: GlossaryTermDef[] = [
@@ -134,14 +134,14 @@ export const GLOSSARY_TERMS: GlossaryTermDef[] = [
   },
   {
     id: 'term-harness',
-    termEn: 'Harness',
-    termDe: 'Harness',
-    badgeEn: 'Runtime Control',
-    badgeDe: 'Laufzeitsteuerung',
-    shortEn: 'Software framework connecting the model to tools, memory, execution loops, and safety checks.',
-    shortDe: 'Softwaregerüst, das das Modell mit Werkzeugen, Gedächtnis, Schleifen und Rechten verbindet.',
-    detailEn: 'The runtime scaffolding around the model. Manages prompt generation, tool registries, file system access, and error retry loops.',
-    detailDe: 'Die Laufzeitumgebung um das Modell. Verwaltet Prompts, Werkzeugaufrufe, Dateisystem-Zugriffe und Wiederholungen bei Fehlern.',
+    termEn: 'Harness (Agent Scaffolding & Runtime)',
+    termDe: 'Harness (Ablauf- & Steuergerüst / Zaumzeug)',
+    badgeEn: 'Agent Scaffolding',
+    badgeDe: 'Agenten- & Ablaufsteuerung',
+    shortEn: 'Scaffolding connecting a raw model to tools, loops, and memory so it can execute complete multi-step workflows.',
+    shortDe: 'Software-Umgebung, die das Modell mit Werkzeugen verbindet, Aufgaben zerlegt und in einer autonomen Schleife hält.',
+    detailEn: 'The metaphorical "harness" or tack: Without a harness, a raw foundation model merely predicts the next word and halts. An agentic harness (e.g. Aider, OpenHands, Cursor) harnesses the model\'s power: it breaks down complex prompts into actionable sub-tasks, provides tools (terminal, file editor, browser), handles error retries, and maintains an autonomous loop (ReAct) until the job is fully done.',
+    detailDe: 'Das sprichwörtliche „Zaumzeug & Geschirr“: Ohne Steuerung sagt ein reines Sprachmodell nur das nächste Wort voraus und bricht ab. Ein Agenten-Harness (wie bei Aider, OpenHands, Cursor) spannt das Modell in eine Arbeitsumgebung ein: Er zerlegt Prompts in Teilschritte, bindet Werkzeuge (Terminal, Dateieditor, Browser) an, fängt Fehler ab und lässt das Modell in einer autonomen Ausführungsschleife (ReAct-Loop) laufen, damit es nicht vorzeitig aufhört, bevor das Gesamtergebnis steht.',
     category: 'agentic',
   },
   {
@@ -275,6 +275,102 @@ export const GLOSSARY_TERMS: GlossaryTermDef[] = [
     detailEn: 'The comprehensive software ecosystem that transforms raw neural network weights into practical user applications.',
     detailDe: 'Das gesamte Software-Ökosystem aus Werkzeugen, Bibliotheken und Schnittstellen, das aus reinen Modellgewichten nutzbare Produkte formt.',
     category: 'infrastructure',
+  },
+  {
+    id: 'term-benchmark',
+    termEn: 'Benchmark',
+    termDe: 'Benchmark',
+    badgeEn: 'Standardized Test',
+    badgeDe: 'Standardisierter Test',
+    shortEn: 'Standardized test battery used to measure and compare model reasoning, accuracy, and capabilities.',
+    shortDe: 'Standardisierte Testbatterie zur empirischen Messung und zum Leistungsvergleich von Modellen.',
+    detailEn: 'Comparable to psychometric test batteries in psychology: a benchmark presents models with standardized test items (e.g. MMLU, GSM8K, HumanEval, SWE-bench) under controlled conditions to derive objective, reproducible scores.',
+    detailDe: 'Vergleichbar mit psychometrischen Testbatterien in der Psychologie: Ein Benchmark stellt Modellen standardisierte Testaufgaben unter kontrollierten Bedingungen, um reproduzierbare, objektive Leistungswerte zu ermitteln.',
+    category: 'evaluation',
+  },
+  {
+    id: 'term-framework',
+    termEn: 'Framework',
+    termDe: 'Framework',
+    badgeEn: 'Architecture',
+    badgeDe: 'Entwicklungsgerüst',
+    shortEn: 'Pre-structured software foundation providing rules, conventions, and reusable components.',
+    shortDe: 'Vorgefertigtes Programmiergerüst mit Regeln, Bibliotheken und Bausteinen zur Softwareentwicklung.',
+    detailEn: 'Provides the architectural scaffolding and design patterns (e.g. PyTorch, LangChain, React) so developers do not need to write basic infrastructure code from scratch.',
+    detailDe: 'Liefert die methodische Architektur und Grundfunktionen (z. B. PyTorch, LangChain, React), damit Entwickler elementare Basisfunktionen nicht jedes Mal neu programmieren müssen.',
+    category: 'infrastructure',
+  },
+  {
+    id: 'term-eval',
+    termEn: 'Eval (Evaluation)',
+    termDe: 'Eval (Evaluation)',
+    badgeEn: 'Assessment',
+    badgeDe: 'Leistungsbewertung',
+    shortEn: 'Systematic empirical assessment of model responses against defined criteria or human judgments.',
+    shortDe: 'Systematische empirische Beurteilung von Modellausgaben anhand definierter Gütekriterien oder Urteile.',
+    detailEn: 'The methodology of evaluating model quality, ranging from automated exact-match checks to LLM-as-a-judge ratings and blind human pairwise comparisons (Elo rating).',
+    detailDe: 'Die methodische Überprüfung von Qualität und Zuverlässigkeit. Reicht von automatischen Richtig/Falsch-Vergleichen bis hin zu Blindvergleichen durch menschliche Beurteiler (Elo-Rating in der Chatbot Arena).',
+    category: 'evaluation',
+  },
+  {
+    id: 'term-runtime',
+    termEn: 'Runtime Environment',
+    termDe: 'Laufzeitumgebung',
+    badgeEn: 'Execution System',
+    badgeDe: 'Ausführungsumgebung',
+    shortEn: 'The hardware and software system providing the active execution context where models and code run.',
+    shortDe: 'Die Hard- und Softwareumgebung, in der Programme und Modelle zur Ausführungszeit tatsächlich gerechnet werden.',
+    detailEn: 'Encompasses system memory (RAM/VRAM), drivers, execution engines (e.g. Python, Node.js, CUDA), and sandboxes required to execute instructions during runtime.',
+    detailDe: 'Umfasst Arbeitsspeicher (RAM/VRAM), Treiber, Rechenkerne (z. B. Python, Node.js, CUDA) und Sicherheits-Sandboxen, die bereitstehen müssen, damit Befehle zur Laufzeit ausgeführt werden können.',
+    category: 'infrastructure',
+  },
+  {
+    id: 'term-ecosystem',
+    termEn: 'Ecosystem',
+    termDe: 'Ökosystem',
+    badgeEn: 'Network',
+    badgeDe: 'Vernetztes Gefüge',
+    shortEn: 'Interconnected network of models, developer tools, hosting providers, benchmarks, and applications.',
+    shortDe: 'Das vernetzte Zusammenspiel aus Modellen, Software-Tools, Servern, Prüfständen und Anwendern.',
+    detailEn: 'Refers to the collective AI landscape where foundational models, open-source fine-tuners, evaluation platforms, and client applications mutually depend on and reinforce each other.',
+    detailDe: 'Beschreibt das dynamische Gesamtnetzwerk der KI-Landschaft: Entwicklerfirmen, Open-Source-Gemeinschaften, unabhängige Testlabore, Frameworks und Endanwendungen, die aufeinander aufbauen.',
+    category: 'infrastructure',
+  },
+  {
+    id: 'term-saturation-problem',
+    termEn: 'Saturation Problem',
+    termDe: 'Saturation-Problem (Benchmark-Sättigung)',
+    badgeEn: 'Ceiling Effect',
+    badgeDe: 'Decken-Effekt',
+    shortEn: 'Ceiling effect when top models score near 100% on standard benchmarks, losing discriminative power.',
+    shortDe: 'Decken-Effekt: Wenn Spitzenmodelle nahe 100 % in Standardtests erreichen und Benchmarks nicht mehr differenzieren.',
+    detailEn: 'Occurs when standard benchmarks (such as MMLU or GSM8K) are solved nearly perfectly by frontier models. Once scores reach 95–99%, the test hits a ceiling and loses the statistical variance needed to differentiate top models, requiring harder, uncontaminated benchmarks (e.g. FrontierMath, SWE-bench Verified).',
+    detailDe: 'Tritt auf, wenn gängige Benchmarks (wie MMLU oder GSM8K) von neuen Spitzenmodellen nahezu perfekt gelöst werden. Ein Benchmark mit 95–99 % Lösungswahrscheinlichkeit stößt an eine Obergrenze und kann Spitzenmodelle nicht mehr sinnvoll voneinander unterscheiden, was schwerere, neue Testverfahren (z. B. FrontierMath, SWE-bench Verified) erforderlich macht.',
+    category: 'evaluation',
+  },
+  {
+    id: 'term-context-rot',
+    termEn: 'Context Rot',
+    termDe: 'Context Rot (Kontext-Zerfall)',
+    badgeEn: 'Context Window',
+    badgeDe: 'Kontextfenster',
+    shortEn: 'Degradation in reasoning quality, recall, and instruction adherence as the context window fills with tokens.',
+    shortDe: 'Qualitätsabfall des Modell-Denkens, Faktenabrufs und Befolgens von Instruktionen bei sehr langen Verläufen.',
+    detailEn: 'Despite context windows scaling to 1–2 million tokens, reasoning precision, recall accuracy, and strict instruction following degrade as context length grows (attention dilution, lost-in-the-middle effect, distraction from noise tokens in long documents).',
+    detailDe: 'Obwohl moderne LLMs bis zu 1–2 Millionen Tokens fassen können, sinken Treffsicherheit, Faktenabruf und logische Konsistenz, wenn der Kontext mit tausenden Seiten gefüllt wird („Lost-in-the-Middle“-Phänomen, Aufmerksamkeitsverwässerung und Ablenkung durch irrelevante Token).',
+    category: 'architecture',
+  },
+  {
+    id: 'term-reasoning-level',
+    termEn: 'Reasoning / Thinking Level',
+    termDe: 'Reasoning / Thinking Level (Denkstufe)',
+    badgeEn: 'Test-Time Compute',
+    badgeDe: 'Test-Time Compute',
+    shortEn: 'Configurable computation budget ("Chain of Thought") spent thinking and verifying before answering.',
+    shortDe: 'Steuerbares Rechenzeit-Budget („Chain of Thought“), das ein Modell vor der finalen Antwort zum Nachdenken nutzt.',
+    detailEn: 'In reasoning models (e.g. OpenAI o1/o3, DeepSeek-R1, Gemini 2.0 Flash Thinking), this parameter determines how much inference-time compute (internal reasoning tokens) is spent planning, verifying, and backtracking before delivering the final response. Higher levels boost complex problem solving at the expense of latency and cost.',
+    detailDe: 'Bei Reasoning-Modellen (z. B. OpenAI o1/o3, DeepSeek-R1, Gemini 2.0 Flash Thinking) steuert dieser Parameter, wie viele interne Denk-Tokens für Zwischenschritte, Selbstkorrekturen und Logikprüfungen erzeugt werden. Höhere Stufen steigern die Treffsicherheit bei Mathematik, Code und komplexer Logik, benötigen aber mehr Tokens und Zeit.',
+    category: 'architecture',
   },
 ];
 
@@ -831,8 +927,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-3xl">
             {lang === 'de'
-              ? 'Strukturierte Übersicht der führenden LLM-Entwickler, ihrer Modellfamilien nach Größenstufen (von Micro/Small bis Singularity) und ihrer Software- & Agenten-Ökosysteme.'
-              : 'Structured overview of leading LLM developers, their model families stacked by size tiers (from Micro/Small to Singularity), and their agent software ecosystems.'}
+              ? 'Storyline und Preisstufen einarbeiten'
+              : 'Incorporate storyline and pricing tiers'}
           </p>
         </div>
 
@@ -935,16 +1031,16 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               {lang === 'de' ? `Labore kleiner Modelle (${smallCount})` : `Small Model Labs (${smallCount})`}
             </button>
             <Tooltip
-              title={lang === 'de' ? 'Eval- & Test-Harness' : 'Evaluation & Test Harness'}
+              title={lang === 'de' ? 'Agenten- & Steuergerüste (Harness)' : 'Agent Scaffolding & Harness'}
               badge={lang === 'de' ? 'Glossar' : 'Glossary'}
               align="center"
-              width="w-64"
+              width="w-72"
               content={
                 <div>
                   <p className="text-slate-300 leading-snug mb-2">
                     {lang === 'de'
-                      ? 'Labore & Entwickler von Test-Frameworks, Benchmarks und Agent-Laufzeitumgebungen, die selbst keine eigenen Modellgewichte trainieren.'
-                      : 'Developers of testing frameworks, benchmarks, and agent execution harnesses that do not train their own model weights.'}
+                      ? 'Entwickler von Software-Umgebungen wie Aider, OpenHands oder Cursor. Sie bauen das Steuerungsgerüst („Zaumzeug“ / Harness): Sie statten LLMs mit Werkzeugen (Terminal, Dateizugriff) aus, zerlegen komplexe Aufgaben in Teilschritte und halten das Modell in einer autonomen Ausführungsschleife (ReAct-Loop), bis die Arbeit vollständig erledigt ist.'
+                      : 'Developers of agentic runtime environments like Aider, OpenHands, or Cursor. Instead of training raw models, they build the execution scaffolding ("harness"): equipping LLMs with tools (terminal, file system), decomposing tasks into sub-steps, and running them in autonomous loops until finished.'}
                   </p>
                   <button
                     type="button"
@@ -968,7 +1064,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                {lang === 'de' ? `Nur Eval-Harness (${harnessCount})` : `Harness Only (${harnessCount})`}
+                {lang === 'de' ? `Agenten- & Steuergerüste (${harnessCount})` : `Agent Scaffolding (${harnessCount})`}
               </button>
             </Tooltip>
           </div>
@@ -1466,7 +1562,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   <div className="mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
                       {lab.group === 'harness'
-                        ? (lang === 'de' ? 'Eval-Harness-Lab' : 'Eval Harness Lab')
+                        ? (lang === 'de' ? 'Agenten- & Steuergerüst (Harness)' : 'Agent Scaffolding & Execution Harness')
                         : lang === 'de'
                         ? 'Modell-Familie'
                         : 'Model Family'}
