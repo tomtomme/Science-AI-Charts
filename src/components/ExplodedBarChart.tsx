@@ -108,12 +108,21 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const [persistentModel, setPersistentModel] = useState<ModelRecord | null>(null);
   const [persistentSegment, setPersistentSegment] = useState<HoveredSegmentInfo | null>(null);
 
+  // Floating compact price / availability note tooltip
+  const [priceTooltip, setPriceTooltip] = useState<{
+    title: string;
+    text: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
   // Reset persistent bar info when switching categories, scoreMode, or when explosion is set to 'off'
   useEffect(() => {
     setPersistentModel(null);
     setPersistentSegment(null);
     setHoveredSegment(null);
     setSegmentTooltip(null);
+    setPriceTooltip(null);
   }, [activeCategoryIndex, hoveredCategoryComp, scoreMode, currentExplosionMode]);
 
   // Smooth scroll down to "How to read this" section at the exact anchor explaining this category
@@ -192,21 +201,22 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     ? 100
     : Math.max(70, ...models.map((m) => m.score ?? m.scoreNewReported ?? 0));
   const maxAxisScore = activeComp ? 100 : Math.ceil((maxScoreInPlot + 2) / 10) * 10;
-  // Proportional, streamlined layout: reduced vertical & horizontal whitespace
-  const chartHeight = 390;
-  const topPadding = 40; // Streamlined headroom for score & favicon
-  const bottomPadding = 125; // Space below baseline for rotated model names with badges without wasted gap
-  const availablePlotHeight = chartHeight - topPadding - bottomPadding; // 225px
-  const baselineY = chartHeight - bottomPadding; // 265px
+  const chartHeight = 495;
+  const topPadding = 62; // Generous headroom for price & notice icon above hovered favicon
+  const bottomPadding = 180; // Generous space below baseline for rotated model names with badges without clipping
+  const availablePlotHeight = chartHeight - topPadding - bottomPadding; // 253px
+  const baselineY = chartHeight - bottomPadding; // 315px
 
-  // Dynamic bar width and gap based on model count: clean & prominent for small sets, compact for large sets
-  const barWidth = models.length <= 12 ? 30 : models.length <= 24 ? 26 : 22;
-  const barGap = models.length <= 12 ? 14 : models.length <= 24 ? 11 : 8;
-  const totalBarSlot = barWidth + barGap;
-  const marginLeft = 58; // Streamlined left margin so rotated text for bar 0 never clips
-  const marginRight = 26; // Right margin for neat grid termination
+  const barWidth = 26;
+  const barGap = 12;
+  const totalBarSlot = barWidth + barGap; // 38px
+  const marginLeft = 120; // Generous left margin so rotated text for bar 0 never clips off the left edge
+  const marginRight = 32; // Right margin so the last bar and label are never clipped
   const calculatedWidth = marginLeft + models.length * totalBarSlot + marginRight;
   const chartWidth = Math.max(380, calculatedWidth);
+
+  // Exact pattern tile offset aligned with barX coordinates so flags (US stars, emblems) are 100% centered in every bar
+  const patternX = ((marginLeft % totalBarSlot) + totalBarSlot) % totalBarSlot;
 
   // Height formula strictly proportional to score
   const scaleY = (val: number) => {
@@ -313,6 +323,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     }
     setHoveredSegment(null);
     setSegmentTooltip(null);
+    setPriceTooltip(null);
     // Behalte persistentModel und persistentSegment nur bei, wenn Explosion aktiv ist
     if (currentExplosionMode === 'off') {
       setPersistentModel(null);
@@ -455,6 +466,46 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     return 'url(#pattern-usa)';
   };
 
+  // Parses CSV Column AL: min. Abokosten/Monat für Chatzugriff in DE (or availability note like 'US only')
+  interface PriceColInfo {
+    type: 'price' | 'note' | 'none';
+    text: string;
+    displayPrice?: string;
+    tooltipTitle: string;
+    tooltipText: string;
+  }
+
+  const getPriceColInfo = (raw: string | undefined): PriceColInfo => {
+    if (!raw) return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
+    const clean = raw.trim();
+    if (!clean || clean === '-' || clean.toLowerCase() === 'n/a' || clean.toLowerCase().includes('abokosten')) {
+      return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
+    }
+
+    const cleanNumStr = clean.replace(/€/g, '').replace(/\$/g, '').trim();
+    const num = parseFloat(cleanNumStr.replace(',', '.'));
+    const isPureNumber = !isNaN(num) && /^-?\d+([.,]\d+)?$/.test(cleanNumStr);
+
+    if (isPureNumber) {
+      const isDe = lang === 'de';
+      return {
+        type: 'price',
+        text: clean,
+        displayPrice: `${num}€`,
+        tooltipTitle: isDe ? 'Min. monatliche Abokosten in DE' : 'Min. monthly subscription in DE',
+        tooltipText: isDe ? `${num} € / Monat für Chatzugriff in DE` : `€${num} / month for chat access in DE`,
+      };
+    }
+
+    const isDe = lang === 'de';
+    return {
+      type: 'note',
+      text: clean,
+      tooltipTitle: isDe ? 'Verfügbarkeit / Hinweis' : 'Availability / Notice',
+      tooltipText: clean,
+    };
+  };
+
   // Determine if a company's favicon needs stronger zoom to eliminate excess whitespace
   const isZoomedCompany = (model: ModelRecord): boolean => {
     const norm = (model.companyName + ' ' + model.creatorClean + ' ' + model.displayName).toLowerCase();
@@ -526,26 +577,47 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 sm:p-3.5 shadow-xs transition-colors">
-      {/* Sleek one-row explainer & info bar above chart: locked 34px height for zero layout shift with overflow-visible tooltips */}
-      <div className="relative z-20 flex items-center h-[34px] min-h-[34px] max-h-[34px] px-2.5 mb-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-visible">
-        <div className="w-full min-w-0 overflow-visible">
+      {/* Sleek locked 2-row explainer & info bar above chart: locked 50px height for zero layout shift with complete readability */}
+      <div className="relative z-20 flex flex-col justify-center h-[50px] min-h-[50px] max-h-[50px] px-2.5 mb-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-visible">
+        <div className="w-full min-w-0 overflow-visible flex flex-col justify-center gap-0.5">
           {displayedModel ? (
-            <div className="flex items-center gap-x-2 text-slate-700 dark:text-slate-300 h-[34px] whitespace-nowrap overflow-visible">
-              {/* Model Name & Favicon (Clickable link if modelUrl is available) */}
-              {displayedModel.modelUrl ? (
-                <Tooltip
-                  content={`${displayedModel.displayName} · ${t.openChatbotApp}`}
-                  position="bottom"
-                  align="left"
-                  width="w-auto max-w-xs"
-                >
-                  <a
-                    href={displayedModel.modelUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors group cursor-pointer shrink-0"
+            <>
+              {/* Row 1: Model Name, Company, Release Date, Total Score & Rank */}
+              <div className="flex items-center gap-x-2 text-slate-700 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar">
+                {displayedModel.modelUrl ? (
+                  <Tooltip
+                    content={`${displayedModel.displayName} · ${t.openChatbotApp}`}
+                    position="bottom"
+                    align="left"
+                    width="w-auto max-w-xs"
                   >
-                    <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
+                    <a
+                      href={displayedModel.modelUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors group cursor-pointer shrink-0"
+                    >
+                      <span className="w-4.5 h-4.5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
+                        <img
+                          src={displayedModel.faviconUrl}
+                          alt=""
+                          className={`w-full h-full object-contain ${
+                            isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
+                          }`}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </span>
+                      <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 group-hover:decoration-blue-500">
+                        {displayedModel.displayName}
+                      </span>
+                      <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                    </a>
+                  </Tooltip>
+                ) : (
+                  <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 shrink-0">
+                    <span className="w-4.5 h-4.5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
                       <img
                         src={displayedModel.faviconUrl}
                         alt=""
@@ -557,281 +629,311 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         }}
                       />
                     </span>
-                    <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 group-hover:decoration-blue-500">
-                      {displayedModel.displayName}
+                    {displayedModel.displayName}
+                  </span>
+                )}
+
+                <span className="text-slate-400">·</span>
+                <button
+                  type="button"
+                  onClick={() => onSelectCompany?.(displayedModel.companyName)}
+                  className="font-mono text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 cursor-pointer text-left transition-colors"
+                  title={lang === 'de' ? `Nach Hersteller filtern: ${displayedModel.companyName}` : `Filter by company: ${displayedModel.companyName}`}
+                >
+                  {t.company} <strong className="underline decoration-dotted underline-offset-2">{displayedModel.companyName}</strong>
+                </button>
+
+                {displayedModel.releaseDate && (
+                  <>
+                    <span className="text-slate-400">·</span>
+                    <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 shrink-0">
+                      <span className="opacity-75">📅</span>
+                      <span>{displayedModel.releaseDate}</span>
                     </span>
-                    <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
-                  </a>
-                </Tooltip>
-              ) : (
-                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 shrink-0">
-                  <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
-                    <img
-                      src={displayedModel.faviconUrl}
-                      alt=""
-                      className={`w-full h-full object-contain ${
-                        isZoomedCompany(displayedModel) ? 'scale-145' : 'scale-110'
-                      }`}
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  </span>
-                  {displayedModel.displayName}
+                  </>
+                )}
+
+                <span className="text-slate-400">·</span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
+                  {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? (scoreMode === 'old' ? (displayedModel.scoreOld ?? displayedModel.scoreOldCalculated) : (displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated))} {t.points} ({t.rank} #{displayedModel.rank})
                 </span>
-              )}
 
-              <span className="text-slate-400">·</span>
-              <button
-                type="button"
-                onClick={() => onSelectCompany?.(displayedModel.companyName)}
-                className="font-mono text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 cursor-pointer text-left transition-colors"
-                title={lang === 'de' ? `Nach Hersteller filtern: ${displayedModel.companyName}` : `Filter by company: ${displayedModel.companyName}`}
-              >
-                {t.company} <strong className="underline decoration-dotted underline-offset-2">{displayedModel.companyName}</strong>
-              </button>
+                {displayedModel.priceDeMonthly && (() => {
+                  const pInfo = getPriceColInfo(displayedModel.priceDeMonthly);
+                  if (pInfo.type === 'price') {
+                    return (
+                      <>
+                        <span className="text-slate-400">·</span>
+                        <Tooltip
+                          content={pInfo.tooltipText}
+                          position="bottom"
+                          align="left"
+                          width="w-auto max-w-xs"
+                        >
+                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 shrink-0 cursor-default">
+                            <span>💶</span>
+                            <span>{pInfo.displayPrice} {lang === 'de' ? '/ Monat' : '/ mo'}</span>
+                          </span>
+                        </Tooltip>
+                      </>
+                    );
+                  }
+                  if (pInfo.type === 'note') {
+                    return (
+                      <>
+                        <span className="text-slate-400">·</span>
+                        <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 shrink-0">
+                          <span className="text-xs">ℹ️</span>
+                          <span>{pInfo.text}</span>
+                        </span>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
 
-              {displayedModel.releaseDate && (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 shrink-0">
-                    <span className="opacity-75">📅</span>
-                    <span>{displayedModel.releaseDate}</span>
-                  </span>
-                </>
-              )}
-
-              {/* Specific segment info if hovered, else summary score */}
-              {displayedSegment ? (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <Tooltip
-                    content={
-                      lang === 'de'
-                        ? `${displayedSegment.comp.nameDe}: Zur Erläuterung in „How to read this“ springen`
-                        : `${displayedSegment.comp.nameEn}: Jump to explanation in "How to read this"`
-                    }
-                    position="bottom"
-                    align="left"
-                    width="w-72 max-w-sm"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => scrollToCategoryExplanation(displayedSegment.comp.id)}
-                      className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
-                    >
-                      <span
-                        className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
-                        style={{ backgroundColor: displayedSegment.comp.color }}
-                      />
-                      <span style={{ color: displayedSegment.comp.color }}>
-                        {lang === 'de' ? displayedSegment.comp.nameDe : displayedSegment.comp.nameEn}
-                      </span>
-                      <span className="font-mono text-slate-900 dark:text-white font-bold">
-                        {displayedSegment.comp.id === 'scienceKnowledge'
-                          ? (displayedSegment.raw > 0 ? `+${Math.round(displayedSegment.raw)} pts` : `${Math.round(displayedSegment.raw)} pts`)
-                          : `${Math.round(displayedSegment.raw)}%`}
-                      </span>
-                      <span className="font-mono text-slate-500 dark:text-slate-400 font-normal">
-                        (+{displayedSegment.points.toFixed(1)} {t.points})
-                      </span>
-                    </button>
-                  </Tooltip>
-
-                  <span className="text-slate-400">·</span>
-                  {displayedSegment.comp.sourceUrl ? (
+              {/* Row 2: Hovered segment breakdown OR Non-hallucination + interaction hint */}
+              <div className="flex items-center gap-x-2 text-[11px] text-slate-600 dark:text-slate-400 h-[20px] min-h-[20px] whitespace-nowrap overflow-x-auto no-scrollbar">
+                {displayedSegment ? (
+                  <>
                     <Tooltip
-                      content={`${displayedSegment.comp.sourceName} · ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
+                      content={
+                        lang === 'de'
+                          ? `${displayedSegment.comp.nameDe}: Zur Erläuterung in „How to read this“ springen`
+                          : `${displayedSegment.comp.nameEn}: Jump to explanation in "How to read this"`
+                      }
                       position="bottom"
                       align="left"
-                      width="w-auto max-w-sm"
+                      width="w-72 max-w-sm"
                     >
-                      <a
-                        href={displayedSegment.comp.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                      <button
+                        type="button"
+                        onClick={() => scrollToCategoryExplanation(displayedSegment.comp.id)}
+                        className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
                       >
-                        <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
-                        <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                      </a>
+                        <span
+                          className="w-2.5 h-2.5 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
+                          style={{ backgroundColor: displayedSegment.comp.color }}
+                        />
+                        <span style={{ color: displayedSegment.comp.color }}>
+                          {lang === 'de' ? displayedSegment.comp.nameDe : displayedSegment.comp.nameEn}
+                        </span>
+                        <span className="font-mono text-slate-900 dark:text-white font-bold">
+                          {displayedSegment.comp.id === 'scienceKnowledge'
+                            ? (displayedSegment.raw > 0 ? `+${Math.round(displayedSegment.raw)} pts` : `${Math.round(displayedSegment.raw)} pts`)
+                            : `${Math.round(displayedSegment.raw)}%`}
+                        </span>
+                      </button>
                     </Tooltip>
-                  ) : (
-                    <span className="font-mono text-[11px] text-slate-400 shrink-0">
-                      {t.sourceLabel} {displayedSegment.comp.sourceName}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
-                    {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? (scoreMode === 'old' ? (displayedModel.scoreOld ?? displayedModel.scoreOldCalculated) : (displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated))} {t.points} ({t.rank} #{displayedModel.rank})
-                  </span>
-                  {displayedModel.rawScores.nonHallucination !== null && (
-                    <>
-                      <span className="text-slate-400">·</span>
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
-                        {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}% (+{(displayedModel.rawScores.nonHallucination / (scoreMode === 'old' ? 5 : 8)).toFixed(1)} {t.points})
+
+                    <span className="text-slate-400">·</span>
+                    {displayedSegment.comp.sourceUrl ? (
+                      <Tooltip
+                        content={`${displayedSegment.comp.sourceName} · ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
+                        position="bottom"
+                        align="left"
+                        width="w-auto max-w-sm"
+                      >
+                        <a
+                          href={displayedSegment.comp.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                        >
+                          <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
+                          <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                        </a>
+                      </Tooltip>
+                    ) : (
+                      <span className="font-mono text-[11px] text-slate-400 shrink-0">
+                        {t.sourceLabel} {displayedSegment.comp.sourceName}
                       </span>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          ) : displayedCategoryComp ? (
-            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] whitespace-nowrap overflow-visible">
-              <Tooltip
-                content={
-                  lang === 'de'
-                    ? `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'de', displayedCategoryComp)}: Zur Erläuterung in „How to read this“ springen`
-                    : `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'en', displayedCategoryComp)}: Jump to explanation in "How to read this"`
-                }
-                align="left"
-                position="bottom"
-                width="w-72 max-w-sm"
-              >
-                <button
-                  type="button"
-                  onClick={() => scrollToCategoryExplanation(displayedCategoryComp.id)}
-                  className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
-                  style={{ color: displayedCategoryComp.color }}
-                >
-                  <span
-                    className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
-                    style={{ backgroundColor: displayedCategoryComp.color }}
-                  />
-                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
-                    {getBenchmarkCategoryLabel(
-                      categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined,
-                      lang,
-                      displayedCategoryComp
                     )}
-                  </span>
-                </button>
-              </Tooltip>
 
-              <span className="text-slate-400">·</span>
-              {displayedCategoryComp.sourceUrl ? (
+                    <span className="text-slate-400">·</span>
+                    <span className="text-slate-500 dark:text-slate-400 truncate">
+                      {lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {displayedModel.rawScores.nonHallucination !== null && (
+                      <>
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
+                          {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}%
+                        </span>
+                        <span className="text-slate-400">·</span>
+                      </>
+                    )}
+                    <span className="text-slate-400 dark:text-slate-500 text-[10.5px] truncate">
+                      {lang === 'de'
+                        ? 'Balkensegmente berühren für Kriterien-Details · Firmenlogo klicken zum Filtern'
+                        : 'Hover segments for benchmark details · Click company logo to filter'}
+                    </span>
+                  </>
+                )}
+              </div>
+            </>
+          ) : displayedCategoryComp ? (
+            <>
+              {/* Row 1: Category Name, Source, Weight, Date Sort */}
+              <div className="flex items-center gap-x-2 text-slate-700 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar">
                 <Tooltip
-                  content={`${displayedCategoryComp.sourceName} · ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
-                  position="bottom"
+                  content={
+                    lang === 'de'
+                      ? `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'de', displayedCategoryComp)}: Zur Erläuterung in „How to read this“ springen`
+                      : `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'en', displayedCategoryComp)}: Jump to explanation in "How to read this"`
+                  }
                   align="left"
-                  width="w-auto max-w-sm"
+                  position="bottom"
+                  width="w-72 max-w-sm"
                 >
-                  <a
-                    href={displayedCategoryComp.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                  <button
+                    type="button"
+                    onClick={() => scrollToCategoryExplanation(displayedCategoryComp.id)}
+                    className="flex items-center gap-1.5 font-bold shrink-0 hover:underline cursor-pointer group"
+                    style={{ color: displayedCategoryComp.color }}
                   >
-                    <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
-                    <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                  </a>
+                    <span
+                      className="w-2.5 h-2.5 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
+                      style={{ backgroundColor: displayedCategoryComp.color }}
+                    />
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {getBenchmarkCategoryLabel(
+                        categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined,
+                        lang,
+                        displayedCategoryComp
+                      )}
+                    </span>
+                  </button>
                 </Tooltip>
-              ) : (
-                <span className="font-mono text-xs text-slate-400 shrink-0">
-                  {t.sourceLabel} {displayedCategoryComp.sourceName}
-                </span>
-              )}
 
-              <span className="text-slate-400">·</span>
-              <Tooltip
-                content={lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
-                position="bottom"
-                align="left"
-                width="w-80"
-              >
-                <span className="text-slate-600 dark:text-slate-300 truncate min-w-0 flex-1 leading-snug cursor-help">
+                <span className="text-slate-400">·</span>
+                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                  {lang === 'de' ? '12.5% Gewichtung' : '12.5% Weight'}
+                </span>
+
+                <span className="text-slate-400">·</span>
+                {displayedCategoryComp.sourceUrl ? (
+                  <Tooltip
+                    content={`${displayedCategoryComp.sourceName} · ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
+                    position="bottom"
+                    align="left"
+                    width="w-auto max-w-sm"
+                  >
+                    <a
+                      href={displayedCategoryComp.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                    >
+                      <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
+                      <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                    </a>
+                  </Tooltip>
+                ) : (
+                  <span className="font-mono text-xs text-slate-400 shrink-0">
+                    {t.sourceLabel} {displayedCategoryComp.sourceName}
+                  </span>
+                )}
+
+                {sortBy === 'date' && (
+                  <>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
+                      <span>📅</span>
+                      <span>{t.sortedByDateLabel}</span>
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Row 2: Full Category Description - completely readable & scrollable */}
+              <div className="flex items-center text-[11.5px] text-slate-600 dark:text-slate-300 h-[20px] min-h-[20px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
+                <span className="font-normal">
                   {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
                 </span>
-              </Tooltip>
-
-              {sortBy === 'date' && (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
-                    <span>📅</span>
-                    <span>{t.sortedByDateLabel}</span>
-                  </span>
-                </>
-              )}
-            </div>
+              </div>
+            </>
           ) : (
-            <div className="flex items-center gap-x-2.5 text-slate-700 dark:text-slate-300 h-[38px] whitespace-nowrap overflow-visible">
-              <Tooltip
-                content={
-                  lang === 'de'
-                    ? `${currentScoreInfo.name}: Zur Erläuterung in „How to read this“ springen`
-                    : `${currentScoreInfo.name}: Jump to explanation in "How to read this"`
-                }
-                align="left"
-                position="bottom"
-                width="w-72 max-w-sm"
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    const el = document.getElementById(currentScoreInfo.targetId) || document.getElementById('final-scores-section');
-                    const box = document.getElementById('section1-scroll-box');
-                    const container = document.getElementById('csv-notes-section');
-                    if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    if (el) {
-                      if (box) {
-                        const targetTop = el.offsetTop - box.offsetTop;
-                        box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
-                      }
-                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
-                      setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15'), 3000);
-                    }
-                  }}
-                  className="flex items-center gap-1.5 font-bold shrink-0 hover:opacity-80 transition-opacity cursor-pointer group text-left"
-                  style={{ color: currentScoreInfo.color }}
+            <>
+              {/* Row 1: Score Mode, Badges, Source, Date Sort */}
+              <div className="flex items-center gap-x-2 text-slate-700 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar">
+                <Tooltip
+                  content={
+                    lang === 'de'
+                      ? `${currentScoreInfo.name}: Zur Erläuterung in „How to read this“ springen`
+                      : `${currentScoreInfo.name}: Jump to explanation in "How to read this"`
+                  }
+                  align="left"
+                  position="bottom"
+                  width="w-72 max-w-sm"
                 >
-                  <span
-                    className="w-3 h-3 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
-                    style={{ backgroundColor: currentScoreInfo.color }}
-                  />
-                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
-                    {currentScoreInfo.name}
-                  </span>
-                </button>
-              </Tooltip>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById(currentScoreInfo.targetId) || document.getElementById('final-scores-section');
+                      const box = document.getElementById('section1-scroll-box');
+                      const container = document.getElementById('csv-notes-section');
+                      if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      if (el) {
+                        if (box) {
+                          const targetTop = el.offsetTop - box.offsetTop;
+                          box.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
+                        }
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-500/15', 'rounded-lg', 'transition-all');
+                        setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-500/15'), 3000);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 font-bold shrink-0 hover:opacity-80 transition-opacity cursor-pointer group text-left"
+                    style={{ color: currentScoreInfo.color }}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-xs shrink-0 shadow-2xs border border-black/10 dark:border-white/10 group-hover:scale-110 transition-transform"
+                      style={{ backgroundColor: currentScoreInfo.color }}
+                    />
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {currentScoreInfo.name}
+                    </span>
+                  </button>
+                </Tooltip>
 
-              <span className="text-slate-400">·</span>
-              <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
-                {currentScoreInfo.badgeLabel}
-              </span>
+                <span className="text-slate-400">·</span>
+                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                  {currentScoreInfo.badgeLabel}
+                </span>
 
-              <span className="text-slate-400">·</span>
-              <Tooltip
-                content={currentScoreInfo.description}
-                position="bottom"
-                align="left"
-                width="w-80"
-              >
-                <span className="text-slate-600 dark:text-slate-300 truncate min-w-0 flex-1 leading-snug cursor-help">
+                <span className="text-slate-400">·</span>
+                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                  {t.sourceLabel} <strong>{currentScoreInfo.sourceName}</strong>
+                </span>
+
+                {sortBy === 'date' && (
+                  <>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
+                      <span>📅</span>
+                      <span>{t.sortedByDateLabel}</span>
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Row 2: Full Composite Score Description - completely readable & scrollable */}
+              <div className="flex items-center text-[11.5px] text-slate-600 dark:text-slate-300 h-[20px] min-h-[20px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
+                <span className="font-normal">
                   {currentScoreInfo.description}
                 </span>
-              </Tooltip>
-
-              {sortBy === 'date' && (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
-                    <span>📅</span>
-                    <span>{t.sortedByDateLabel}</span>
-                  </span>
-                </>
-              )}
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>
 
       {/* SVG Chart Container: Compact & centered for fewer models, horizontal scrollbar for large sets */}
-      <div className="relative select-none w-full overflow-x-auto pb-1 custom-scrollbar">
+      <div className="relative select-none w-full overflow-x-auto pb-2 sm:pb-3 custom-scrollbar">
         {models.length === 0 ? (
           <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">
             {lang === 'de' ? 'Keine Modelle für die aktuelle Filterauswahl gefunden.' : 'No models match the current filter selection.'}
@@ -845,7 +947,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
           >
             <svg
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="block w-full h-auto"
+              className="block w-full h-auto overflow-visible"
               preserveAspectRatio="xMidYMid meet"
               onMouseMove={(e) => {
                 if (segmentTooltip) {
@@ -861,7 +963,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* USA: Blau mit weißen Sternen - Stärker gezoomt & dezent verteilt */}
               <pattern
                 id="pattern-usa"
-                x="24"
+                x={patternX}
                 width="38"
                 height="42"
                 patternUnits="userSpaceOnUse"
@@ -878,7 +980,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* China: Rot mit gelber Sichel und Stern */}
               <pattern
                 id="pattern-china"
-                x="24"
+                x={patternX}
                 width="38"
                 height="44"
                 patternUnits="userSpaceOnUse"
@@ -898,6 +1000,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* Singapur: Oben Rot mit weißer Mondsichel und 5 Sternen, unten Weiß (Flag of Singapore - z. B. Agnes) */}
               <pattern
                 id="pattern-singapore"
+                x={patternX}
                 width="38"
                 height="42"
                 patternUnits="userSpaceOnUse"
@@ -946,28 +1049,30 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* Südkorea: Weißer Hintergrund, zentrales rot-blaues Taegeuk & schwarze Trigramme */}
               <pattern
                 id="pattern-korea"
+                x={patternX}
                 width="38"
                 height="42"
                 patternUnits="userSpaceOnUse"
               >
                 <rect width="38" height="42" fill="#FFFFFF" />
                 {/* Zentrales rot-blaues Taegeuk */}
-                <circle cx="19" cy="21" r="7.5" fill="#CD2E3A" />
-                <path d="M 11.5,21 A 3.75,3.75 0 0,0 19,21 A 3.75,3.75 0 0,1 26.5,21 A 7.5,7.5 0 0,1 11.5,21 Z" fill="#0047A0" />
+                <circle cx="13" cy="21" r="6.5" fill="#CD2E3A" />
+                <path d="M 6.5,21 A 3.25,3.25 0 0,0 13,21 A 3.25,3.25 0 0,1 19.5,21 A 6.5,6.5 0 0,1 6.5,21 Z" fill="#0047A0" />
                 {/* Trigramme links und rechts */}
-                <line x1="4" y1="14" x2="8" y2="14" stroke="#000000" strokeWidth="1.2" />
-                <line x1="4" y1="16.5" x2="8" y2="16.5" stroke="#000000" strokeWidth="1.2" />
-                <line x1="30" y1="14" x2="34" y2="14" stroke="#000000" strokeWidth="1.2" />
-                <line x1="30" y1="16.5" x2="34" y2="16.5" stroke="#000000" strokeWidth="1.2" />
-                <line x1="4" y1="26" x2="8" y2="26" stroke="#000000" strokeWidth="1.2" />
-                <line x1="4" y1="28.5" x2="8" y2="28.5" stroke="#000000" strokeWidth="1.2" />
-                <line x1="30" y1="26" x2="34" y2="26" stroke="#000000" strokeWidth="1.2" />
-                <line x1="30" y1="28.5" x2="34" y2="28.5" stroke="#000000" strokeWidth="1.2" />
+                <line x1="2" y1="14" x2="5" y2="14" stroke="#000000" strokeWidth="1.1" />
+                <line x1="2" y1="16.5" x2="5" y2="16.5" stroke="#000000" strokeWidth="1.1" />
+                <line x1="21" y1="14" x2="24" y2="14" stroke="#000000" strokeWidth="1.1" />
+                <line x1="21" y1="16.5" x2="24" y2="16.5" stroke="#000000" strokeWidth="1.1" />
+                <line x1="2" y1="26" x2="5" y2="26" stroke="#000000" strokeWidth="1.1" />
+                <line x1="2" y1="28.5" x2="5" y2="28.5" stroke="#000000" strokeWidth="1.1" />
+                <line x1="21" y1="26" x2="24" y2="26" stroke="#000000" strokeWidth="1.1" />
+                <line x1="21" y1="28.5" x2="24" y2="28.5" stroke="#000000" strokeWidth="1.1" />
               </pattern>
 
               {/* Spanien: Rot - Gelb (doppelt so breit) - Rot horizontal mit Wappen-Emblem */}
               <pattern
                 id="pattern-spain"
+                x={patternX}
                 width="38"
                 height="40"
                 patternUnits="userSpaceOnUse"
@@ -976,24 +1081,25 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 <rect x="0" y="10" width="38" height="20" fill="#F1BF00" />
                 <rect x="0" y="30" width="38" height="10" fill="#AA151B" />
                 {/* Spanisches Wappen auf dem gelben Streifen */}
-                <rect x="15" y="15" width="8" height="10" rx="1.5" fill="#AA151B" />
-                <circle cx="19" cy="13.5" r="1.5" fill="#AA151B" />
-                <rect x="17" y="17" width="4" height="6" fill="#F1BF00" />
+                <rect x="9" y="15" width="8" height="10" rx="1.5" fill="#AA151B" />
+                <circle cx="13" cy="13.5" r="1.5" fill="#AA151B" />
+                <rect x="11" y="17" width="4" height="6" fill="#F1BF00" />
               </pattern>
 
               {/* Kanada: Rot - Weiß (doppelt so breit) - Rot vertikal mit rotem Ahornblatt */}
               <pattern
                 id="pattern-canada"
+                x={patternX}
                 width="38"
                 height="38"
                 patternUnits="userSpaceOnUse"
               >
-                <rect x="0" y="0" width="9" height="38" fill="#FF0000" />
-                <rect x="9" y="0" width="20" height="38" fill="#FFFFFF" />
-                <rect x="29" y="0" width="9" height="38" fill="#FF0000" />
+                <rect x="0" y="0" width="6.5" height="38" fill="#FF0000" />
+                <rect x="6.5" y="0" width="13" height="38" fill="#FFFFFF" />
+                <rect x="19.5" y="0" width="6.5" height="38" fill="#FF0000" />
                 {/* Rotes Ahornblatt im weißen Zentrum */}
                 <path
-                  d="M 19,10 L 20.5,14 L 24,13.5 L 22.5,16.5 L 25,18.5 L 22,19.5 L 22.5,22 L 19.5,20.5 L 19.5,26 L 18.5,26 L 18.5,20.5 L 15.5,22 L 16,19.5 L 13,18.5 L 15.5,16.5 L 14,13.5 L 17.5,14 Z"
+                  d="M 13,10 L 14.5,14 L 18,13.5 L 16.5,16.5 L 19,18.5 L 16,19.5 L 16.5,22 L 13.5,20.5 L 13.5,26 L 12.5,26 L 12.5,20.5 L 9.5,22 L 10,19.5 L 7,18.5 L 9.5,16.5 L 8,13.5 L 11.5,14 Z"
                   fill="#FF0000"
                 />
               </pattern>
@@ -1001,6 +1107,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* Deutschland: Schwarz - Rot - Gold (drei gleiche horizontale Streifen) */}
               <pattern
                 id="pattern-germany"
+                x={patternX}
                 width="38"
                 height="42"
                 patternUnits="userSpaceOnUse"
@@ -1139,6 +1246,20 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               if (!exploded && hoveredIndex !== index) {
                 barOpacity = 0.45;
               }
+            }
+
+            const priceInfo = getPriceColInfo(model.priceDeMonthly);
+            let priceY = barTopY - 8;
+            if (catRaw < 0 && isScienceKnowledge) {
+              priceY = barBottomY + 16;
+            } else if (exploded && isHovered) {
+              const logoY = Math.max(26, barTopY - 26);
+              priceY = logoY - 24;
+            } else if (exploded && !isHovered) {
+              const logoY = Math.max(20, barTopY - 22);
+              priceY = logoY - 18;
+            } else if (sortBy === 'date') {
+              priceY = barTopY - 20;
             }
 
             return (
@@ -1374,7 +1495,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               textShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 1px rgba(0,0,0,0.95)',
                             }}
                           >
-                            {`${Math.round(seg.comp.rawValue)}%`}
+                            {seg.comp.id === 'scienceKnowledge'
+                              ? (seg.comp.rawValue > 0 ? `+${Math.round(seg.comp.rawValue)}` : `${Math.round(seg.comp.rawValue)}`)
+                              : `${Math.round(seg.comp.rawValue)}%`}
                           </text>
                         )}
                       </g>
@@ -1440,43 +1563,22 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   );
                 })()}
 
-                {/* Score Number OR (when sorted by date) Month & 2-Digit Year only */}
-                <g>
-                  {sortBy === 'date' ? (
-                    <text
-                      x={barCenterX}
-                      y={catRaw < 0 && isScienceKnowledge ? barBottomY + 12 : barTopY - 6}
-                      textAnchor="middle"
-                      className="fill-blue-600 dark:fill-blue-400 font-bold tabular-nums"
-                      fontSize="9.5"
-                      fontFamily="monospace"
-                      style={{
-                        transition: 'y 0.25s ease-out',
-                      }}
-                    >
-                      {formatMonthYearShort(model.releaseDate)}
-                    </text>
-                  ) : (
-                    <text
-                      x={barCenterX}
-                      y={catRaw < 0 && isScienceKnowledge ? barBottomY + 12 : barTopY - 6}
-                      textAnchor="middle"
-                      fill={isHovered || (hasActiveHighlight && highlighted) ? '#0F172A' : '#64748B'}
-                      className="dark:fill-slate-300 font-bold tabular-nums"
-                      fontSize="10"
-                      fontFamily="monospace"
-                      style={{
-                        transition: 'y 0.25s ease-out',
-                      }}
-                    >
-                      {activeComp
-                        ? isScienceKnowledge
-                          ? (catRaw > 0 ? `+${Math.round(catRaw)}` : `${Math.round(catRaw)}`)
-                          : `${Math.round(catRaw)}%`
-                        : score}
-                    </text>
-                  )}
-                </g>
+                {/* Release Month & Year when sorted by date (Month + 2-digit Year only, score number removed) */}
+                {sortBy === 'date' && (
+                  <text
+                    x={barCenterX}
+                    y={catRaw < 0 && isScienceKnowledge ? barBottomY + 12 : barTopY - 6}
+                    textAnchor="middle"
+                    className="fill-blue-600 dark:fill-blue-400 font-bold tabular-nums"
+                    fontSize="9.5"
+                    fontFamily="monospace"
+                    style={{
+                      transition: 'y 0.25s ease-out',
+                    }}
+                  >
+                    {formatMonthYearShort(model.releaseDate)}
+                  </text>
+                )}
 
                 {/* Company Favicon shifted high enough and larger above exploded bar */}
                 {exploded && isHovered && (() => {
@@ -1484,7 +1586,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   const circleRadius = 12.5;
                   const imgSize = isZoomed ? 31 : 22;
                   const clipId = `clip-exp-hov-${model.id}`;
-                  const logoY = Math.max(16, barTopY - 26);
+                  const logoY = Math.max(26, barTopY - 26);
                   const isSelected = selectedCompany && (
                     model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
                     model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase())
@@ -1542,7 +1644,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   const circleRadius = 9.5;
                   const imgSize = isZoomed ? 24 : 16;
                   const clipId = `clip-exp-nbr-${model.id}`;
-                  const logoY = Math.max(14, barTopY - 22);
+                  const logoY = Math.max(18, barTopY - 22);
                   const isSelected = selectedCompany && (
                     model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
                     model.creatorClean.toLowerCase().includes(selectedCompany.toLowerCase())
@@ -1595,8 +1697,69 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   );
                 })()}
 
+                {/* Euro-Price from Col AL rendered above bar / logo */}
+                {priceInfo.type === 'price' && (
+                  <text
+                    x={barCenterX}
+                    y={priceY}
+                    textAnchor="middle"
+                    className="font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none"
+                    fontSize="9.5"
+                    style={{
+                      textShadow: '0 1px 2px rgba(255,255,255,0.9), 0 0 1px rgba(255,255,255,0.9)',
+                      transition: 'y 0.25s ease-out',
+                    }}
+                  >
+                    {priceInfo.displayPrice}
+                  </text>
+                )}
+
+                {/* Availability / Restriction Notice from Col AL: fixed-anchor notice icon rendered on top with smooth compact popup */}
+                {priceInfo.type === 'note' && (
+                  <g
+                    className="cursor-pointer group/note"
+                    onMouseEnter={(e) => {
+                      setPriceTooltip({
+                        title: priceInfo.tooltipTitle,
+                        text: priceInfo.tooltipText,
+                        x: e.clientX,
+                        y: e.clientY,
+                      });
+                    }}
+                    onMouseMove={(e) => {
+                      setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                    }}
+                    onMouseLeave={() => setPriceTooltip(null)}
+                  >
+                    <circle
+                      cx={barCenterX}
+                      cy={priceY - 3}
+                      r={6}
+                      className="fill-amber-100 dark:fill-amber-950 stroke-amber-500 dark:stroke-amber-400 group-hover/note:fill-amber-200 dark:group-hover/note:fill-amber-900 group-hover/note:stroke-amber-600 dark:group-hover/note:stroke-amber-300 transition-colors"
+                      strokeWidth="1.2"
+                      style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
+                    />
+                    <text
+                      x={barCenterX}
+                      y={priceY}
+                      textAnchor="middle"
+                      className="fill-amber-800 dark:fill-amber-200 font-bold select-none pointer-events-none"
+                      fontSize="8"
+                      fontFamily="sans-serif"
+                    >
+                      ℹ
+                    </text>
+                    <circle
+                      cx={barCenterX}
+                      cy={priceY - 3}
+                      r={12}
+                      fill="transparent"
+                    />
+                  </g>
+                )}
+
                 {/* Rotated Model Name below Baseline: OHNE Flagge, mit vergrößerten 💲, 🌐 Symbolen & klickbar falls modelUrl vorhanden */}
-                <g transform={`translate(${barCenterX}, ${baselineY + 10})`}>
+                <g transform={`translate(${barCenterX}, ${baselineY + 12})`}>
                   {model.modelUrl ? (
                     <a
                       href={model.modelUrl}
@@ -1608,7 +1771,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         x="0"
                         y="0"
                         textAnchor="end"
-                        transform="rotate(-50)"
+                        transform="rotate(-52)"
                         fill={isHovered || (hasActiveHighlight && highlighted) ? '#2563EB' : '#475569'}
                         className="dark:fill-slate-300 transition-colors hover:fill-blue-600 dark:hover:fill-blue-400 cursor-pointer"
                         fontSize="10"
@@ -1631,7 +1794,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       x="0"
                       y="0"
                       textAnchor="end"
-                      transform="rotate(-50)"
+                      transform="rotate(-52)"
                       fill={isHovered || (hasActiveHighlight && highlighted) ? '#0F172A' : '#475569'}
                       className="dark:fill-slate-300 transition-colors"
                       fontSize="10"
@@ -1668,7 +1831,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             transform: segmentTooltip.y < 110 ? 'translateY(0)' : 'translateY(-100%)',
           }}
         >
-          <div className="w-auto min-w-[155px] max-w-[210px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-[11px] font-sans">
+          <div className="w-auto min-w-[130px] max-w-[210px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-[11px] font-sans">
             {/* Category Name & Raw Score */}
             <div className="flex items-center justify-between gap-2.5">
               <div className="flex items-center gap-1.5 min-w-0">
@@ -1686,15 +1849,28 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   : `${Math.round(segmentTooltip.data.raw)}%`}
               </span>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Score points contribution & subtle click hint */}
-            <div className="flex items-center justify-between gap-2 mt-1 pt-1 border-t border-slate-800 text-[10px] font-mono text-slate-400">
-              <span className="text-emerald-400 font-semibold">
-                +{segmentTooltip.data.points.toFixed(1)} {t.points}
-              </span>
-              <span className="text-[9.5px] text-slate-400">
-                {lang === 'de' ? '👉 Details' : '👉 Details'}
-              </span>
+      {/* Floating compact price / availability note tooltip */}
+      {priceTooltip && (
+        <div
+          className="pointer-events-none fixed z-50 transition-opacity duration-100"
+          style={{
+            left: `${Math.max(12, Math.min(window.innerWidth - 220, priceTooltip.x - 70))}px`,
+            top: `${priceTooltip.y < 80 ? priceTooltip.y + 22 : priceTooltip.y - 12}px`,
+            transform: priceTooltip.y < 80 ? 'translateY(0)' : 'translateY(-100%)',
+          }}
+        >
+          <div className="w-auto min-w-[130px] max-w-[240px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-[11px] font-sans">
+            {priceTooltip.title && (
+              <div className="text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
+                {priceTooltip.title}
+              </div>
+            )}
+            <div className="font-medium text-slate-100">
+              {priceTooltip.text}
             </div>
           </div>
         </div>

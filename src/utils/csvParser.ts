@@ -247,7 +247,23 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     }
   }
 
-  // 3. Locate start of history table: Row 36 (index 35) or row after "History"
+  // 3. Pre-collect any Column AL (index 37) price / availability notes by displayName & cleaned name
+  const colALMap = new Map<string, string>();
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (row && row[37]) {
+      const val = row[37].trim();
+      if (val && !val.toLowerCase().includes('abokosten')) {
+        const s = (row[18] || '').trim().toLowerCase();
+        const b = (row[1] || '').trim().toLowerCase();
+        const { cleanText: cleanB } = extractFlag(b);
+        if (s) colALMap.set(s, val);
+        if (cleanB) colALMap.set(cleanB.toLowerCase(), val);
+      }
+    }
+  }
+
+  // 4. Locate start of history table: Row 36 (index 35) or row after "History"
   let startIndex = 35; // Row 36 in 1-based indexing
   for (let r = 0; r < Math.min(45, rows.length); r++) {
     const b = (rows[r]?.[1] || '').trim().toLowerCase();
@@ -438,6 +454,11 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       currentBotNames.has(cleanedName.toLowerCase()) ||
       (!isSupersededOrDiscontinued && (chatLinkLow.startsWith('http') || chatLinkLow.includes('paid') || chatLinkLow.includes('api') || !!parsedApiLink));
 
+    const rawColAL = (row[37] || '').trim();
+    const priceDeMonthly = (!rawColAL.toLowerCase().includes('abokosten') && rawColAL)
+      ? rawColAL
+      : colALMap.get(displayName.toLowerCase()) || colALMap.get(cleanedName.toLowerCase()) || undefined;
+
     allModels.push({
       id: `${displayName}-${r}`,
       rank: 0,
@@ -474,6 +495,7 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       companyDomain: company.domain,
       companyColor: company.color,
       faviconUrl,
+      priceDeMonthly: priceDeMonthly || undefined,
     });
   }
 

@@ -12,6 +12,7 @@ import { LoadedDatasets, loadModelsData } from './services/dataService';
 import { fetchLiveLabEntries } from './services/labDataService';
 import { BENCHMARK_COMPONENTS } from './data/benchmarks';
 import { ExplodedBarChart } from './components/ExplodedBarChart';
+import { ScoreSlider } from './components/ScoreSlider';
 import { SearchBar } from './components/SearchBar';
 import { CsvNotesSection } from './components/CsvNotesSection';
 import { LabMatrixView } from './components/LabMatrixView';
@@ -920,12 +921,12 @@ export default function App() {
       </header>
 
       {/* Primary Tab Switcher */}
-      <div className="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 sticky top-0 z-30 px-4 sm:px-6 shadow-2xs">
-        <div className="w-full max-w-[1720px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 py-2">
-          {/* Segmented Tab Controls */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl shrink-0">
+      <div className="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 sticky top-0 z-30 px-3 sm:px-6 shadow-2xs">
+        <div className="w-full max-w-[1720px] mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-2.5 py-1.5 sm:py-2">
+          {/* Segmented Tab Controls: Horizontally scrollable on mobile/tablet without overflowing */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl max-w-full overflow-x-auto no-scrollbar shrink-0">
             {/* Two-Way Tab: Bar Chart & Timeline */}
-            <div className="flex items-center bg-slate-200/70 dark:bg-slate-700/60 rounded-lg p-0.5">
+            <div className="flex items-center bg-slate-200/70 dark:bg-slate-700/60 rounded-lg p-0.5 shrink-0">
               <button
                 onClick={() => {
                   setActiveTab('benchmark');
@@ -977,7 +978,7 @@ export default function App() {
 
             <button
               onClick={() => setActiveTab('labs')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 ${
                 activeTab === 'labs'
                   ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -991,11 +992,11 @@ export default function App() {
             </button>
           </div>
 
-          {/* Right section: Active filter reset notice + Benchmark Controls (only on barchart benchmark view) */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 sm:ml-auto">
+          {/* Right section: Active filter reset notice + Benchmark Controls (accessible on mobile/tablet) */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 lg:ml-auto max-w-full overflow-x-auto no-scrollbar py-0.5">
             {/* Active filter reset notice */}
             {searchFilter && activeTab === 'benchmark' && benchmarkView === 'barchart' && (
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-xs shrink-0">
                 <span className="text-slate-500 text-[11px]">
                   {lang === 'de' ? 'Aktiver Lab-/Modell-Filter:' : 'Active Lab/Model filter:'} <strong className="text-slate-800 dark:text-slate-200 font-semibold">{searchFilter}</strong>
                 </span>
@@ -1010,7 +1011,7 @@ export default function App() {
 
             {/* Benchmark Controls: Advanced Button + Paid/Free/All Switcher + Explosion Button (only on Bar Chart view) */}
             {activeTab === 'benchmark' && benchmarkView === 'barchart' && (
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex flex-wrap items-center gap-1.5 max-w-full">
 
                 {/* Advanced Button */}
                 <Tooltip
@@ -1034,9 +1035,21 @@ export default function App() {
                   </button>
                 </Tooltip>
 
+                {/* Score / Category Criteria Slider (pulled out of advanced directly between Advanced and Free/Paid filter) */}
+                <ScoreSlider
+                  scoreMode={scoreMode}
+                  onScoreModeChange={setScoreMode}
+                  selectedCategoryIndex={selectedCategoryIndex}
+                  onSelectCategoryIndex={setSelectedCategoryIndex}
+                  categoryNames={loadedData.headerMeta?.categoryNames}
+                  onHoverCategory={setCategoryInfoComp}
+                  onScrollToParagraph={scrollToParagraph}
+                  lang={lang}
+                />
+
                 {/* Price Filter Switcher: Free(API|Chat)Paid|All */}
                 <div
-                  className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0"
+                  className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0 max-w-full overflow-x-auto no-scrollbar"
                   role="group"
                   aria-label={t.priceFilterDesc}
                 >

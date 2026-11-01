@@ -80,6 +80,7 @@ export interface ModelRecord {
   companyDomain: string;
   companyColor: string;
   faviconUrl: string;
+  priceDeMonthly?: string; // Col AL: min. Abokosten/Monat für Chatzugriff in DE (or availability note like 'US only')
 }
 
 export interface CompanyInfo {
