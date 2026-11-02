@@ -117,28 +117,96 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2.5">
-      {/* ZEILE 1: Filter-Suchfeld (links) + Explosions-Schalter (mittig) + Score-Slider (rechts) */}
+      {/* ZEILE 1: Current/All Switcher + Max Bar Count (links) + Explosions-Schalter + Sortierung (rechts) */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        {/* 1. Filter/Suchfeld ("filter by company ...") (links) */}
-        <div className="relative flex-1 min-w-[170px] max-w-full sm:max-w-[220px] md:max-w-[260px] flex items-center">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={t.searchPlaceholder}
-            className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
-          />
-          {value && (
-            <button
-              type="button"
-              onClick={() => onChange('')}
-              className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-              title={t.reset}
+        {/* Linke Kontroll-Gruppe: Current/All Switcher + Max Bar Count Slider */}
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          {/* Current vs All Chatbots */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+            <Tooltip
+              title={t.scopeCurrent}
+              content={t.scopeCurrentDesc}
+              align="left"
+              width="w-56"
             >
-              <X className="w-3 h-3" />
-            </button>
-          )}
+              <button
+                type="button"
+                onClick={() => onModelScopeChange('current')}
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  modelScope === 'current'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {t.scopeCurrent}
+              </button>
+            </Tooltip>
+            <Tooltip
+              title={t.scopeAll}
+              content={t.scopeAllDesc}
+              align="left"
+              width="w-56"
+            >
+              <button
+                type="button"
+                onClick={() => onModelScopeChange('all')}
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  modelScope === 'all'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {t.scopeAll}
+              </button>
+            </Tooltip>
+          </div>
+
+          {/* Max Bar Count Slider */}
+          {(() => {
+            const minVal = Math.min(5, Math.max(1, maxAvailableModels));
+            const displayVal = Math.min(topCount, maxAvailableModels);
+            const sliderMax = Math.max(minVal, maxAvailableModels);
+            return (
+              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
+                <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                  {t.topSliderTop}:
+                </span>
+                <Tooltip content={t.stepMinusChatbots} align="center" width="w-24">
+                  <button
+                    type="button"
+                    onClick={() => handleTopStep(-5)}
+                    disabled={displayVal <= minVal || maxAvailableModels <= 0}
+                    className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                </Tooltip>
+                <input
+                  type="range"
+                  min={minVal}
+                  max={sliderMax}
+                  step={1}
+                  value={Math.max(minVal, displayVal)}
+                  onChange={handleTopSliderChange}
+                  disabled={maxAvailableModels <= minVal}
+                  className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 disabled:opacity-40"
+                />
+                <Tooltip content={t.stepPlusChatbots} align="center" width="w-24">
+                  <button
+                    type="button"
+                    onClick={() => handleTopStep(5)}
+                    disabled={displayVal >= maxAvailableModels || maxAvailableModels <= 0}
+                    className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </Tooltip>
+                <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right">
+                  {displayVal}
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* 2. Explosions-Schalter: an / teils / aus (mittig erste Zeile) + Sortierung rechts davon */}
@@ -322,94 +390,26 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             )}
           </div>
 
-          {/* Rechte Kontroll-Gruppe: Current/All Switcher + Max Bar Count Slider + Sortierung ganz rechts */}
-          <div className="flex flex-wrap items-center gap-1.5 shrink-0 xl:ml-auto">
-            {/* Current vs All Chatbots */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <Tooltip
-                title={t.scopeCurrent}
-                content={t.scopeCurrentDesc}
-                align="left"
-                width="w-56"
+          {/* Freitextfilter ("filter by company ...") ganz rechts */}
+          <div className="relative flex-1 min-w-[170px] max-w-full sm:max-w-[220px] md:max-w-[260px] flex items-center shrink-0 xl:ml-auto">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={t.searchPlaceholder}
+              className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
+            />
+            {value && (
+              <button
+                type="button"
+                onClick={() => onChange('')}
+                className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                title={t.reset}
               >
-                <button
-                  type="button"
-                  onClick={() => onModelScopeChange('current')}
-                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    modelScope === 'current'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {t.scopeCurrent}
-                </button>
-              </Tooltip>
-              <Tooltip
-                title={t.scopeAll}
-                content={t.scopeAllDesc}
-                align="left"
-                width="w-56"
-              >
-                <button
-                  type="button"
-                  onClick={() => onModelScopeChange('all')}
-                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    modelScope === 'all'
-                      ? 'bg-indigo-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {t.scopeAll}
-                </button>
-              </Tooltip>
-            </div>
-
-            {/* Max Bar Count Slider */}
-            {(() => {
-              const minVal = Math.min(5, Math.max(1, maxAvailableModels));
-              const displayVal = Math.min(topCount, maxAvailableModels);
-              const sliderMax = Math.max(minVal, maxAvailableModels);
-              return (
-                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
-                  <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                    {t.topSliderTop}:
-                  </span>
-                  <Tooltip content={t.stepMinusChatbots} align="center" width="w-24">
-                    <button
-                      type="button"
-                      onClick={() => handleTopStep(-5)}
-                      disabled={displayVal <= minVal || maxAvailableModels <= 0}
-                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                  </Tooltip>
-                  <input
-                    type="range"
-                    min={minVal}
-                    max={sliderMax}
-                    step={1}
-                    value={Math.max(minVal, displayVal)}
-                    onChange={handleTopSliderChange}
-                    disabled={maxAvailableModels <= minVal}
-                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 disabled:opacity-40"
-                  />
-                  <Tooltip content={t.stepPlusChatbots} align="center" width="w-24">
-                    <button
-                      type="button"
-                      onClick={() => handleTopStep(5)}
-                      disabled={displayVal >= maxAvailableModels || maxAvailableModels <= 0}
-                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </Tooltip>
-                  <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right">
-                    {displayVal}
-                  </span>
-                </div>
-              );
-            })()}
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
       </div>

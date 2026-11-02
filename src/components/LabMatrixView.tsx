@@ -710,8 +710,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   onSelectLabForBenchmark,
   lang = 'de',
 }) => {
-  // Default to 'all' as requested
-  const [activeGroup, setActiveGroup] = useState<LabGroup>('all');
+  // Default to 'top10' (Top LLM Labs) as requested
+  const [activeGroup, setActiveGroup] = useState<LabGroup>('top10');
   const [weightsFilter, setWeightsFilter] = useState<WeightsFilter>('all');
   const [sizeFilter, setSizeFilter] = useState<string>('all');
   const [simplifiedSizeView, setSimplifiedSizeView] = useState<boolean>(true);
@@ -995,7 +995,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              {lang === 'de' ? `Top 10 LLM-Labore (${top10Count})` : `Top 10 LLM Labs (${top10Count})`}
+              {lang === 'de' ? `Top LLM-Labore (${top10Count})` : `Top LLM Labs (${top10Count})`}
             </button>
             <button
               type="button"
@@ -1006,7 +1006,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              {lang === 'de' ? `24 Herausforderer (${contenderCount})` : `24 Contenders (${contenderCount})`}
+              {lang === 'de' ? `Herausforderer (${contenderCount})` : `Contenders (${contenderCount})`}
             </button>
             <button
               type="button"
@@ -1017,7 +1017,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              {lang === 'de' ? `12 Modell-Optimierer (${tweakersCount})` : `12 Model Tweakers (${tweakersCount})`}
+              {lang === 'de' ? `Modell-Optimierer (${tweakersCount})` : `Model Tweakers (${tweakersCount})`}
             </button>
             <button
               type="button"
@@ -1560,16 +1560,25 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 {/* Primary Engine / ChatBot name or Harness Only Lab */}
                 {(lab.engineName || lab.harness) && lab.engineName !== '-' && (
                   <div className="mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
-                      {lab.group === 'harness'
-                        ? (lang === 'de' ? 'Agenten- & Steuergerüst (Harness)' : 'Agent Scaffolding & Execution Harness')
-                        : lang === 'de'
-                        ? 'Modell-Familie'
-                        : 'Model Family'}
-                    </div>
-                    <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                      {lab.group === 'harness' ? (lab.harness || lab.engineName) : lab.engineName}
-                    </div>
+                    {lab.group === 'harness' ? (
+                      <>
+                        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
+                          {lang === 'de' ? 'Agenten- & Steuergerüst (Harness)' : 'Agent Scaffolding & Execution Harness'}
+                        </div>
+                        <div className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate">
+                          {lab.harness || lab.engineName}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-sm font-semibold whitespace-nowrap truncate">
+                        <span className="text-blue-600 dark:text-blue-400">
+                          {lab.engineName}
+                        </span>{' '}
+                        <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
+                          ChatBot Family
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 

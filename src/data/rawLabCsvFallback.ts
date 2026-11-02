@@ -262,16 +262,19 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "engineName": "Kimi",
     "weightsType": "hybrid",
     "openWeights": {
-      "medium": true,
+      "small": false,
+      "medium": false,
       "large": false,
+      "massive": false,
       "colossal": true,
-      "planetary": true
+      "planetary": true,
+      "singularity": false
     },
     "parameterSizes": {
       "small": "",
       "medium": "",
-      "large": "K1",
-      "massive": "",
+      "large": "",
+      "massive": "K1",
       "colossal": "K2",
       "planetary": "K3",
       "singularity": "",

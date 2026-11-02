@@ -653,10 +653,14 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   </>
                 )}
 
-                <span className="text-slate-400">·</span>
-                <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
-                  {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? (scoreMode === 'old' ? (displayedModel.scoreOld ?? displayedModel.scoreOldCalculated) : (displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated))} {t.points} ({t.rank} #{displayedModel.rank})
-                </span>
+                {activeCategoryIndex === 0 && (
+                  <>
+                    <span className="text-slate-400">·</span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
+                      {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? (scoreMode === 'old' ? (displayedModel.scoreOld ?? displayedModel.scoreOldCalculated) : (displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated))} {t.points} ({t.rank} #{displayedModel.rank})
+                    </span>
+                  </>
+                )}
 
                 {displayedModel.priceDeMonthly && (() => {
                   const pInfo = getPriceColInfo(displayedModel.priceDeMonthly);
@@ -720,9 +724,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           {lang === 'de' ? displayedSegment.comp.nameDe : displayedSegment.comp.nameEn}
                         </span>
                         <span className="font-mono text-slate-900 dark:text-white font-bold">
-                          {displayedSegment.comp.id === 'scienceKnowledge'
-                            ? (displayedSegment.raw > 0 ? `+${Math.round(displayedSegment.raw)} pts` : `${Math.round(displayedSegment.raw)} pts`)
-                            : `${Math.round(displayedSegment.raw)}%`}
+                          {`+${displayedSegment.points.toFixed(1)} ${t.points}`}
                         </span>
                       </button>
                     </Tooltip>
@@ -1342,27 +1344,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         setSegmentTooltip(null);
                       }}
                     />
-
-                    {/* Centered raw score inside bar if height >= 18 */}
-                    {totalBarHeight >= 18 && (
-                      <text
-                        x={barCenterX}
-                        y={barCenterY + 3.5}
-                        textAnchor="middle"
-                        fill="#FFFFFF"
-                        fontSize="8.5"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                        pointerEvents="none"
-                        style={{
-                          textShadow: '0 1px 2px rgba(0,0,0,0.85)',
-                        }}
-                      >
-                        {isScienceKnowledge
-                          ? (catRaw > 0 ? `+${Math.round(catRaw)}` : `${Math.round(catRaw)}`)
-                          : `${Math.round(catRaw)}%`}
-                      </text>
-                    )}
                   </g>
                 ) : (
                   /* The 8 Segments */
@@ -1480,7 +1461,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           />
                         )}
 
-                        {/* Originale Prozentzahl mittig im jeweiligen Balkenteil bei Explosion (auch Nachbarbalken & volle Explosion) */}
+                        {/* Umgerechneter Wert (Punkteanteil), der innerhalb des Scores dazugewonnen wurde */}
                         {exploded && seg.segHeight >= 6 && (
                           <text
                             x={barCenterX}
@@ -1495,9 +1476,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               textShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 1px rgba(0,0,0,0.95)',
                             }}
                           >
-                            {seg.comp.id === 'scienceKnowledge'
-                              ? (seg.comp.rawValue > 0 ? `+${Math.round(seg.comp.rawValue)}` : `${Math.round(seg.comp.rawValue)}`)
-                              : `${Math.round(seg.comp.rawValue)}%`}
+                            {`+${seg.comp.pointsContribution.toFixed(1)}`}
                           </text>
                         )}
                       </g>
@@ -1698,6 +1677,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 })()}
 
                 {/* Euro-Price from Col AL rendered above bar / logo */}
+                {/* Euro-Price from Col AL rendered above bar / logo */}
                 {priceInfo.type === 'price' && (
                   <text
                     x={barCenterX}
@@ -1706,7 +1686,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     className="font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none"
                     fontSize="9.5"
                     style={{
-                      textShadow: '0 1px 2px rgba(255,255,255,0.9), 0 0 1px rgba(255,255,255,0.9)',
                       transition: 'y 0.25s ease-out',
                     }}
                   >
@@ -1758,7 +1737,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   </g>
                 )}
 
-                {/* Rotated Model Name below Baseline: OHNE Flagge, mit vergrößerten 💲, 🌐 Symbolen & klickbar falls modelUrl vorhanden */}
+                {/* Rotated Model Name below Baseline: OHNE Flagge, mit vergrößertem 🌐 Symbol & klickbar falls modelUrl vorhanden */}
                 <g transform={`translate(${barCenterX}, ${baselineY + 12})`}>
                   {model.modelUrl ? (
                     <a
@@ -1781,9 +1760,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         {model.isNew && (
                           <tspan fill="#F59E0B" fontWeight="bold"> ✦ NEW</tspan>
                         )}
-                        {model.isPaid && (
-                          <tspan fontSize="15" fontWeight="bold" fill="#059669"> 💲</tspan>
-                        )}
                         {model.isFreeApi && (
                           <tspan fontSize="15" fontWeight="bold" fill="#2563EB"> 🌐</tspan>
                         )}
@@ -1803,9 +1779,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       {model.displayName}
                       {model.isNew && (
                         <tspan fill="#F59E0B" fontWeight="bold"> ✦ NEW</tspan>
-                      )}
-                      {model.isPaid && (
-                        <tspan fontSize="15" fontWeight="bold" fill="#059669"> 💲</tspan>
                       )}
                       {model.isFreeApi && (
                         <tspan fontSize="15" fontWeight="bold" fill="#2563EB"> 🌐</tspan>
@@ -1844,9 +1817,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 </span>
               </div>
               <span className="font-mono font-bold text-white shrink-0 text-xs">
-                {segmentTooltip.data.comp.id === 'scienceKnowledge'
-                  ? (segmentTooltip.data.raw > 0 ? `+${Math.round(segmentTooltip.data.raw)} pts` : `${Math.round(segmentTooltip.data.raw)} pts`)
-                  : `${Math.round(segmentTooltip.data.raw)}%`}
+                {`+${segmentTooltip.data.points.toFixed(1)} ${t.points}`}
               </span>
             </div>
           </div>

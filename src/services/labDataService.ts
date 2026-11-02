@@ -218,12 +218,12 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       country: 'China',
       weightsType: 'hybrid',
       openWeights: {
-        small: true,
-        medium: true,
-        large: true,
-        massive: true, // K1 is open
+        small: false,
+        medium: false,
+        large: false,
+        massive: false, // K1 is closed
         colossal: true, // K2 is open
-        planetary: false, // K3 is closed
+        planetary: true, // K3 is open
         singularity: false,
       },
     },
@@ -362,7 +362,12 @@ export function parseLabCsv(csvText: string): LabEntry[] {
 
   // 4. Small Model Labs (Default row 40)
   const rSmall = findRow('small model') !== -1 ? findRow('small model') : 40;
-  const rHarness = findRow('harness') !== -1 ? findRow('harness') : 52;
+  const rHarness =
+    findRow('harness labs') !== -1
+      ? findRow('harness labs')
+      : findRow('harness only') !== -1
+      ? findRow('harness only')
+      : 52;
   const rSmallNotes = findRowInRange(rSmall, rHarness, ['note', 'famous']);
   const notesRowSmall = rSmallNotes !== -1 ? rSmallNotes : rSmall + 9;
   const smallNotesLabel = rSmallNotes !== -1 ? getCell(rSmallNotes, 0) : 'Notes';
