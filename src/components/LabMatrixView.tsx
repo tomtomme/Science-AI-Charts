@@ -265,18 +265,6 @@ export const GLOSSARY_TERMS: GlossaryTermDef[] = [
     category: 'architecture',
   },
   {
-    id: 'term-stack',
-    termEn: 'Tooling & Agent-Stack',
-    termDe: 'Werkzeuge & Agenten-Stack',
-    badgeEn: 'Software Layer',
-    badgeDe: 'Software-Schicht',
-    shortEn: 'The software layers built on top of raw models: SDKs, daily assistants, and coding agents.',
-    shortDe: 'Software-Schichten über den reinen Modellen: SDKs, Alltagsassistenten und Coding-Agenten.',
-    detailEn: 'The comprehensive software ecosystem that transforms raw neural network weights into practical user applications.',
-    detailDe: 'Das gesamte Software-Ökosystem aus Werkzeugen, Bibliotheken und Schnittstellen, das aus reinen Modellgewichten nutzbare Produkte formt.',
-    category: 'infrastructure',
-  },
-  {
     id: 'term-benchmark',
     termEn: 'Benchmark',
     termDe: 'Benchmark',
@@ -1408,7 +1396,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   content={
                     lang === 'de'
                       ? 'Karten auf Vendor, Modellfamilie & gewähltes Modell reduzieren oder Vollansicht anzeigen'
-                      : 'Toggle reduced cards (Vendor, Model Family & selected model) vs. full cards'
+                      : 'Toggle reduced cards (Vendor, chatbot family & selected model) vs. full cards'
                   }
                   align="right"
                   width="w-64"
@@ -1570,13 +1558,37 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         </div>
                       </>
                     ) : (
-                      <div className="text-sm font-semibold whitespace-nowrap truncate">
-                        <span className="text-blue-600 dark:text-blue-400">
+                      <div
+                        className="text-sm font-semibold whitespace-nowrap truncate flex items-baseline gap-1.5"
+                        title={
+                          (lab.famousFor || lab.specialties) && lab.specialties !== `Based on ${lab.basedOn}`
+                            ? `${lab.engineName} chatbot family — ${
+                                lab.notesLabel?.toLowerCase().includes('note') || lab.group === 'contender' || lab.group === 'small'
+                                  ? (lang === 'de' ? 'Hinweise: ' : 'Notes: ')
+                                  : (lang === 'de' ? 'Bekannt für: ' : 'Famous for: ')
+                              }${lab.famousFor || lab.specialties}`
+                            : `${lab.engineName} chatbot family`
+                        }
+                      >
+                        <span className="text-blue-600 dark:text-blue-400 shrink-0">
                           {lab.engineName}
-                        </span>{' '}
-                        <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
-                          ChatBot Family
                         </span>
+                        <span className="text-xs font-normal text-slate-400 dark:text-slate-500 shrink-0">
+                          chatbot family
+                        </span>
+                        {(lab.famousFor || lab.specialties) && lab.specialties !== `Based on ${lab.basedOn}` && (
+                          <span className="text-xs font-normal text-slate-500 dark:text-slate-400 truncate flex items-baseline gap-1 min-w-0">
+                            <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+                            <span className="text-slate-400 dark:text-slate-500 font-medium shrink-0">
+                              {lab.notesLabel?.toLowerCase().includes('note') || lab.group === 'contender' || lab.group === 'small'
+                                ? (lang === 'de' ? 'Hinweise: ' : 'Notes: ')
+                                : (lang === 'de' ? 'Bekannt für: ' : 'Famous for: ')}
+                            </span>
+                            <span className="text-slate-600 dark:text-slate-300 truncate">
+                              {lab.famousFor || lab.specialties}
+                            </span>
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1617,8 +1629,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   </div>
                 )}
 
-                {/* Famous for / Specialties / Notes (hidden in simplified size view) */}
-                {!isSimplifiedView && lab.group !== 'harness' && (lab.famousFor || lab.specialties) && lab.specialties !== `Based on ${lab.basedOn}` && (
+                {/* Fallback Famous for / Notes only if not already shown above with engineName */}
+                {!isSimplifiedView && (!lab.engineName || lab.engineName === '-') && lab.group !== 'harness' && (lab.famousFor || lab.specialties) && lab.specialties !== `Based on ${lab.basedOn}` && (
                   <div className="text-xs text-slate-600 dark:text-slate-400 mb-2.5 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
                     <span className="font-medium text-slate-700 dark:text-slate-300">
                       {lab.notesLabel?.toLowerCase().includes('note') || lab.group === 'contender' || lab.group === 'small'
@@ -1723,7 +1735,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       <span className="flex items-center gap-1.5">
                         <Wrench className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
                         <span className="group-hover:underline">
-                          {lang === 'de' ? 'Werkzeuge & Agenten-Stack' : 'Tooling & Agent-Stack'}
+                          {lang === 'de' ? 'Werkzeuge & Agenten' : 'Tooling & Agents'}
                         </span>
                       </span>
                       <span className="text-[11px] text-blue-600 dark:text-blue-400 font-normal normal-case tracking-normal flex items-center gap-1">
@@ -1732,7 +1744,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       </span>
                     </button>
 
-                    {/* Full tooling and agent stack revealed when clicked */}
+                    {/* Full tooling and agents revealed when clicked */}
                     {isExpanded && (
                       <div className="text-xs space-y-1.5 pt-2 mt-1.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-800/40 p-2.5 rounded-lg transition-all">
                         {lab.codingAgent && (

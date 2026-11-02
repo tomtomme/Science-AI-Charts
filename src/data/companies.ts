@@ -4,6 +4,7 @@ export const COMPANY_LOOKUP: Record<string, CompanyInfo> = {
   'google': { name: 'Google', domain: 'google.com', color: '#118731', flag: '🇺🇸' },
   'anthropic': { name: 'Anthropic', domain: 'anthropic.com', color: '#CC785C', flag: '🇺🇸' },
   'openai': { name: 'OpenAI', domain: 'openai.com', color: '#1F1F1F', flag: '🇺🇸' },
+  'chatgpt': { name: 'OpenAI', domain: 'openai.com', color: '#1F1F1F', flag: '🇺🇸' },
   'meta': { name: 'Meta', domain: 'meta.com', color: '#0089F4', flag: '🇺🇸' },
   'xai': { name: 'xAI', domain: 'x.ai', color: '#8400a9', flag: '🇺🇸' },
   'spacexai': { name: 'SpaceXAI', domain: 'x.ai', color: '#8400a9', flag: '🇺🇸' },

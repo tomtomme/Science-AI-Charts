@@ -460,7 +460,7 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       : colALMap.get(displayName.toLowerCase()) || colALMap.get(cleanedName.toLowerCase()) || undefined;
 
     allModels.push({
-      id: `${displayName}-${r}`,
+      id: `model-${r}-${displayName.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
       rank: 0,
       flag,
       name: rawNameCell,
