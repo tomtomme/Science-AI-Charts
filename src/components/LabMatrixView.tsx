@@ -1608,11 +1608,13 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   </div>
                 )}
 
-                {/* Famous for / Specialties (hidden in simplified size view) */}
+                {/* Famous for / Specialties / Notes (hidden in simplified size view) */}
                 {!isSimplifiedView && lab.group !== 'harness' && (lab.famousFor || lab.specialties) && lab.specialties !== `Based on ${lab.basedOn}` && (
                   <div className="text-xs text-slate-600 dark:text-slate-400 mb-2.5 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
                     <span className="font-medium text-slate-700 dark:text-slate-300">
-                      {lab.famousFor
+                      {lab.notesLabel?.toLowerCase().includes('note') || lab.group === 'contender' || lab.group === 'small'
+                        ? (lang === 'de' ? 'Hinweise: ' : 'Notes: ')
+                        : lab.famousFor
                         ? (lang === 'de' ? 'Bekannt für: ' : 'Famous for: ')
                         : (lang === 'de' ? 'Besonderheiten: ' : 'Specialties: ')}
                     </span>

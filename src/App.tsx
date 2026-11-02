@@ -1009,33 +1009,10 @@ export default function App() {
               </div>
             )}
 
-            {/* Benchmark Controls: Advanced Button + Paid/Free/All Switcher + Explosion Button (only on Bar Chart view) */}
+            {/* Benchmark Controls: ScoreSlider + Paid/Free/All Switcher + Advanced Button (only on Bar Chart view) */}
             {activeTab === 'benchmark' && benchmarkView === 'barchart' && (
               <div className="flex flex-wrap items-center gap-1.5 max-w-full">
-
-                {/* Advanced Button */}
-                <Tooltip
-                  title={t.advanced}
-                  align="left"
-                  width="w-60"
-                  content={t.advancedDesc}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setShowAdvanced((prev) => !prev)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
-                      showAdvanced
-                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
-                        : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                    }`}
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>{t.advanced}</span>
-                    <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
-                  </button>
-                </Tooltip>
-
-                {/* Score / Category Criteria Slider (pulled out of advanced directly between Advanced and Free/Paid filter) */}
+                {/* Score / Category Criteria Slider */}
                 <ScoreSlider
                   scoreMode={scoreMode}
                   onScoreModeChange={setScoreMode}
@@ -1210,6 +1187,21 @@ export default function App() {
                     </button>
                   </Tooltip>
                 </div>
+
+                {/* Advanced Button (ganz rechts, Pop-up entfernt) */}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((prev) => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
+                    showAdvanced
+                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
+                      : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>{t.advanced}</span>
+                  <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
+                </button>
               </div>
             )}
           </div>

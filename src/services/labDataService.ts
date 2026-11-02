@@ -63,19 +63,186 @@ export function parseLabCsv(csvText: string): LabEntry[] {
     return -1;
   };
 
+  const findRowInRange = (startRow: number, endRow: number, keywords: string[]): number => {
+    for (let i = startRow; i <= Math.min(endRow, rows.length - 1); i++) {
+      const col0 = rows[i]?.[0]?.toLowerCase() || '';
+      if (keywords.some((kw) => col0.includes(kw))) {
+        return i;
+      }
+    }
+    return -1;
+  };
+
   // 1. Top 10 Labs (Default row 1)
   const rTop10 = findRow('top') !== -1 ? findRow('top') : 1;
-  const top10Specs: Array<{ id: string; defaultName: string; cols: number[]; country: string }> = [
-    { id: 'anthropic', defaultName: 'Anthropic', cols: [1], country: 'America (US)' },
-    { id: 'google', defaultName: 'Google', cols: [2], country: 'America (US)' },
-    { id: 'meta', defaultName: 'Meta', cols: [3], country: 'America (US)' },
-    { id: 'nvidia', defaultName: 'Nvidia', cols: [4], country: 'America (US)' },
-    { id: 'openai', defaultName: 'OpenAI', cols: [5], country: 'America (US)' },
-    { id: 'spacexai', defaultName: 'SpaceXAI', cols: [6], country: 'America (US)' },
-    { id: 'alibaba', defaultName: 'Alibaba', cols: [7, 8], country: 'China' },
-    { id: 'deepseek', defaultName: 'DeepSeek', cols: [9], country: 'China' },
-    { id: 'moonshot', defaultName: 'Moonshot', cols: [10], country: 'China' },
-    { id: 'zhipu', defaultName: 'Z.ai / Zhipu', cols: [11], country: 'China' },
+  const top10Specs: Array<{
+    id: string;
+    defaultName: string;
+    col: number;
+    country: string;
+    weightsType: 'open' | 'closed' | 'hybrid';
+    openWeights?: Record<string, boolean>;
+  }> = [
+    {
+      id: 'anthropic',
+      defaultName: 'Anthropic',
+      col: 1,
+      country: 'America (US)',
+      weightsType: 'closed',
+      openWeights: {
+        small: false,
+        medium: false,
+        large: false,
+        massive: false,
+        colossal: false,
+        planetary: false,
+        singularity: false,
+      },
+    },
+    {
+      id: 'google',
+      defaultName: 'Google',
+      col: 2,
+      country: 'America (US)',
+      weightsType: 'hybrid',
+      openWeights: {
+        small: true,
+        medium: false,
+        large: false,
+        massive: false,
+        colossal: false,
+        planetary: false,
+        singularity: false,
+      },
+    },
+    {
+      id: 'meta',
+      defaultName: 'Meta',
+      col: 3,
+      country: 'America (US)',
+      weightsType: 'hybrid',
+      openWeights: {
+        small: true,
+        medium: false,
+        large: false,
+        massive: false,
+        colossal: false,
+        planetary: false,
+        singularity: false,
+      },
+    },
+    {
+      id: 'nvidia',
+      defaultName: 'Nvidia',
+      col: 4,
+      country: 'America (US)',
+      weightsType: 'open',
+      openWeights: {
+        small: true,
+        medium: true,
+        large: true,
+        massive: true,
+        colossal: true,
+        planetary: true,
+        singularity: true,
+      },
+    },
+    {
+      id: 'openai',
+      defaultName: 'OpenAI',
+      col: 5,
+      country: 'America (US)',
+      weightsType: 'hybrid',
+      openWeights: {
+        small: true,
+        medium: true, // gpt-oss is open
+        large: false,
+        massive: false,
+        colossal: false,
+        planetary: false,
+        singularity: false,
+      },
+    },
+    {
+      id: 'spacexai',
+      defaultName: 'SpaceXSI',
+      col: 6,
+      country: 'America (US)',
+      weightsType: 'hybrid',
+      openWeights: {
+        small: false,
+        medium: false, // v0 is closed
+        large: true, // v1 (Grok 1) is open
+        massive: true, // v2 (Grok 2) is open
+        colossal: false, // v3 is closed
+        planetary: false, // v4 is closed
+        singularity: false,
+      },
+    },
+    {
+      id: 'alibaba',
+      defaultName: 'Alibaba',
+      col: 7,
+      country: 'China',
+      weightsType: 'open',
+      openWeights: {
+        small: true,
+        medium: true,
+        large: true,
+        massive: true,
+        colossal: true,
+        planetary: true,
+        singularity: true,
+      },
+    },
+    {
+      id: 'deepseek',
+      defaultName: 'DeepSeek',
+      col: 8,
+      country: 'China',
+      weightsType: 'open',
+      openWeights: {
+        small: true,
+        medium: true,
+        large: true,
+        massive: true,
+        colossal: true,
+        planetary: true,
+        singularity: true,
+      },
+    },
+    {
+      id: 'moonshot',
+      defaultName: 'Moonshot',
+      col: 9,
+      country: 'China',
+      weightsType: 'hybrid',
+      openWeights: {
+        small: true,
+        medium: true,
+        large: true,
+        massive: true, // K1 is open
+        colossal: true, // K2 is open
+        planetary: false, // K3 is closed
+        singularity: false,
+      },
+    },
+    {
+      id: 'zhipu',
+      defaultName: 'Zhipu',
+      col: 10,
+      country: 'China',
+      weightsType: 'open',
+      openWeights: {
+        small: true,
+        medium: true,
+        large: true, // V is open
+        massive: true, // Flash is open
+        colossal: true, // GLM is open
+        planetary: true,
+        singularity: true,
+      },
+    },
   ];
 
   // Map of fallback entries by ID and by creator name for open weights metadata
@@ -83,16 +250,13 @@ export function parseLabCsv(csvText: string): LabEntry[] {
   const fallbackByCreator = new Map<string, LabEntry>(FALLBACK_LAB_ENTRIES.map((l) => [l.creator.toLowerCase().trim(), l]));
 
   const top10Entries: LabEntry[] = top10Specs.map((spec) => {
-    const getCombined = (offset: number) => {
+    const getVal = (offset: number) => {
       const r = rTop10 + offset;
-      return spec.cols.map((c) => getCell(r, c)).filter(Boolean).join(' / ');
+      return getCell(r, spec.col);
     };
-    const dynamicCreator =
-      spec.id === 'alibaba'
-        ? 'Alibaba'
-        : getCell(rTop10 + 1, spec.cols[0]) || spec.defaultName;
+    const dynamicCreator = getCell(rTop10 + 1, spec.col) || spec.defaultName;
 
-    const fb = fallbackMap.get(spec.id);
+    const fb = fallbackMap.get(spec.id) || fallbackByCreator.get(dynamicCreator.toLowerCase());
     const { country, flag } = normalizeCountry(spec.country);
 
     return {
@@ -101,30 +265,34 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       country,
       countryFlag: flag,
       creator: dynamicCreator,
-      famousFor: getCombined(2),
-      engineName: getCombined(3),
-      weightsType: fb?.weightsType || 'hybrid',
-      openWeights: fb?.openWeights,
+      famousFor: getVal(2),
+      engineName: getVal(3),
+      weightsType: spec.weightsType || fb?.weightsType || 'hybrid',
+      openWeights: spec.openWeights || fb?.openWeights,
       parameterSizes: {
-        small: getCombined(4),
-        medium: getCombined(5),
-        large: getCombined(6),
-        massive: getCombined(7),
-        colossal: getCombined(8),
-        planetary: getCombined(9),
-        singularity: getCombined(10),
-        godTier: getCombined(11),
+        small: getVal(4),
+        medium: getVal(5),
+        large: getVal(6),
+        massive: getVal(7),
+        colossal: getVal(8),
+        planetary: getVal(9),
+        singularity: getVal(10),
+        godTier: getVal(11),
       },
-      subscriptionTiers: getCombined(12),
-      harnessSdk: getCombined(13),
-      dailyAgent: getCombined(14),
-      codingAgent: getCombined(15),
+      subscriptionTiers: getVal(12),
+      harnessSdk: getVal(13),
+      dailyAgent: getVal(14),
+      codingAgent: getVal(15),
     };
   });
 
-
   // 2. Contenders (Default row 18)
   const rContenders = findRow('contender') !== -1 ? findRow('contender') : 18;
+  const rTweakers = findRow('tweaker') !== -1 ? findRow('tweaker') : 29;
+  const rContenderNotes = findRowInRange(rContenders, rTweakers, ['note', 'famous']);
+  const notesRowContender = rContenderNotes !== -1 ? rContenderNotes : rContenders + 9;
+  const contenderNotesLabel = rContenderNotes !== -1 ? getCell(rContenderNotes, 0) : 'Notes';
+
   let curCountryContender = 'America (US)';
   const contenders: LabEntry[] = [];
   const contendersMaxCols = rows[rContenders + 1]?.length || 35;
@@ -142,7 +310,8 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       countryFlag: flag,
       creator: creator,
       engineName: getCell(rContenders + 2, c),
-      famousFor: getCell(rContenders + 9, c),
+      famousFor: getCell(notesRowContender, c),
+      notesLabel: contenderNotesLabel,
       weightsType: fb?.weightsType || 'open',
       openWeights: fb?.openWeights,
       parameterSizes: {
@@ -153,12 +322,11 @@ export function parseLabCsv(csvText: string): LabEntry[] {
         colossal: getCell(rContenders + 7, c),
         planetary: getCell(rContenders + 8, c),
       },
-      specialties: getCell(rContenders + 9, c),
+      specialties: getCell(notesRowContender, c),
     });
   }
 
   // 3. Model Tweakers (Default row 29)
-  const rTweakers = findRow('tweaker') !== -1 ? findRow('tweaker') : 29;
   const tweakers: LabEntry[] = [];
   let curCountryTweaker = 'America (US)';
   const tweakersMaxCols = rows[rTweakers + 1]?.length || 30;
@@ -194,6 +362,11 @@ export function parseLabCsv(csvText: string): LabEntry[] {
 
   // 4. Small Model Labs (Default row 40)
   const rSmall = findRow('small model') !== -1 ? findRow('small model') : 40;
+  const rHarness = findRow('harness') !== -1 ? findRow('harness') : 52;
+  const rSmallNotes = findRowInRange(rSmall, rHarness, ['note', 'famous']);
+  const notesRowSmall = rSmallNotes !== -1 ? rSmallNotes : rSmall + 9;
+  const smallNotesLabel = rSmallNotes !== -1 ? getCell(rSmallNotes, 0) : 'Notes';
+
   const smallLabs: LabEntry[] = [];
   let curCountrySmall = 'America (US)';
   const smallMaxCols = rows[rSmall + 1]?.length || 30;
@@ -228,7 +401,8 @@ export function parseLabCsv(csvText: string): LabEntry[] {
         countryFlag: flag,
         creator: 'Samsung',
         engineName: 'Gauss 1 / Gauss 2',
-        famousFor: getCell(rSmall + 9, c) || 'for Galaxy AI',
+        famousFor: getCell(notesRowSmall, c) || 'for Galaxy AI',
+        notesLabel: smallNotesLabel,
         weightsType: fb?.weightsType || 'open',
         openWeights: fb?.openWeights,
         parameterSizes: {
@@ -239,7 +413,7 @@ export function parseLabCsv(csvText: string): LabEntry[] {
           medium: combineModels(getCell(rSmall + 7, c), g2Medium),
           large: getCell(rSmall + 8, c),
         },
-        specialties: getCell(rSmall + 9, c) || 'for Galaxy AI',
+        specialties: getCell(notesRowSmall, c) || 'for Galaxy AI',
       });
       continue;
     }
@@ -251,7 +425,8 @@ export function parseLabCsv(csvText: string): LabEntry[] {
       countryFlag: flag,
       creator: creator,
       engineName: getCell(rSmall + 2, c),
-      famousFor: getCell(rSmall + 9, c),
+      famousFor: getCell(notesRowSmall, c),
+      notesLabel: smallNotesLabel,
       weightsType: fb?.weightsType || 'open',
       openWeights: fb?.openWeights,
       parameterSizes: {
@@ -262,12 +437,11 @@ export function parseLabCsv(csvText: string): LabEntry[] {
         medium: getCell(rSmall + 7, c),
         large: getCell(rSmall + 8, c),
       },
-      specialties: getCell(rSmall + 9, c),
+      specialties: getCell(notesRowSmall, c),
     });
   }
 
   // 5. Harness Only Labs (Default row 52)
-  const rHarness = findRow('harness only') !== -1 ? findRow('harness only') : 52;
   const harnessLabs: LabEntry[] = [];
   let curCountryHarness = 'America (US)';
   const harnessMaxCols = rows[rHarness + 1]?.length || 30;

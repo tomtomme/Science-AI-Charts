@@ -141,87 +141,131 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           )}
         </div>
 
-        {/* 2. Explosions-Schalter: an / teils / aus (mittig erste Zeile) */}
-        {explosionMode && onExplosionModeChange && (
-          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 font-mono text-[10px] sm:text-[11px] self-center">
-            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
-              {t.explosionToggle}:
-            </span>
-            <div className="flex items-center bg-slate-200/60 dark:bg-slate-800/60 rounded p-0.5 gap-0.5">
-              {/* an */}
-              <Tooltip
-                title={<span className="text-emerald-400">{lang === 'de' ? 'Explosion: an' : 'Explosion: on'}</span>}
-                align="center"
-                width="w-60"
-                content={
-                  lang === 'de'
-                    ? 'Alle Balken werden permanent voll in 8 Kriterien aufgefächert dargestellt.'
-                    : 'All bars are permanently expanded into their 8 benchmark criteria.'
-                }
-              >
-                <button
-                  type="button"
-                  onClick={() => onExplosionModeChange('on')}
-                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    explosionMode === 'on'
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
+        {/* 2. Explosions-Schalter: an / teils / aus (mittig erste Zeile) + Sortierung rechts davon */}
+        <div className="flex flex-wrap items-center gap-2">
+          {explosionMode && onExplosionModeChange && (
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 font-mono text-[10px] sm:text-[11px] self-center">
+              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+                {t.explosionToggle}:
+              </span>
+              <div className="flex items-center bg-slate-200/60 dark:bg-slate-800/60 rounded p-0.5 gap-0.5">
+                {/* an */}
+                <Tooltip
+                  title={<span className="text-emerald-400">{lang === 'de' ? 'Explosion: an' : 'Explosion: on'}</span>}
+                  align="center"
+                  width="w-60"
+                  content={
+                    lang === 'de'
+                      ? 'Alle Balken werden permanent voll in 8 Kriterien aufgefächert dargestellt.'
+                      : 'All bars are permanently expanded into their 8 benchmark criteria.'
+                  }
                 >
-                  {t.explosionOn}
-                </button>
-              </Tooltip>
+                  <button
+                    type="button"
+                    onClick={() => onExplosionModeChange('on')}
+                    className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                      explosionMode === 'on'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {t.explosionOn}
+                  </button>
+                </Tooltip>
 
-              {/* teils */}
-              <Tooltip
-                title={<span className="text-blue-400">{lang === 'de' ? 'Explosion: teils (Hover)' : 'Explosion: hover'}</span>}
-                align="center"
-                width="w-60"
-                content={
-                  lang === 'de'
-                    ? 'Nur der Balken unter dem Mauszeiger und seine direkten Nachbarn fächern auf.'
-                    : 'Only the bar under the mouse cursor and adjacent neighbors expand.'
-                }
-              >
-                <button
-                  type="button"
-                  onClick={() => onExplosionModeChange('hover')}
-                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    explosionMode === 'hover'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
+                {/* teils */}
+                <Tooltip
+                  title={<span className="text-blue-400">{lang === 'de' ? 'Explosion: teils (Hover)' : 'Explosion: hover'}</span>}
+                  align="center"
+                  width="w-60"
+                  content={
+                    lang === 'de'
+                      ? 'Nur der Balken unter dem Mauszeiger und seine direkten Nachbarn fächern auf.'
+                      : 'Only the bar under the mouse cursor and adjacent neighbors expand.'
+                  }
                 >
-                  {t.explosionHover}
-                </button>
-              </Tooltip>
+                  <button
+                    type="button"
+                    onClick={() => onExplosionModeChange('hover')}
+                    className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                      explosionMode === 'hover'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {t.explosionHover}
+                  </button>
+                </Tooltip>
 
-              {/* aus */}
-              <Tooltip
-                title={<span className="text-slate-300">{lang === 'de' ? 'Explosion: aus' : 'Explosion: off'}</span>}
-                align="center"
-                width="w-56"
-                content={
-                  lang === 'de'
-                    ? 'Balken bleiben immer kompakt und fächern auch bei Mausberührung nicht auf.'
-                    : 'Bars stay compact as single bars and never expand on hover.'
-                }
-              >
-                <button
-                  type="button"
-                  onClick={() => onExplosionModeChange('off')}
-                  className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    explosionMode === 'off'
-                      ? 'bg-slate-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
+                {/* aus */}
+                <Tooltip
+                  title={<span className="text-slate-300">{lang === 'de' ? 'Explosion: aus' : 'Explosion: off'}</span>}
+                  align="center"
+                  width="w-56"
+                  content={
+                    lang === 'de'
+                      ? 'Balken bleiben immer kompakt und fächern auch bei Mausberührung nicht auf.'
+                      : 'Bars stay compact as single bars and never expand on hover.'
+                  }
                 >
-                  {t.explosionOff}
-                </button>
-              </Tooltip>
+                  <button
+                    type="button"
+                    onClick={() => onExplosionModeChange('off')}
+                    className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                      explosionMode === 'off'
+                        ? 'bg-slate-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {t.explosionOff}
+                  </button>
+                </Tooltip>
+              </div>
             </div>
+          )}
+
+          {/* Sortierung (Score vs Datum) rechts vom Explosionsknopf */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+            <Tooltip
+              title={t.sortScore}
+              content={t.sortScoreDesc}
+              align="center"
+              width="w-56"
+            >
+              <button
+                type="button"
+                onClick={() => onSortByChange('score')}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  sortBy === 'score'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <BarChart2 className="w-3 h-3" />
+                <span>{t.sortScore}</span>
+              </button>
+            </Tooltip>
+            <Tooltip
+              title={t.sortDate}
+              content={t.sortDateDesc}
+              align="center"
+              width="w-56"
+            >
+              <button
+                type="button"
+                onClick={() => onSortByChange('date')}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  sortBy === 'date'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Calendar className="w-3 h-3" />
+                <span>{t.sortDate}</span>
+              </button>
+            </Tooltip>
           </div>
-        )}
+        </div>
 
 
       </div>
@@ -366,48 +410,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 </div>
               );
             })()}
-
-            {/* Sortierung (Score vs Datum) ganz rechts */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <Tooltip
-                title={t.sortScore}
-                content={t.sortScoreDesc}
-                align="right"
-                width="w-56"
-              >
-                <button
-                  type="button"
-                  onClick={() => onSortByChange('score')}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    sortBy === 'score'
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <BarChart2 className="w-3 h-3" />
-                  <span>{t.sortScore}</span>
-                </button>
-              </Tooltip>
-              <Tooltip
-                title={t.sortDate}
-                content={t.sortDateDesc}
-                align="right"
-                width="w-56"
-              >
-                <button
-                  type="button"
-                  onClick={() => onSortByChange('date')}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                    sortBy === 'date'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Calendar className="w-3 h-3" />
-                  <span>{t.sortDate}</span>
-                </button>
-              </Tooltip>
-            </div>
           </div>
         </div>
       </div>

@@ -121,6 +121,7 @@ export interface LabEntry {
   countryFlag: string;
   creator: string;
   famousFor: string;
+  notesLabel?: string;
   engineName: string;
   basedOn?: string;
   harness?: string;

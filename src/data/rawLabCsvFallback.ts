@@ -136,18 +136,20 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "weightsType": "hybrid",
     "openWeights": {
       "small": true,
+      "medium": true,
       "large": false,
       "massive": false,
+      "colossal": false,
       "planetary": false,
       "singularity": false
     },
     "parameterSizes": {
-      "small": "gpt-oss",
-      "medium": "",
+      "small": "",
+      "medium": "gpt-oss",
       "large": "Luna",
-      "massive": "Terra",
-      "colossal": "",
-      "planetary": "Sol (Cyber)",
+      "massive": "",
+      "colossal": "Terra",
+      "planetary": "Sol",
       "singularity": "Astra",
       "godTier": ""
     },
@@ -161,14 +163,18 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "group": "top10",
     "country": "America (US)",
     "countryFlag": "🇺🇸",
-    "creator": "SpaceXAI",
+    "creator": "SpaceXSI",
     "famousFor": "Tesla, Twitter",
     "engineName": "Grok",
     "weightsType": "hybrid",
     "openWeights": {
+      "small": false,
       "medium": false,
+      "large": true,
       "massive": true,
-      "colossal": false
+      "colossal": false,
+      "planetary": false,
+      "singularity": false
     },
     "parameterSizes": {
       "small": "",
@@ -281,14 +287,18 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "group": "top10",
     "country": "China",
     "countryFlag": "🇨🇳",
-    "creator": "Z.ai / Zhipu",
+    "creator": "Zhipu",
     "famousFor": "",
     "engineName": "GLM 5",
     "weightsType": "open",
     "openWeights": {
+      "small": true,
+      "medium": true,
       "large": true,
       "massive": true,
-      "colossal": true
+      "colossal": true,
+      "planetary": true,
+      "singularity": true
     },
     "parameterSizes": {
       "small": "",
