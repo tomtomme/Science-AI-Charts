@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode, ScoreMode } from '../types';
 import { BENCHMARK_COMPONENTS, getBenchmarkCategoryLabel } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { matchesSearchQuery } from '../utils/searchUtils';
 import { createModelBreakdown } from '../utils/csvParser';
+import { translateStoryline } from '../utils/storylineHelper';
 import { ExternalLink } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
@@ -54,6 +55,18 @@ interface HoveredSegmentInfo {
   raw: number;
 }
 
+/**
+ * Formats a raw score strictly matching the original CSV notation:
+ * Science Knowledge (AA-Omniscience) in PTS (e.g. +22, -10), all others in % (e.g. 83%).
+ */
+function formatRawCategoryScore(comp: BenchmarkComponent, raw: number): string {
+  const formatted = Number.isInteger(raw) ? raw.toString() : raw.toFixed(1);
+  if (comp.id === 'scienceKnowledge') {
+    return raw > 0 ? `+${formatted}` : `${formatted}`;
+  }
+  return `${formatted}%`;
+}
+
 export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   models,
   activeBenchmarkId,
@@ -97,12 +110,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [hoveredSegment, setHoveredSegment] = useState<HoveredSegmentInfo | null>(null);
 
-  // Floating segment tooltip with cursor offset (zero mouse obstruction)
-  const [segmentTooltip, setSegmentTooltip] = useState<{
-    data: HoveredSegmentInfo;
-    x: number;
-    y: number;
-  } | null>(null);
 
   // Persistent model & segment detail to keep showing the info even after the mouse leaves the bar
   const [persistentModel, setPersistentModel] = useState<ModelRecord | null>(null);
@@ -116,12 +123,26 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     y: number;
   } | null>(null);
 
+  // Horizontal scroll container reference and vertical mousewheel converter
+  const chartScrollRef = useRef<HTMLDivElement>(null);
+  const handleChartWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && chartScrollRef.current) {
+      const el = chartScrollRef.current;
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      if (maxScroll > 0) {
+        if ((e.deltaY > 0 && el.scrollLeft < maxScroll - 1) || (e.deltaY < 0 && el.scrollLeft > 1)) {
+          el.scrollLeft += e.deltaY;
+          e.preventDefault();
+        }
+      }
+    }
+  };
+
   // Reset persistent bar info when switching categories, scoreMode, or when explosion is set to 'off'
   useEffect(() => {
     setPersistentModel(null);
     setPersistentSegment(null);
     setHoveredSegment(null);
-    setSegmentTooltip(null);
     setPriceTooltip(null);
   }, [activeCategoryIndex, hoveredCategoryComp, scoreMode, currentExplosionMode]);
 
@@ -322,7 +343,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       setHoveredIndex(null);
     }
     setHoveredSegment(null);
-    setSegmentTooltip(null);
     setPriceTooltip(null);
     // Behalte persistentModel und persistentSegment nur bei, wenn Explosion aktiv ist
     if (currentExplosionMode === 'off') {
@@ -695,6 +715,26 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   }
                   return null;
                 })()}
+
+                {/* Storyline aus CSV Spalte O: In Zeile 1 ohne Anführungszeichen, eingeleitet mit "Kommentar:" / "Comment:" */}
+                {activeCategoryIndex === 0 && displayedModel.storyline && (() => {
+                  const rawStory = translateStoryline(displayedModel.storyline, lang);
+                  const cleanStory = rawStory.replace(/^["„“'»«\s]+/, '').replace(/["„“'»«\s]+$/, '').trim();
+                  if (!cleanStory) return null;
+                  return (
+                    <>
+                      <span className="text-slate-400">·</span>
+                      <span className="text-slate-700 dark:text-slate-300 font-mono text-[11px] shrink-0 flex items-center gap-1">
+                        <strong className="font-semibold text-slate-800 dark:text-slate-200">
+                          {lang === 'de' ? 'Kommentar:' : 'Comment:'}
+                        </strong>
+                        <span className="font-normal italic text-slate-600 dark:text-slate-300">
+                          {cleanStory}
+                        </span>
+                      </span>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Row 2: Hovered segment breakdown OR Non-hallucination + interaction hint */}
@@ -724,7 +764,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           {lang === 'de' ? displayedSegment.comp.nameDe : displayedSegment.comp.nameEn}
                         </span>
                         <span className="font-mono text-slate-900 dark:text-white font-bold">
-                          {`+${displayedSegment.points.toFixed(1)} ${t.points}`}
+                          {activeCategoryIndex === 0
+                            ? `+${displayedSegment.points.toFixed(1)} ${t.points}`
+                            : formatRawCategoryScore(displayedSegment.comp, displayedSegment.raw)}
                         </span>
                       </button>
                     </Tooltip>
@@ -934,8 +976,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         </div>
       </div>
 
-      {/* SVG Chart Container: Compact & centered for fewer models, horizontal scrollbar for large sets */}
-      <div className="relative select-none w-full overflow-x-auto pb-2 sm:pb-3 custom-scrollbar">
+      {/* SVG Chart Container: Retains full readable bar scale and supports smooth mousewheel scrolling */}
+      <div
+        ref={chartScrollRef}
+        onWheel={handleChartWheel}
+        className="relative select-none w-full overflow-x-auto overflow-y-hidden pb-2 sm:pb-3 custom-scrollbar"
+      >
         {models.length === 0 ? (
           <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">
             {lang === 'de' ? 'Keine Modelle für die aktuelle Filterauswahl gefunden.' : 'No models match the current filter selection.'}
@@ -943,22 +989,19 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         ) : (
           <div
             style={{
-              maxWidth: `${chartWidth}px`,
+              width: `${chartWidth}px`,
+              minWidth: `${chartWidth}px`,
             }}
-            className="mx-auto w-full"
+            className="mx-auto"
           >
             <svg
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="block w-full h-auto overflow-visible"
+              width={chartWidth}
+              height={chartHeight}
+              className="block overflow-visible"
               preserveAspectRatio="xMidYMid meet"
-              onMouseMove={(e) => {
-                if (segmentTooltip) {
-                  setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                }
-              }}
               onMouseLeave={() => {
                 handleMouseLeave();
-                setSegmentTooltip(null);
               }}
             >
             <defs>
@@ -1321,7 +1364,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       style={{
                         transition: 'y 0.25s ease-out, height 0.25s ease-out',
                       }}
-                      onMouseEnter={(e) => {
+                      onMouseEnter={() => {
                         const segInfo: HoveredSegmentInfo = {
                           comp: activeComp,
                           model,
@@ -1331,17 +1374,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         setHoveredSegment(segInfo);
                         setPersistentSegment(segInfo);
                         setPersistentModel(model);
-                        setSegmentTooltip({
-                          data: segInfo,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
-                      }}
-                      onMouseMove={(e) => {
-                        setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                      }}
-                      onMouseLeave={() => {
-                        setSegmentTooltip(null);
                       }}
                     />
                   </g>
@@ -1400,20 +1432,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               setHoveredSegment(segInfo);
                               setPersistentSegment(segInfo);
                               setPersistentModel(model);
-                              setSegmentTooltip({
-                                data: segInfo,
-                                x: e.clientX,
-                                y: e.clientY,
-                              });
                             }
-                          }}
-                          onMouseMove={(e) => {
-                            if (exploded && benchMeta) {
-                              setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                            }
-                          }}
-                          onMouseLeave={() => {
-                            setSegmentTooltip(null);
                           }}
                         />
 
@@ -1436,7 +1455,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               e.stopPropagation();
                               scrollToCategoryExplanation(seg.comp.id);
                             }}
-                            onMouseEnter={(e) => {
+                            onMouseEnter={() => {
                               const segInfo: HoveredSegmentInfo = {
                                 comp: benchMeta,
                                 model,
@@ -1446,17 +1465,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                               setHoveredSegment(segInfo);
                               setPersistentSegment(segInfo);
                               setPersistentModel(model);
-                              setSegmentTooltip({
-                                data: segInfo,
-                                x: e.clientX,
-                                y: e.clientY,
-                              });
-                            }}
-                            onMouseMove={(e) => {
-                              setSegmentTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                            }}
-                            onMouseLeave={() => {
-                              setSegmentTooltip(null);
                             }}
                           />
                         )}
@@ -1489,7 +1497,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   const isZoomed = isZoomedCompany(model);
                   const circleRadius = 11.5;
                   const imgSize = isZoomed ? 27 : 19;
-                  const clipId = `clip-unexp-${model.id}`;
+                  const cleanId = model.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+                  const clipId = `clip-unexp-${cleanId}`;
                   const iconCenterY = activeComp && totalBarHeight >= 48 ? barCenterY - 10 : barCenterY;
                   const isSelected = selectedCompany && (
                     model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
@@ -1559,12 +1568,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   </text>
                 )}
 
-                {/* Company Favicon shifted high enough and larger above exploded bar */}
-                {exploded && isHovered && (() => {
+                {/* Company Favicon shifted high enough and larger above exploded bar: nur für die 3 Hauptscores */}
+                {activeCategoryIndex === 0 && exploded && isHovered && (() => {
                   const isZoomed = isZoomedCompany(model);
                   const circleRadius = 12.5;
                   const imgSize = isZoomed ? 31 : 22;
-                  const clipId = `clip-exp-hov-${model.id}`;
+                  const cleanId = model.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+                  const clipId = `clip-exp-hov-${cleanId}`;
                   const logoY = Math.max(26, barTopY - 26);
                   const isSelected = selectedCompany && (
                     model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
@@ -1617,12 +1627,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   );
                 })()}
 
-                {/* Companion Mini-Favicon above Neighbor Exploded Bars */}
-                {exploded && !isHovered && (() => {
+                {/* Companion Mini-Favicon above Neighbor Exploded Bars: nur für die 3 Hauptscores */}
+                {activeCategoryIndex === 0 && exploded && !isHovered && (() => {
                   const isZoomed = isZoomedCompany(model);
                   const circleRadius = 9.5;
                   const imgSize = isZoomed ? 24 : 16;
-                  const clipId = `clip-exp-nbr-${model.id}`;
+                  const cleanId = model.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+                  const clipId = `clip-exp-nbr-${cleanId}`;
                   const logoY = Math.max(18, barTopY - 22);
                   const isSelected = selectedCompany && (
                     model.companyName.toLowerCase() === selectedCompany.toLowerCase() ||
@@ -1793,36 +1804,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         </div>
         )}
       </div>
-
-      {/* Floating compact segment tooltip with cursor offset (zero redundancy, zero mouse obstruction) */}
-      {segmentTooltip && (
-        <div
-          className="pointer-events-none fixed z-50 transition-opacity duration-100"
-          style={{
-            left: `${Math.max(12, Math.min(window.innerWidth - 210, segmentTooltip.x - 90))}px`,
-            top: `${segmentTooltip.y < 110 ? segmentTooltip.y + 22 : segmentTooltip.y - 12}px`,
-            transform: segmentTooltip.y < 110 ? 'translateY(0)' : 'translateY(-100%)',
-          }}
-        >
-          <div className="w-auto min-w-[130px] max-w-[210px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-[11px] font-sans">
-            {/* Category Name & Raw Score */}
-            <div className="flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span
-                  className="w-2.5 h-2.5 rounded-xs shrink-0 shadow-2xs border border-white/20"
-                  style={{ backgroundColor: segmentTooltip.data.comp.color }}
-                />
-                <span className="font-bold truncate text-[11px]" style={{ color: segmentTooltip.data.comp.color }}>
-                  {lang === 'de' ? segmentTooltip.data.comp.nameDe : segmentTooltip.data.comp.nameEn}
-                </span>
-              </div>
-              <span className="font-mono font-bold text-white shrink-0 text-xs">
-                {`+${segmentTooltip.data.points.toFixed(1)} ${t.points}`}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Floating compact price / availability note tooltip */}
       {priceTooltip && (

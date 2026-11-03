@@ -338,10 +338,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
       </div>
 
-      {/* ZEILE 2: Modell-Familien, Scope, Count & Sortierung */}
-      <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+      {/* ZEILE 2: Modell-Familien (links) & Freitextfilter (rechtsbündig) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
           {/* Modell-Familien Buttons */}
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1 min-w-0">
             {/* 'Alle' Button */}
             <button
               type="button"
@@ -390,26 +390,35 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             )}
           </div>
 
-          {/* Freitextfilter ("filter by company ...") ganz rechts */}
-          <div className="relative flex-1 min-w-[170px] max-w-full sm:max-w-[220px] md:max-w-[260px] flex items-center shrink-0 xl:ml-auto">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-            <input
-              type="text"
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              placeholder={t.searchPlaceholder}
-              className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
-            />
-            {value && (
-              <button
-                type="button"
-                onClick={() => onChange('')}
-                className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                title={t.reset}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
+          {/* Freitextfilter ("filter by company ...") immer rechtsbündig eingestellt */}
+          <div className="relative w-full sm:w-[300px] md:w-[350px] flex items-center shrink-0 ml-auto justify-end">
+            <Tooltip
+              title={lang === 'de' ? 'Freitextfilter' : 'Free-text Search'}
+              content={t.searchPlaceholder}
+              align="right"
+              width="w-72 sm:w-80"
+            >
+              <div className="relative w-full flex items-center">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none z-10" />
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) => onChange(e.target.value)}
+                  placeholder={t.searchPlaceholder}
+                  className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
+                />
+                {value && (
+                  <button
+                    type="button"
+                    onClick={() => onChange('')}
+                    className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer z-10"
+                    title={t.reset}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </Tooltip>
           </div>
         </div>
       </div>

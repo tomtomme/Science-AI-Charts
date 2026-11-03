@@ -161,10 +161,27 @@ export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
     }
   }
 
-  const section1Title = (notesRow?.[0] || 'How To Read').trim();
-  const section1Content = (notesRow?.[2] || '').trim();
-  const section2Title = (notesRow?.[13] || "What Bots can & can't do for you").trim();
-  const section2Content = (notesRow?.[14] || '').trim();
+  let section1Title = (notesRow?.[0] || notesRow?.[1] || 'How To Read').trim();
+  let section1Content = (notesRow?.[2] || '').trim();
+  if (!section1Content && notesRow?.[1] && notesRow[1].length > 100) {
+    section1Content = notesRow[1].trim();
+  }
+
+  let section2Title = (notesRow?.[13] || "What Bots can & can't do for you").trim();
+  let section2Content = (notesRow?.[14] || '').trim();
+
+  // If section 2 content is empty at col 14 (O), scan adjacent columns in notesRow for long text
+  if (notesRow && section2Content.length < 50) {
+    for (let c = 12; c < Math.min(notesRow.length, 20); c++) {
+      if (notesRow[c] && notesRow[c].length > 150) {
+        section2Content = notesRow[c].trim();
+        if (c > 0 && notesRow[c - 1] && notesRow[c - 1].length < 80) {
+          section2Title = notesRow[c - 1].trim();
+        }
+        break;
+      }
+    }
+  }
 
   return {
     section1Title: section1Title || 'How To Read',

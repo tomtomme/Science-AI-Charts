@@ -282,45 +282,68 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
 }
 
 /**
- * Dynamically parse Section 2 content from Cell O34 into headings & paragraphs
+ * Dynamically parse Section 2 content from Cell O34 into headings & paragraphs,
+ * detecting bullets starting with '-' followed by a heading and text.
+ * Accurately parses bullet points without ever splitting URLs (http:// or https://).
  */
-function parseSection2Text(rawText: string): CsvParagraph[] {
+export function parseSection2Text(rawText: string): CsvParagraph[] {
   if (!rawText) return [];
-  const headers = [
-    'Zensur & Datenschutz:',
-    'IQ:',
-    'Sparfuchs-Tipp:',
-    '"Saturation"-Problem:',
-    'Konversations-Tipp:',
-    'Anti-Bullshit-Tipp:',
-    'Wann KI nutzen und wann nicht?',
-    'Censorship & Data Privacy:',
-    'Frugal Tip:',
-    'Conversation Tip:',
-    'Anti-Bullshit Tip:',
-    'When to use AI and when not?'
+
+  // Dedicated cues targeting the exact bullet structure of cell O34
+  const topicCues = [
+    { key: 'censorship', regex: /(?:^|\r?\n|\s)-\s*(Zensur\s*&\s*Datenschutz|Censorship\s*&\s*Data\s*Privacy)(?::|\r?\n|\s+)/i, defaultHeading: 'Zensur & Datenschutz' },
+    { key: 'iq', regex: /(?:^|\r?\n|\s)-\s*(IQ)(?::|\r?\n|\s+)/i, defaultHeading: 'IQ' },
+    { key: 'frugal', regex: /(?:^|\r?\n|\s)-\s*(Sparfuchs-Tipp|Frugal\s*Tip)(?::|\r?\n|\s+)/i, defaultHeading: 'Sparfuchs-Tipp' },
+    { key: 'saturation', regex: /(?:^|\r?\n|\s)-\s*(Sättigungs-Problem|"Saturation"\s*Problem|Saturation\s*Problem)(?::|\r?\n|\s+)/i, defaultHeading: 'Sättigungs-Problem' },
+    { key: 'conversation', regex: /(?:^|\r?\n|\s)-\s*(Konversations-Tipp|Conversation\s*Tip)(?::|\r?\n|\s+)/i, defaultHeading: 'Konversations-Tipp' },
+    { key: 'antibullshit', regex: /(?:^|\r?\n|\s)-\s*(Anti-Unsinn-Tipp|Anti-Bullshit\s*Tip)(?::|\r?\n|\s+)/i, defaultHeading: 'Anti-Unsinn-Tipp' },
+    { key: 'whentouse', regex: /(?:^|\r?\n|\s)-\s*(Wann\s+KI\s+nutzen\s+und\s+wann\s+nicht\?|When\s+to\s+use\s+AI\s+and\s+when\s+not\?)(?:\s+|\r?\n|$)/i, defaultHeading: 'Wann KI nutzen und wann nicht?' },
+    { key: 'statsmachines', regex: /(?:^|\r?\n|\s)-\s*(KIs\s+sind\s+statistische\s+Maschinen\s+bzw\.\s+neuronale\s+Netze|AIs\s+are\s+statistical\s+machines\s+\(neural\s+networks\))(?:[.:]|\s+|\r?\n|$)/i, defaultHeading: 'KIs sind statistische Maschinen bzw. neuronale Netze' },
+    { key: 'newreqs', regex: /(?:^|\r?\n|\s)-\s*(Neue\s+Anforderungen|Higher\s+Evaluation\s+Standards\s*&\s*Academic\s*Integrity)(?::|\s+|\r?\n|$)/i, defaultHeading: 'Neue Anforderungen' },
   ];
 
   interface Cut {
     start: number;
     end: number;
     heading: string;
+    key?: string;
   }
   const cuts: Cut[] = [];
-  for (const h of headers) {
-    const idx = rawText.indexOf(h);
-    if (idx !== -1) {
+
+  for (const cue of topicCues) {
+    const m = cue.regex.exec(rawText);
+    if (m) {
       cuts.push({
-        start: idx,
-        end: idx + h.length,
-        heading: h.replace(/[:.]+$/, '').trim(),
+        start: m.index,
+        end: m.index + m[0].length,
+        heading: cue.defaultHeading,
+        key: cue.key,
       });
     }
   }
+
+  // Also match general bullets starting with '-' followed by heading (using negative lookahead :(?!//) to never break on URLs)
+  const generalBulletRegex = /(?:^|\r?\n)\s*-\s*([A-Za-z0-9ÄÖÜäöü"&(),.?!' -]{3,65}?)(?::(?!\/\/)|[?]\s+|\r?\n|$)\s*/g;
+  let gMatch: RegExpExecArray | null;
+  while ((gMatch = generalBulletRegex.exec(rawText)) !== null) {
+    const heading = gMatch[1].trim();
+    if (heading.length > 0 && !cuts.some((c) => Math.abs(c.start - gMatch!.index) < 10)) {
+      cuts.push({
+        start: gMatch.index,
+        end: gMatch.index + gMatch[0].length,
+        heading,
+      });
+    }
+  }
+
   cuts.sort((a, b) => a.start - b.start);
 
   if (cuts.length === 0) {
-    return rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(text => ({ text }));
+    return rawText
+      .split(/\r?\n\r?\n/)
+      .map((chunk) => chunk.trim())
+      .filter((text) => text.length > 0)
+      .map((text) => ({ text }));
   }
 
   const result: CsvParagraph[] = [];
@@ -332,16 +355,33 @@ function parseSection2Text(rawText: string): CsvParagraph[] {
   for (let i = 0; i < cuts.length; i++) {
     const cur = cuts[i];
     const nextStart = i + 1 < cuts.length ? cuts[i + 1].start : rawText.length;
-    const chunk = rawText.slice(cur.end, nextStart).trim();
-    if (chunk) {
+    let body = rawText.slice(cur.end, nextStart).trim();
+    body = body.replace(/^[:.]\s*/, '').trim();
+    if (body || cur.heading) {
       result.push({
         heading: cur.heading,
-        text: chunk,
+        text: body,
       });
     }
   }
 
   return result;
+}
+
+/**
+ * Matches a Section 2 heading or text to one of the 8 standard topic categories.
+ */
+function matchSection2Topic(heading?: string, text?: string): number {
+  const norm = ((heading || '') + ' ' + (text || '').slice(0, 100)).toLowerCase();
+  if (norm.includes('zensur') || norm.includes('censor') || norm.includes('datenschutz') || norm.includes('privacy')) return 0;
+  if (norm.includes('sparfuchs') || norm.includes('frugal') || norm.includes('kostenpflichtig') || norm.includes('drittanbieter')) return 1;
+  if (norm.includes('saturation') || norm.includes('sättigung') || norm.includes('geleakte fragen')) return 2;
+  if (norm.includes('konversation') || norm.includes('conversation') || norm.includes('deep think')) return 3;
+  if (norm.includes('anti-unsinn') || norm.includes('anti-bullshit') || norm.includes('fake news') || norm.includes('fakenews')) return 4;
+  if (norm.includes('wann ki') || norm.includes('when to use') || norm.includes('wichtige kriterien') || norm.includes('inspiration')) return 5;
+  if (norm.includes('statistische maschine') || norm.includes('statistical machine') || norm.includes('neuronale netze') || norm.includes('flowingdata') || norm.includes('terence tao')) return 6;
+  if (norm.includes('neue anforderung') || norm.includes('higher evaluation') || norm.includes('lischke') || norm.includes('wissenschaftlich arbeiten')) return 7;
+  return -1;
 }
 
 /**
@@ -419,58 +459,94 @@ function getBilingualSection2Paragraphs(
   curatedEn: CsvParagraph[],
   isDe: boolean
 ): CsvParagraph[] {
-  // If German is requested:
-  // Cell O34 in the sheet is written in German. If dynamic paragraphs are in German, use them!
+  // Filter out any duplicate 'IQ' paragraph from Section 2 (since IQ benchmark is already thoroughly explained in Section 1)
+  const isNotDuplicateIq = (p: CsvParagraph) => {
+    const clean = (p.heading || '').trim().toLowerCase();
+    return clean !== 'iq' && !clean.startsWith('iq ') && !clean.startsWith('iq:');
+  };
+
+  const filteredDynamic = dynamicParagraphs.filter(isNotDuplicateIq);
+  const filteredCuratedDe = curatedDe.filter(isNotDuplicateIq);
+  const filteredCuratedEn = curatedEn.filter(isNotDuplicateIq);
+
+  if (filteredDynamic.length === 0) {
+    return isDe ? filteredCuratedDe : filteredCuratedEn;
+  }
+
+  // GERMAN MODE: 1:1 LIVE SYNCHRONIZATION WITH CELL O34!
+  // Any text edits, new sentences, links, or notes from the user in Google Sheets are rendered 1:1!
   if (isDe) {
-    if (dynamicParagraphs.length > 0) {
-      const firstHeading = (dynamicParagraphs[0]?.heading || '').toLowerCase();
-      const isDynamicDe =
-        firstHeading.includes('zensur') ||
-        firstHeading.includes('sparfuchs') ||
-        firstHeading.includes('konversation') ||
-        firstHeading.includes('wann');
-      if (isDynamicDe) {
-        return dynamicParagraphs;
+    return filteredDynamic.map((p, idx) => {
+      const topicIdx = matchSection2Topic(p.heading, p.text);
+      const matched = topicIdx >= 0 ? filteredCuratedDe[topicIdx] : filteredCuratedDe[idx];
+      return {
+        heading: p.heading || matched?.heading || '',
+        text: p.text, // 1:1 Live CSV Text directly from cell O34
+        link: matched?.link || p.link,
+      };
+    });
+  }
+
+  // ENGLISH MODE: Translate dynamic paragraphs to English!
+  // Preserves any newly added links (such as the Golem link) or custom additions from the user
+  return filteredDynamic.map((p, idx) => {
+    const topicIdx = matchSection2Topic(p.heading, p.text);
+    const matched = topicIdx >= 0 ? filteredCuratedEn[topicIdx] : filteredCuratedEn[idx];
+    if (matched) {
+      let translatedText = matched.text;
+
+      // Check if the live German text contains newly added URLs that are not yet in the baseline English translation
+      const urlRegex = /(https?:\/\/[^\s,)]+)/g;
+      const liveUrls = p.text.match(urlRegex) || [];
+      const englishUrls = matched.text.match(urlRegex) || [];
+
+      for (const url of liveUrls) {
+        if (!englishUrls.includes(url)) {
+          if (url.includes('golem.de')) {
+            translatedText += `\nIt is just as unrealistic to revere AI as the savior of a utopia, see also: ${url}`;
+          } else {
+            translatedText += `\nSee also: ${url}`;
+          }
+        }
       }
-    }
-    return curatedDe;
-  }
 
-  // If English is requested (!isDe):
-  // Check if dynamic is already English (e.g. if the sheet was updated to English in the future)
-  if (dynamicParagraphs.length > 0) {
-    const firstHeading = (dynamicParagraphs[0]?.heading || '').toLowerCase();
-    const isDynamicEn =
-      firstHeading.includes('censor') ||
-      firstHeading.includes('privacy') ||
-      firstHeading.includes('frugal') ||
-      firstHeading.includes('conversation');
-    if (isDynamicEn) {
-      return dynamicParagraphs;
+      return {
+        ...matched,
+        heading: matched.heading,
+        text: translatedText,
+        link: matched.link || p.link,
+      };
     }
-  }
 
-  // Since cell O34 in the sheet is German only, return curatedEn for English users
-  return curatedEn;
+    return p;
+  });
 }
 
 export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notesMeta }) => {
   const { columnsGuide, practicalGuide } = CSV_NOTES_DATA;
   const isDe = appLang === 'de';
 
-  // Section 1 Title: dynamically from Cell A34 (synced from CSV)
+  // Section 1 Title: dynamically from Cell A34 / B34 (synced from CSV)
   const dynamicSec1Title = notesMeta?.section1Title?.trim();
   const isSec1TitleEn = !dynamicSec1Title || dynamicSec1Title.toLowerCase().includes('how to');
+  const isSec1TitleDe = dynamicSec1Title && (
+    dynamicSec1Title.toLowerCase().includes('anleitung') ||
+    dynamicSec1Title.toLowerCase().includes('lesen')
+  );
   const title1 = isDe
     ? (isSec1TitleEn ? columnsGuide.titleDe : dynamicSec1Title)
-    : (dynamicSec1Title || columnsGuide.titleEn);
+    : (isSec1TitleDe ? columnsGuide.titleEn : (dynamicSec1Title || columnsGuide.titleEn));
 
   // Section 2 Title: dynamically from Cell N34 (synced from CSV)
   const dynamicSec2Title = notesMeta?.section2Title?.trim();
   const isSec2TitleEn = !dynamicSec2Title || dynamicSec2Title.toLowerCase().includes('what bot');
+  const isSec2TitleDe = dynamicSec2Title && (
+    dynamicSec2Title.toLowerCase().includes('was bot') ||
+    dynamicSec2Title.toLowerCase().includes('tun können')
+  );
   const title2 = isDe
     ? (isSec2TitleEn ? practicalGuide.titleDe : dynamicSec2Title)
-    : (dynamicSec2Title || practicalGuide.titleEn);
+    : (isSec2TitleDe ? practicalGuide.titleEn : (dynamicSec2Title || practicalGuide.titleEn));
 
   // Dynamically parse live CSV strings from C34 and O34
   const dynamicP1 = notesMeta?.section1Content
