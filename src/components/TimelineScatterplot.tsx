@@ -3,6 +3,7 @@ import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, Sparkles } 
 import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint } from '../types';
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { calculateRegression, extractFrontierPoints } from '../utils/mathRegression';
+import { calculatePearson, calculateSpearman } from '../utils/correlationUtils';
 import { Tooltip } from './Tooltip';
 import { TRANSLATIONS } from '../utils/i18n';
 
@@ -83,11 +84,11 @@ const REGRESSION_OPTIONS: RegressionOption[] = [
   {
     id: 'frontier',
     labelDe: 'Pioniere (Rekorde)',
-    labelEn: 'SOTA Frontier (Records)',
+    labelEn: 'Pioneers (Records)',
     shortDe: 'Pioniere',
-    shortEn: 'Frontier',
+    shortEn: 'Pioneers',
     descDe: 'Verlauf der historischen Höchststände (Pioniere / Rekordhalter)',
-    descEn: 'Cumulative maximum state-of-the-art breakthroughs',
+    descEn: 'Cumulative maximum pioneer breakthroughs over time',
     color: '#d97706', // Gold / Bronze
   },
 ];
@@ -283,6 +284,15 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   const regression = useMemo(() => {
     return calculateRegression(regressionDataPoints, activeRegression.id, 120, regressionParam);
   }, [regressionDataPoints, activeRegression.id, regressionParam]);
+
+  // Compute Pearson r & Spearman Rho on timeline data points matching active scope
+  const correlationPoints = useMemo(() => {
+    return regressionDataPoints.map((pt) => ({ x: pt.timestamp, y: pt.score }));
+  }, [regressionDataPoints]);
+
+  const pearsonResult = useMemo(() => calculatePearson(correlationPoints), [correlationPoints]);
+  const spearmanResult = useMemo(() => calculateSpearman(correlationPoints), [correlationPoints]);
+  const isLinearModel = activeRegression.id === 'linear';
 
   // Format SVG Path for regression line
   const regressionPath = useMemo(() => {
@@ -610,12 +620,35 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               </button>
 
               {/* Regression Badge */}
-              <div className="w-[105px] sm:w-[130px] shrink-0 overflow-hidden flex items-center">
+              <div className="w-[105px] sm:w-[125px] shrink-0 overflow-hidden flex items-center">
                 <Tooltip
                   title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
-                  content={lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
+                  content={
+                    <div className="space-y-2">
+                      <p className="leading-snug">{lang === 'de' ? activeRegression.descDe : activeRegression.descEn}</p>
+                      <div className="pt-2 border-t border-slate-700/60 space-y-1 text-[11px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-slate-300">
+                            {lang === 'de' ? 'Linear (Pearson r):' : 'Linear (Pearson r):'}
+                          </span>
+                          <span className="font-bold text-blue-300">
+                            {pearsonResult.value >= 0 ? '+' : ''}{pearsonResult.value.toFixed(2)} ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-slate-300">
+                            {lang === 'de' ? 'Rang (Spearman Rho):' : 'Rank (Spearman Rho):'}
+                          </span>
+                          <span className="font-bold text-rose-300">
+                            {spearmanResult.value >= 0 ? '+' : ''}{spearmanResult.value.toFixed(2)} ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  }
                   align="right"
-                  width="w-64"
+                  width="w-72"
+                  className="w-full"
                 >
                   <span
                     className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
@@ -698,7 +731,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           </div>
         </div>
 
-        {/* Row 2: Model Scope Toggle (All Models vs SOTA Frontier) + R² Metric Display */}
+        {/* Row 2: Model Scope Toggle (All Models vs Pioneers) + Pearson r & Spearman Rho Correlation Display */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
           {/* Scope Segmented Control */}
           <div className="flex items-center gap-1.5">
@@ -728,57 +761,74 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 title={
                   lang === 'de'
                     ? 'Nur Modelle, die zum Release-Zeitpunkt einen neuen Rekord-Highscore erzielten (Pioniere)'
-                    : 'Only models setting a new record score at release date (Pareto frontier)'
+                    : 'Only models setting a new record score at release date (pioneers)'
                 }
               >
                 <Sparkles className="w-3 h-3 text-amber-300" />
-                <span>{lang === 'de' ? 'Pioniere' : 'SOTA Frontier'}</span>
+                <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
                 <span className="text-[10px] opacity-90">({frontierPointIds.size})</span>
               </button>
             </div>
           </div>
 
-          {/* Prominent R² Metric Display with Formula Hint (greyed out for non-regression models like Frontier where R² is 0 or not applicable) */}
-          <div className="flex items-center gap-2 sm:ml-auto">
-            {activeRegression.id !== 'frontier' && regression.r2 > 0 ? (
-              <div className="flex items-center gap-1.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-2.5 py-1 rounded-lg">
-                <span className="text-[10.5px] uppercase tracking-wider font-bold text-rose-600 dark:text-rose-400">
-                  {lang === 'de' ? 'Bestimmtheitsmaß:' : 'R² Metric:'}
-                </span>
-                <span className="font-mono text-xs sm:text-sm font-extrabold text-rose-700 dark:text-rose-300">
-                  R² = {regression.r2.toFixed(3)}
-                </span>
-                <span className="text-[10px] text-rose-600/80 dark:text-rose-400/80 hidden sm:inline">
-                  ({(regression.r2 * 100).toFixed(1)}% {lang === 'de' ? 'Varianz erklärt' : 'variance explained'})
-                </span>
-              </div>
-            ) : (
+          {/* Side-by-Side Pearson r & Spearmans Rho Badges (Matching Correlations Tab) */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs sm:ml-auto">
+            {/* Pearson r Badge */}
+            <Tooltip
+              title="Pearson r"
+              badge="Linear"
+              align="center"
+              width="w-64"
+              content={
+                lang === 'de'
+                  ? 'Pearson-Korrelationskoeffizient r misst den linearen Zusammenhang über die Zeit.'
+                  : 'Pearson correlation coefficient r measures the linear relationship over time.'
+              }
+            >
               <div
-                className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 rounded-lg opacity-40 cursor-not-allowed select-none"
-                title={
-                  activeRegression.id === 'frontier'
-                    ? lang === 'de'
-                      ? 'Bestimmtheitsmaß R² ist für die Pioniere-Hüllkurve nicht definiert'
-                      : 'R² metric does not apply to the SOTA frontier envelope'
-                    : lang === 'de'
-                    ? 'Bestimmtheitsmaß R² für dieses Modell nicht anwendbar'
-                    : 'R² metric not applicable for this model'
-                }
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                  isLinearModel
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
+                    : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+                }`}
               >
-                <span className="text-[10.5px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
-                  {lang === 'de' ? 'Bestimmtheitsmaß:' : 'R² Metric:'}
-                </span>
-                <span className="font-mono text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
-                  {activeRegression.id === 'frontier'
-                    ? lang === 'de'
-                      ? '— (Hüllkurve / n/a)'
-                      : '— (Envelope / n/a)'
-                    : '— (n/a)'}
+                <span className="text-[10px] font-bold text-slate-500 uppercase">r:</span>
+                <span className="font-mono text-xs font-extrabold" style={{ color: pearsonResult.color }}>
+                  {pearsonResult.value >= 0 ? '+' : ''}
+                  {pearsonResult.value.toFixed(2)}
                 </span>
               </div>
-            )}
+            </Tooltip>
+
+            {/* Spearmans Rho Badge */}
+            <Tooltip
+              title="Spearman Rho"
+              badge="Rangfolge"
+              align="center"
+              width="w-64"
+              content={
+                lang === 'de'
+                  ? 'Spearmans Rho misst den monotonen Rangzusammenhang über die Zeit, unempfindlicher gegenüber Ausreißern.'
+                  : 'Spearman rank correlation measures monotonic rank relationship over time, more robust against outliers.'
+              }
+            >
+              <div
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                  !isLinearModel
+                    ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
+                    : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+                }`}
+              >
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Rho:</span>
+                <span className="font-mono text-xs font-extrabold" style={{ color: spearmanResult.color }}>
+                  {spearmanResult.value >= 0 ? '+' : ''}
+                  {spearmanResult.value.toFixed(2)}
+                </span>
+              </div>
+            </Tooltip>
+
             <span
-              className="text-[10px] font-mono text-slate-400 hidden xl:inline max-w-[280px] truncate"
+              className="text-[10px] font-mono text-slate-400 hidden xl:inline max-w-[280px] truncate ml-1"
               title={regression.formula}
             >
               {regression.formula}
@@ -1005,7 +1055,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   {frontierPointIds.has(hoveredPoint.point.id) && (
                     <span className="text-[10px] font-mono px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5">
                       <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-                      <span>{lang === 'de' ? 'Pionier' : 'SOTA'}</span>
+                      <span>{lang === 'de' ? 'Pionier' : 'Pioneer'}</span>
                     </span>
                   )}
                 </h4>

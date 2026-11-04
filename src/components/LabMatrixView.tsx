@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { LabEntry, ModelRecord } from '../types';
-import { Search, ExternalLink, Cpu, Wrench, Terminal, Layers, HelpCircle, BookOpen, Minus, Plus } from 'lucide-react';
+import { Search, ExternalLink, Cpu, Wrench, Terminal, Layers, HelpCircle, BookOpen, Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
 interface LabMatrixViewProps {
@@ -705,9 +705,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   const [simplifiedSizeView, setSimplifiedSizeView] = useState<boolean>(true);
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [expandedLabId, setExpandedLabId] = useState<string | null>(null);
-
   const isSimplifiedView = sizeFilter !== 'all' && simplifiedSizeView;
+
+  const activeAdvancedFiltersCount = useMemo(() => {
+    let count = 0;
+    if (weightsFilter !== 'all') count++;
+    if (selectedCountry !== 'all') count++;
+    if (searchQuery.trim() !== '') count++;
+    if (sizeFilter !== 'all') count++;
+    return count;
+  }, [weightsFilter, selectedCountry, searchQuery, sizeFilter]);
 
   // Group counts
   const allCount = labs.length;
@@ -904,24 +913,109 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
 
   return (
     <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-6 space-y-5">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🏢</span>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              {lang === 'de' ? 'LLM-Labs & Modell-Ökosystem' : 'LLM Labs & Model Ecosystem'}
-            </h2>
-          </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-3xl">
-            {lang === 'de'
-              ? 'Storyline und Preisstufen einarbeiten'
-              : 'Incorporate storyline and pricing tiers'}
-          </p>
+      {/* Top Bar: Permanently visible Category Tabs on the left, Glossary / Original Sheet / Advanced on the right */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+        {/* Segmented Filter: "All Labs" to "Agent Scaffolding" */}
+        <div
+          className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs overflow-x-auto scrollbar-none sm:scrollbar-thin max-w-full"
+          onWheel={handleHorizontalWheel}
+        >
+          <button
+            type="button"
+            onClick={() => handleGroupChange('all')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+              activeGroup === 'all'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            {lang === 'de' ? `Alle Labore (${allCount})` : `All Labs (${allCount})`}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleGroupChange('top10')}
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+              activeGroup === 'top10'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            {lang === 'de' ? `Top LLM-Labore (${top10Count})` : `Top LLM Labs (${top10Count})`}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleGroupChange('contender')}
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+              activeGroup === 'contender'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            {lang === 'de' ? `Herausforderer (${contenderCount})` : `Contenders (${contenderCount})`}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleGroupChange('tweakers')}
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+              activeGroup === 'tweakers'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            {lang === 'de' ? `Modell-Optimierer (${tweakersCount})` : `Model Tweakers (${tweakersCount})`}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleGroupChange('small')}
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+              activeGroup === 'small'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            {lang === 'de' ? `Labore kleiner Modelle (${smallCount})` : `Small Model Labs (${smallCount})`}
+          </button>
+          <Tooltip
+            title={lang === 'de' ? 'Agenten- & Steuergerüste (Harness)' : 'Agent Scaffolding & Harness'}
+            badge={lang === 'de' ? 'Glossar' : 'Glossary'}
+            align="center"
+            width="w-72"
+            content={
+              <div>
+                <p className="text-slate-300 leading-snug mb-2">
+                  {lang === 'de'
+                    ? 'Entwickler von Software-Umgebungen wie Aider, OpenHands oder Cursor. Sie bauen das Steuerungsgerüst („Zaumzeug“ / Harness): Sie statten LLMs mit Werkzeugen (Terminal, Dateizugriff) aus, zerlegen komplexe Aufgaben in Teilschritte und halten das Modell in einer autonomen Ausführungsschleife (ReAct-Loop), bis die Arbeit vollständig erledigt ist.'
+                    : 'Developers of agentic runtime environments like Aider, OpenHands, or Cursor. Instead of training raw models, they build the execution scaffolding ("harness"): equipping LLMs with tools (terminal, file system), decomposing tasks into sub-steps, and running them in autonomous loops until finished.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    scrollToGlossary('term-harness');
+                  }}
+                  className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
+                >
+                  <span>{lang === 'de' ? 'Harness im Glossar nachschlagen ↓' : 'View Harness in Glossary ↓'}</span>
+                </button>
+              </div>
+            }
+          >
+            <button
+              type="button"
+              onClick={() => handleGroupChange('harness')}
+              className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                activeGroup === 'harness'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              {lang === 'de' ? `Agenten- & Steuergerüste (${harnessCount})` : `Agent Scaffolding (${harnessCount})`}
+            </button>
+          </Tooltip>
         </div>
 
-        {/* Header Action Buttons: Glossary & Original Sheet Link */}
-        <div className="shrink-0 flex items-center gap-2">
+        {/* Action Buttons: Glossary, Original Sheet, and Advanced toggle */}
+        <div className="shrink-0 flex items-center gap-2 self-end xl:self-auto">
           <Tooltip
             title={lang === 'de' ? 'Glossar & Fachbegriffe' : 'Glossary & Terms'}
             align="right"
@@ -952,110 +1046,79 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             <span>{lang === 'de' ? 'Original-Sheet' : 'Original Sheet'}</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
+
+          {/* Advanced Button */}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((prev) => !prev)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border cursor-pointer ${
+              showAdvanced
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-500/20'
+                : 'text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-2xs'
+            }`}
+          >
+            <SlidersHorizontal className={`w-3.5 h-3.5 ${showAdvanced ? 'text-white' : 'text-blue-500'}`} />
+            <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
+            {activeAdvancedFiltersCount > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                showAdvanced ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
+              }`}>
+                {activeAdvancedFiltersCount}
+              </span>
+            )}
+            <span className={`text-[10px] ml-0.5 ${showAdvanced ? 'text-blue-200' : 'text-slate-400'}`}>
+              {showAdvanced ? '▲' : '▼'}
+            </span>
+          </button>
         </div>
       </div>
 
-      {/* Control Bar: Extended Tabs, Open/Closed Toggle & Search */}
-      <div className="flex flex-col gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-        <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
-          {/* Segmented Filter: "All Labs" is first / default on the far left */}
-          <div
-            className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs overflow-x-auto scrollbar-none sm:scrollbar-thin max-w-full"
-            onWheel={handleHorizontalWheel}
-          >
-            <button
-              type="button"
-              onClick={() => handleGroupChange('all')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
-                activeGroup === 'all'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+      {/* Advanced Drawer: Revealed when showAdvanced is true */}
+      {showAdvanced && (
+        <div className="flex flex-col gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
+          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+            {/* Country Filter Strip (Pills) positioned where categories used to be */}
+            <div
+              className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 text-xs scrollbar-thin max-w-full"
+              onWheel={handleHorizontalWheel}
             >
-              {lang === 'de' ? `Alle Labore (${allCount})` : `All Labs (${allCount})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleGroupChange('top10')}
-              className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
-                activeGroup === 'top10'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              {lang === 'de' ? `Top LLM-Labore (${top10Count})` : `Top LLM Labs (${top10Count})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleGroupChange('contender')}
-              className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
-                activeGroup === 'contender'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              {lang === 'de' ? `Herausforderer (${contenderCount})` : `Contenders (${contenderCount})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleGroupChange('tweakers')}
-              className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
-                activeGroup === 'tweakers'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              {lang === 'de' ? `Modell-Optimierer (${tweakersCount})` : `Model Tweakers (${tweakersCount})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleGroupChange('small')}
-              className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
-                activeGroup === 'small'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              {lang === 'de' ? `Labore kleiner Modelle (${smallCount})` : `Small Model Labs (${smallCount})`}
-            </button>
-            <Tooltip
-              title={lang === 'de' ? 'Agenten- & Steuergerüste (Harness)' : 'Agent Scaffolding & Harness'}
-              badge={lang === 'de' ? 'Glossar' : 'Glossary'}
-              align="center"
-              width="w-72"
-              content={
-                <div>
-                  <p className="text-slate-300 leading-snug mb-2">
-                    {lang === 'de'
-                      ? 'Entwickler von Software-Umgebungen wie Aider, OpenHands oder Cursor. Sie bauen das Steuerungsgerüst („Zaumzeug“ / Harness): Sie statten LLMs mit Werkzeugen (Terminal, Dateizugriff) aus, zerlegen komplexe Aufgaben in Teilschritte und halten das Modell in einer autonomen Ausführungsschleife (ReAct-Loop), bis die Arbeit vollständig erledigt ist.'
-                      : 'Developers of agentic runtime environments like Aider, OpenHands, or Cursor. Instead of training raw models, they build the execution scaffolding ("harness"): equipping LLMs with tools (terminal, file system), decomposing tasks into sub-steps, and running them in autonomous loops until finished.'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      scrollToGlossary('term-harness');
-                    }}
-                    className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
-                  >
-                    <span>{lang === 'de' ? 'Harness im Glossar nachschlagen ↓' : 'View Harness in Glossary ↓'}</span>
-                  </button>
-                </div>
-              }
-            >
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 shrink-0 mr-1 flex items-center gap-1">
+                <span>🌐</span>
+                <span>{lang === 'de' ? 'Land:' : 'Country:'}</span>
+              </span>
               <button
                 type="button"
-                onClick={() => handleGroupChange('harness')}
-                className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
-                  activeGroup === 'harness'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                onClick={() => setSelectedCountry('all')}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  selectedCountry === 'all'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                {lang === 'de' ? `Agenten- & Steuergerüste (${harnessCount})` : `Agent Scaffolding (${harnessCount})`}
+                {lang === 'de' ? 'Alle Länder (A-Z)' : 'All Countries (A-Z)'}
               </button>
-            </Tooltip>
-          </div>
+              {countries.map((c) => {
+                const isSelected = selectedCountry === c.country;
+                return (
+                  <button
+                    key={c.country}
+                    type="button"
+                    onClick={() => setSelectedCountry(isSelected ? 'all' : c.country)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>{c.flag}</span>
+                    <span>{c.country}</span>
+                    <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                      ({c.count})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Open / Hybrid / Closed Weights Segmented Toggle Button */}
@@ -1419,49 +1482,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
           );
         })()}
 
-        {/* Country Filter Strip (Pills) */}
-        <div
-          className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 text-xs scrollbar-thin"
-          onWheel={handleHorizontalWheel}
-        >
-          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 shrink-0 mr-1 flex items-center gap-1">
-            <span>🌐</span>
-            <span>{lang === 'de' ? 'Land:' : 'Country:'}</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedCountry('all')}
-            className={`px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-              selectedCountry === 'all'
-                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            {lang === 'de' ? 'Alle Länder (A-Z)' : 'All Countries (A-Z)'}
-          </button>
-          {countries.map((c) => {
-            const isSelected = selectedCountry === c.country;
-            return (
-              <button
-                key={c.country}
-                type="button"
-                onClick={() => setSelectedCountry(isSelected ? 'all' : c.country)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <span>{c.flag}</span>
-                <span>{c.country}</span>
-                <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                  ({c.count})
-                </span>
-              </button>
-            );
-          })}
         </div>
-      </div>
+      )}
 
       {/* Grid of Lab Cards (Responsive 1 to 4 cols) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1562,11 +1584,9 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         className="text-sm font-semibold whitespace-nowrap truncate flex items-baseline gap-1.5"
                         title={
                           (lab.famousFor || lab.specialties) && lab.specialties !== `Based on ${lab.basedOn}`
-                            ? `${lab.engineName} chatbot family — ${
-                                lab.notesLabel?.toLowerCase().includes('note') || lab.group === 'contender' || lab.group === 'small'
-                                  ? (lang === 'de' ? 'Hinweise: ' : 'Notes: ')
-                                  : (lang === 'de' ? 'Bekannt für: ' : 'Famous for: ')
-                              }${lab.famousFor || lab.specialties}`
+                            ? `${lab.engineName} chatbot family ${
+                                lang === 'de' ? 'bekannt für' : 'famous for'
+                              } ${lab.famousFor || lab.specialties}`
                             : `${lab.engineName} chatbot family`
                         }
                       >
@@ -1578,11 +1598,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         </span>
                         {(lab.famousFor || lab.specialties) && lab.specialties !== `Based on ${lab.basedOn}` && (
                           <span className="text-xs font-normal text-slate-500 dark:text-slate-400 truncate flex items-baseline gap-1 min-w-0">
-                            <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
-                            <span className="text-slate-400 dark:text-slate-500 font-medium shrink-0">
-                              {lab.notesLabel?.toLowerCase().includes('note') || lab.group === 'contender' || lab.group === 'small'
-                                ? (lang === 'de' ? 'Hinweise: ' : 'Notes: ')
-                                : (lang === 'de' ? 'Bekannt für: ' : 'Famous for: ')}
+                            <span className="text-slate-400 dark:text-slate-500 font-normal shrink-0">
+                              {lang === 'de' ? 'bekannt für' : 'famous for'}
                             </span>
                             <span className="text-slate-600 dark:text-slate-300 truncate">
                               {lab.famousFor || lab.specialties}
@@ -1705,8 +1722,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                               {modelVal}
                             </span>
 
-                            {/* Right: Open / Closed Badge (hidden in compact size view) */}
-                            {!isSimplifiedView && isOpen !== undefined && (
+                            {/* Right: Open / Closed Badge (only shown for hybrid model families) */}
+                            {!isSimplifiedView && lab.weightsType === 'hybrid' && isOpen !== undefined && (
                               <span
                                 className={`text-[8.5px] font-semibold px-1.5 py-0.2 rounded-full border shrink-0 ${
                                   isOpen

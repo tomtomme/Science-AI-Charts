@@ -940,9 +940,6 @@ export default function App() {
               >
                 <BarChart2 className="w-3.5 h-3.5" />
                 <span>{lang === 'de' ? 'Balkendiagramm' : 'Bar Chart'}</span>
-                <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 dark:bg-slate-600/70 rounded text-slate-700 dark:text-slate-200 tabular-nums">
-                  {displayedModels.length}
-                </span>
               </button>
 
               <button
@@ -957,7 +954,7 @@ export default function App() {
                 }`}
               >
                 <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-                <span>{lang === 'de' ? 'Zeitachse' : 'Timeline'}</span>
+                <span>{lang === 'de' ? 'Zeitreihe' : 'Timeline'}</span>
               </button>
 
               <button
@@ -985,10 +982,7 @@ export default function App() {
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
-              <span>{lang === 'de' ? 'LLM-Labs & Ökosystem' : 'LLM Labs & Ecosystem'}</span>
-              <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 dark:bg-slate-600/70 rounded text-slate-700 dark:text-slate-200 tabular-nums">
-                {labs.length}
-              </span>
+              <span>{lang === 'de' ? 'Ökosystem' : 'Ecosystem'}</span>
             </button>
           </div>
 

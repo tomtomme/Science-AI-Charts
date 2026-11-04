@@ -886,7 +886,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 {frontierPointIds.has(hoveredPoint.point.id) && (
                   <span className="text-[9px] font-mono px-1 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5 shrink-0">
                     <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-                    <span>SOTA</span>
+                    <span>{lang === 'de' ? 'Pionier' : 'Pioneer'}</span>
                   </span>
                 )}
               </div>
@@ -1042,12 +1042,12 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             }`}
             title={
               lang === 'de'
-                ? 'Nur SOTA-Rekord-Modelle (Pareto-Frontier)'
-                : 'Only SOTA record models (Pareto frontier)'
+                ? 'Nur Pionier-Modelle (historische Rekordhalter / Pareto-Front)'
+                : 'Only pioneer models (historical record breakers / Pareto frontier)'
             }
           >
             <Sparkles className="w-3 h-3 text-amber-300" />
-            <span>SOTA Frontier</span>
+            <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
             <span className="text-[10px] opacity-90">({frontierPointIds.size})</span>
           </button>
         </div>

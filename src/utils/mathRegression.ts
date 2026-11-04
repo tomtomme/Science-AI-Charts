@@ -302,7 +302,7 @@ export function calculateRegression(
       }
       return maxScore;
     };
-    formula = `SOTA Frontier Envelope (${frontierPoints.length} Rekord-Modelle)`;
+    formula = `Pioniere Envelope (${frontierPoints.length} Rekord-Modelle)`;
   } else {
     // LOESS (Locally Estimated Scatterplot Smoothing)
     // Bandwidth span h (controlled by param e.g. 40 = 40%)
@@ -390,7 +390,7 @@ export function getRegressionName(type: RegressionType, param?: number): string 
     case 'loess':
       return param ? `LOESS Smoothing (${param}%)` : 'LOESS Smoothing';
     case 'frontier':
-      return 'SOTA Frontier Envelope';
+      return 'Pioniere / Pioneers Envelope';
     default:
       return 'Linear';
   }

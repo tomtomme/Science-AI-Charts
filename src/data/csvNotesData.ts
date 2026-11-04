@@ -200,7 +200,7 @@ export const CSV_NOTES_DATA: {
       },
       {
         heading: 'AIs are statistical machines (neural networks)',
-        text: 'For an explanation, see https://flowingdata.com/26/09/09/terence-tao-on-the-paradox-of-solving-mathematical-problems\nIn text models (chatbots), these networks compute probabilities for the most fitting next word syllable. They possess no consciousness, no emotions, and no personal initiative—so they never act autonomously without a prompt.',
+        text: 'For an explanation, see https://flowingdata.com/26/09/09/terence-tao-on-the-paradox-of-solving-mathematical-problems\nIn text models (chatbots), these networks compute probabilities for the most fitting next word syllable. They possess no consciousness, no emotions, and no personal initiative—so they never act autonomously without a prompt, nor do they suddenly want to destroy the world. Criminals can of course use bots as an attack tool, but defenders do the exact same thing. After a certain settling-in period, things will remain at the familiar balance. It is just as unrealistic to revere AI as the savior of a utopia, see also: https://www.golem.de/news/maschinentraeume-5-ki-ent-taeuschung-2611-214755.html',
         link: { url: 'https://flowingdata.com/26/09/09/terence-tao-on-the-paradox-of-solving-mathematical-problems', label: 'Terence Tao on Math & LLMs' },
       },
       {
@@ -236,7 +236,7 @@ export const CSV_NOTES_DATA: {
       },
       {
         heading: 'KIs sind statistische Maschinen bzw. neuronale Netze',
-        text: 'Zwecks Erläuterung siehe https://flowingdata.com/26/09/09/terence-tao-on-the-paradox-of-solving-mathematical-problems\nDiese Netze berechnen bei Textmodellen (ChatBots) Wahrscheinlichkeiten für die passendste nächste Wortsilbe. Sie haben kein Bewusstsein, keine Gefühle, keinen eigenen Antrieb, werden also auch nicht ohne Aufforderung aktiv.',
+        text: 'Zwecks Erläuterung siehe https://flowingdata.com/26/09/09/terence-tao-on-the-paradox-of-solving-mathematical-problems\nDiese Netze berechnen bei Textmodellen (ChatBots) Wahrscheinlichkeiten für die passendste nächste Wortsilbe. Sie haben kein Bewusstsein, keine Gefühle, keinen eigenen Antrieb, werden also auch nicht ohne Aufforderung aktiv und wollen auch nicht auf einmal die Welt zerstören. Kriminielle können die Bots natürlich als Angriffswerkzeug nutzen, das macht die Verteidigerseite aber genauso. Hier wird es nach einem gewissen Einpendeln bei der altbekannten Balance bleiben. Ebensowenig realistisch ist es die KI als Heilbringer eines Utopias zu verehren, siehe auch: https://www.golem.de/news/maschinentraeume-5-ki-ent-taeuschung-2611-214755.html',
         link: { url: 'https://flowingdata.com/26/09/09/terence-tao-on-the-paradox-of-solving-mathematical-problems', label: 'Terence Tao zu Mathe & LLMs' },
       },
       {

@@ -497,8 +497,8 @@ function getBilingualSection2Paragraphs(
 
       // Check if the live German text contains newly added URLs that are not yet in the baseline English translation
       const urlRegex = /(https?:\/\/[^\s,)]+)/g;
-      const liveUrls = p.text.match(urlRegex) || [];
-      const englishUrls = matched.text.match(urlRegex) || [];
+      const liveUrls: string[] = p.text.match(urlRegex) || [];
+      const englishUrls: string[] = matched.text.match(urlRegex) || [];
 
       for (const url of liveUrls) {
         if (!englishUrls.includes(url)) {

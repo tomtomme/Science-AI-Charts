@@ -334,93 +334,91 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </Tooltip>
           </div>
         </div>
-
-
       </div>
 
-      {/* ZEILE 2: Modell-Familien (links) & Freitextfilter (rechtsbündig) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-          {/* Modell-Familien Buttons */}
-          <div className="flex flex-wrap items-center gap-1 min-w-0">
-            {/* 'Alle' Button */}
-            <button
-              type="button"
-              onClick={onClearFamilies}
-              className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
-                selectedFamilies.length === 0
-                  ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
-                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {t.all}
-            </button>
-
-            {/* Die alphabetischen Hersteller-Buttons */}
-            {ALPHABETICAL_FAMILIES.map((family) => {
-              const isSelected = selectedFamilies.includes(family);
-              return (
-                <button
-                  key={family}
-                  type="button"
-                  onClick={() => onToggleFamily(family)}
-                  className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
-                      : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  {family}
-                </button>
-              );
-            })}
-
-            {/* Aktiver Hersteller-Filter per Klick auf Firmen-Logo */}
-            {selectedCompany && (
-              <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono bg-blue-600 text-white font-bold shadow-2xs ring-1 ring-blue-400">
-                <span>{lang === 'de' ? 'Hersteller' : 'Company'}: {selectedCompany}</span>
+      {/* ZEILE 2: Freitextfilter am Beginn + Modell-Familien */}
+      <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+        {/* Freitextfilter am Beginn von Zeile 2 */}
+        <div className="relative w-full sm:w-[240px] md:w-[280px] flex items-center shrink-0">
+          <Tooltip
+            title={lang === 'de' ? 'Freitextfilter' : 'Free-text Search'}
+            content={t.searchPlaceholder}
+            align="left"
+            width="w-72 sm:w-80"
+          >
+            <div className="relative w-full flex items-center">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none z-10" />
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
+              />
+              {value && (
                 <button
                   type="button"
-                  onClick={() => onSelectCompany?.(null)}
-                  className="hover:text-blue-200 cursor-pointer ml-0.5 p-0.5 rounded hover:bg-blue-700/80"
-                  title={lang === 'de' ? 'Hersteller-Filter aufheben' : 'Clear company filter'}
+                  onClick={() => onChange('')}
+                  className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer z-10"
+                  title={t.reset}
                 >
                   <X className="w-3 h-3" />
                 </button>
-              </span>
-            )}
-          </div>
-
-          {/* Freitextfilter ("filter by company ...") immer rechtsbündig eingestellt */}
-          <div className="relative w-full sm:w-[300px] md:w-[350px] flex items-center shrink-0 ml-auto justify-end">
-            <Tooltip
-              title={lang === 'de' ? 'Freitextfilter' : 'Free-text Search'}
-              content={t.searchPlaceholder}
-              align="right"
-              width="w-72 sm:w-80"
-            >
-              <div className="relative w-full flex items-center">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none z-10" />
-                <input
-                  type="text"
-                  value={value}
-                  onChange={(e) => onChange(e.target.value)}
-                  placeholder={t.searchPlaceholder}
-                  className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
-                />
-                {value && (
-                  <button
-                    type="button"
-                    onClick={() => onChange('')}
-                    className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer z-10"
-                    title={t.reset}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </Tooltip>
-          </div>
+              )}
+            </div>
+          </Tooltip>
         </div>
+
+        {/* Trenner zwischen Suchfeld und Modell-Familien */}
+        <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block shrink-0 mx-0.5" />
+
+        {/* 'Alle' Button */}
+        <button
+          type="button"
+          onClick={onClearFamilies}
+          className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+            selectedFamilies.length === 0
+              ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
+              : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+          }`}
+        >
+          {t.all}
+        </button>
+
+        {/* Die alphabetischen Hersteller-Buttons */}
+        {ALPHABETICAL_FAMILIES.map((family) => {
+          const isSelected = selectedFamilies.includes(family);
+          return (
+            <button
+              key={family}
+              type="button"
+              onClick={() => onToggleFamily(family)}
+              className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
+                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {family}
+            </button>
+          );
+        })}
+
+        {/* Aktiver Hersteller-Filter per Klick auf Firmen-Logo */}
+        {selectedCompany && (
+          <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono bg-blue-600 text-white font-bold shadow-2xs ring-1 ring-blue-400">
+            <span>{lang === 'de' ? 'Hersteller' : 'Company'}: {selectedCompany}</span>
+            <button
+              type="button"
+              onClick={() => onSelectCompany?.(null)}
+              className="hover:text-blue-200 cursor-pointer ml-0.5 p-0.5 rounded hover:bg-blue-700/80"
+              title={lang === 'de' ? 'Hersteller-Filter aufheben' : 'Clear company filter'}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        )}
+      </div>
       </div>
   );
 };
