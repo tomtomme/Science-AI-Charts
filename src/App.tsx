@@ -644,7 +644,7 @@ export default function App() {
             onMouseLeave={() => setShowHeaderInfo(false)}
           >
             <div className="cursor-help inline-block max-w-full">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-1.5">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-1.5">
                 <span>{lang === 'de' ? t.title : (loadedData.headerMeta?.combinedTitle || t.title)}</span>
                 <Info className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0 opacity-70 group-hover:opacity-100 transition-all" />
               </h1>
