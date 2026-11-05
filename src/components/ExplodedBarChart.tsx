@@ -222,17 +222,17 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     ? 100
     : Math.max(70, ...models.map((m) => m.score ?? m.scoreNewReported ?? 0));
   const maxAxisScore = activeComp ? 100 : Math.ceil((maxScoreInPlot + 2) / 10) * 10;
-  const chartHeight = 495;
+  const chartHeight = 515;
   const topPadding = 62; // Generous headroom for price & notice icon above hovered favicon
-  const bottomPadding = 180; // Generous space below baseline for rotated model names with badges without clipping
+  const bottomPadding = 200; // Generous space below baseline for rotated model names with badges without clipping
   const availablePlotHeight = chartHeight - topPadding - bottomPadding; // 253px
   const baselineY = chartHeight - bottomPadding; // 315px
 
   const barWidth = 26;
   const barGap = 12;
   const totalBarSlot = barWidth + barGap; // 38px
-  const marginLeft = 120; // Generous left margin so rotated text for bar 0 never clips off the left edge
-  const marginRight = 32; // Right margin so the last bar and label are never clipped
+  const marginLeft = 130; // Generous left margin so rotated text for bar 0 never clips off the left edge
+  const marginRight = 36; // Right margin so the last bar and label are never clipped
   const calculatedWidth = marginLeft + models.length * totalBarSlot + marginRight;
   const chartWidth = Math.max(380, calculatedWidth);
 
@@ -597,8 +597,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 sm:p-3.5 shadow-xs transition-colors">
-      {/* Sleek locked 2-row explainer & info bar above chart: locked 50px height for zero layout shift with complete readability */}
-      <div className="relative z-20 flex flex-col justify-center h-[50px] min-h-[50px] max-h-[50px] px-2.5 mb-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-visible">
+      {/* Sleek locked 2-row explainer & info bar above chart: locked 54px height for zero layout shift with complete readability */}
+      <div className="relative z-20 flex flex-col justify-center h-[54px] min-h-[54px] max-h-[54px] px-2.5 mb-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-visible">
         <div className="w-full min-w-0 overflow-visible flex flex-col justify-center gap-0.5">
           {displayedModel ? (
             <>
@@ -724,7 +724,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   return (
                     <>
                       <span className="text-slate-400">·</span>
-                      <span className="text-slate-700 dark:text-slate-300 font-mono text-[11px] shrink-0 flex items-center gap-1">
+                      <span className="text-slate-700 dark:text-slate-300 font-mono text-xs shrink-0 flex items-center gap-1">
                         <strong className="font-semibold text-slate-800 dark:text-slate-200">
                           {lang === 'de' ? 'Kommentar:' : 'Comment:'}
                         </strong>
@@ -738,7 +738,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </div>
 
               {/* Row 2: Hovered segment breakdown OR Non-hallucination + interaction hint */}
-              <div className="flex items-center gap-x-2 text-[11px] text-slate-600 dark:text-slate-400 h-[20px] min-h-[20px] whitespace-nowrap overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-x-2 text-xs text-slate-600 dark:text-slate-400 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar">
                 {displayedSegment ? (
                   <>
                     <Tooltip
@@ -783,14 +783,14 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           href={displayedSegment.comp.sourceUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                          className="font-mono text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
                         >
                           <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
                           <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
                         </a>
                       </Tooltip>
                     ) : (
-                      <span className="font-mono text-[11px] text-slate-400 shrink-0">
+                      <span className="font-mono text-xs text-slate-400 shrink-0">
                         {t.sourceLabel} {displayedSegment.comp.sourceName}
                       </span>
                     )}
@@ -810,7 +810,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         <span className="text-slate-400">·</span>
                       </>
                     )}
-                    <span className="text-slate-400 dark:text-slate-500 text-[10.5px] truncate">
+                    <span className="text-slate-400 dark:text-slate-500 text-xs truncate">
                       {lang === 'de'
                         ? 'Balkensegmente berühren für Kriterien-Details · Firmenlogo klicken zum Filtern'
                         : 'Hover segments for benchmark details · Click company logo to filter'}
@@ -854,7 +854,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 </Tooltip>
 
                 <span className="text-slate-400">·</span>
-                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 shrink-0">
                   {lang === 'de' ? '12.5% Gewichtung' : '12.5% Weight'}
                 </span>
 
@@ -870,7 +870,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       href={displayedCategoryComp.sourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-mono text-[11px] text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                      className="font-mono text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
                     >
                       <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
                       <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
@@ -885,7 +885,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 {sortBy === 'date' && (
                   <>
                     <span className="text-slate-400">·</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-xs font-semibold flex items-center gap-1 shrink-0">
                       <span>📅</span>
                       <span>{t.sortedByDateLabel}</span>
                     </span>
@@ -894,7 +894,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </div>
 
               {/* Row 2: Full Category Description - completely readable & scrollable */}
-              <div className="flex items-center text-[11.5px] text-slate-600 dark:text-slate-300 h-[20px] min-h-[20px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
+              <div className="flex items-center text-xs text-slate-600 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
                 <span className="font-normal">
                   {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
                 </span>
@@ -945,19 +945,19 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 </Tooltip>
 
                 <span className="text-slate-400">·</span>
-                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 shrink-0">
                   {currentScoreInfo.badgeLabel}
                 </span>
 
                 <span className="text-slate-400">·</span>
-                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 shrink-0">
                   {t.sourceLabel} <strong>{currentScoreInfo.sourceName}</strong>
                 </span>
 
                 {sortBy === 'date' && (
                   <>
                     <span className="text-slate-400">·</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-semibold flex items-center gap-1 shrink-0">
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-xs font-semibold flex items-center gap-1 shrink-0">
                       <span>📅</span>
                       <span>{t.sortedByDateLabel}</span>
                     </span>
@@ -966,7 +966,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </div>
 
               {/* Row 2: Full Composite Score Description - completely readable & scrollable */}
-              <div className="flex items-center text-[11.5px] text-slate-600 dark:text-slate-300 h-[20px] min-h-[20px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
+              <div className="flex items-center text-xs text-slate-600 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
                 <span className="font-normal">
                   {currentScoreInfo.description}
                 </span>
@@ -1181,10 +1181,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 />
                 <text
                   x={marginLeft - 12}
-                  y={yPos + 4}
+                  y={yPos + 5}
                   textAnchor="end"
                   fill={isZero ? '#475569' : '#94A3B8'}
-                  fontSize="10"
+                  fontSize="14"
                   fontFamily="monospace"
                   className="tabular-nums font-semibold"
                 >
@@ -1470,13 +1470,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         )}
 
                         {/* Umgerechneter Wert (Punkteanteil), der innerhalb des Scores dazugewonnen wurde */}
-                        {exploded && seg.segHeight >= 6 && (
+                        {exploded && seg.segHeight >= 12 && (
                           <text
                             x={barCenterX}
-                            y={seg.segY + seg.segHeight / 2 + 3}
+                            y={seg.segY + seg.segHeight / 2 + 4}
                             textAnchor="middle"
                             fill="#FFFFFF"
-                            fontSize={seg.segHeight < 11 ? '8' : '8.5'}
+                            fontSize="12"
                             fontFamily="monospace"
                             fontWeight="bold"
                             pointerEvents="none"
@@ -1555,10 +1555,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 {sortBy === 'date' && (
                   <text
                     x={barCenterX}
-                    y={catRaw < 0 && isScienceKnowledge ? barBottomY + 12 : barTopY - 6}
+                    y={catRaw < 0 && isScienceKnowledge ? barBottomY + 14 : barTopY - 6}
                     textAnchor="middle"
                     className="fill-blue-600 dark:fill-blue-400 font-bold tabular-nums"
-                    fontSize="9.5"
+                    fontSize="14"
                     fontFamily="monospace"
                     style={{
                       transition: 'y 0.25s ease-out',
@@ -1695,7 +1695,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     y={priceY}
                     textAnchor="middle"
                     className="font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none"
-                    fontSize="9.5"
+                    fontSize="14"
                     style={{
                       transition: 'y 0.25s ease-out',
                     }}
@@ -1723,8 +1723,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   >
                     <circle
                       cx={barCenterX}
-                      cy={priceY - 3}
-                      r={6}
+                      cy={priceY - 4}
+                      r={7}
                       className="fill-amber-100 dark:fill-amber-950 stroke-amber-500 dark:stroke-amber-400 group-hover/note:fill-amber-200 dark:group-hover/note:fill-amber-900 group-hover/note:stroke-amber-600 dark:group-hover/note:stroke-amber-300 transition-colors"
                       strokeWidth="1.2"
                       style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
@@ -1734,22 +1734,22 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       y={priceY}
                       textAnchor="middle"
                       className="fill-amber-800 dark:fill-amber-200 font-bold select-none pointer-events-none"
-                      fontSize="8"
+                      fontSize="12"
                       fontFamily="sans-serif"
                     >
                       ℹ
                     </text>
                     <circle
                       cx={barCenterX}
-                      cy={priceY - 3}
-                      r={12}
+                      cy={priceY - 4}
+                      r={13}
                       fill="transparent"
                     />
                   </g>
                 )}
 
                 {/* Rotated Model Name below Baseline: OHNE Flagge, mit vergrößertem 🌐 Symbol & klickbar falls modelUrl vorhanden */}
-                <g transform={`translate(${barCenterX}, ${baselineY + 12})`}>
+                <g transform={`translate(${barCenterX}, ${baselineY + 14})`}>
                   {model.modelUrl ? (
                     <a
                       href={model.modelUrl}
@@ -1764,7 +1764,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         transform="rotate(-52)"
                         fill={isHovered || (hasActiveHighlight && highlighted) ? '#2563EB' : '#475569'}
                         className="dark:fill-slate-300 transition-colors hover:fill-blue-600 dark:hover:fill-blue-400 cursor-pointer"
-                        fontSize="10"
+                        fontSize="14"
                         fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '500'}
                       >
                         {model.displayName}
@@ -1772,7 +1772,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           <tspan fill="#F59E0B" fontWeight="bold"> ✦ NEW</tspan>
                         )}
                         {model.isFreeApi && (
-                          <tspan fontSize="15" fontWeight="bold" fill="#2563EB"> 🌐</tspan>
+                          <tspan fontSize="16" fontWeight="bold" fill="#2563EB"> 🌐</tspan>
                         )}
                       </text>
                     </a>
@@ -1784,7 +1784,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       transform="rotate(-52)"
                       fill={isHovered || (hasActiveHighlight && highlighted) ? '#0F172A' : '#475569'}
                       className="dark:fill-slate-300 transition-colors"
-                      fontSize="10"
+                      fontSize="14"
                       fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '500'}
                     >
                       {model.displayName}
@@ -1792,7 +1792,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         <tspan fill="#F59E0B" fontWeight="bold"> ✦ NEW</tspan>
                       )}
                       {model.isFreeApi && (
-                        <tspan fontSize="15" fontWeight="bold" fill="#2563EB"> 🌐</tspan>
+                        <tspan fontSize="16" fontWeight="bold" fill="#2563EB"> 🌐</tspan>
                       )}
                     </text>
                   )}
@@ -1815,9 +1815,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             transform: priceTooltip.y < 80 ? 'translateY(0)' : 'translateY(-100%)',
           }}
         >
-          <div className="w-auto min-w-[130px] max-w-[240px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-[11px] font-sans">
+          <div className="w-auto min-w-[130px] max-w-[240px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-xs font-sans">
             {priceTooltip.title && (
-              <div className="text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
+              <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
                 {priceTooltip.title}
               </div>
             )}

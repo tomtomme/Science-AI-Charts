@@ -132,7 +132,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <button
                 type="button"
                 onClick={() => onModelScopeChange('current')}
-                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                   modelScope === 'current'
                     ? 'bg-blue-600 text-white shadow-2xs'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -150,7 +150,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <button
                 type="button"
                 onClick={() => onModelScopeChange('all')}
-                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                   modelScope === 'all'
                     ? 'bg-indigo-600 text-white shadow-2xs'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -168,7 +168,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             const sliderMax = Math.max(minVal, maxAvailableModels);
             return (
               <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
-                <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
                   {t.topSliderTop}:
                 </span>
                 <Tooltip content={t.stepMinusChatbots} align="center" width="w-24">
@@ -212,8 +212,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* 2. Explosions-Schalter: an / teils / aus (mittig erste Zeile) + Sortierung rechts davon */}
         <div className="flex flex-wrap items-center gap-2">
           {explosionMode && onExplosionModeChange && (
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 font-mono text-[10px] sm:text-[11px] self-center">
-              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 font-mono text-xs self-center">
+              <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
                 {t.explosionToggle}:
               </span>
               <div className="flex items-center bg-slate-200/60 dark:bg-slate-800/60 rounded p-0.5 gap-0.5">
@@ -231,7 +231,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   <button
                     type="button"
                     onClick={() => onExplosionModeChange('on')}
-                    className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                       explosionMode === 'on'
                         ? 'bg-emerald-600 text-white shadow-2xs'
                         : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -255,7 +255,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   <button
                     type="button"
                     onClick={() => onExplosionModeChange('hover')}
-                    className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                       explosionMode === 'hover'
                         ? 'bg-blue-600 text-white shadow-2xs'
                         : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -279,7 +279,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   <button
                     type="button"
                     onClick={() => onExplosionModeChange('off')}
-                    className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                       explosionMode === 'off'
                         ? 'bg-slate-600 text-white shadow-2xs'
                         : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -303,7 +303,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <button
                 type="button"
                 onClick={() => onSortByChange('score')}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                   sortBy === 'score'
                     ? 'bg-emerald-600 text-white shadow-2xs'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -322,7 +322,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <button
                 type="button"
                 onClick={() => onSortByChange('date')}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                   sortBy === 'date'
                     ? 'bg-blue-600 text-white shadow-2xs'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -376,7 +376,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <button
           type="button"
           onClick={onClearFamilies}
-          className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+          className={`text-xs px-2.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
             selectedFamilies.length === 0
               ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
               : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -393,7 +393,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               key={family}
               type="button"
               onClick={() => onToggleFamily(family)}
-              className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
+              className={`text-xs px-2.5 py-0.5 rounded font-mono transition-all cursor-pointer ${
                 isSelected
                   ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
                   : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -406,7 +406,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
         {/* Aktiver Hersteller-Filter per Klick auf Firmen-Logo */}
         {selectedCompany && (
-          <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] px-2 py-0.5 rounded font-mono bg-blue-600 text-white font-bold shadow-2xs ring-1 ring-blue-400">
+          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-mono bg-blue-600 text-white font-bold shadow-2xs ring-1 ring-blue-400">
             <span>{lang === 'de' ? 'Hersteller' : 'Company'}: {selectedCompany}</span>
             <button
               type="button"

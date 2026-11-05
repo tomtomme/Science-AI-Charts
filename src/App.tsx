@@ -644,11 +644,11 @@ export default function App() {
             onMouseLeave={() => setShowHeaderInfo(false)}
           >
             <div className="cursor-help inline-block max-w-full">
-              <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-1.5">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-1.5">
                 <span>{lang === 'de' ? t.title : (loadedData.headerMeta?.combinedTitle || t.title)}</span>
-                <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 shrink-0 opacity-70 group-hover:opacity-100 transition-all" />
+                <Info className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0 opacity-70 group-hover:opacity-100 transition-all" />
               </h1>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal font-sans line-clamp-2 transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-300">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-normal font-sans line-clamp-2 transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-300">
                 {lang === 'de' ? t.subtitle : (loadedData.headerMeta?.subtitle || t.subtitle)}
               </p>
             </div>
@@ -669,12 +669,12 @@ export default function App() {
               />
 
               {/* Intro paragraph */}
-              <p className="text-[12px] leading-relaxed text-slate-200 font-medium mb-3">
+              <p className="text-xs leading-relaxed text-slate-200 font-medium mb-3">
                 {t.headerPopupIntro}
               </p>
 
               {/* 6 Benchmark Items */}
-              <ul className="space-y-2 text-[11.5px] leading-snug text-slate-300">
+              <ul className="space-y-2 text-xs leading-snug text-slate-300">
                 {t.headerPopupItems.map((item, idx) => (
                   <li key={idx} className="flex items-start gap-2.5">
                     <span
@@ -697,12 +697,12 @@ export default function App() {
               title="Google Sheets Sync"
               badge={isSyncing ? t.syncingText : (loadedData.isLive ? 'Live' : 'Fallback')}
               content={
-                <div className="flex flex-col gap-1.5 text-[11px]">
+                <div className="flex flex-col gap-1.5 text-xs">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-slate-400 font-medium">{t.lastSync}:</span>
                     <span className="font-mono text-emerald-400 font-bold">{formatSyncDate(lastSyncedAt)}</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 border-t border-slate-700/60 pt-1 leading-normal">
+                  <div className="text-xs text-slate-400 border-t border-slate-700/60 pt-1 leading-normal">
                     {t.autoSyncNotice}
                   </div>
                 </div>
@@ -717,7 +717,7 @@ export default function App() {
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer disabled:opacity-50"
                 aria-label={t.syncButtonTitle}
               >
-                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-blue-500' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-blue-500' : ''}`} />
                 <span>{t.sync}</span>
               </button>
             </Tooltip>
@@ -732,7 +732,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setLang('de')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+                  className={`px-2 py-0.5 rounded text-xs font-bold transition-colors cursor-pointer ${
                     lang === 'de'
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
                       : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -749,7 +749,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setLang('en')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+                  className={`px-2 py-0.5 rounded text-xs font-bold transition-colors cursor-pointer ${
                     lang === 'en'
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
                       : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -779,7 +779,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleSelectTheme('light')}
-                  className={`p-1 sm:px-1.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center ${
+                  className={`p-1 sm:px-1.5 py-0.5 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
                     themePref === 'light'
                       ? 'bg-white dark:bg-slate-700 text-amber-500 shadow-2xs'
                       : themePref === 'auto' && effectiveTheme === 'light'
@@ -805,7 +805,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleSelectTheme('dark')}
-                  className={`p-1 sm:px-1.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center ${
+                  className={`p-1 sm:px-1.5 py-0.5 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
                     themePref === 'dark'
                       ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-2xs'
                       : themePref === 'auto' && effectiveTheme === 'dark'
@@ -836,7 +836,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleSelectTheme('auto')}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                  className={`px-1.5 py-0.5 rounded text-xs font-bold font-mono transition-all cursor-pointer ${
                     themePref === 'auto'
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
                       : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -866,7 +866,7 @@ export default function App() {
                   type="button"
                   onClick={requestGeoLocation}
                   disabled={isLocating}
-                  className={`p-1 py-0.5 rounded text-[11px] transition-all cursor-pointer flex items-center justify-center ${
+                  className={`p-1 py-0.5 rounded text-xs transition-all cursor-pointer flex items-center justify-center ${
                     geoCoords
                       ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
                       : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -879,7 +879,7 @@ export default function App() {
             </div>
 
             {locationStatus && (
-              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono whitespace-nowrap">
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-mono whitespace-nowrap">
                 {locationStatus}
               </span>
             )}
@@ -991,7 +991,7 @@ export default function App() {
             {/* Active filter reset notice */}
             {searchFilter && activeTab === 'benchmark' && benchmarkView === 'barchart' && (
               <div className="flex items-center gap-2 text-xs shrink-0">
-                <span className="text-slate-500 text-[11px]">
+                <span className="text-slate-500 text-xs">
                   {lang === 'de' ? 'Aktiver Lab-/Modell-Filter:' : 'Active Lab/Model filter:'} <strong className="text-slate-800 dark:text-slate-200 font-semibold">{searchFilter}</strong>
                 </span>
                 <button
@@ -1020,7 +1020,7 @@ export default function App() {
 
                 {/* Price Filter Switcher: Free(API|Chat)Paid|All */}
                 <div
-                  className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0 max-w-full overflow-x-auto no-scrollbar"
+                  className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 font-mono text-xs font-bold shrink-0 max-w-full overflow-x-auto no-scrollbar"
                   role="group"
                   aria-label={t.priceFilterDesc}
                 >
@@ -1040,7 +1040,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setPriceFilter(priceFilter === 'free_api' ? 'free_chat' : 'free_api')}
-                        className={`pl-1 font-bold text-[10px] sm:text-[11px] select-none cursor-pointer transition-colors ${
+                        className={`pl-1 font-bold text-xs select-none cursor-pointer transition-colors ${
                           priceFilter === 'free_api' || priceFilter === 'free_chat'
                             ? 'text-emerald-700 dark:text-emerald-300'
                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -1069,7 +1069,7 @@ export default function App() {
                               e.stopPropagation();
                               navigateToGlossaryTerm('term-api');
                             }}
-                            className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-blue-400 hover:text-blue-300 hover:underline pt-1.5 border-t border-slate-800/90 w-full cursor-pointer transition-colors"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 hover:underline pt-1.5 border-t border-slate-800/90 w-full cursor-pointer transition-colors"
                           >
                             <BookOpen className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                             <span>{lang === 'de' ? 'Ausführliche Erklärung im Glossar öffnen →' : 'Read full explanation in Glossary →'}</span>
@@ -1091,7 +1091,7 @@ export default function App() {
                       </button>
                     </Tooltip>
 
-                    <span className="text-slate-400 dark:text-slate-600 text-[10px] px-0.5 select-none">|</span>
+                    <span className="text-slate-400 dark:text-slate-600 text-xs px-0.5 select-none">|</span>
 
                     {/* Chat Button */}
                     <Tooltip
@@ -1119,7 +1119,7 @@ export default function App() {
                     </Tooltip>
 
                     <span
-                      className={`pr-1 font-bold text-[10px] sm:text-[11px] select-none ${
+                      className={`pr-1 font-bold text-xs select-none ${
                         priceFilter === 'free_api' || priceFilter === 'free_chat'
                           ? 'text-emerald-700 dark:text-emerald-300'
                           : 'text-slate-600 dark:text-slate-400'
@@ -1154,7 +1154,7 @@ export default function App() {
                     </button>
                   </Tooltip>
 
-                  <span className="text-slate-300 dark:text-slate-600 text-[10px] px-0.5 select-none">|</span>
+                  <span className="text-slate-300 dark:text-slate-600 text-xs px-0.5 select-none">|</span>
 
                   {/* All */}
                   <Tooltip
@@ -1186,7 +1186,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowAdvanced((prev) => !prev)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer border shrink-0 ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border shrink-0 ${
                     showAdvanced
                       ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
                       : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
@@ -1194,7 +1194,7 @@ export default function App() {
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
                   <span>{t.advanced}</span>
-                  <span className="text-[10px] opacity-80">{showAdvanced ? '▲' : '▼'}</span>
+                  <span className="text-xs opacity-80">{showAdvanced ? '▲' : '▼'}</span>
                 </button>
               </div>
             )}

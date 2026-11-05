@@ -142,9 +142,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
           {/* Optional Title Bar with Badge */}
           {(title || badge) && (
             <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-slate-800">
-              {title && <div className="font-bold text-xs text-slate-100 whitespace-normal break-words">{title}</div>}
+              {title && <div className="font-bold text-sm text-slate-100 whitespace-normal break-words">{title}</div>}
               {badge && (
-                <div className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                <div className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                   {badge}
                 </div>
               )}
@@ -152,7 +152,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
           )}
 
           {/* Body Content */}
-          <div className="text-[11px] font-normal leading-relaxed text-slate-300 whitespace-normal break-words">
+          <div className="text-xs font-normal leading-relaxed text-slate-300 whitespace-normal break-words">
             {content}
           </div>
         </div>

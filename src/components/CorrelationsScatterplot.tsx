@@ -214,17 +214,17 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-2 py-1 mb-1 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-slate-400">
+          <span className="text-xs font-mono uppercase font-bold tracking-wider text-slate-400">
             {lang === 'de' ? 'Metrik auswählen' : 'Select Metric'}
           </span>
-          <span className="text-[10px] font-mono text-slate-400">
+          <span className="text-xs font-mono text-slate-400">
             {CORRELATION_DIMENSIONS.length} {lang === 'de' ? 'Optionen' : 'Options'}
           </span>
         </div>
 
         {/* Section 1: Composite Scores */}
         <div className="mb-2">
-          <div className="px-2 py-0.5 text-[9.5px] font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
+          <div className="px-2 py-0.5 text-xs font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
             {lang === 'de' ? 'Gesamt-Scores (3)' : 'Composite Scores (3)'}
           </div>
           <div className="space-y-0.5 mt-0.5">
@@ -257,7 +257,7 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
 
         {/* Section 2: Component Categories */}
         <div>
-          <div className="px-2 py-0.5 text-[9.5px] font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
+          <div className="px-2 py-0.5 text-xs font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
             {lang === 'de' ? 'Einzel-Kategorien (8)' : 'Benchmark Categories (8)'}
           </div>
           <div className="space-y-0.5 mt-0.5">
@@ -548,7 +548,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             <button
               type="button"
               onClick={onSwapAxes}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-[10.5px] font-mono shadow-2xs"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-xs font-mono shadow-2xs"
             >
               <ArrowLeftRight className="w-3 h-3 text-blue-600 dark:text-blue-400" />
               <span>{lang === 'de' ? 'X ⇄ Y' : 'X ⇄ Y'}</span>
@@ -577,12 +577,12 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
               }`}
             >
-              <span className="text-[10px] font-bold text-slate-500 uppercase">r:</span>
+              <span className="text-xs font-bold text-slate-500 uppercase">r:</span>
               <span className="font-mono text-xs font-extrabold" style={{ color: pearsonResult.color }}>
                 {pearsonResult.value >= 0 ? '+' : ''}
                 {pearsonResult.value.toFixed(2)}
               </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden xl:inline">
+              <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
                 ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
               </span>
             </div>
@@ -607,12 +607,12 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
               }`}
             >
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Rho:</span>
+              <span className="text-xs font-bold text-slate-500 uppercase">Rho:</span>
               <span className="font-mono text-xs font-extrabold" style={{ color: spearmanResult.color }}>
                 {spearmanResult.value >= 0 ? '+' : ''}
                 {spearmanResult.value.toFixed(2)}
               </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden xl:inline">
+              <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
                 ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
               </span>
             </div>
@@ -633,7 +633,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               setOpenAxisMenu(openAxisMenu === 'y' ? null : 'y');
               setHoveredPoint(null);
             }}
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-mono font-bold text-[10.5px]"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-mono font-bold text-sm"
             style={{ backgroundColor: yDim.color }}
             title={
               lang === 'de'
@@ -641,11 +641,11 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 : `Y-Axis: ${yDim.nameEn} (Click to choose category)`
             }
           >
-            <span className="text-[9px] uppercase tracking-wide opacity-80">Y:</span>
-            <span className="truncate max-w-[120px] sm:max-w-[160px]">
+            <span className="text-xs uppercase tracking-wide opacity-80">Y:</span>
+            <span className="truncate max-w-[130px] sm:max-w-[180px]">
               {lang === 'de' ? yDim.nameDe : yDim.nameEn}
             </span>
-            <ChevronDown className="w-3 h-3 shrink-0 opacity-80" />
+            <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-80" />
           </button>
 
           {/* Y-Axis Dropdown Popover */}
@@ -692,9 +692,10 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 />
                 <text
                   x={x}
-                  y={margin.top + innerHeight + 16}
+                  y={margin.top + innerHeight + 18}
                   textAnchor="middle"
-                  className="fill-slate-400 dark:fill-slate-500 text-[9.5px] font-mono font-medium"
+                  fontSize="14"
+                  className="fill-slate-400 dark:fill-slate-500 font-mono font-medium"
                 >
                   {val}
                 </text>
@@ -718,9 +719,10 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 />
                 <text
                   x={margin.left - 8}
-                  y={y + 3}
+                  y={y + 5}
                   textAnchor="end"
-                  className="fill-slate-400 dark:fill-slate-500 text-[9.5px] font-mono font-medium"
+                  fontSize="14"
+                  className="fill-slate-400 dark:fill-slate-500 font-mono font-medium"
                 >
                   {val}
                 </text>
@@ -829,7 +831,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               setOpenAxisMenu(openAxisMenu === 'x' ? null : 'x');
               setHoveredPoint(null);
             }}
-            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-mono font-bold text-[10.5px]"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-mono font-bold text-sm"
             style={{ backgroundColor: xDim.color }}
             title={
               lang === 'de'
@@ -837,11 +839,11 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 : `X-Axis: ${xDim.nameEn} (Click to choose category)`
             }
           >
-            <span className="text-[9px] uppercase tracking-wide opacity-80">X:</span>
-            <span className="truncate max-w-[140px] sm:max-w-[200px]">
+            <span className="text-xs uppercase tracking-wide opacity-80">X:</span>
+            <span className="truncate max-w-[150px] sm:max-w-[220px]">
               {lang === 'de' ? xDim.nameDe : xDim.nameEn}
             </span>
-            <ChevronDown className="w-3 h-3 shrink-0 opacity-80" />
+            <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-80" />
           </button>
 
           {/* X-Axis Dropdown Popover */}
@@ -867,7 +869,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               left: `${hoveredPoint.pos.left}px`,
               top: `${hoveredPoint.pos.top}px`,
             }}
-            className="absolute z-40 bg-slate-900/95 dark:bg-slate-950/95 text-white px-2.5 py-2 rounded-lg shadow-xl border border-slate-700/80 backdrop-blur-md pointer-events-auto w-[230px] transition-all animate-in fade-in zoom-in-95 duration-150 select-text"
+            className="absolute z-40 bg-slate-900/95 dark:bg-slate-950/95 text-white px-2.5 py-2 rounded-lg shadow-xl border border-slate-700/80 backdrop-blur-md pointer-events-auto w-[240px] transition-all animate-in fade-in zoom-in-95 duration-150 select-text"
             onMouseEnter={handleTooltipMouseEnter}
             onMouseLeave={handleTooltipMouseLeave}
           >
@@ -884,7 +886,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   <span className="text-xs shrink-0">{hoveredPoint.point.flag}</span>
                 )}
                 {frontierPointIds.has(hoveredPoint.point.id) && (
-                  <span className="text-[9px] font-mono px-1 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5 shrink-0">
+                  <span className="text-xs font-mono px-1 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5 shrink-0">
                     <Sparkles className="w-2.5 h-2.5 text-amber-300" />
                     <span>{lang === 'de' ? 'Pionier' : 'Pioneer'}</span>
                   </span>
@@ -896,7 +898,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   href={hoveredPoint.point.chatUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-semibold flex items-center gap-0.5 shrink-0 transition-colors"
+                  className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold flex items-center gap-0.5 shrink-0 transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span>Chat</span>
@@ -906,7 +908,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             </div>
 
             {/* Metadata Subline: Company · Date · Free/Paid */}
-            <div className="flex items-center justify-between text-[10px] text-slate-400 mt-0.5 truncate">
+            <div className="flex items-center justify-between text-xs text-slate-400 mt-0.5 truncate">
               <span className="truncate max-w-[125px]" title={hoveredPoint.point.company}>
                 {hoveredPoint.point.company}
               </span>
@@ -920,7 +922,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             <div className="grid grid-cols-2 gap-1.5 mt-1.5 pt-1.5 border-t border-slate-800/80">
               <div className="bg-slate-800/80 px-1.5 py-1 rounded flex items-center justify-between gap-1">
                 <span
-                  className="text-[10px] text-slate-400 font-mono truncate"
+                  className="text-xs text-slate-400 font-mono truncate"
                   title={lang === 'de' ? xDim.nameDe : xDim.nameEn}
                 >
                   X: {lang === 'de' ? xDim.shortDe : xDim.shortEn}
@@ -934,7 +936,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               </div>
               <div className="bg-slate-800/80 px-1.5 py-1 rounded flex items-center justify-between gap-1">
                 <span
-                  className="text-[10px] text-slate-400 font-mono truncate"
+                  className="text-xs text-slate-400 font-mono truncate"
                   title={lang === 'de' ? yDim.nameDe : yDim.nameEn}
                 >
                   Y: {lang === 'de' ? yDim.shortDe : yDim.shortEn}
@@ -1024,7 +1026,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
           <button
             type="button"
             onClick={() => setScope('all')}
-            className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold transition-all cursor-pointer ${
+            className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
               scope === 'all'
                 ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -1035,7 +1037,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
           <button
             type="button"
             onClick={() => setScope('frontier')}
-            className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
               scope === 'frontier'
                 ? 'bg-amber-500 text-white shadow-2xs'
                 : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
@@ -1048,7 +1050,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
           >
             <Sparkles className="w-3 h-3 text-amber-300" />
             <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
-            <span className="text-[10px] opacity-90">({frontierPointIds.size})</span>
+            <span className="text-xs opacity-90">({frontierPointIds.size})</span>
           </button>
         </div>
 
@@ -1056,7 +1058,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
         <div className="flex flex-wrap items-center gap-2">
           {/* Regression Model Picker */}
           <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+            <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
               <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
               <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
             </span>
@@ -1089,17 +1091,39 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             </button>
 
             {/* Model Badge */}
-            <div className="w-[105px] sm:w-[125px] shrink-0 overflow-hidden flex items-center">
-              <span
-                className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full"
-                style={{ backgroundColor: activeRegression.color }}
-                title={lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
+            <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
+              <Tooltip
+                content={
+                  <div className="space-y-1.5">
+                    <p className="leading-snug">{lang === 'de' ? activeRegression.descDe : activeRegression.descEn}</p>
+                    {activeRegression.id === 'polynomial' && (
+                      <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                        {lang === 'de' ? `Polynom-Regression (Grad ${polyDegree})` : `Polynomial Regression (Degree ${polyDegree})`}
+                      </div>
+                    )}
+                    {activeRegression.id === 'loess' && (
+                      <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                        {lang === 'de' ? `LOESS-Glättung (Span ${loessSpan}%)` : `LOESS Smoothing (Span ${loessSpan}%)`}
+                      </div>
+                    )}
+                  </div>
+                }
+                position="bottom"
+                align="center"
+                width="w-64"
+                className="w-full"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                <span className="truncate">
-                  {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
+                <span
+                  className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                  style={{ backgroundColor: activeRegression.color }}
+                  title={`${lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}: ${lang === 'de' ? activeRegression.descDe : activeRegression.descEn}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  <span className="truncate">
+                    {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
+                  </span>
                 </span>
-              </span>
+              </Tooltip>
             </div>
           </div>
 
@@ -1111,7 +1135,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                 : ''
             }`}
           >
-            <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400">
               Param:
             </span>
             {activeRegression.id === 'polynomial' ? (
@@ -1128,7 +1152,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   }}
                   className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
                 />
-                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 select-none">
+                <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
                   deg
                 </span>
               </div>
@@ -1146,7 +1170,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   }}
                   className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
                 />
-                <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
+                <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
                   %
                 </span>
               </div>

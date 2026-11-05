@@ -581,7 +581,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
         {/* Bereich 1: How To Read (Titel aus Zelle A34, Inhalt aus Zelle C34) */}
         <div className="flex flex-col bg-slate-50/70 dark:bg-slate-950/40 border border-slate-200/90 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs">
           {/* Header Bereich 1 */}
-          <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2 pb-1.5 mb-1.5">
             <Table2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
               {title1}
@@ -589,7 +589,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
           </div>
 
           {/* Inhalt Bereich 1 (1:1 Text strukturiert mit Banderolen & Aufzählungs-Badges) */}
-          <div id="section1-scroll-box" className="space-y-3.5 text-xs leading-relaxed text-slate-700 dark:text-slate-300 overflow-y-auto max-h-[620px] pr-2 scrollbar-thin">
+          <div id="section1-scroll-box" className="space-y-2 text-xs leading-relaxed text-slate-700 dark:text-slate-300 overflow-y-auto max-h-[620px] pr-2 scrollbar-thin">
             {paragraphs1.map((p, idx) => {
               // Differentiate between Header 1 (categories explainer: "The different benchmarks which comprise the Final Scores")
               // and Header 2 (the actual final scores section: "Final Scores")
@@ -637,17 +637,17 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                   <div
                     key={idx}
                     id={anchorId}
-                    className={`mt-4 pt-3.5 pb-1 border-t border-slate-200 dark:border-slate-800 first:border-t-0 first:pt-0 first:mt-0 ${
+                    className={`mt-2.5 mb-0.5 first:mt-0 ${
                       anchorId ? 'scroll-mt-6 rounded-lg' : ''
                     }`}
                   >
-                    <div className="px-3 py-2 bg-slate-100 dark:bg-slate-800/90 rounded-lg border-l-4 border-slate-700 dark:border-slate-300 border-y border-r border-slate-200/90 dark:border-slate-700/80 mb-2 shadow-2xs">
+                    <div className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg border-l-4 border-slate-700 dark:border-slate-300 mb-1 shadow-2xs">
                       <h4 className="font-normal text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] tracking-tight leading-snug">
                         {p.heading}
                       </h4>
                     </div>
                     {p.text && (
-                      <p className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line px-1 mb-2.5 text-xs">
+                      <p className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line px-1 mb-1 text-xs">
                         {renderTextWithLinks(p.text)}
                       </p>
                     )}
@@ -659,14 +659,12 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                 <div
                   key={idx}
                   id={anchorId}
-                  className={`${
-                    p.heading ? 'pt-2 border-t border-slate-200/60 dark:border-slate-800/60 first:border-t-0 first:pt-0' : ''
-                  } ${anchorId ? 'scroll-mt-6 p-2 rounded-lg' : ''}`}
+                  className={`${anchorId ? 'scroll-mt-6 p-1 rounded-lg' : ''}`}
                 >
                   {p.heading && (() => {
                     const headingColor = getBenchmarkHeadingColor(p.heading);
                     return (
-                      <h4 className="font-normal text-slate-800 dark:text-slate-200 text-xs mb-1 flex items-center gap-1.5">
+                      <h4 className="font-normal text-slate-800 dark:text-slate-200 text-xs mb-0.5 flex items-center gap-1.5">
                         <span
                           className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
                           style={{ backgroundColor: headingColor }}
@@ -680,10 +678,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                       </h4>
                     );
                   })()}
-                  <p
-                    className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line pl-2.5 border-l-2"
-                    style={{ borderColor: `${getBenchmarkHeadingColor(p.heading)}33` }}
-                  >
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
                     {renderTextWithLinks(p.text)}
                   </p>
                   {p.link && (
@@ -691,7 +686,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                       href={p.link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 hover:underline mt-1 font-medium"
+                      className="inline-flex items-center gap-1 text-xs font-mono text-emerald-600 dark:text-emerald-400 hover:underline mt-0.5 font-medium"
                     >
                       <span>{p.link.label}</span>
                       <ExternalLink className="w-2.5 h-2.5" />
@@ -706,7 +701,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
         {/* Bereich 2: What Bots can & can't do for you (Titel aus Zelle N34, Inhalt aus Zelle O34) */}
         <div className="flex flex-col bg-slate-50/70 dark:bg-slate-950/40 border border-slate-200/90 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs">
           {/* Header Bereich 2 */}
-          <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2 pb-1.5 mb-1.5">
             <Lightbulb className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
             <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
               {title2}
@@ -714,14 +709,11 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
           </div>
 
           {/* Inhalt Bereich 2 (1:1 Text aus CSV Tabelle) */}
-          <div className="space-y-3.5 text-xs leading-relaxed text-slate-700 dark:text-slate-300 overflow-y-auto max-h-[620px] pr-2 scrollbar-thin">
+          <div className="space-y-2 text-xs leading-relaxed text-slate-700 dark:text-slate-300 overflow-y-auto max-h-[620px] pr-2 scrollbar-thin">
             {paragraphs2.map((p, idx) => (
-              <div
-                key={idx}
-                className={p.heading ? 'pt-2 border-t border-slate-200/60 dark:border-slate-800/60 first:border-t-0 first:pt-0' : ''}
-              >
+              <div key={idx}>
                 {p.heading && (
-                  <h4 className="font-normal text-slate-800 dark:text-slate-200 text-xs mb-1 flex items-center gap-1.5">
+                  <h4 className="font-normal text-slate-800 dark:text-slate-200 text-xs mb-0.5 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
                     <span>{p.heading}</span>
                   </h4>
@@ -734,7 +726,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                     href={p.link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-mono text-blue-600 dark:text-blue-400 hover:underline mt-1 font-medium"
+                    className="inline-flex items-center gap-1 text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline mt-0.5 font-medium"
                   >
                     <span>{p.link.label}</span>
                     <ExternalLink className="w-2.5 h-2.5" />

@@ -234,7 +234,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   // SVG dimensions & scales
   const svgWidth = 1000;
   const svgHeight = 520;
-  const margin = { top: 40, right: 40, bottom: 65, left: 65 };
+  const margin = { top: 40, right: 40, bottom: 70, left: 70 };
   const innerWidth = svgWidth - margin.left - margin.right;
   const innerHeight = svgHeight - margin.top - margin.bottom;
 
@@ -506,7 +506,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           {/* Merged Score Slider (Identical styling to bar chart tab) */}
           <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+            <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
               Score:
             </span>
             <button
@@ -543,7 +543,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 <button
                   type="button"
                   onClick={() => handleScroll('note-col-m')}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
+                  className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                   <span className="truncate">{t.scoreModeNew}</span>
@@ -553,7 +553,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 <button
                   type="button"
                   onClick={() => handleScroll('note-col-l')}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
+                  className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                   <span className="truncate">{t.scoreModeOld}</span>
@@ -563,7 +563,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 <button
                   type="button"
                   onClick={() => handleScroll('note-col-n')}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
+                  className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                   <span className="truncate">{t.scoreModeWorstCase}</span>
@@ -573,7 +573,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 <button
                   type="button"
                   onClick={() => handleScroll(scoreScrollTargets.targetId)}
-                  className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
+                  className="text-xs font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ backgroundColor: activeComponent.color }}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
@@ -588,8 +588,8 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           {/* Right Group: Regression Model Slider + Contextual Param Input */}
           <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
             {/* Regression Model Slider */}
-            <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+            <div className="relative z-30 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
+              <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
                 <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
                 <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
               </span>
@@ -620,39 +620,27 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               </button>
 
               {/* Regression Badge */}
-              <div className="w-[105px] sm:w-[125px] shrink-0 overflow-hidden flex items-center">
+              <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
                 <Tooltip
-                  title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
                   content={
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <p className="leading-snug">{lang === 'de' ? activeRegression.descDe : activeRegression.descEn}</p>
-                      <div className="pt-2 border-t border-slate-700/60 space-y-1 text-[11px]">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-slate-300">
-                            {lang === 'de' ? 'Linear (Pearson r):' : 'Linear (Pearson r):'}
-                          </span>
-                          <span className="font-bold text-blue-300">
-                            {pearsonResult.value >= 0 ? '+' : ''}{pearsonResult.value.toFixed(2)} ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
-                          </span>
+                      {regression.formula && (
+                        <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                          {regression.formula}
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-slate-300">
-                            {lang === 'de' ? 'Rang (Spearman Rho):' : 'Rank (Spearman Rho):'}
-                          </span>
-                          <span className="font-bold text-rose-300">
-                            {spearmanResult.value >= 0 ? '+' : ''}{spearmanResult.value.toFixed(2)} ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   }
-                  align="right"
-                  width="w-72"
+                  position="bottom"
+                  align="center"
+                  width="w-64"
                   className="w-full"
                 >
                   <span
-                    className="text-[10px] sm:text-[10.5px] font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                    className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
                     style={{ backgroundColor: activeRegression.color }}
+                    title={`${lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}: ${regression.formula || (lang === 'de' ? activeRegression.descDe : activeRegression.descEn)}`}
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                     <span className="truncate">
@@ -688,7 +676,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                     : ''
                 }`}
               >
-                <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
+                <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
                   Param:
                 </span>
                 <div className="w-[76px] shrink-0 flex items-center justify-end">
@@ -696,7 +684,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                     <select
                       value={polyDegree}
                     onChange={(e) => setPolyDegree(Number(e.target.value))}
-                    className="w-[76px] h-6 px-1.5 font-mono text-[11px] font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-hidden focus:border-rose-500 text-center"
+                    className="w-[76px] h-6 px-1.5 font-mono text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-hidden focus:border-rose-500 text-center"
                   >
                     <option value={2}>{lang === 'de' ? 'Grad 2' : 'Deg 2'}</option>
                     <option value={3}>{lang === 'de' ? 'Grad 3' : 'Deg 3'}</option>
@@ -714,9 +702,9 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                         const val = parseInt(e.target.value, 10);
                         if (!isNaN(val) && val >= 15 && val <= 80) setLoessSpan(val);
                       }}
-                      className="w-[44px] font-mono text-[11px] font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
+                      className="w-[44px] font-mono text-xs font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
                     />
-                    <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
+                    <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
                       %
                     </span>
                   </div>
@@ -735,14 +723,14 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
           {/* Scope Segmented Control */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-400">
+            <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-400">
               {lang === 'de' ? 'Datenbasis:' : 'Scope:'}
             </span>
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
               <button
                 type="button"
                 onClick={() => setTimelineScope('all')}
-                className={`px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                   timelineScope === 'all'
                     ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -753,7 +741,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               <button
                 type="button"
                 onClick={() => setTimelineScope('frontier')}
-                className={`px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
                   timelineScope === 'frontier'
                     ? 'bg-amber-500 text-white shadow-2xs'
                     : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
@@ -766,7 +754,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               >
                 <Sparkles className="w-3 h-3 text-amber-300" />
                 <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
-                <span className="text-[10px] opacity-90">({frontierPointIds.size})</span>
+                <span className="text-xs opacity-90">({frontierPointIds.size})</span>
               </button>
             </div>
           </div>
@@ -792,10 +780,13 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                     : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
                 }`}
               >
-                <span className="text-[10px] font-bold text-slate-500 uppercase">r:</span>
+                <span className="text-xs font-bold text-slate-500 uppercase">r:</span>
                 <span className="font-mono text-xs font-extrabold" style={{ color: pearsonResult.color }}>
                   {pearsonResult.value >= 0 ? '+' : ''}
                   {pearsonResult.value.toFixed(2)}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                  ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
                 </span>
               </div>
             </Tooltip>
@@ -819,20 +810,16 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                     : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
                 }`}
               >
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Rho:</span>
+                <span className="text-xs font-bold text-slate-500 uppercase">Rho:</span>
                 <span className="font-mono text-xs font-extrabold" style={{ color: spearmanResult.color }}>
                   {spearmanResult.value >= 0 ? '+' : ''}
                   {spearmanResult.value.toFixed(2)}
                 </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                  ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
+                </span>
               </div>
             </Tooltip>
-
-            <span
-              className="text-[10px] font-mono text-slate-400 hidden xl:inline max-w-[280px] truncate ml-1"
-              title={regression.formula}
-            >
-              {regression.formula}
-            </span>
           </div>
         </div>
       </div>
@@ -874,9 +861,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 />
                 <text
                   x={margin.left - 12}
-                  y={y + 4}
+                  y={y + 5}
                   textAnchor="end"
-                  className="text-[11px] font-mono fill-slate-400 dark:fill-slate-500"
+                  fontSize="14"
+                  className="font-mono font-medium fill-slate-400 dark:fill-slate-500"
                 >
                   {tick}
                 </text>
@@ -901,9 +889,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 />
                 <text
                   x={x}
-                  y={svgHeight - margin.bottom + 20}
+                  y={svgHeight - margin.bottom + 22}
                   textAnchor="middle"
-                  className="text-[11px] font-mono fill-slate-400 dark:fill-slate-500"
+                  fontSize="14"
+                  className="font-mono font-medium fill-slate-400 dark:fill-slate-500"
                 >
                   {tick.label}
                 </text>
@@ -934,18 +923,20 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           {/* Axis Labels */}
           <text
             x={margin.left + innerWidth / 2}
-            y={svgHeight - 15}
+            y={svgHeight - 16}
             textAnchor="middle"
-            className="text-xs font-bold fill-slate-600 dark:fill-slate-400 uppercase tracking-wider"
+            fontSize="14"
+            className="font-bold fill-slate-600 dark:fill-slate-400 uppercase tracking-wider"
           >
             {lang === 'de' ? 'Veröffentlichungsdatum' : 'Release Date'}
           </text>
           <text
-            transform={`rotate(-90 ${margin.left - 42} ${margin.top + innerHeight / 2})`}
-            x={margin.left - 42}
+            transform={`rotate(-90 ${margin.left - 46} ${margin.top + innerHeight / 2})`}
+            x={margin.left - 46}
             y={margin.top + innerHeight / 2}
             textAnchor="middle"
-            className="text-xs font-bold fill-slate-600 dark:fill-slate-400 tracking-wider"
+            fontSize="14"
+            className="font-bold fill-slate-600 dark:fill-slate-400 tracking-wider"
           >
             {yAxisLabel}
           </text>
@@ -1053,7 +1044,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   <span>{hoveredPoint.point.displayName}</span>
                   {hoveredPoint.point.flag && <span>{hoveredPoint.point.flag}</span>}
                   {frontierPointIds.has(hoveredPoint.point.id) && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5">
+                    <span className="text-xs font-mono px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5">
                       <Sparkles className="w-2.5 h-2.5 text-amber-300" />
                       <span>{lang === 'de' ? 'Pionier' : 'Pioneer'}</span>
                     </span>
@@ -1071,7 +1062,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   href={hoveredPoint.point.chatUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors"
+                  className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold flex items-center gap-1 shrink-0 transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span>Chat</span>
@@ -1082,7 +1073,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
 
             <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-800">
               <div className="bg-slate-800/80 p-1.5 rounded">
-                <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                <span className="text-slate-400 block text-xs uppercase font-bold">
                   {selectedCategoryIndex === 0 ? 'Score' : 'Wert'}
                 </span>
                 <span className="font-mono text-base font-extrabold text-emerald-400">
@@ -1090,7 +1081,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 </span>
               </div>
               <div className="bg-slate-800/80 p-1.5 rounded">
-                <span className="text-slate-400 block text-[10px] uppercase font-bold flex items-center gap-1">
+                <span className="text-slate-400 block text-xs uppercase font-bold flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
                   <span>Datum</span>
                 </span>

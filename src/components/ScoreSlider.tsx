@@ -129,8 +129,8 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
   };
 
   return (
-    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0 max-w-full font-mono text-[10px] sm:text-[11px] overflow-x-auto no-scrollbar">
-      <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 pl-1.5 whitespace-nowrap shrink-0">
+    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0 max-w-full font-mono text-xs overflow-x-auto no-scrollbar">
+      <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 pl-1.5 whitespace-nowrap shrink-0">
         Score:
       </span>
       <button
@@ -168,14 +168,14 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
         position="bottom"
         align="center"
         width="w-max"
-        popupClassName="px-2.5 py-1 text-[11px] font-semibold tracking-wide whitespace-nowrap"
+        popupClassName="px-2.5 py-1 text-xs font-semibold tracking-wide whitespace-nowrap"
       >
-        <div className="w-[125px] sm:w-[155px] shrink-0 overflow-hidden flex items-center pr-0.5">
+        <div className="w-[130px] sm:w-[165px] shrink-0 overflow-hidden flex items-center pr-0.5">
           {unifiedSliderValue === 0 && (
             <button
               type="button"
               onClick={() => handleScroll('note-col-m')}
-              className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
+              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
               <span className="truncate">{t.scoreModeNew}</span>
@@ -185,7 +185,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
             <button
               type="button"
               onClick={() => handleScroll('note-col-l')}
-              className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
+              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
               <span className="truncate">{t.scoreModeOld}</span>
@@ -195,7 +195,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
             <button
               type="button"
               onClick={() => handleScroll('note-col-n')}
-              className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
+              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
               <span className="truncate">{t.scoreModeWorstCase}</span>
@@ -205,7 +205,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
             <button
               type="button"
               onClick={() => handleScroll(scoreScrollTargets.targetId)}
-              className="text-[10px] sm:text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
+              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
               style={{ backgroundColor: activeCategoryComp.color }}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />

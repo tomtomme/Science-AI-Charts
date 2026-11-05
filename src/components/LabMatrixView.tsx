@@ -993,7 +993,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     e.stopPropagation();
                     scrollToGlossary('term-harness');
                   }}
-                  className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
+                  className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
                 >
                   <span>{lang === 'de' ? 'Harness im Glossar nachschlagen ↓' : 'View Harness in Glossary ↓'}</span>
                 </button>
@@ -1060,13 +1060,13 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             <SlidersHorizontal className={`w-3.5 h-3.5 ${showAdvanced ? 'text-white' : 'text-blue-500'}`} />
             <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
             {activeAdvancedFiltersCount > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+              <span className={`text-xs px-1.5 py-0.2 rounded-full font-bold ${
                 showAdvanced ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
               }`}>
                 {activeAdvancedFiltersCount}
               </span>
             )}
-            <span className={`text-[10px] ml-0.5 ${showAdvanced ? 'text-blue-200' : 'text-slate-400'}`}>
+            <span className={`text-xs ml-0.5 ${showAdvanced ? 'text-blue-200' : 'text-slate-400'}`}>
               {showAdvanced ? '▲' : '▼'}
             </span>
           </button>
@@ -1082,7 +1082,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 text-xs scrollbar-thin max-w-full"
               onWheel={handleHorizontalWheel}
             >
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 shrink-0 mr-1 flex items-center gap-1">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 shrink-0 mr-1 flex items-center gap-1">
                 <span>🌐</span>
                 <span>{lang === 'de' ? 'Land:' : 'Country:'}</span>
               </span>
@@ -1112,7 +1112,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   >
                     <span>{c.flag}</span>
                     <span>{c.country}</span>
-                    <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                    <span className={`text-xs ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
                       ({c.count})
                     </span>
                   </button>
@@ -1123,7 +1123,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Open / Hybrid / Closed Weights Segmented Toggle Button */}
             <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs shrink-0">
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 px-2 flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-2 flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-slate-400" />
                 <span>{lang === 'de' ? 'Gewichte:' : 'Weights:'}</span>
                 <Tooltip
@@ -1180,7 +1180,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         e.stopPropagation();
                         scrollToWeightsExplainer('weights-open');
                       }}
-                      className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
+                      className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
                     >
                       <span>{lang === 'de' ? 'Ausführliche Erklärung anzeigen ↓' : 'Show full explanation ↓'}</span>
                     </button>
@@ -1222,7 +1222,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         e.stopPropagation();
                         scrollToWeightsExplainer('weights-hybrid');
                       }}
-                      className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
+                      className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
                     >
                       <span>{lang === 'de' ? 'Ausführliche Erklärung anzeigen ↓' : 'Show full explanation ↓'}</span>
                     </button>
@@ -1264,7 +1264,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         e.stopPropagation();
                         scrollToWeightsExplainer('weights-closed');
                       }}
-                      className="inline-flex items-center gap-1 text-[10.5px] text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
+                      className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
                     >
                       <span>{lang === 'de' ? 'Ausführliche Erklärung anzeigen ↓' : 'Show full explanation ↓'}</span>
                     </button>
@@ -1367,7 +1367,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               </button>
 
               {/* Active size indicator badge */}
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 min-w-[84px] text-center whitespace-nowrap">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 min-w-[84px] text-center whitespace-nowrap">
                 {sizeFilter === 'all'
                   ? (lang === 'de' ? 'Alle' : 'All')
                   : sizeFilter === 'planetary_singularity'
@@ -1419,7 +1419,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     <span className={`w-2 h-2 rounded-full ${cat.dotClass} shrink-0`} />
                   )}
                   <span>{lang === 'de' ? cat.nameDe : cat.nameEn}</span>
-                  <span className={`text-[10px] ${isExact ? 'text-blue-100' : isSubSelected ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400'}`}>
+                  <span className={`text-xs ${isExact ? 'text-blue-100' : isSubSelected ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400'}`}>
                     ({count})
                   </span>
                 </button>
@@ -1467,14 +1467,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setSimplifiedSizeView((prev) => !prev)}
-                    className="px-2 py-0.5 text-[11px] font-semibold rounded bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
+                    className="px-2 py-0.5 text-xs font-semibold rounded bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
                   >
                     {simplifiedSizeView
                       ? (lang === 'de' ? 'Kompakte Ansicht: An' : 'Compact View: On')
                       : (lang === 'de' ? 'Vollansicht: An' : 'Full View: On')}
                   </button>
                 </Tooltip>
-                <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
                   {filteredLabs.length} {lang === 'de' ? 'Labore' : 'labs'}
                 </span>
               </div>
@@ -1543,7 +1543,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     <button
                       type="button"
                       onClick={() => scrollToWeightsExplainer(`weights-${lab.weightsType}`)}
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 cursor-pointer transition-transform hover:scale-105 ${
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 cursor-pointer transition-transform hover:scale-105 ${
                         lab.weightsType === 'open'
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
                           : lab.weightsType === 'hybrid'
@@ -1572,7 +1572,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   <div className="mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                     {lab.group === 'harness' ? (
                       <>
-                        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
+                        <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
                           {lang === 'de' ? 'Agenten- & Steuergerüst (Harness)' : 'Agent Scaffolding & Execution Harness'}
                         </div>
                         <div className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate">
@@ -1617,8 +1617,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     {lab.form && (
                       <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                         <Terminal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="font-semibold text-slate-500 text-[11px]">Form:</span>
-                        <span className="font-mono text-[11px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-medium text-slate-800 dark:text-slate-200">
+                        <span className="font-semibold text-slate-500 text-xs">Form:</span>
+                        <span className="font-mono text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-medium text-slate-800 dark:text-slate-200">
                           {lab.form}
                         </span>
                       </div>
@@ -1637,7 +1637,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 {/* Group: Model Tweakers - Based on OpenWeights note (hidden in simplified size view) */}
                 {!isSimplifiedView && lab.group === 'tweakers' && lab.basedOn && (
                   <div className="bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded-lg border border-emerald-200 dark:border-emerald-900/60 mb-2.5">
-                    <div className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">
+                    <div className="text-xs uppercase font-bold text-emerald-600 dark:text-emerald-400">
                       {lang === 'de' ? 'Basiert auf OpenWeights' : 'Based on Open Weights'}
                     </div>
                     <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
@@ -1694,7 +1694,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                             <div className="flex items-center gap-1.5 shrink-0">
                               <MiniScaleMeter level={tier.level} colorClass={tier.colorClass} />
                               <span
-                                className={`font-bold text-[11px] cursor-help ${
+                                className={`font-bold text-xs cursor-help ${
                                   isSimplifiedView
                                     ? 'text-blue-900 dark:text-blue-200'
                                     : 'text-slate-700 dark:text-slate-200'
@@ -1704,7 +1704,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                               </span>
 
                               {/* Tooltip on hover showing parameter count */}
-                              <div className="absolute left-2 -top-8 hidden group-hover:flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-lg text-[10px] font-mono pointer-events-none z-30 whitespace-nowrap">
+                              <div className="absolute left-2 -top-8 hidden group-hover:flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-lg text-xs font-mono pointer-events-none z-30 whitespace-nowrap">
                                 <span className="font-bold">{lang === 'de' ? tier.nameDe : tier.nameEn}:</span>
                                 <span>{lang === 'de' ? tier.paramCountDe : tier.paramCountEn}</span>
                               </div>
@@ -1712,7 +1712,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
 
                             {/* Center: Model Name(s) */}
                             <span
-                              className={`font-mono text-[11px] text-right truncate flex-1 ${
+                              className={`font-mono text-xs text-right truncate flex-1 ${
                                 isSimplifiedView
                                   ? 'font-bold text-slate-900 dark:text-slate-100'
                                   : 'font-semibold text-slate-800 dark:text-slate-200'
@@ -1725,7 +1725,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                             {/* Right: Open / Closed Badge (only shown for hybrid model families) */}
                             {!isSimplifiedView && lab.weightsType === 'hybrid' && isOpen !== undefined && (
                               <span
-                                className={`text-[8.5px] font-semibold px-1.5 py-0.2 rounded-full border shrink-0 ${
+                                className={`text-xs font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${
                                   isOpen
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800'
                                     : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
@@ -1747,7 +1747,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setExpandedLabId(isExpanded ? null : lab.id)}
-                      className="w-full flex items-center justify-between py-1 text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-semibold cursor-pointer transition-colors group select-none"
+                      className="w-full flex items-center justify-between py-1 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-semibold cursor-pointer transition-colors group select-none"
                     >
                       <span className="flex items-center gap-1.5">
                         <Wrench className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
@@ -1755,9 +1755,9 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                           {lang === 'de' ? 'Werkzeuge & Agenten' : 'Tooling & Agents'}
                         </span>
                       </span>
-                      <span className="text-[11px] text-blue-600 dark:text-blue-400 font-normal normal-case tracking-normal flex items-center gap-1">
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-normal normal-case tracking-normal flex items-center gap-1">
                         <span>{isExpanded ? (lang === 'de' ? 'ausblenden' : 'hide') : (lang === 'de' ? 'Details' : 'Details')}</span>
-                        <span className="text-[9px]">{isExpanded ? '▲' : '▼'}</span>
+                        <span className="text-xs">{isExpanded ? '▲' : '▼'}</span>
                       </span>
                     </button>
 
@@ -1766,7 +1766,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       <div className="text-xs space-y-1.5 pt-2 mt-1.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-800/40 p-2.5 rounded-lg transition-all">
                         {lab.codingAgent && (
                           <div className="flex items-start gap-1.5">
-                            <span className="text-slate-400 text-[11px] shrink-0 font-medium">
+                            <span className="text-slate-400 text-xs shrink-0 font-medium">
                               {lang === 'de' ? 'Coding-Agent:' : 'Coding Agent:'}
                             </span>
                             <span className="font-medium text-slate-700 dark:text-slate-300">
@@ -1776,7 +1776,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.dailyAgent && (
                           <div className="flex items-start gap-1.5">
-                            <span className="text-slate-400 text-[11px] shrink-0 font-medium">
+                            <span className="text-slate-400 text-xs shrink-0 font-medium">
                               {lang === 'de' ? 'Alltags-Agent:' : 'Daily Agent:'}
                             </span>
                             <span className="font-medium text-slate-700 dark:text-slate-300">
@@ -1786,7 +1786,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.harnessSdk && (
                           <div className="flex items-start gap-1.5 pt-0.5">
-                            <span className="text-slate-400 text-[11px] shrink-0 font-medium">
+                            <span className="text-slate-400 text-xs shrink-0 font-medium">
                               Harness / SDK:
                             </span>
                             <span className="font-medium text-slate-700 dark:text-slate-300">
@@ -1796,7 +1796,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         )}
                         {lab.subscriptionTiers && (
                           <div className="flex items-start gap-1.5 pt-0.5">
-                            <span className="text-slate-400 text-[11px] shrink-0 font-medium">
+                            <span className="text-slate-400 text-xs shrink-0 font-medium">
                               {lang === 'de' ? 'Abo-Stufen:' : 'Subscription Tiers:'}
                             </span>
                             <span className="font-medium text-slate-700 dark:text-slate-300">
@@ -1847,11 +1847,11 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-slate-500" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
               {lang === 'de' ? 'Konzepte: Open vs. Hybrid vs. Closed' : 'Concepts: Open vs. Hybrid vs. Closed'}
             </h3>
           </div>
-          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-slate-500 dark:text-slate-400">
             {lang === 'de' ? 'Definition der Bereitstellungs- und Betriebsmodelle' : 'Definition of model distribution and access models'}
           </span>
         </div>
@@ -1863,11 +1863,11 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 transition-all scroll-mt-20"
           >
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+              <span className="text-sm font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                 <span>{lang === 'de' ? WEIGHTS_CONCEPTS.open.titleDe : WEIGHTS_CONCEPTS.open.titleEn}</span>
               </span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
                 {lang === 'de' ? 'Offen' : 'Open'}
               </span>
             </div>
@@ -1879,7 +1879,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 </li>
               ))}
             </ul>
-            <div className="pt-2 border-t border-emerald-100 dark:border-emerald-900/40 text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="pt-2 border-t border-emerald-100 dark:border-emerald-900/40 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-semibold text-slate-700 dark:text-slate-300">
                 {lang === 'de' ? 'Beispiele: ' : 'Examples: '}
               </span>
@@ -1893,11 +1893,11 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             className="p-4 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/40 dark:bg-purple-950/20 transition-all scroll-mt-20"
           >
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs font-bold text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+              <span className="text-sm font-bold text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
                 <span>{lang === 'de' ? WEIGHTS_CONCEPTS.hybrid.titleDe : WEIGHTS_CONCEPTS.hybrid.titleEn}</span>
               </span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800">
                 Hybrid
               </span>
             </div>
@@ -1909,7 +1909,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 </li>
               ))}
             </ul>
-            <div className="pt-2 border-t border-purple-100 dark:border-purple-900/40 text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="pt-2 border-t border-purple-100 dark:border-purple-900/40 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-semibold text-slate-700 dark:text-slate-300">
                 {lang === 'de' ? 'Beispiele: ' : 'Examples: '}
               </span>
@@ -1923,11 +1923,11 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 transition-all scroll-mt-20"
           >
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0" />
                 <span>{lang === 'de' ? WEIGHTS_CONCEPTS.closed.titleDe : WEIGHTS_CONCEPTS.closed.titleEn}</span>
               </span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
                 {lang === 'de' ? 'Geschlossen' : 'Closed'}
               </span>
             </div>
@@ -1939,7 +1939,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 </li>
               ))}
             </ul>
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-semibold text-slate-700 dark:text-slate-300">
                 {lang === 'de' ? 'Beispiele: ' : 'Examples: '}
               </span>
@@ -1958,11 +1958,11 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-blue-500" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
               {lang === 'de' ? 'Glossar: Fachbegriffe & Abkürzungen' : 'Glossary: Key AI Concepts & Acronyms'}
             </h3>
           </div>
-          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-slate-500 dark:text-slate-400">
             {lang === 'de'
               ? 'Kurze, sachliche Definitionen der wichtigsten Kernbegriffe'
               : 'Short, factual definitions for key model and ecosystem terms'}
@@ -1978,10 +1978,10 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     {lang === 'de' ? term.termDe : term.termEn}
                   </h4>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0">
                     {lang === 'de' ? term.badgeDe : term.badgeEn}
                   </span>
                 </div>
