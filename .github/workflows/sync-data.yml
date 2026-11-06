@@ -1,0 +1,40 @@
+name: Weekly Sheet & Translation Sync
+
+on:
+  schedule:
+    # Runs every Monday at 04:00 UTC (weekly)
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Fetch Live Sheet & Sync Translations
+        run: npx tsx scripts/updateTranslations.ts
+
+      - name: Commit and push changes if any
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes detected in Google Sheet or translations."
+          else
+            git commit -m "chore(sync): automated weekly sheet & translation update"
+            git push
+          fi

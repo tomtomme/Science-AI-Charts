@@ -17,9 +17,19 @@ interface TimelineScatterplotProps {
   onScrollToParagraph?: (targetId: string) => void;
   onScrollToFinalScores?: () => void;
   lang: 'de' | 'en';
+  // Controlled props when header controls are elevated
+  timelineScope?: 'all' | 'frontier';
+  onTimelineScopeChange?: (scope: 'all' | 'frontier') => void;
+  regressionIndex?: number;
+  onRegressionIndexChange?: (idx: number | ((prev: number) => number)) => void;
+  polyDegree?: number;
+  onPolyDegreeChange?: (deg: number) => void;
+  loessSpan?: number;
+  onLoessSpanChange?: (span: number) => void;
+  hideHeaderControls?: boolean;
 }
 
-interface RegressionOption {
+export interface RegressionOption {
   id: RegressionType;
   labelDe: string;
   labelEn: string;
@@ -30,7 +40,7 @@ interface RegressionOption {
   color: string;
 }
 
-const REGRESSION_OPTIONS: RegressionOption[] = [
+export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
   {
     id: 'linear',
     labelDe: 'Linear (Trendlinie)',
@@ -93,9 +103,11 @@ const REGRESSION_OPTIONS: RegressionOption[] = [
   },
 ];
 
-const DEFAULT_TIMELINE_REGRESSION_INDEX = Math.max(
+const REGRESSION_OPTIONS = TIMELINE_REGRESSION_OPTIONS;
+
+export const DEFAULT_TIMELINE_REGRESSION_INDEX = Math.max(
   0,
-  REGRESSION_OPTIONS.findIndex((o) => o.id === 'loess')
+  TIMELINE_REGRESSION_OPTIONS.findIndex((o) => o.id === 'loess')
 );
 
 export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
@@ -107,12 +119,33 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   onScrollToParagraph,
   onScrollToFinalScores,
   lang,
+  timelineScope: propTimelineScope,
+  onTimelineScopeChange,
+  regressionIndex: propRegressionIndex,
+  onRegressionIndexChange,
+  polyDegree: propPolyDegree,
+  onPolyDegreeChange,
+  loessSpan: propLoessSpan,
+  onLoessSpanChange,
+  hideHeaderControls = false,
 }) => {
-  // Regression Model state: default to LOESS (Param 50%)
-  const [regressionIndex, setRegressionIndex] = useState<number>(DEFAULT_TIMELINE_REGRESSION_INDEX);
-  const [polyDegree, setPolyDegree] = useState<number>(2); // Default: degree 2
-  const [loessSpan, setLoessSpan] = useState<number>(50); // Default: 50% smoothing span
-  const [timelineScope, setTimelineScope] = useState<'all' | 'frontier'>('all'); // All Models vs Frontier Only
+  // Regression Model state with controlled/internal fallbacks
+  const [internalRegressionIndex, setInternalRegressionIndex] = useState<number>(DEFAULT_TIMELINE_REGRESSION_INDEX);
+  const [internalPolyDegree, setInternalPolyDegree] = useState<number>(2); // Default: degree 2
+  const [internalLoessSpan, setInternalLoessSpan] = useState<number>(50); // Default: 50% smoothing span
+  const [internalTimelineScope, setInternalTimelineScope] = useState<'all' | 'frontier'>('all');
+
+  const regressionIndex = propRegressionIndex !== undefined ? propRegressionIndex : internalRegressionIndex;
+  const setRegressionIndex = onRegressionIndexChange || setInternalRegressionIndex;
+
+  const polyDegree = propPolyDegree !== undefined ? propPolyDegree : internalPolyDegree;
+  const setPolyDegree = onPolyDegreeChange || setInternalPolyDegree;
+
+  const loessSpan = propLoessSpan !== undefined ? propLoessSpan : internalLoessSpan;
+  const setLoessSpan = onLoessSpanChange || setInternalLoessSpan;
+
+  const timelineScope = propTimelineScope !== undefined ? propTimelineScope : internalTimelineScope;
+  const setTimelineScope = onTimelineScopeChange || setInternalTimelineScope;
 
   const activeRegression = REGRESSION_OPTIONS[regressionIndex] || REGRESSION_OPTIONS[0];
 
@@ -500,8 +533,9 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
 
   return (
     <div className="w-full space-y-3.5">
-      {/* Controls Container */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2.5">
+      {/* Controls Container (rendered only if not elevated to header) */}
+      {!hideHeaderControls && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2.5">
         {/* Row 1: Score Slider + Regression Model Slider + Contextual Param Input */}
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           {/* Merged Score Slider (Identical styling to bar chart tab) */}
@@ -585,182 +619,345 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             </div>
           </div>
 
-          {/* Right Group: Regression Model Slider + Contextual Param Input */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
-            {/* Regression Model Slider */}
-            <div className="relative z-30 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-              <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-                <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setRegressionIndex((prev) => Math.max(0, prev - 1))}
-                disabled={regressionIndex <= 0}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+          {/* Right Group: When hideHeaderControls is true, show Pearson & Spearman badges directly here on Row 1. Otherwise show Regression Model Slider + Param */}
+          {hideHeaderControls ? (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs sm:ml-auto">
+              {/* Pearson r Badge */}
+              <Tooltip
+                title="Pearson r"
+                badge="Linear"
+                align="center"
+                width="w-64"
+                content={
+                  lang === 'de'
+                    ? 'Pearson-Korrelationskoeffizient r misst den linearen Zusammenhang über die Zeit.'
+                    : 'Pearson correlation coefficient r measures the linear relationship over time.'
+                }
               >
-                <Minus className="w-3 h-3" />
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={REGRESSION_OPTIONS.length - 1}
-                step={1}
-                value={regressionIndex}
-                onChange={(e) => setRegressionIndex(Number(e.target.value))}
-                className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
-              />
-              <button
-                type="button"
-                onClick={() => setRegressionIndex((prev) => Math.min(REGRESSION_OPTIONS.length - 1, prev + 1))}
-                disabled={regressionIndex >= REGRESSION_OPTIONS.length - 1}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-
-              {/* Regression Badge */}
-              <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
-                <Tooltip
-                  content={
-                    <div className="space-y-1.5">
-                      <p className="leading-snug">{lang === 'de' ? activeRegression.descDe : activeRegression.descEn}</p>
-                      {regression.formula && (
-                        <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                          {regression.formula}
-                        </div>
-                      )}
-                    </div>
-                  }
-                  position="bottom"
-                  align="center"
-                  width="w-64"
-                  className="w-full"
+                <div
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                    isLinearModel
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+                  }`}
                 >
-                  <span
-                    className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
-                    style={{ backgroundColor: activeRegression.color }}
-                    title={`${lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}: ${regression.formula || (lang === 'de' ? activeRegression.descDe : activeRegression.descEn)}`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                    <span className="truncate">
-                      {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
-                    </span>
+                  <span className="text-xs font-bold text-slate-500 uppercase">r:</span>
+                  <span className="font-mono text-xs font-extrabold" style={{ color: pearsonResult.color }}>
+                    {pearsonResult.value >= 0 ? '+' : ''}
+                    {pearsonResult.value.toFixed(2)}
                   </span>
-                </Tooltip>
-              </div>
-            </div>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                    ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
+                  </span>
+                </div>
+              </Tooltip>
 
-            {/* Contextual Parameter Input (Fixed width, Active for Polynomial & LOESS, otherwise grayed-out) */}
-            <Tooltip
-              content={
-                activeRegression.id === 'polynomial'
-                  ? lang === 'de'
-                    ? 'Polynom-Grad (2, 3 oder 4)'
-                    : 'Polynomial degree (2, 3 or 4)'
-                  : activeRegression.id === 'loess'
-                  ? lang === 'de'
-                    ? 'Bandbreite / Glättungs-Span (15–80%)'
-                    : 'Bandwidth smoothing span (15–80%)'
-                  : lang === 'de'
-                  ? 'Kein variabler Parameter für dieses Modell'
-                  : 'No variable parameter for this model'
-              }
-              align="right"
-              width="w-56"
-            >
-              <div
-                className={`w-[142px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
-                  activeRegression.id !== 'polynomial' && activeRegression.id !== 'loess'
-                    ? 'opacity-40 cursor-not-allowed'
-                    : ''
-                }`}
+              {/* Spearmans Rho Badge */}
+              <Tooltip
+                title="Spearman Rho"
+                badge="Rangfolge"
+                align="center"
+                width="w-64"
+                content={
+                  lang === 'de'
+                    ? 'Spearmans Rho misst den monotonen Rangzusammenhang über die Zeit, unempfindlicher gegenüber Ausreißern.'
+                    : 'Spearman rank correlation measures monotonic rank relationship over time, more robust against outliers.'
+                }
               >
-                <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
-                  Param:
-                </span>
-                <div className="w-[76px] shrink-0 flex items-center justify-end">
-                  {activeRegression.id === 'polynomial' ? (
-                    <select
-                      value={polyDegree}
-                    onChange={(e) => setPolyDegree(Number(e.target.value))}
-                    className="w-[76px] h-6 px-1.5 font-mono text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-hidden focus:border-rose-500 text-center"
-                  >
-                    <option value={2}>{lang === 'de' ? 'Grad 2' : 'Deg 2'}</option>
-                    <option value={3}>{lang === 'de' ? 'Grad 3' : 'Deg 3'}</option>
-                    <option value={4}>{lang === 'de' ? 'Grad 4' : 'Deg 4'}</option>
-                  </select>
-                ) : activeRegression.id === 'loess' ? (
-                  <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-amber-500">
-                    <input
-                      type="number"
-                      min={15}
-                      max={80}
-                      step={5}
-                      value={loessSpan}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        if (!isNaN(val) && val >= 15 && val <= 80) setLoessSpan(val);
-                      }}
-                      className="w-[44px] font-mono text-xs font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
-                    />
-                    <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
-                      %
-                    </span>
-                  </div>
-                ) : (
-                  <div className="w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
-                    —
-                  </div>
-                )}
-              </div>
+                <div
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                    !isLinearModel
+                      ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-slate-500 uppercase">Rho:</span>
+                  <span className="font-mono text-xs font-extrabold" style={{ color: spearmanResult.color }}>
+                    {spearmanResult.value >= 0 ? '+' : ''}
+                    {spearmanResult.value.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                    ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
+                  </span>
+                </div>
+              </Tooltip>
             </div>
-            </Tooltip>
-          </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
+              {/* Regression Model Slider */}
+              <div className="relative z-30 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
+                <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+                  <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRegressionIndex((prev) => Math.max(0, prev - 1))}
+                  disabled={regressionIndex <= 0}
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={REGRESSION_OPTIONS.length - 1}
+                  step={1}
+                  value={regressionIndex}
+                  onChange={(e) => setRegressionIndex(Number(e.target.value))}
+                  className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
+                />
+                <button
+                  type="button"
+                  onClick={() => setRegressionIndex((prev) => Math.min(REGRESSION_OPTIONS.length - 1, prev + 1))}
+                  disabled={regressionIndex >= REGRESSION_OPTIONS.length - 1}
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+
+                {/* Regression Badge */}
+                <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
+                  <Tooltip
+                    content={
+                      <div className="space-y-1.5">
+                        <p className="leading-snug">{lang === 'de' ? activeRegression.descDe : activeRegression.descEn}</p>
+                        {regression.formula && (
+                          <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                            {regression.formula}
+                          </div>
+                        )}
+                      </div>
+                    }
+                    position="bottom"
+                    align="center"
+                    width="w-64"
+                    className="w-full"
+                  >
+                    <span
+                      className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                      style={{ backgroundColor: activeRegression.color }}
+                      title={`${lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}: ${regression.formula || (lang === 'de' ? activeRegression.descDe : activeRegression.descEn)}`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                      <span className="truncate">
+                        {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
+                      </span>
+                    </span>
+                  </Tooltip>
+                </div>
+              </div>
+
+              {/* Contextual Parameter Input (Fixed width, Active for Polynomial & LOESS, otherwise grayed-out) */}
+              <Tooltip
+                content={
+                  activeRegression.id === 'polynomial'
+                    ? lang === 'de'
+                      ? 'Polynom-Grad (2, 3 oder 4)'
+                      : 'Polynomial degree (2, 3 or 4)'
+                    : activeRegression.id === 'loess'
+                    ? lang === 'de'
+                      ? 'Bandbreite / Glättungs-Span (15–80%)'
+                      : 'Bandwidth smoothing span (15–80%)'
+                    : lang === 'de'
+                    ? 'Kein variabler Parameter für dieses Modell'
+                    : 'No variable parameter for this model'
+                }
+                align="right"
+                width="w-56"
+              >
+                <div
+                  className={`w-[142px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
+                    activeRegression.id !== 'polynomial' && activeRegression.id !== 'loess'
+                      ? 'opacity-40 cursor-not-allowed'
+                      : ''
+                  }`}
+                >
+                  <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
+                    Param:
+                  </span>
+                  <div className="w-[76px] shrink-0 flex items-center justify-end">
+                    {activeRegression.id === 'polynomial' ? (
+                      <select
+                        value={polyDegree}
+                        onChange={(e) => setPolyDegree(Number(e.target.value))}
+                        className="w-[76px] h-6 px-1.5 font-mono text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-hidden focus:border-rose-500 text-center"
+                      >
+                        <option value={2}>{lang === 'de' ? 'Grad 2' : 'Deg 2'}</option>
+                        <option value={3}>{lang === 'de' ? 'Grad 3' : 'Deg 3'}</option>
+                        <option value={4}>{lang === 'de' ? 'Grad 4' : 'Deg 4'}</option>
+                      </select>
+                    ) : activeRegression.id === 'loess' ? (
+                      <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-amber-500">
+                        <input
+                          type="number"
+                          min={15}
+                          max={80}
+                          step={5}
+                          value={loessSpan}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val) && val >= 15 && val <= 80) setLoessSpan(val);
+                          }}
+                          className="w-[44px] font-mono text-xs font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
+                        />
+                        <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
+                          %
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
+                        —
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Tooltip>
+            </div>
+          )}
         </div>
 
         {/* Row 2: Model Scope Toggle (All Models vs Pioneers) + Pearson r & Spearman Rho Correlation Display */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-          {/* Scope Segmented Control */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-400">
-              {lang === 'de' ? 'Datenbasis:' : 'Scope:'}
-            </span>
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => setTimelineScope('all')}
-                className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                  timelineScope === 'all'
-                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({scatterPoints.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimelineScope('frontier')}
-                className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                  timelineScope === 'frontier'
-                    ? 'bg-amber-500 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
-                }`}
-                title={
+        {!hideHeaderControls && (
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+            {/* Scope Segmented Control */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-400">
+                {lang === 'de' ? 'Datenbasis:' : 'Scope:'}
+              </span>
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setTimelineScope('all')}
+                  className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                    timelineScope === 'all'
+                      ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({scatterPoints.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimelineScope('frontier')}
+                  className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    timelineScope === 'frontier'
+                      ? 'bg-amber-500 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+                  }`}
+                  title={
+                    lang === 'de'
+                      ? 'Nur Modelle, die zum Release-Zeitpunkt einen neuen Rekord-Highscore erzielten (Pioniere)'
+                      : 'Only models setting a new record score at release date (pioneers)'
+                  }
+                >
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
+                  <span className="text-xs opacity-90">({frontierPointIds.size})</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Side-by-Side Pearson r & Spearmans Rho Badges (Matching Correlations Tab) */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs sm:ml-auto">
+              {/* Pearson r Badge */}
+              <Tooltip
+                title="Pearson r"
+                badge="Linear"
+                align="center"
+                width="w-64"
+                content={
                   lang === 'de'
-                    ? 'Nur Modelle, die zum Release-Zeitpunkt einen neuen Rekord-Highscore erzielten (Pioniere)'
-                    : 'Only models setting a new record score at release date (pioneers)'
+                    ? 'Pearson-Korrelationskoeffizient r misst den linearen Zusammenhang über die Zeit.'
+                    : 'Pearson correlation coefficient r measures the linear relationship over time.'
                 }
               >
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
-                <span className="text-xs opacity-90">({frontierPointIds.size})</span>
-              </button>
+                <div
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                    isLinearModel
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-slate-500 uppercase">r:</span>
+                  <span className="font-mono text-xs font-extrabold" style={{ color: pearsonResult.color }}>
+                    {pearsonResult.value >= 0 ? '+' : ''}
+                    {pearsonResult.value.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                    ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
+                  </span>
+                </div>
+              </Tooltip>
+
+              {/* Spearmans Rho Badge */}
+              <Tooltip
+                title="Spearman Rho"
+                badge="Rangfolge"
+                align="center"
+                width="w-64"
+                content={
+                  lang === 'de'
+                    ? 'Spearmans Rho misst den monotonen Rangzusammenhang über die Zeit, unempfindlicher gegenüber Ausreißern.'
+                    : 'Spearman rank correlation measures monotonic rank relationship over time, more robust against outliers.'
+                }
+              >
+                <div
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                    !isLinearModel
+                      ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-slate-500 uppercase">Rho:</span>
+                  <span className="font-mono text-xs font-extrabold" style={{ color: spearmanResult.color }}>
+                    {spearmanResult.value >= 0 ? '+' : ''}
+                    {spearmanResult.value.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                    ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
+                  </span>
+                </div>
+              </Tooltip>
             </div>
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* Scatterplot Canvas Container */}
+      <div
+        ref={containerRef}
+        className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden select-none flex flex-col"
+      >
+        {/* Diagram Header Bar: Category / Criterion info on the left, Pearson r & Spearman Rho on the right (matching Correlations Tab) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 sm:px-4 bg-slate-50/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-blue-500" />
+              <span>
+                {activeCategoryName
+                  ? activeCategoryName
+                  : scoreMode === 'old'
+                  ? t.scoreModeOld
+                  : scoreMode === 'worstCase'
+                  ? t.scoreModeWorstCase
+                  : t.scoreModeNew}
+              </span>
+            </span>
+            <span className="text-xs font-mono text-slate-400 dark:text-slate-500">
+              ({scatterPoints.length} {lang === 'de' ? 'Modelle' : 'models'})
+            </span>
+            {timelineScope === 'frontier' && (
+              <span className="inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-500 text-white shadow-2xs">
+                <Sparkles className="w-3 h-3 text-amber-200" />
+                <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
+              </span>
+            )}
           </div>
 
           {/* Side-by-Side Pearson r & Spearmans Rho Badges (Matching Correlations Tab) */}
-          <div className="flex flex-wrap items-center gap-1.5 text-xs sm:ml-auto">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
             {/* Pearson r Badge */}
             <Tooltip
               title="Pearson r"
@@ -822,18 +1019,13 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             </Tooltip>
           </div>
         </div>
-      </div>
 
-      {/* Scatterplot Canvas Container */}
-      <div
-        ref={containerRef}
-        className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm overflow-hidden select-none"
-      >
-        {/* SVG Scatterplot */}
-        <svg
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          className="w-full h-auto max-h-[640px] overflow-visible"
-        >
+        {/* SVG Scatterplot Container */}
+        <div className="p-4 overflow-hidden relative">
+          <svg
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            className="w-full h-auto max-h-[640px] overflow-visible"
+          >
           <defs>
             <linearGradient id="regressionGlow" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor={activeRegression.color} stopOpacity="0.85" />
@@ -1092,6 +1284,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

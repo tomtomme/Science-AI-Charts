@@ -412,11 +412,11 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     const scoreNewReported = parseNum(row[12]); // Col M
     const scoreWorstCaseReported = parseNum(row[13]);   // Col N
 
-    // When values in columns change in the CSV (e.g. Cols D, E, F, G, J for Old Score, or H & K for New/WorstCase),
-    // the composite scores dynamically reflect the updated values:
-    const finalScoreOld = scoreOldReported ?? scoreOldCalculated;
-    const finalScoreNew = scoreNewReported ?? scoreNewCalculated;
-    const finalScoreWorstCase = scoreWorstCaseReported ?? scoreWorstCaseCalculated;
+    // When score cells in the CSV are emptied (e.g. updating AA-Intelligence-Index to v5),
+    // empty cells must strictly remain empty / null rather than falling back to synthetic calculations:
+    const finalScoreOld = scoreOldReported;
+    const finalScoreNew = scoreNewReported;
+    const finalScoreWorstCase = scoreWorstCaseReported;
 
     const activeScore = finalScoreNew ?? finalScoreOld ?? finalScoreWorstCase ?? 0;
     const activeMode: ScoreMode = finalScoreNew !== null ? 'new' : finalScoreOld !== null ? 'old' : 'worstCase';
@@ -622,9 +622,9 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
       });
   } else {
     filtered = all
-      .filter((m) => (m.scoreNew !== null && m.scoreNew > 0) || (m.scoreNewReported !== null && m.scoreNewReported > 0))
+      .filter((m) => m.scoreNew !== null && m.scoreNew > 0)
       .map((m) => {
-        const score = (m.scoreNew ?? m.scoreNewReported) as number;
+        const score = m.scoreNew as number;
         return {
           ...m,
           score,

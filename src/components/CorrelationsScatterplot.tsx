@@ -11,15 +11,25 @@ import {
   CorrelationPoint,
 } from '../utils/correlationUtils';
 
-interface CorrelationsScatterplotProps {
+export interface CorrelationsScatterplotProps {
   models: ModelRecord[];
   allModels: ModelRecord[];
   onScrollToParagraph?: (targetId: string) => void;
   onScrollToFinalScores?: () => void;
   lang: 'de' | 'en';
+  // Controlled props when header controls are elevated
+  scope?: 'all' | 'frontier';
+  onScopeChange?: (scope: 'all' | 'frontier') => void;
+  regressionIndex?: number;
+  onRegressionIndexChange?: (idx: number | ((prev: number) => number)) => void;
+  polyDegree?: number;
+  onPolyDegreeChange?: (deg: number) => void;
+  loessSpan?: number;
+  onLoessSpanChange?: (span: number) => void;
+  hideHeaderControls?: boolean;
 }
 
-interface RegressionOption {
+export interface CorrelationRegressionOption {
   id: RegressionType;
   labelDe: string;
   labelEn: string;
@@ -30,7 +40,7 @@ interface RegressionOption {
   color: string;
 }
 
-const CORRELATION_REGRESSION_OPTIONS: RegressionOption[] = [
+export const CORRELATION_REGRESSION_OPTIONS: CorrelationRegressionOption[] = [
   {
     id: 'linear',
     labelDe: 'Linear (Trendlinie)',
@@ -83,7 +93,7 @@ const CORRELATION_REGRESSION_OPTIONS: RegressionOption[] = [
   },
 ];
 
-const DEFAULT_CORRELATION_REGRESSION_INDEX = Math.max(
+export const DEFAULT_CORRELATION_REGRESSION_INDEX = Math.max(
   0,
   CORRELATION_REGRESSION_OPTIONS.findIndex((o) => o.id === 'loess')
 );
@@ -298,7 +308,7 @@ interface SingleCorrelationPlotProps {
   allModels: ModelRecord[];
   scope: 'all' | 'frontier';
   frontierPointIds: Set<string>;
-  activeRegression: RegressionOption;
+  activeRegression: CorrelationRegressionOption;
   polyDegree: number;
   loessSpan: number;
   xAxisDimIndex: number;
@@ -961,6 +971,15 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
   onScrollToParagraph,
   onScrollToFinalScores,
   lang,
+  scope: controlledScope,
+  onScopeChange,
+  regressionIndex: controlledRegressionIndex,
+  onRegressionIndexChange,
+  polyDegree: controlledPolyDegree,
+  onPolyDegreeChange,
+  loessSpan: controlledLoessSpan,
+  onLoessSpanChange,
+  hideHeaderControls = false,
 }) => {
   // Plot 1 Dimension selection (Default: X = #1 Coding & Math, Y = #2 Non-Hallucination)
   const [plot1XDimIndex, setPlot1XDimIndex] = useState<number>(3);
@@ -971,10 +990,22 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
   const [plot2YDimIndex, setPlot2YDimIndex] = useState<number>(0);
 
   // Model & Regression State: default to LOESS with Param 50%
-  const [regressionIndex, setRegressionIndex] = useState<number>(DEFAULT_CORRELATION_REGRESSION_INDEX);
-  const [polyDegree, setPolyDegree] = useState<number>(2); // Default degree 2
-  const [loessSpan, setLoessSpan] = useState<number>(50); // Default 50%
-  const [scope, setScope] = useState<'all' | 'frontier'>('all');
+  const [internalRegressionIndex, setInternalRegressionIndex] = useState<number>(DEFAULT_CORRELATION_REGRESSION_INDEX);
+  const [internalPolyDegree, setInternalPolyDegree] = useState<number>(2); // Default degree 2
+  const [internalLoessSpan, setInternalLoessSpan] = useState<number>(50); // Default 50%
+  const [internalScope, setInternalScope] = useState<'all' | 'frontier'>('all');
+
+  const regressionIndex = controlledRegressionIndex ?? internalRegressionIndex;
+  const setRegressionIndex = onRegressionIndexChange ?? setInternalRegressionIndex;
+
+  const polyDegree = controlledPolyDegree ?? internalPolyDegree;
+  const setPolyDegree = onPolyDegreeChange ?? setInternalPolyDegree;
+
+  const loessSpan = controlledLoessSpan ?? internalLoessSpan;
+  const setLoessSpan = onLoessSpanChange ?? setInternalLoessSpan;
+
+  const scope = controlledScope ?? internalScope;
+  const setScope = onScopeChange ?? setInternalScope;
 
   const activeRegression = CORRELATION_REGRESSION_OPTIONS[regressionIndex] || CORRELATION_REGRESSION_OPTIONS[0];
 
@@ -1019,8 +1050,9 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
 
   return (
     <div className="space-y-3">
-      {/* Compact Controls Bar: Scope filter & Regression model controls (Title & Presets removed to save space) */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 shadow-sm flex flex-wrap items-center justify-between gap-2.5">
+      {/* Compact Controls Bar: Scope filter & Regression model controls (rendered if not placed in header) */}
+      {!hideHeaderControls && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 shadow-sm flex flex-wrap items-center justify-between gap-2.5">
         {/* Scope Segmented Control */}
         <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
           <button
@@ -1182,6 +1214,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
           </div>
         </div>
       </div>
+      )}
 
       {/* 2 CORRELATION PLOTS SIDE-BY-SIDE (Quadratic 1:1 Aspect Ratio) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

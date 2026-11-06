@@ -15,12 +15,13 @@ import { ExplodedBarChart } from './components/ExplodedBarChart';
 import { ScoreSlider } from './components/ScoreSlider';
 import { SearchBar } from './components/SearchBar';
 import { CsvNotesSection } from './components/CsvNotesSection';
-import { LabMatrixView } from './components/LabMatrixView';
-import { TimelineScatterplot } from './components/TimelineScatterplot';
-import { CorrelationsScatterplot } from './components/CorrelationsScatterplot';
+import { LabMatrixView, LabGroup } from './components/LabMatrixView';
+import { TimelineScatterplot, TIMELINE_REGRESSION_OPTIONS, DEFAULT_TIMELINE_REGRESSION_INDEX } from './components/TimelineScatterplot';
+import { CorrelationsScatterplot, CORRELATION_REGRESSION_OPTIONS, DEFAULT_CORRELATION_REGRESSION_INDEX } from './components/CorrelationsScatterplot';
+import { extractFrontierPoints } from './utils/mathRegression';
 import { Language, TRANSLATIONS } from './utils/i18n';
 import { matchesSearchQuery } from './utils/searchUtils';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink } from 'lucide-react';
 import { Tooltip } from './components/Tooltip';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
@@ -336,6 +337,22 @@ export default function App() {
   // Three-Way Tab for Benchmark: 'barchart' (Balkendiagramm) vs 'timeline' (Zeitachse) vs 'correlations' (Korrelationen)
   const [benchmarkView, setBenchmarkView] = useState<'barchart' | 'timeline' | 'correlations'>('barchart');
 
+  // Timeline State elevated to header
+  const [timelineScope, setTimelineScope] = useState<'all' | 'frontier'>('all');
+  const [timelineRegressionIndex, setTimelineRegressionIndex] = useState<number>(DEFAULT_TIMELINE_REGRESSION_INDEX);
+  const [timelinePolyDegree, setTimelinePolyDegree] = useState<number>(2);
+  const [timelineLoessSpan, setTimelineLoessSpan] = useState<number>(50);
+
+  // Correlations State elevated to header
+  const [correlationsScope, setCorrelationsScope] = useState<'all' | 'frontier'>('all');
+  const [correlationsRegressionIndex, setCorrelationsRegressionIndex] = useState<number>(DEFAULT_CORRELATION_REGRESSION_INDEX);
+  const [correlationsPolyDegree, setCorrelationsPolyDegree] = useState<number>(2);
+  const [correlationsLoessSpan, setCorrelationsLoessSpan] = useState<number>(50);
+
+  // Ecosystem / Lab Matrix State elevated to header
+  const [labActiveGroup, setLabActiveGroup] = useState<LabGroup>('top10');
+  const [showLabAdvanced, setShowLabAdvanced] = useState<boolean>(false);
+
 
   // LLM Labs Datensatz (aus Google Sheets gid=355721692 mit Fallback)
   const [labs, setLabs] = useState<LabEntry[]>(FALLBACK_LAB_ENTRIES);
@@ -414,6 +431,42 @@ export default function App() {
     scrollToParagraph('final-scores-section');
   }, [scrollToParagraph]);
 
+  // Reset all state, filters, searches, views and sliders to initial defaults
+  const handleResetToDefaults = useCallback((e?: React.MouseEvent) => {
+    // If standard left-click without modifiers, reset state without full page reload
+    if (e && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+      e.preventDefault();
+    }
+    setScoreMode('new');
+    setTimelineScoreMode('old');
+    setModelScope('current');
+    setPriceFilter('paid');
+    setUserTopCount(9999);
+    setUserAdjustedTopCount(false);
+    setExplosionMode('hover');
+    setSortBy('score');
+    setSelectedCategoryIndex(0);
+    setTimelineCategoryIndex(0);
+    setShowAdvanced(false);
+    setActiveTab('benchmark');
+    setBenchmarkView('barchart');
+    setTimelineScope('all');
+    setTimelineRegressionIndex(DEFAULT_TIMELINE_REGRESSION_INDEX);
+    setTimelinePolyDegree(2);
+    setTimelineLoessSpan(50);
+    setCorrelationsScope('all');
+    setCorrelationsRegressionIndex(DEFAULT_CORRELATION_REGRESSION_INDEX);
+    setCorrelationsPolyDegree(2);
+    setCorrelationsLoessSpan(50);
+    setLabActiveGroup('top10');
+    setShowLabAdvanced(false);
+    setSearchFilter('');
+    setSelectedFamilies([]);
+    setSelectedCompany(null);
+    setCategoryInfoComp(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   // Active models based on scoreMode, modelScope & priceFilter ('current' vs 'all', 'free' vs 'paid' vs 'all')
   // HINWEIS: Wenn im Freitextfilter gesucht wird, sollen immer alle Bots durchsucht werden, nicht nur 'current' Bots.
   const effectiveModelScope: ModelScope = searchFilter.trim().length > 0 ? 'all' : modelScope;
@@ -452,6 +505,101 @@ export default function App() {
   const fullTimelineModels = useMemo(() => {
     return loadedData.allModels;
   }, [loadedData.allModels]);
+
+  // Active regression options for header display
+  const activeTimelineRegression = TIMELINE_REGRESSION_OPTIONS[timelineRegressionIndex] || TIMELINE_REGRESSION_OPTIONS[0];
+  const activeCorrelationsRegression = CORRELATION_REGRESSION_OPTIONS[correlationsRegressionIndex] || CORRELATION_REGRESSION_OPTIONS[0];
+
+  // Timeline eligible models count for header scope badge count
+  const timelineEligibleCount = useMemo(() => {
+    let count = 0;
+    for (const m of fullTimelineModels) {
+      if (!m.releaseDate) continue;
+      const ts = new Date(m.releaseDate).getTime();
+      if (isNaN(ts)) continue;
+      let score: number | null = null;
+      if (timelineCategoryIndex === 0) {
+        score = timelineScoreMode === 'old' ? m.scoreOld : timelineScoreMode === 'worstCase' ? m.scoreWorstCase : m.scoreNewReported;
+      } else {
+        const comp = BENCHMARK_COMPONENTS[timelineCategoryIndex - 1];
+        if (comp && m.rawScores) {
+          const raw = m.rawScores[comp.key];
+          score = typeof raw === 'number' && raw !== null ? comp.transform(raw) : null;
+        }
+      }
+      if (typeof score === 'number' && score > 0) {
+        count++;
+      }
+    }
+    return count;
+  }, [fullTimelineModels, timelineCategoryIndex, timelineScoreMode]);
+
+  // Timeline frontier points calculation for header scope badge count
+  const timelineFrontierCount = useMemo(() => {
+    const list: Array<{ id: string; timestamp: number; score: number }> = [];
+    for (const m of fullTimelineModels) {
+      if (!m.releaseDate) continue;
+      const ts = new Date(m.releaseDate).getTime();
+      if (isNaN(ts)) continue;
+      let score: number | null = null;
+      if (timelineCategoryIndex === 0) {
+        score = timelineScoreMode === 'old' ? m.scoreOld : timelineScoreMode === 'worstCase' ? m.scoreWorstCase : m.scoreNewReported;
+      } else {
+        const comp = BENCHMARK_COMPONENTS[timelineCategoryIndex - 1];
+        if (comp && m.rawScores) {
+          const raw = m.rawScores[comp.key];
+          score = typeof raw === 'number' && raw !== null ? comp.transform(raw) : null;
+        }
+      }
+      if (typeof score === 'number' && score > 0) {
+        list.push({ id: m.id, timestamp: ts, score });
+      }
+    }
+    list.sort((a, b) => a.timestamp - b.timestamp);
+    return extractFrontierPoints(list as any).length;
+  }, [fullTimelineModels, timelineCategoryIndex, timelineScoreMode]);
+
+  // Correlation frontier points calculation for header scope badge count
+  const correlationsFrontierCount = useMemo(() => {
+    const eligible = fullTimelineModels
+      .filter((m) => {
+        const sc = m.scoreOld ?? m.scoreNewReported;
+        return typeof sc === 'number' && sc > 0;
+      })
+      .map((m) => ({
+        id: m.id,
+        timestamp: new Date(m.releaseDate).getTime(),
+        score: (m.scoreOld ?? m.scoreNewReported) as number,
+      }));
+    eligible.sort((a, b) => a.timestamp - b.timestamp);
+    return extractFrontierPoints(eligible as any).length;
+  }, [fullTimelineModels]);
+
+  // Ecosystem group counts for header pills
+  const labCounts = useMemo(() => {
+    return {
+      all: labs.length,
+      top10: labs.filter((l) => l.group === 'top10').length,
+      contender: labs.filter((l) => l.group === 'contender').length,
+      tweakers: labs.filter((l) => l.group === 'tweakers').length,
+      small: labs.filter((l) => l.group === 'small').length,
+      harness: labs.filter((l) => l.group === 'harness').length,
+    };
+  }, [labs]);
+
+  const scrollToGlossary = useCallback(() => {
+    setActiveTab('labs');
+    setTimeout(() => {
+      const el = document.getElementById('glossary-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-2', 'ring-blue-500', 'transition-all');
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-blue-500');
+        }, 2500);
+      }
+    }, 60);
+  }, []);
 
   const hasFilterActive =
     searchFilter.trim().length > 0 || selectedFamilies.length > 0 || selectedCompany !== null;
@@ -643,7 +791,12 @@ export default function App() {
             onMouseEnter={() => setShowHeaderInfo(true)}
             onMouseLeave={() => setShowHeaderInfo(false)}
           >
-            <div className="cursor-help inline-block max-w-full">
+            <a
+              href="https://tomtomme.github.io/Science-AI-Charts/"
+              onClick={handleResetToDefaults}
+              className="cursor-pointer inline-block max-w-full text-left focus:outline-hidden"
+              title={lang === 'de' ? 'Klicken: Alle Filter und Ansichten auf Standard zurücksetzen' : 'Click: Reset all filters and views to default'}
+            >
               <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-1.5">
                 <span>{lang === 'de' ? t.title : (loadedData.headerMeta?.combinedTitle || t.title)}</span>
                 <Info className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0 opacity-70 group-hover:opacity-100 transition-all" />
@@ -651,7 +804,7 @@ export default function App() {
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-normal font-sans line-clamp-2 transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-300">
                 {lang === 'de' ? t.subtitle : (loadedData.headerMeta?.subtitle || t.subtitle)}
               </p>
-            </div>
+            </a>
 
             {/* Pop-Up on hovering title or subtitle - fully opaque with 0% transparency */}
             <div
@@ -1198,6 +1351,476 @@ export default function App() {
                 </button>
               </div>
             )}
+
+            {/* Timeline View Header Controls: ScoreSlider, Scope toggle, Regression slider & badges, and Contextual param input */}
+            {activeTab === 'benchmark' && benchmarkView === 'timeline' && (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Score / Category Criteria Slider */}
+                <ScoreSlider
+                  scoreMode={timelineScoreMode}
+                  onScoreModeChange={setTimelineScoreMode}
+                  selectedCategoryIndex={timelineCategoryIndex}
+                  onSelectCategoryIndex={(idx) => {
+                    setTimelineCategoryIndex(idx);
+                    if (idx > 0) {
+                      setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
+                    } else {
+                      setCategoryInfoComp(null);
+                    }
+                  }}
+                  categoryNames={loadedData.headerMeta?.categoryNames}
+                  onHoverCategory={setCategoryInfoComp}
+                  onScrollToParagraph={scrollToParagraph}
+                  lang={lang}
+                />
+
+                {/* Scope Segmented Control */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setTimelineScope('all')}
+                    className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                      timelineScope === 'all'
+                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({timelineEligibleCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTimelineScope('frontier')}
+                    className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      timelineScope === 'frontier'
+                        ? 'bg-amber-500 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+                    }`}
+                    title={
+                      lang === 'de'
+                        ? 'Nur Pionier-Modelle (historische Rekordhalter / Pareto-Front)'
+                        : 'Only pioneer models (historical record breakers / Pareto frontier)'
+                    }
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-300" />
+                    <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
+                    <span className="text-xs opacity-90">({timelineFrontierCount})</span>
+                  </button>
+                </div>
+
+                {/* Regression Model Controller */}
+                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
+                  <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                    <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setTimelineRegressionIndex((prev) => Math.max(0, prev - 1))}
+                    disabled={timelineRegressionIndex <= 0}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                    title="-1"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={TIMELINE_REGRESSION_OPTIONS.length - 1}
+                    step={1}
+                    value={timelineRegressionIndex}
+                    onChange={(e) => setTimelineRegressionIndex(Number(e.target.value))}
+                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setTimelineRegressionIndex((prev) => Math.min(TIMELINE_REGRESSION_OPTIONS.length - 1, prev + 1))}
+                    disabled={timelineRegressionIndex >= TIMELINE_REGRESSION_OPTIONS.length - 1}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                    title="+1"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+
+                  {/* Model Badge */}
+                  <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
+                    <Tooltip
+                      content={
+                        <div className="space-y-1.5">
+                          <p className="leading-snug">{lang === 'de' ? activeTimelineRegression.descDe : activeTimelineRegression.descEn}</p>
+                          {activeTimelineRegression.id === 'polynomial' && (
+                            <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                              {lang === 'de' ? `Polynom-Regression (Grad ${timelinePolyDegree})` : `Polynomial Regression (Degree ${timelinePolyDegree})`}
+                            </div>
+                          )}
+                          {activeTimelineRegression.id === 'loess' && (
+                            <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                              {lang === 'de' ? `LOESS-Glättung (Span ${timelineLoessSpan}%)` : `LOESS Smoothing (Span ${timelineLoessSpan}%)`}
+                            </div>
+                          )}
+                        </div>
+                      }
+                      position="bottom"
+                      align="center"
+                      width="w-64"
+                      className="w-full"
+                    >
+                      <span
+                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                        style={{ backgroundColor: activeTimelineRegression.color }}
+                        title={`${lang === 'de' ? activeTimelineRegression.labelDe : activeTimelineRegression.labelEn}: ${lang === 'de' ? activeTimelineRegression.descDe : activeTimelineRegression.descEn}`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                        <span className="truncate">
+                          {lang === 'de' ? activeTimelineRegression.shortDe : activeTimelineRegression.shortEn}
+                        </span>
+                      </span>
+                    </Tooltip>
+                  </div>
+                </div>
+
+                {/* Contextual Param Input */}
+                <div
+                  className={`w-[130px] sm:w-[140px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
+                    activeTimelineRegression.id !== 'polynomial' && activeTimelineRegression.id !== 'loess'
+                      ? 'opacity-40 cursor-not-allowed'
+                      : ''
+                  }`}
+                >
+                  <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400">
+                    Param:
+                  </span>
+                  {activeTimelineRegression.id === 'polynomial' ? (
+                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-1.5 shadow-2xs">
+                      <input
+                        type="number"
+                        min={2}
+                        max={4}
+                        step={1}
+                        value={timelinePolyDegree}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val)) setTimelinePolyDegree(Math.min(4, Math.max(2, val)));
+                        }}
+                        className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
+                      />
+                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
+                        deg
+                      </span>
+                    </div>
+                  ) : activeTimelineRegression.id === 'loess' ? (
+                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-1.5 shadow-2xs">
+                      <input
+                        type="number"
+                        min={10}
+                        max={100}
+                        step={5}
+                        value={timelineLoessSpan}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val)) setTimelineLoessSpan(Math.min(100, Math.max(10, val)));
+                        }}
+                        className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
+                      />
+                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
+                        %
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
+                      —
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Correlations View Header Controls: Scope toggle, Regression slider & badges, and Contextual param input */}
+            {activeTab === 'benchmark' && benchmarkView === 'correlations' && (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Scope Segmented Control */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setCorrelationsScope('all')}
+                    className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                      correlationsScope === 'all'
+                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({fullTimelineModels.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCorrelationsScope('frontier')}
+                    className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      correlationsScope === 'frontier'
+                        ? 'bg-amber-500 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+                    }`}
+                    title={
+                      lang === 'de'
+                        ? 'Nur Pionier-Modelle (historische Rekordhalter / Pareto-Front)'
+                        : 'Only pioneer models (historical record breakers / Pareto frontier)'
+                    }
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-300" />
+                    <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
+                    <span className="text-xs opacity-90">({correlationsFrontierCount})</span>
+                  </button>
+                </div>
+
+                {/* Regression Model Controller */}
+                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
+                  <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+                    <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCorrelationsRegressionIndex((prev) => Math.max(0, prev - 1))}
+                    disabled={correlationsRegressionIndex <= 0}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                    title="-1"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={CORRELATION_REGRESSION_OPTIONS.length - 1}
+                    step={1}
+                    value={correlationsRegressionIndex}
+                    onChange={(e) => setCorrelationsRegressionIndex(Number(e.target.value))}
+                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCorrelationsRegressionIndex((prev) => Math.min(CORRELATION_REGRESSION_OPTIONS.length - 1, prev + 1))}
+                    disabled={correlationsRegressionIndex >= CORRELATION_REGRESSION_OPTIONS.length - 1}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                    title="+1"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+
+                  {/* Model Badge */}
+                  <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
+                    <Tooltip
+                      content={
+                        <div className="space-y-1.5">
+                          <p className="leading-snug">{lang === 'de' ? activeCorrelationsRegression.descDe : activeCorrelationsRegression.descEn}</p>
+                          {activeCorrelationsRegression.id === 'polynomial' && (
+                            <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                              {lang === 'de' ? `Polynom-Regression (Grad ${correlationsPolyDegree})` : `Polynomial Regression (Degree ${correlationsPolyDegree})`}
+                            </div>
+                          )}
+                          {activeCorrelationsRegression.id === 'loess' && (
+                            <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                              {lang === 'de' ? `LOESS-Glättung (Span ${correlationsLoessSpan}%)` : `LOESS Smoothing (Span ${correlationsLoessSpan}%)`}
+                            </div>
+                          )}
+                        </div>
+                      }
+                      position="bottom"
+                      align="center"
+                      width="w-64"
+                      className="w-full"
+                    >
+                      <span
+                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                        style={{ backgroundColor: activeCorrelationsRegression.color }}
+                        title={`${lang === 'de' ? activeCorrelationsRegression.labelDe : activeCorrelationsRegression.labelEn}: ${lang === 'de' ? activeCorrelationsRegression.descDe : activeCorrelationsRegression.descEn}`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                        <span className="truncate">
+                          {lang === 'de' ? activeCorrelationsRegression.shortDe : activeCorrelationsRegression.shortEn}
+                        </span>
+                      </span>
+                    </Tooltip>
+                  </div>
+                </div>
+
+                {/* Contextual Param Input */}
+                <div
+                  className={`w-[130px] sm:w-[140px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
+                    activeCorrelationsRegression.id !== 'polynomial' && activeCorrelationsRegression.id !== 'loess'
+                      ? 'opacity-40 cursor-not-allowed'
+                      : ''
+                  }`}
+                >
+                  <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400">
+                    Param:
+                  </span>
+                  {activeCorrelationsRegression.id === 'polynomial' ? (
+                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-1.5 shadow-2xs">
+                      <input
+                        type="number"
+                        min={2}
+                        max={4}
+                        step={1}
+                        value={correlationsPolyDegree}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val)) setCorrelationsPolyDegree(Math.min(4, Math.max(2, val)));
+                        }}
+                        className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
+                      />
+                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
+                        deg
+                      </span>
+                    </div>
+                  ) : activeCorrelationsRegression.id === 'loess' ? (
+                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-1.5 shadow-2xs">
+                      <input
+                        type="number"
+                        min={10}
+                        max={100}
+                        step={5}
+                        value={correlationsLoessSpan}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val)) setCorrelationsLoessSpan(Math.min(100, Math.max(10, val)));
+                        }}
+                        className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
+                      />
+                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
+                        %
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
+                      —
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Ecosystem / Lab Matrix View Header Controls: original sheet pill -> glossary pill -> lab category pills -> advanced toggle */}
+            {activeTab === 'labs' && (
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                {/* 1. Original Sheet Pill */}
+                <a
+                  href="https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=355721692#gid=355721692"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 shrink-0"
+                  title={lang === 'de' ? 'Original-Tabelle in neuem Tab öffnen' : 'Open original spreadsheet in new tab'}
+                >
+                  <span>{lang === 'de' ? 'Original-Sheet' : 'Original Sheet'}</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                {/* 2. Glossary Pill */}
+                <Tooltip
+                  title={lang === 'de' ? 'Interaktives Glossar' : 'Interactive Glossary'}
+                  content={
+                    lang === 'de'
+                      ? 'Springt direkt zum ausführlichen Glossar am Ende der Seite mit Begriffserklärungen zu LLM-Größen, Quantisierung, Lizenzen und Testplattformen.'
+                      : 'Jump directly to the detailed glossary at the bottom explaining LLM parameter scales, quantization, open weights licenses, and harness frameworks.'
+                  }
+                  align="left"
+                  width="w-72"
+                >
+                  <button
+                    type="button"
+                    onClick={scrollToGlossary}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs cursor-pointer shrink-0"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+                    <span>{lang === 'de' ? 'Glossar' : 'Glossary'}</span>
+                  </button>
+                </Tooltip>
+
+                {/* 3. Lab Category Pills */}
+                <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs shrink-0 max-w-full overflow-x-auto no-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => setLabActiveGroup('all')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                      labActiveGroup === 'all'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lang === 'de' ? `Alle (${labCounts.all})` : `All (${labCounts.all})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLabActiveGroup('top10')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                      labActiveGroup === 'top10'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lang === 'de' ? `Top LLM (${labCounts.top10})` : `Top LLM (${labCounts.top10})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLabActiveGroup('contender')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                      labActiveGroup === 'contender'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lang === 'de' ? `Herausforderer (${labCounts.contender})` : `Contenders (${labCounts.contender})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLabActiveGroup('tweakers')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                      labActiveGroup === 'tweakers'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lang === 'de' ? `Tweakers (${labCounts.tweakers})` : `Tweakers (${labCounts.tweakers})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLabActiveGroup('small')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                      labActiveGroup === 'small'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lang === 'de' ? `Spezialisiert (${labCounts.small})` : `Specialized (${labCounts.small})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLabActiveGroup('harness')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                      labActiveGroup === 'harness'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lang === 'de' ? `Scaffolding (${labCounts.harness})` : `Scaffolding (${labCounts.harness})`}
+                  </button>
+                </div>
+
+                {/* 4. Advanced Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowLabAdvanced((prev) => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg transition-all border cursor-pointer shrink-0 ${
+                    showLabAdvanced
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-500/20'
+                      : 'text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-2xs'
+                  }`}
+                >
+                  <SlidersHorizontal className={`w-3.5 h-3.5 ${showLabAdvanced ? 'text-white' : 'text-blue-500'}`} />
+                  <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
+                  <span className={`text-xs ml-0.5 ${showLabAdvanced ? 'text-blue-200' : 'text-slate-400'}`}>
+                    {showLabAdvanced ? '▲' : '▼'}
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1223,6 +1846,15 @@ export default function App() {
               onScrollToParagraph={scrollToParagraph}
               onScrollToFinalScores={scrollToFinalScores}
               lang={lang}
+              timelineScope={timelineScope}
+              onTimelineScopeChange={setTimelineScope}
+              regressionIndex={timelineRegressionIndex}
+              onRegressionIndexChange={setTimelineRegressionIndex}
+              polyDegree={timelinePolyDegree}
+              onPolyDegreeChange={setTimelinePolyDegree}
+              loessSpan={timelineLoessSpan}
+              onLoessSpanChange={setTimelineLoessSpan}
+              hideHeaderControls={true}
             />
 
             {/* Notes Section under Timeline */}
@@ -1238,6 +1870,15 @@ export default function App() {
               onScrollToParagraph={scrollToParagraph}
               onScrollToFinalScores={scrollToFinalScores}
               lang={lang}
+              scope={correlationsScope}
+              onScopeChange={setCorrelationsScope}
+              regressionIndex={correlationsRegressionIndex}
+              onRegressionIndexChange={setCorrelationsRegressionIndex}
+              polyDegree={correlationsPolyDegree}
+              onPolyDegreeChange={setCorrelationsPolyDegree}
+              loessSpan={correlationsLoessSpan}
+              onLoessSpanChange={setCorrelationsLoessSpan}
+              hideHeaderControls={true}
             />
 
             {/* Notes Section under Correlations */}
@@ -1329,6 +1970,11 @@ export default function App() {
             models={loadedData.newModels}
             onSelectLabForBenchmark={handleSelectLabFromMatrix}
             lang={lang}
+            activeGroup={labActiveGroup}
+            onActiveGroupChange={setLabActiveGroup}
+            showAdvanced={showLabAdvanced}
+            onToggleAdvanced={() => setShowLabAdvanced((prev) => !prev)}
+            hideHeaderControls={true}
           />
         </main>
       )}

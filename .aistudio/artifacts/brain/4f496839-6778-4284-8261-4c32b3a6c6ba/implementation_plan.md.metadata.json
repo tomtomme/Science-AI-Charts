@@ -1,6 +1,6 @@
 {
-  "summary":  "Updated implementation plan for LLM Labs model size filtering: granular slider now features separate Micro (<0.5B), Mini (<2B), and Tiny (<8B) steps (0 to 10), and the 2-category-combined pills feature Small / Tiny and Mini / Micro brackets.",
-  "updatedAt":  "2026-10-29T08:36:24.997254833Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Architectural plan to align and elevate primary interactive controls into the sticky top navigation header alongside the tab switcher for all 4 application views (Bar Chart, Timeline, Correlations, and Ecosystem), honoring confirmed control ordering, fine-tuning parameter inputs, and responsive wrapping.",
+  "updatedAt": "2026-11-05T11:45:33.880933357Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

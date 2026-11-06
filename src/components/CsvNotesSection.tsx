@@ -369,19 +369,21 @@ export function parseSection2Text(rawText: string): CsvParagraph[] {
 }
 
 /**
- * Matches a Section 2 heading or text to one of the 8 standard topic categories.
+ * Matches a Section 2 heading or text to one of the standard topic categories.
  */
-function matchSection2Topic(heading?: string, text?: string): number {
+function matchSection2Topic(heading?: string, text?: string): string {
   const norm = ((heading || '') + ' ' + (text || '').slice(0, 100)).toLowerCase();
-  if (norm.includes('zensur') || norm.includes('censor') || norm.includes('datenschutz') || norm.includes('privacy')) return 0;
-  if (norm.includes('sparfuchs') || norm.includes('frugal') || norm.includes('kostenpflichtig') || norm.includes('drittanbieter')) return 1;
-  if (norm.includes('saturation') || norm.includes('sättigung') || norm.includes('geleakte fragen')) return 2;
-  if (norm.includes('konversation') || norm.includes('conversation') || norm.includes('deep think')) return 3;
-  if (norm.includes('anti-unsinn') || norm.includes('anti-bullshit') || norm.includes('fake news') || norm.includes('fakenews')) return 4;
-  if (norm.includes('wann ki') || norm.includes('when to use') || norm.includes('wichtige kriterien') || norm.includes('inspiration')) return 5;
-  if (norm.includes('statistische maschine') || norm.includes('statistical machine') || norm.includes('neuronale netze') || norm.includes('flowingdata') || norm.includes('terence tao')) return 6;
-  if (norm.includes('neue anforderung') || norm.includes('higher evaluation') || norm.includes('lischke') || norm.includes('wissenschaftlich arbeiten')) return 7;
-  return -1;
+  const cleanHeading = (heading || '').trim().toLowerCase();
+  if (norm.includes('zensur') || norm.includes('censor') || norm.includes('datenschutz') || norm.includes('privacy')) return 'censorship';
+  if (cleanHeading === 'iq' || cleanHeading.startsWith('iq:') || norm.includes('iq-tests') || norm.includes('aa-ii') || norm.includes('artificialanalysis')) return 'iq';
+  if (norm.includes('sparfuchs') || norm.includes('frugal') || norm.includes('kostenpflichtig') || norm.includes('drittanbieter')) return 'frugal';
+  if (norm.includes('saturation') || norm.includes('sättigung') || norm.includes('geleakte fragen')) return 'saturation';
+  if (norm.includes('konversation') || norm.includes('conversation') || norm.includes('deep think')) return 'conversation';
+  if (norm.includes('anti-unsinn') || norm.includes('anti-bullshit') || norm.includes('fake news') || norm.includes('fakenews')) return 'antibullshit';
+  if (norm.includes('wann ki') || norm.includes('when to use') || norm.includes('wichtige kriterien') || norm.includes('inspiration')) return 'whentouse';
+  if (norm.includes('statistische maschine') || norm.includes('statistical machine') || norm.includes('neuronale netze') || norm.includes('flowingdata') || norm.includes('terence tao')) return 'statsmachines';
+  if (norm.includes('neue anforderung') || norm.includes('higher evaluation') || norm.includes('lischke') || norm.includes('wissenschaftlich arbeiten')) return 'newreqs';
+  return '';
 }
 
 /**
@@ -459,26 +461,24 @@ function getBilingualSection2Paragraphs(
   curatedEn: CsvParagraph[],
   isDe: boolean
 ): CsvParagraph[] {
-  // Filter out any duplicate 'IQ' paragraph from Section 2 (since IQ benchmark is already thoroughly explained in Section 1)
-  const isNotDuplicateIq = (p: CsvParagraph) => {
-    const clean = (p.heading || '').trim().toLowerCase();
-    return clean !== 'iq' && !clean.startsWith('iq ') && !clean.startsWith('iq:');
-  };
-
-  const filteredDynamic = dynamicParagraphs.filter(isNotDuplicateIq);
-  const filteredCuratedDe = curatedDe.filter(isNotDuplicateIq);
-  const filteredCuratedEn = curatedEn.filter(isNotDuplicateIq);
-
-  if (filteredDynamic.length === 0) {
-    return isDe ? filteredCuratedDe : filteredCuratedEn;
+  if (dynamicParagraphs.length === 0) {
+    return isDe ? curatedDe : curatedEn;
   }
+
+  const findCuratedMatch = (p: CsvParagraph, pool: CsvParagraph[], fallbackIdx: number) => {
+    const topicKey = matchSection2Topic(p.heading, p.text);
+    if (topicKey) {
+      const match = pool.find((c) => matchSection2Topic(c.heading, c.text) === topicKey);
+      if (match) return match;
+    }
+    return pool[fallbackIdx] || null;
+  };
 
   // GERMAN MODE: 1:1 LIVE SYNCHRONIZATION WITH CELL O34!
   // Any text edits, new sentences, links, or notes from the user in Google Sheets are rendered 1:1!
   if (isDe) {
-    return filteredDynamic.map((p, idx) => {
-      const topicIdx = matchSection2Topic(p.heading, p.text);
-      const matched = topicIdx >= 0 ? filteredCuratedDe[topicIdx] : filteredCuratedDe[idx];
+    return dynamicParagraphs.map((p, idx) => {
+      const matched = findCuratedMatch(p, curatedDe, idx);
       return {
         heading: p.heading || matched?.heading || '',
         text: p.text, // 1:1 Live CSV Text directly from cell O34
@@ -488,10 +488,9 @@ function getBilingualSection2Paragraphs(
   }
 
   // ENGLISH MODE: Translate dynamic paragraphs to English!
-  // Preserves any newly added links (such as the Golem link) or custom additions from the user
-  return filteredDynamic.map((p, idx) => {
-    const topicIdx = matchSection2Topic(p.heading, p.text);
-    const matched = topicIdx >= 0 ? filteredCuratedEn[topicIdx] : filteredCuratedEn[idx];
+  // Preserves any newly added links (such as the Golem link, Google Scholar Labs, etc.)
+  return dynamicParagraphs.map((p, idx) => {
+    const matched = findCuratedMatch(p, curatedEn, idx);
     if (matched) {
       let translatedText = matched.text;
 

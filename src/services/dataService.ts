@@ -50,8 +50,11 @@ export async function fetchLiveCsv(): Promise<{
 
       const response = await fetch(url, {
         signal: controller.signal,
+        cache: 'no-store',
         headers: {
           'Accept': 'text/csv, text/plain, */*',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
         },
       });
 

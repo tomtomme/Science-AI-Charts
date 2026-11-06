@@ -3,14 +3,20 @@ import { LabEntry, ModelRecord } from '../types';
 import { Search, ExternalLink, Cpu, Wrench, Terminal, Layers, HelpCircle, BookOpen, Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
-interface LabMatrixViewProps {
+export type LabGroup = 'all' | 'top10' | 'contender' | 'tweakers' | 'small' | 'harness';
+
+export interface LabMatrixViewProps {
   labs: LabEntry[];
   models?: ModelRecord[];
   onSelectLabForBenchmark?: (creatorName: string) => void;
   lang?: 'de' | 'en';
+  activeGroup?: LabGroup;
+  onActiveGroupChange?: (group: LabGroup) => void;
+  showAdvanced?: boolean;
+  onToggleAdvanced?: () => void;
+  hideHeaderControls?: boolean;
 }
 
-type LabGroup = 'all' | 'top10' | 'contender' | 'tweakers' | 'small' | 'harness';
 type WeightsFilter = 'all' | 'open' | 'hybrid' | 'closed';
 
 export const WEIGHTS_CONCEPTS = {
@@ -697,16 +703,26 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   labs,
   onSelectLabForBenchmark,
   lang = 'de',
+  activeGroup: controlledActiveGroup,
+  onActiveGroupChange,
+  showAdvanced: controlledShowAdvanced,
+  onToggleAdvanced,
+  hideHeaderControls = false,
 }) => {
   // Default to 'top10' (Top LLM Labs) as requested
-  const [activeGroup, setActiveGroup] = useState<LabGroup>('top10');
+  const [internalActiveGroup, setInternalActiveGroup] = useState<LabGroup>('top10');
   const [weightsFilter, setWeightsFilter] = useState<WeightsFilter>('all');
   const [sizeFilter, setSizeFilter] = useState<string>('all');
   const [simplifiedSizeView, setSimplifiedSizeView] = useState<boolean>(true);
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [internalShowAdvanced, setInternalShowAdvanced] = useState<boolean>(false);
   const [expandedLabId, setExpandedLabId] = useState<string | null>(null);
+
+  const activeGroup = controlledActiveGroup ?? internalActiveGroup;
+  const showAdvanced = controlledShowAdvanced ?? internalShowAdvanced;
+  const toggleAdvanced = onToggleAdvanced ?? (() => setInternalShowAdvanced((prev) => !prev));
+
   const isSimplifiedView = sizeFilter !== 'all' && simplifiedSizeView;
 
   const activeAdvancedFiltersCount = useMemo(() => {
@@ -727,7 +743,11 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   const harnessCount = labs.filter((l) => l.group === 'harness').length;
 
   const handleGroupChange = (group: LabGroup) => {
-    setActiveGroup(group);
+    if (onActiveGroupChange) {
+      onActiveGroupChange(group);
+    } else {
+      setInternalActiveGroup(group);
+    }
     if (selectedCountry !== 'all') {
       const targetLabs = group === 'all' ? labs : labs.filter((l) => l.group === group);
       const hasCountry = targetLabs.some((l) => l.country === selectedCountry);
@@ -914,7 +934,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   return (
     <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-6 space-y-5">
       {/* Top Bar: Permanently visible Category Tabs on the left, Glossary / Original Sheet / Advanced on the right */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+      {!hideHeaderControls && (
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         {/* Segmented Filter: "All Labs" to "Agent Scaffolding" */}
         <div
           className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs overflow-x-auto scrollbar-none sm:scrollbar-thin max-w-full"
@@ -1050,7 +1071,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
           {/* Advanced Button */}
           <button
             type="button"
-            onClick={() => setShowAdvanced((prev) => !prev)}
+            onClick={toggleAdvanced}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border cursor-pointer ${
               showAdvanced
                 ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-500/20'
@@ -1072,6 +1093,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
           </button>
         </div>
       </div>
+      )}
 
       {/* Advanced Drawer: Revealed when showAdvanced is true */}
       {showAdvanced && (
@@ -1826,7 +1848,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             type="button"
             onClick={() => {
               setSearchQuery('');
-              setActiveGroup('all');
+              handleGroupChange('all');
               setSelectedCountry('all');
               setWeightsFilter('all');
               setSizeFilter('all');
