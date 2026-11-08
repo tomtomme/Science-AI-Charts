@@ -18,7 +18,7 @@ export interface BenchmarkComponent {
 export interface RawBenchmarkScores {
   actCodeReason: number | null; // Col D (10 Evals)
   nonHallucination: number | null; // Col E
-  scienceKnowledge: number | null; // Col F (-100 to 100)
+  scienceKnowledge: number | null; // Col F (0 to 100 %)
   visionPlot: number | null; // Col G (MMMU-Pro)
   medReasoning: number | null; // Col H (MLCR-AA)
   excelAgent: number | null; // Col I (ExcelAgent)

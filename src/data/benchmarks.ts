@@ -54,11 +54,11 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
     color: '#3B82F6', // Blue
     darkColor: '#2563EB',
     lightBg: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    descriptionDe: 'AA-Omniscience: Kombiniert Nicht-Halluzination (33%) mit wissenschaftlichem Faktenwissen (67%). Belohnt korrekte Antworten, bestraft Halluzinationen, neutral bei Nichtwissen (-100 bis +100 auf 0–100% skaliert).',
-    descriptionEn: 'AA-Omniscience: Combines non-hallucination (33%) and scientific knowledge (67%). Rewards correct answers, penalizes hallucinations, zero penalty for refusing (-100..+100 rescaled to 0..100%).',
-    formulaDesc: '(F / 2 + 50) / 8',
+    descriptionDe: 'AA-Omniscience in % (0–100%): Bewertet wissenschaftliches Faktenwissen und Genauigkeit. Belohnt korrekte Antworten, bestraft Halluzinationen und ist neutral bei Nichtwissen.',
+    descriptionEn: 'AA-Omniscience in % (0–100%): Evaluates scientific domain knowledge and factual accuracy. Rewards correct answers, penalizes hallucinations, zero penalty for refusing.',
+    formulaDesc: 'F / 8',
     weightPct: 12.5,
-    transform: (val: number) => Math.max(0, Math.min(100, val / 2 + 50)),
+    transform: (val: number) => Math.max(0, Math.min(100, val)),
   },
   {
     id: 'visionPlot',
@@ -111,18 +111,18 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'trickQuestions',
     key: 'trickQuestions',
-    nameDe: '(3D) Trickfragen',
-    nameEn: '(3D) Trick Questions',
-    sourceName: 'SimpleBench',
-    sourceUrl: 'https://simple-bench.com',
+    nameDe: 'Agentic Work',
+    nameEn: 'Agentic Work',
+    sourceName: 'GDPx',
+    sourceUrl: 'https://gdpx.semianalysis.com',
     color: '#6366F1', // Indigo
     darkColor: '#4F46E5',
     lightBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
-    descriptionDe: 'SimpleBench (Fangfragen & 3D-Denken): 200 Trickfragen (1 aus 6) zu räumlicher Vorstellung und gesundem Menschenverstand – für Menschen intuitiv, für KI anspruchsvoll (skaliert ab 16.67% Ratebasis).',
-    descriptionEn: 'SimpleBench: 200 trick questions (1 of 6) testing spatial reasoning and common sense that are natural to physical humans but difficult for bots (rescaled above 16.67% random guessing).',
-    formulaDesc: '1.2 × (J - 16.6666) / 8',
+    descriptionDe: 'Agentic Work (GDPx in %): Misst autonome Agentenfähigkeiten in wertschöpfungsstarken Sektoren (Chip-Design, Cybersicherheit, Biologie, Finanzen, Recht, Quant Trading, Software-Entwicklung).',
+    descriptionEn: 'Agentic Work (GDPx in %): Measures autonomous agentic capabilities across high-impact sectors (chip design, cybersecurity, biology, finance, legal, quant trading, software engineering).',
+    formulaDesc: 'J / 8',
     weightPct: 12.5,
-    transform: (val: number) => Math.max(0, Math.min(100, 1.2 * (val - 16.6666))),
+    transform: (val: number) => Math.max(0, Math.min(100, val)),
   },
   {
     id: 'econLegal',
@@ -170,7 +170,8 @@ export function getBenchmarkCategoryLabel(
   if (lower.includes('plot reading') || lower.includes('plot') || lower.includes('diagramm') || lower.includes('vision') || lower.includes('mmmu')) return 'Diagrammanalyse';
   if (lower.includes('diagnostic') || lower.includes('diagnostik') || lower.includes('medical') || lower.includes('mlcr')) return 'Diagnostik';
   if (lower.includes('excel')) return 'Excel-Analyst';
-  if (lower.includes('trick') || lower.includes('simplebench') || lower.includes('(3d)')) return '(3D) Trickfragen';
+  if (lower.includes('agentic') || lower.includes('gdpx')) return 'Agentic Work';
+  if (lower.includes('trick') || lower.includes('simplebench') || lower.includes('(3d)')) return 'Agentic Work';
   if (lower.includes('econ') || lower.includes('legal') || lower.includes('wirtschaft') || lower.includes('recht') || lower.includes('vals')) return 'Wirtschaft & Recht';
 
   if (compFallback) {

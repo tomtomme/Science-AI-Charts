@@ -77,7 +77,41 @@ export interface CsvHeaderMetadata {
   cellC1: string;
   combinedTitle: string;
   subtitle: string;
+  titleDe?: string;
+  subtitleDe?: string;
   categoryNames?: string[];
+}
+
+/**
+ * Translates header title and subtitle dynamically from English to German
+ */
+export function translateHeaderToDe(titleEn: string, subtitleEn: string): { titleDe: string; subtitleDe: string } {
+  let titleDe = titleEn;
+  titleDe = titleDe.replace(/Science-IQ of ChatBots/i, 'Science-IQ von ChatBots');
+  titleDe = titleDe.replace(/update to AA-Index version 5 in progress/i, 'Umstellung auf AA-Index Version 5 in Arbeit');
+  titleDe = titleDe.replace(/update to AA-Index v5 in progress/i, 'Umstellung auf AA-Index v5 in Arbeit');
+  titleDe = titleDe.replace(/\bupdate to\b/i, 'Umstellung auf');
+  titleDe = titleDe.replace(/\bin progress\b/i, 'in Arbeit');
+
+  let subtitleDe = subtitleEn;
+  if (subtitleEn) {
+    let s = subtitleEn;
+    s = s.replace(/The scoring focusses on factual accuracy \(non-hallucination\), scientific expertise, and data analysis skills instead of coding\./i, 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding.');
+    s = s.replace(/The bots completed tests from ArtificialAnalysis\.ai, Simple-Bench\.com, and Vals\.ai\./i, 'Die Bots absolvierten Tests von ArtificialAnalysis.ai, Simple-Bench.com und Vals.ai.');
+    s = s.replace(/3 different benchmark providers/i, '3 verschiedenen Benchmark-Anbietern');
+    s = s.replace(/from 3 different benchmark providers/i, 'von 3 verschiedenen Benchmark-Anbietern');
+    s = s.replace(/Final scores are averages, with some sub-scores adjusted for guessing probability/i, 'Final Scores sind Durchschnitte, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden');
+    s = s.replace(/The scoring focusses on/i, 'Die Bewertung konzentriert sich auf');
+    s = s.replace(/factual accuracy/i, 'faktische Genauigkeit');
+    s = s.replace(/scientific expertise/i, 'wissenschaftliche Expertise');
+    s = s.replace(/and data analysis skills instead of coding/i, 'und Datenanalysefähigkeiten statt Coding');
+    s = s.replace(/The bots completed tests from/i, 'Die Bots absolvierten Tests von');
+    s = s.replace(/Final scores are averages/i, 'Final Scores sind Durchschnitte');
+    s = s.replace(/with some sub-scores adjusted for guessing probability/i, 'wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden');
+    subtitleDe = s;
+  }
+
+  return { titleDe, subtitleDe };
 }
 
 /**
@@ -106,12 +140,16 @@ export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
     }
   }
 
+  const { titleDe, subtitleDe } = translateHeaderToDe(combinedTitle, cellC1);
+
   return {
     cellA1,
     cellB2,
     cellC1,
     combinedTitle,
     subtitle: cellC1,
+    titleDe,
+    subtitleDe,
     categoryNames: categoryNames.length === 8 ? categoryNames : undefined,
   };
 }
@@ -379,11 +417,11 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     // Transformed benchmark values (0-100 scale)
     const tD = valD !== null ? Math.max(0, Math.min(100, valD)) : null;
     const tE = valE !== null ? Math.max(0, Math.min(100, valE)) : null;
-    const tF = valF !== null ? Math.max(0, Math.min(100, valF / 2 + 50)) : null;
+    const tF = valF !== null ? Math.max(0, Math.min(100, valF)) : null;
     const tG = valG !== null ? Math.max(0, Math.min(100, 1.4085 * (valG - 29))) : null;
     const tH = valH !== null ? Math.max(0, Math.min(100, valH)) : null;
     const tI = valI !== null ? Math.max(0, Math.min(100, valI)) : null;
-    const tJ = valJ !== null ? Math.max(0, Math.min(100, 1.2 * (valJ - 16.6666))) : null;
+    const tJ = valJ !== null ? Math.max(0, Math.min(100, valJ)) : null;
     const tK = valK !== null ? Math.max(0, Math.min(100, valK)) : null;
 
     const hasAll8 =

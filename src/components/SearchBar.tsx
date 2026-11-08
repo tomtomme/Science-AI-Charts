@@ -17,8 +17,8 @@ interface SearchBarProps {
   matchCount?: number;
   totalCount?: number;
   lang: Language;
-  sortBy: SortField;
-  onSortByChange: (sort: SortField) => void;
+  sortBy?: SortField;
+  onSortByChange?: (sort: SortField) => void;
   selectedCategoryIndex: number;
   onCategoryIndexChange: (idx: number) => void;
   onHoverCategory?: (comp: BenchmarkComponent | null) => void;
@@ -292,47 +292,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </div>
           )}
 
-          {/* Sortierung (Score vs Datum) rechts vom Explosionsknopf */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
-            <Tooltip
-              title={t.sortScore}
-              content={t.sortScoreDesc}
-              align="center"
-              width="w-56"
-            >
-              <button
-                type="button"
-                onClick={() => onSortByChange('score')}
-                className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                  sortBy === 'score'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <BarChart2 className="w-3 h-3" />
-                <span>{t.sortScore}</span>
-              </button>
-            </Tooltip>
-            <Tooltip
-              title={t.sortDate}
-              content={t.sortDateDesc}
-              align="center"
-              width="w-56"
-            >
-              <button
-                type="button"
-                onClick={() => onSortByChange('date')}
-                className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                  sortBy === 'date'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Calendar className="w-3 h-3" />
-                <span>{t.sortDate}</span>
-              </button>
-            </Tooltip>
-          </div>
         </div>
       </div>
 

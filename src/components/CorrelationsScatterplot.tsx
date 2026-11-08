@@ -177,6 +177,7 @@ interface AxisDimensionDropdownProps {
   lang: 'de' | 'en';
   align?: 'left' | 'center' | 'right';
   direction?: 'up' | 'down';
+  onScrollToParagraph?: (targetId: string) => void;
 }
 
 const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
@@ -186,6 +187,7 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
   lang,
   align = 'left',
   direction = 'down',
+  onScrollToParagraph,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -317,6 +319,7 @@ interface SingleCorrelationPlotProps {
   onYAxisDimChange: (idx: number) => void;
   onSwapAxes: () => void;
   lang: 'de' | 'en';
+  onScrollToParagraph?: (targetId: string) => void;
 }
 
 const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
@@ -333,6 +336,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   onYAxisDimChange,
   onSwapAxes,
   lang,
+  onScrollToParagraph,
 }) => {
   const xDim: CorrelationDimension = CORRELATION_DIMENSIONS[xAxisDimIndex] || CORRELATION_DIMENSIONS[0];
   const yDim: CorrelationDimension = CORRELATION_DIMENSIONS[yAxisDimIndex] || CORRELATION_DIMENSIONS[1];
@@ -636,7 +640,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
         className="relative p-3 pt-2 bg-white dark:bg-slate-900 rounded-b-2xl overflow-visible select-none flex-1 flex flex-col justify-center"
       >
         {/* CLICKABLE Y-AXIS TITLE BUTTON (Directly at the Top-Left of the Y-Axis) */}
-        <div className="absolute top-2.5 left-3 sm:left-4 z-20">
+        <div className="absolute top-2.5 left-3 sm:left-4 z-20 flex items-center gap-1">
           <button
             type="button"
             onClick={() => {
@@ -658,6 +662,21 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-80" />
           </button>
 
+          {onScrollToParagraph && yDim.targetId && (
+            <button
+              type="button"
+              onClick={() => onScrollToParagraph(yDim.targetId)}
+              className="p-1.5 rounded-md bg-white/95 dark:bg-slate-800/95 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-2xs border border-slate-200/80 dark:border-slate-700 cursor-pointer"
+              title={
+                lang === 'de'
+                  ? `${yDim.nameDe}: Zur Erläuterung in „How to read this“ springen`
+                  : `${yDim.nameEn}: Jump to explanation in "How to read this"`
+              }
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {/* Y-Axis Dropdown Popover */}
           {openAxisMenu === 'y' && (
             <AxisDimensionDropdown
@@ -670,6 +689,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               lang={lang}
               align="left"
               direction="down"
+              onScrollToParagraph={onScrollToParagraph}
             />
           )}
         </div>
@@ -834,7 +854,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
         </svg>
 
         {/* CLICKABLE X-AXIS TITLE BUTTON (Directly at the Bottom Center of the X-Axis) */}
-        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-20">
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
           <button
             type="button"
             onClick={() => {
@@ -856,6 +876,21 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-80" />
           </button>
 
+          {onScrollToParagraph && xDim.targetId && (
+            <button
+              type="button"
+              onClick={() => onScrollToParagraph(xDim.targetId)}
+              className="p-1.5 rounded-md bg-white/95 dark:bg-slate-800/95 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-2xs border border-slate-200/80 dark:border-slate-700 cursor-pointer"
+              title={
+                lang === 'de'
+                  ? `${xDim.nameDe}: Zur Erläuterung in „How to read this“ springen`
+                  : `${xDim.nameEn}: Jump to explanation in "How to read this"`
+              }
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {/* X-Axis Dropdown Popover */}
           {openAxisMenu === 'x' && (
             <AxisDimensionDropdown
@@ -868,6 +903,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               lang={lang}
               align="center"
               direction="up"
+              onScrollToParagraph={onScrollToParagraph}
             />
           )}
         </div>
@@ -1233,6 +1269,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
           onYAxisDimChange={setPlot1YDimIndex}
           onSwapAxes={handleSwapPlot1}
           lang={lang}
+          onScrollToParagraph={onScrollToParagraph}
         />
 
         {/* Plot 2 (Right) */}
@@ -1250,6 +1287,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
           onYAxisDimChange={setPlot2YDimIndex}
           onSwapAxes={handleSwapPlot2}
           lang={lang}
+          onScrollToParagraph={onScrollToParagraph}
         />
       </div>
     </div>

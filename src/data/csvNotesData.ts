@@ -60,9 +60,9 @@ export const CSV_NOTES_DATA: {
         text: 'This data analysis benchmark measures the percentage of correctly solved tasks within Excel.',
       },
       {
-        heading: '(3D) Trick Questions',
-        text: 'The "SimpleBench" score gives us the correctly solved percentage of 200 single choice (1 of 6) trick questions. They contain spatial (3 dimensional) reasoning and common sense tasks - easy for humans to solve, but hard to solve for bots. They require a spatial imagination in the physical world that is natural to us because we grow up in it; while the training data of bots is lacking in regard to (3D) hearing, seeing, touching, smelling, tasting, and social intelligence. Because choosing the correct answer of 1 in 6 by purely guessing is 16.67%, the score is rescaled to reflect this as the real 0.',
-        link: { url: 'https://simplebench.com', label: 'SimpleBench.com' },
+        heading: 'Agentic Work',
+        text: 'GDPx is a benchmark that covers agentic capabilities where AI is supposed to be most impactful. It believes AI revenue will be concentrated in sectors that can easily deploy frontier intelligence - thus measuring AI capabilities broadly diffused throughout the economy, like vals.ai does, may be a mistake. GDPx covers Chip design, Cybersecurity, Biology, Finance, Legal, Quant trading, Recursive self-improvement (RSI), Hardware design, Materials science, Alignment, Software engineering.',
+        link: { url: 'https://gdpx.semianalysis.com', label: 'gdpx.semianalysis.com' },
       },
       {
         heading: 'Real Econ & Legal Work',
@@ -137,9 +137,9 @@ export const CSV_NOTES_DATA: {
         text: 'Dieser Datenanalyse-Benchmark misst den Prozentsatz der korrekt gelösten Aufgaben innerhalb von Excel.',
       },
       {
-        heading: '(3D) Trick Questions',
-        text: 'Der „SimpleBench“-Score gibt den korrekt gelösten Prozentsatz von 200 Single-Choice-Fangfragen (1 aus 6) an. Sie enthalten räumliches (dreidimensionales) Vorstellungsvermögen und Aufgaben des gesunden Menschenverstands – leicht für Menschen zu lösen, aber schwer für Bots. Sie erfordern eine räumliche Vorstellungskraft in der physischen Welt, die für uns natürlich ist, weil wir in ihr aufwachsen; während es den Trainingsdaten der Bots an (3D) Hören, Sehen, Fühlen, Riechen, Schmecken und sozialer Intelligenz mangelt. Da das Auswählen der richtigen Antwort von 1 aus 6 durch reines Raten 16,67 % beträgt, wird der Score so umskaliert, dass dies die reale 0 widerspiegelt.',
-        link: { url: 'https://simplebench.com', label: 'SimpleBench.com' },
+        heading: 'Agentic Work',
+        text: 'GDPx ist ein Benchmark, der agentische und autonome Fähigkeiten abdeckt, bei denen KI die größte Wirkung entfaltet. Anstatt allgemeine Wirtschaftsfähigkeiten wie bei vals.ai breit zu streuen, konzentriert sich GDPx gezielt auf Branchen mit hoher Wertschöpfung: Chip-Design, Cybersicherheit, Biologie, Finanzen, Recht, Quant Trading, rekursive Selbstverbesserung (RSI), Hardware-Design, Materialwissenschaften, Alignment und Software-Entwicklung.',
+        link: { url: 'https://gdpx.semianalysis.com', label: 'gdpx.semianalysis.com' },
       },
       {
         heading: 'Real Econ & Legal Work',

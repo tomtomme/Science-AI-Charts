@@ -21,7 +21,7 @@ import { CorrelationsScatterplot, CORRELATION_REGRESSION_OPTIONS, DEFAULT_CORREL
 import { extractFrontierPoints } from './utils/mathRegression';
 import { Language, TRANSLATIONS } from './utils/i18n';
 import { matchesSearchQuery } from './utils/searchUtils';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Info, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink } from 'lucide-react';
 import { Tooltip } from './components/Tooltip';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
@@ -288,8 +288,6 @@ export default function App() {
   // Preis-Filter: 'paid' (Standard), 'free', 'all'
   const [priceFilter, setPriceFilter] = useState<PriceFilter>('paid');
 
-  // Pop-Up für Titel / Untertitel bei Mouse-Over
-  const [showHeaderInfo, setShowHeaderInfo] = useState<boolean>(false);
 
   // Aktive oder per Hover gewählte Kategorie für detaillierte Infos & Quellen-Link
   const [categoryInfoComp, setCategoryInfoComp] = useState<BenchmarkComponent | null>(null);
@@ -785,62 +783,21 @@ export default function App() {
       {/* Clean top bar */}
       <header className="relative z-40 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6 py-2.5">
         <div className="w-full max-w-[1720px] mx-auto flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-          {/* Title & Subtitle directly from CSV cells with Pop-Up on hover */}
-          <div
-            className="relative min-w-0 flex-1 group"
-            onMouseEnter={() => setShowHeaderInfo(true)}
-            onMouseLeave={() => setShowHeaderInfo(false)}
-          >
+          {/* Title & Subtitle directly from CSV cells: links to site & resets on click */}
+          <div className="min-w-0 flex-1">
             <a
               href="https://tomtomme.github.io/Science-AI-Charts/"
               onClick={handleResetToDefaults}
-              className="cursor-pointer inline-block max-w-full text-left focus:outline-hidden"
+              className="group cursor-pointer inline-block max-w-full text-left focus:outline-hidden"
               title={lang === 'de' ? 'Klicken: Alle Filter und Ansichten auf Standard zurücksetzen' : 'Click: Reset all filters and views to default'}
             >
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-1.5">
-                <span>{lang === 'de' ? t.title : (loadedData.headerMeta?.combinedTitle || t.title)}</span>
-                <Info className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0 opacity-70 group-hover:opacity-100 transition-all" />
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                {lang === 'de' ? (loadedData.headerMeta?.titleDe || t.title) : (loadedData.headerMeta?.combinedTitle || t.title)}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-normal font-sans line-clamp-2 transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-300">
-                {lang === 'de' ? t.subtitle : (loadedData.headerMeta?.subtitle || t.subtitle)}
+                {lang === 'de' ? (loadedData.headerMeta?.subtitleDe || t.subtitle) : (loadedData.headerMeta?.subtitle || t.subtitle)}
               </p>
             </a>
-
-            {/* Pop-Up on hovering title or subtitle - fully opaque with 0% transparency */}
-            <div
-              className={`absolute left-0 top-full mt-2 w-full max-w-xl sm:max-w-2xl bg-slate-900 text-slate-100 border border-slate-700 rounded-xl p-4 shadow-2xl z-50 text-xs transition-all duration-200 pointer-events-none ${
-                showHeaderInfo
-                  ? 'opacity-100 translate-y-0 visible'
-                  : 'opacity-0 -translate-y-1 invisible'
-              }`}
-              style={{ backgroundColor: '#0f172a' }}
-            >
-              {/* Decorative top arrow pointing to the title */}
-              <div
-                className="absolute -top-1.5 left-7 w-3 h-3 bg-slate-900 border-t border-l border-slate-700 rotate-45"
-                style={{ backgroundColor: '#0f172a' }}
-              />
-
-              {/* Intro paragraph */}
-              <p className="text-xs leading-relaxed text-slate-200 font-medium mb-3">
-                {t.headerPopupIntro}
-              </p>
-
-              {/* 6 Benchmark Items */}
-              <ul className="space-y-2 text-xs leading-snug text-slate-300">
-                {t.headerPopupItems.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2.5">
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0 mt-1 shadow-2xs"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="flex-1">
-                      {item.text}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
 
           {/* Controls, sync, date, language toggle & external link icons */}
@@ -1282,9 +1239,9 @@ export default function App() {
                     </span>
                   </div>
 
-                  {/* Paid Chat */}
+                  {/* Paid / € */}
                   <Tooltip
-                    title={<span className="text-amber-400">Paid Chat 💲</span>}
+                    title={<span className="text-amber-400">{lang === 'de' ? 'Kostenpflichtig (€)' : 'Paid (€)'}</span>}
                     align="center"
                     width="w-64"
                     content={
@@ -1303,7 +1260,7 @@ export default function App() {
                       }`}
                       aria-pressed={priceFilter === 'paid'}
                     >
-                      Paid 💲
+                      €
                     </button>
                   </Tooltip>
 
@@ -1906,8 +1863,6 @@ export default function App() {
               matchCount={matchCount}
               totalCount={currentModels.length}
               lang={lang}
-              sortBy={sortBy}
-              onSortByChange={setSortBy}
               selectedCategoryIndex={selectedCategoryIndex}
               onCategoryIndexChange={(idx) => {
                 setSelectedCategoryIndex(idx);

@@ -59,8 +59,8 @@ function getBenchmarkHeadingColor(heading?: string): string {
   // 6. Excel Analyst (Col I)
   if (clean.includes('excel analyst') || clean.includes('excel agent') || clean === 'excel') return '#06B6D4';
 
-  // 7. (3D) Trick Questions (Col J)
-  if (clean.includes('trick questions') || clean.includes('trickfragen') || clean.includes('simplebench') || clean.includes('(3d)')) return '#6366F1';
+  // 7. Agentic Work / GDPx (Col J, formerly (3D) Trick Questions)
+  if (clean.includes('agentic') || clean.includes('gdpx') || clean.includes('trick questions') || clean.includes('trickfragen') || clean.includes('simplebench') || clean.includes('(3d)')) return '#6366F1';
 
   // 8. Real Econ & Legal Work (Col K)
   if (clean.includes('real econ') || clean.includes('econ & legal') || clean.includes('wirtschaft') || clean.includes('vals')) return '#EA580C';
@@ -113,8 +113,8 @@ export function getParagraphAnchorId(heading?: string): string | undefined {
   // Cat 6: Excel Analyst (Col I)
   if (h.includes('spalte i') || h.includes('column i') || h.includes('excel')) return 'note-col-i';
 
-  // Cat 7: (3D) Trick Questions (Col J)
-  if (h.includes('spalte j') || h.includes('column j') || h.includes('trick questions') || h.includes('trickfragen') || h.includes('simplebench') || h.includes('(3d)')) return 'note-col-j';
+  // Cat 7: Agentic Work / GDPx (Col J, formerly (3D) Trick Questions)
+  if (h.includes('spalte j') || h.includes('column j') || h.includes('agentic') || h.includes('gdpx') || h.includes('trick questions') || h.includes('trickfragen') || h.includes('simplebench') || h.includes('(3d)')) return 'note-col-j';
 
   // Cat 8: Real Econ & Legal Work (Col K)
   if (h.includes('spalte k') || h.includes('column k') || h.includes('real econ') || h.includes('econ & legal') || h.includes('vals') || h.includes('wirtschaft')) return 'note-col-k';
@@ -185,9 +185,9 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     });
   }
 
-  // 3. Explicit known benchmark keywords (e.g. IQ, Non-Hallucination-Rate, Science Knowledge, etc.)
+  // 3. Explicit known benchmark keywords (e.g. IQ, Non-Hallucination-Rate, Science Knowledge, Agentic Work, etc.)
   // Handles punctuation boundaries, optional dashes, spaces, and 'in %' suffixes
-  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])\s*/gi;
+  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|Agentic(?:\s+Work)?|GDPx|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])\s*/gi;
   while ((match = benchmarkKeywordsRegex.exec(rawText)) !== null) {
     cuts.push({
       start: match.index,
@@ -427,6 +427,7 @@ function getBilingualSection1Paragraphs(
         const cClean = (c.heading || '').toLowerCase();
         if (pClean.includes('ranking') && (cClean.includes('ranking') || cClean.includes('rangliste'))) return true;
         if (pClean.includes('benchmark') && (cClean.includes('benchmark') || cClean.includes('kategorie'))) return true;
+        if ((pClean.includes('agentic') || pClean.includes('gdpx')) && (cClean.includes('agentic') || cClean.includes('gdpx'))) return true;
         if (pClean.includes('final score') && (cClean.includes('final score') || cClean.includes('finale score'))) return true;
         if (pClean.includes('storyline') && cClean.includes('storyline')) return true;
         if (pClean === 'current' && cClean === 'current') return true;

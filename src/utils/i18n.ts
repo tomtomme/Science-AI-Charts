@@ -12,7 +12,7 @@ export const TRANSLATIONS = {
   de: {
     // Titel & Untertitel (Zelle A1 sowie C1 der CSV)
     title: 'Science-IQ von ChatBots',
-    subtitle: 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding. Die Bots absolvierten Tests von ArtificialAnalysis.ai, Simple-Bench.com und Vals.ai.',
+    subtitle: 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding. Die Bots absolvierten Tests von 3 verschiedenen Benchmark-Anbietern. Final Scores sind Durchschnitte, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden.',
     headerPopupIntro:
       'Im Gegensatz zu herkömmlichen Benchmarks, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen, legt dieser Benchmark-Parcours den Fokus gezielt auf Forschungs- und Wissenschaftsrelevanz:',
     headerPopupItems: [
@@ -20,7 +20,7 @@ export const TRANSLATIONS = {
       { text: 'Mathematische & tabellarische Datenanalyse (Excel / FinanceBench)', color: '#06B6D4' },
       { text: 'Faktentreue & Non-Hallucination-Rate (Ehrlichkeit bei Nichtwissen statt Erfinden)', color: '#10B981' },
       { text: 'Medizinisches Langkontext-Denken über hunderte Seiten klinischer Fachliteratur', color: '#F43F5E' },
-      { text: 'Räumliches Vorstellungsvermögen & gesunder Menschenverstand (SimpleBench)', color: '#6366F1' },
+      { text: 'Autonomes Arbeiten & Agenten-Fähigkeiten (GDPx Agentic Work)', color: '#6366F1' },
       { text: 'Automatisierte mehrstufige quantitative Workflows (Vals.ai)', color: '#EA580C' },
     ],
 
@@ -86,14 +86,14 @@ export const TRANSLATIONS = {
     priceFree: 'Kostenlos',
     priceFreeApi: 'Free API',
     priceFreeChat: 'Free Chat OR API',
-    pricePaid: 'Paid Chat',
+    pricePaid: '€',
     priceAll: 'Alle',
     priceFreeDesc: 'Nur kostenlose Chatbots anzeigen',
     priceFreeApiDesc: 'Nur Modelle mit kostenlosem API-Zugriff (🌐, z. B. für JASP oder AI-Agenten)',
     priceFreeChatDesc: 'Kostenlos im Web-Chat nutzbar ODER mit kostenloser API',
-    pricePaidDesc: 'Nur kostenpflichtige Chatbots (💲, Plus/Pro/Abo)',
+    pricePaidDesc: 'Nur kostenpflichtige Chatbots (€, Plus/Pro/Abo)',
     priceAllDesc: 'Alle Chatbots anzeigen (kostenlos & bezahlt)',
-    priceFilterDesc: 'Zwischen Free API, Free Chat OR API, Paid Chat (💲) und allen Chatbots wechseln',
+    priceFilterDesc: 'Zwischen Free API, Free Chat OR API, Paid (€) und allen Chatbots wechseln',
 
     // Suche & Filter
     searchPlaceholder: 'Firma oder LLM-Familie suchen (z. B. ChatGPT, Claude, Gemini, Kimi, MiMo)...',
@@ -137,7 +137,7 @@ export const TRANSLATIONS = {
   en: {
     // Title & Subtitle (Cell A1 and C1 of CSV)
     title: 'Science-IQ of ChatBots',
-    subtitle: 'The scoring focusses on factual accuracy (non-hallucination), scientific expertise, and data analysis skills instead of coding. Bots completed tests from artificialanalysis.ai, simple-bench.com and vals.ai.',
+    subtitle: 'The scoring focusses on factual accuracy (non-hallucination), scientific expertise, and data analysis skills instead of coding. The bots completed tests from 3 different benchmark providers. Final scores are averages, with some sub-scores adjusted for guessing probability.',
     headerPopupIntro:
       'Unlike conventional benchmarks that primarily measure text-based coding tasks or pure language skills, this benchmark suite focuses specifically on research and scientific relevance:',
     headerPopupItems: [
@@ -145,7 +145,7 @@ export const TRANSLATIONS = {
       { text: 'Mathematical & tabular data analysis (Excel / FinanceBench)', color: '#06B6D4' },
       { text: 'Factual accuracy & Non-Hallucination Rate (honesty when uncertain instead of inventing)', color: '#10B981' },
       { text: 'Medical long-context reasoning across hundreds of pages of clinical literature', color: '#F43F5E' },
-      { text: 'Spatial reasoning & common sense (SimpleBench)', color: '#6366F1' },
+      { text: 'Autonomous & agentic workflows in high-impact domains (GDPx Agentic Work)', color: '#6366F1' },
       { text: 'Automated multi-step quantitative workflows (Vals.ai)', color: '#EA580C' },
     ],
 
@@ -211,14 +211,14 @@ export const TRANSLATIONS = {
     priceFree: 'Free',
     priceFreeApi: 'Free API',
     priceFreeChat: 'Free Chat OR API',
-    pricePaid: 'Paid Chat',
+    pricePaid: '€',
     priceAll: 'All',
     priceFreeDesc: 'Show only free chatbots',
     priceFreeApiDesc: 'Only models with free API access (🌐, e.g. for JASP or AI agents)',
     priceFreeChatDesc: 'Free to use in web chat OR with free API',
-    pricePaidDesc: 'Paid chatbots only (💲, subscription/paid tier)',
+    pricePaidDesc: 'Paid chatbots only (€, subscription/paid tier)',
     priceAllDesc: 'Show all chatbots (free & paid)',
-    priceFilterDesc: 'Switch between Free API, Free Chat OR API, Paid Chat (💲), and all chatbots',
+    priceFilterDesc: 'Switch between Free API, Free Chat OR API, Paid (€), and all chatbots',
 
     // Search & Filters
     searchPlaceholder: 'Filter by company or LLM family (e.g. ChatGPT, Claude, Gemini, Kimi, MiMo)...',
