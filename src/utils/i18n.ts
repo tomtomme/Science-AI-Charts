@@ -11,8 +11,8 @@ export type Language = 'de' | 'en';
 export const TRANSLATIONS = {
   de: {
     // Titel & Untertitel (Zelle A1 sowie C1 der CSV)
-    title: 'Science IQ of Chatbots',
-    subtitle: 'Unlike conventional tests that primarily measure text-based coding tasks or pure language skills, this composite scoring focusses on capabilities important for science like faktische Genauigkeit (non-hallucination), data analysis, plot-reading, and automated multi-step workflows like diagnostic. To counter potential dependencies of test-suite developers on major AI companies, benchmarks from at least 3 different providers are included. The 3 final composite scores (old, new, worst case) are simple averages, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden. More details below.',
+    title: 'Wissenschafts-IQ von Chatbots',
+    subtitle: 'Im Gegensatz zu herkömmlichen Tests, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen, konzentriert sich dieser Gesamt-Score auf wissenschaftlich relevante Fähigkeiten wie faktische Genauigkeit (Non-Hallucination), Datenanalyse, Diagrammverständnis und automatisierte mehrstufige Workflows wie Diagnostik. Um möglichen Abhängigkeiten von Testsuite-Entwicklern zu großen KI-Unternehmen entgegenzuwirken, werden Benchmarks von mindestens 3 verschiedenen Anbietern einbezogen. Die 3 finalen Gesamt-Scores (Alt, Neu, Worst-Case) sind einfache Durchschnitte, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden. Weitere Details unten.',
     headerPopupIntro:
       'Im Gegensatz zu herkömmlichen Benchmarks, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen, legt dieser Benchmark-Parcours den Fokus gezielt auf Forschungs- und Wissenschaftsrelevanz:',
     headerPopupItems: [

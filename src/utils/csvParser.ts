@@ -87,7 +87,9 @@ export interface CsvHeaderMetadata {
  */
 export function translateHeaderToDe(titleEn: string, subtitleEn: string): { titleDe: string; subtitleDe: string } {
   let titleDe = titleEn;
-  titleDe = titleDe.replace(/Science-IQ of ChatBots/i, 'Science-IQ von ChatBots');
+  titleDe = titleDe.replace(/Science[\s-]+IQ\s+of\s+Chat[bB]ots/i, 'Wissenschafts-IQ von Chatbots');
+  titleDe = titleDe.replace(/Science[\s-]+IQ\s+von\s+Chat[bB]ots/i, 'Wissenschafts-IQ von Chatbots');
+  titleDe = titleDe.replace(/Science[\s-]+IQ/i, 'Wissenschafts-IQ');
   titleDe = titleDe.replace(/update to AA-Index version 5 in progress/i, 'Umstellung auf AA-Index Version 5 in Arbeit');
   titleDe = titleDe.replace(/update to AA-Index v5 in progress/i, 'Umstellung auf AA-Index v5 in Arbeit');
   titleDe = titleDe.replace(/\bupdate to\b/i, 'Umstellung auf');
@@ -96,8 +98,21 @@ export function translateHeaderToDe(titleEn: string, subtitleEn: string): { titl
   let subtitleDe = subtitleEn;
   if (subtitleEn) {
     let s = subtitleEn;
+    // Full replacement for the new long subtitle
+    s = s.replace(
+      /Unlike conventional tests that primarily measure text-based coding tasks or pure language skills,\s*this composite scoring focusses on capabilities important for science like factual accuracy \(non-hallucination\),\s*data analysis,\s*plot-reading,\s*and automated multi-step workflows like diagnostic\.\s*To counter potential dependencies of test-suite developers on major AI companies,\s*benchmarks from at least 3 different providers are included\.\s*The 3 final composite scores \(old, new, worst case\) are simple averages,\s*with some sub-scores adjusted for guessing probability\.\s*More details below\./i,
+      'Im Gegensatz zu herkömmlichen Tests, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen, konzentriert sich dieser Gesamt-Score auf wissenschaftlich relevante Fähigkeiten wie faktische Genauigkeit (Non-Hallucination), Datenanalyse, Diagrammverständnis und automatisierte mehrstufige Workflows wie Diagnostik. Um möglichen Abhängigkeiten von Testsuite-Entwicklern zu großen KI-Unternehmen entgegenzuwirken, werden Benchmarks von mindestens 3 verschiedenen Anbietern einbezogen. Die 3 finalen Gesamt-Scores (Alt, Neu, Worst-Case) sind einfache Durchschnitte, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden. Weitere Details unten.'
+    );
+    // Legacy subtitle replacement
     s = s.replace(/The scoring focusses on factual accuracy \(non-hallucination\), scientific expertise, and data analysis skills instead of coding\./i, 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding.');
     s = s.replace(/The bots completed tests from ArtificialAnalysis\.ai, Simple-Bench\.com, and Vals\.ai\./i, 'Die Bots absolvierten Tests von ArtificialAnalysis.ai, Simple-Bench.com und Vals.ai.');
+    // Component phrases for robustness
+    s = s.replace(/Unlike conventional tests that primarily measure text-based coding tasks or pure language skills/i, 'Im Gegensatz zu herkömmlichen Tests, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen');
+    s = s.replace(/this composite scoring focusses on capabilities important for science/i, 'konzentriert sich dieser Gesamt-Score auf wissenschaftlich relevante Fähigkeiten');
+    s = s.replace(/like factual accuracy \(non-hallucination\), data analysis, plot-reading, and automated multi-step workflows like diagnostic/i, 'wie faktische Genauigkeit (Non-Hallucination), Datenanalyse, Diagrammverständnis und automatisierte mehrstufige Workflows wie Diagnostik');
+    s = s.replace(/To counter potential dependencies of test-suite developers on major AI companies/i, 'Um möglichen Abhängigkeiten von Testsuite-Entwicklern zu großen KI-Unternehmen entgegenzuwirken');
+    s = s.replace(/benchmarks from at least 3 different providers are included/i, 'werden Benchmarks von mindestens 3 verschiedenen Anbietern einbezogen');
+    s = s.replace(/The 3 final composite scores \(old, new, worst case\) are simple averages/i, 'Die 3 finalen Gesamt-Scores (Alt, Neu, Worst-Case) sind einfache Durchschnitte');
     s = s.replace(/3 different benchmark providers/i, '3 verschiedenen Benchmark-Anbietern');
     s = s.replace(/from 3 different benchmark providers/i, 'von 3 verschiedenen Benchmark-Anbietern');
     s = s.replace(/Final scores are averages, with some sub-scores adjusted for guessing probability/i, 'Final Scores sind Durchschnitte, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden');
@@ -108,6 +123,7 @@ export function translateHeaderToDe(titleEn: string, subtitleEn: string): { titl
     s = s.replace(/The bots completed tests from/i, 'Die Bots absolvierten Tests von');
     s = s.replace(/Final scores are averages/i, 'Final Scores sind Durchschnitte');
     s = s.replace(/with some sub-scores adjusted for guessing probability/i, 'wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden');
+    s = s.replace(/More details below\./i, 'Weitere Details unten.');
     subtitleDe = s;
   }
 
@@ -162,29 +178,33 @@ export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
   const rows = parseCsvRows(csvText);
   let notesRow: string[] | null = null;
 
-  // 1. Scan for any row containing 'How to read' or 'How To Read' or 'Sources & Notes' or long text in col 2/14
-  for (let i = 0; i < Math.min(120, rows.length); i++) {
-    const r = rows[i] || [];
-    const col0 = (r[0] || '').toLowerCase();
-    const col1 = (r[1] || '').toLowerCase();
-    const col2 = r[2] || '';
-    if (
-      col0.includes('how to read') ||
-      col1.includes('how to read') ||
-      col0.includes('sources & notes') ||
-      col1.includes('sources & notes') ||
-      (col2.length > 300 && (col0.length > 0 || (r[13] && r[13].length > 0)))
-    ) {
-      notesRow = r;
-      break;
+  // 1. Direct check at Row 34 (row index 33 in 0-based indexing)
+  if (rows.length > 33) {
+    const cand = rows[33];
+    if (cand && cand[2] && cand[2].length > 500) {
+      notesRow = cand;
     }
   }
 
-  // 2. Check row index 33 (Row 34 in 1-based indexing: Cell A34 / C34)
-  if (!notesRow && rows.length > 33) {
-    const cand = rows[33];
-    if (cand && (cand[0] || cand[2])) {
-      notesRow = cand;
+  // 2. Scan rows from index 10 onward (skipping header rows 0-9 to avoid picking cell C1 subtitle)
+  if (!notesRow) {
+    for (let i = 10; i < Math.min(120, rows.length); i++) {
+      const r = rows[i] || [];
+      const col0 = (r[0] || '').toLowerCase();
+      const col1 = (r[1] || '').toLowerCase();
+      const col2 = r[2] || '';
+      const col13 = (r[13] || '').toLowerCase();
+      if (
+        col0.includes('how to read') ||
+        col1.includes('how to read') ||
+        col0.includes('sources & notes') ||
+        col1.includes('sources & notes') ||
+        col13.includes('what bot') ||
+        (col2.length > 500 && (col0.length > 0 || (r[13] && r[13].length > 0)))
+      ) {
+        notesRow = r;
+        break;
+      }
     }
   }
 
@@ -192,7 +212,7 @@ export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
   if (!notesRow) {
     for (let i = 20; i < Math.min(100, rows.length); i++) {
       const cand = rows[i];
-      if (cand && cand[2] && cand[2].length > 200) {
+      if (cand && cand[2] && cand[2].length > 300) {
         notesRow = cand;
         break;
       }
@@ -402,6 +422,13 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     const valI = parseNum(row[8]);
     const valJ = parseNum(row[9]);
     const valK = parseNum(row[10]);
+
+    // Parse Retired Benchmark Columns (U through X: IQ_old, Non-Hallu-Rate_old, Science Knowledge_old, Trick Questions_old)
+    const valU = parseNum(row[20]); // Col U
+    const valV = parseNum(row[21]); // Col V
+    const valW = parseNum(row[22]); // Col W
+    const valX = parseNum(row[23]); // Col X
+
     // Benchmark raw scores
     const rawScores: RawBenchmarkScores = {
       actCodeReason: valD,
@@ -412,6 +439,10 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       excelAgent: valI,
       trickQuestions: valJ,
       econLegal: valK,
+      iqOld: valU,
+      nonHalluOld: valV,
+      scienceKnowledgeOld: valW,
+      trickQuestionsOld: valX,
     };
 
     // Transformed benchmark values (0-100 scale)

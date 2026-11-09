@@ -493,6 +493,31 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
       .join(' ');
   }, [regression.points, minX, maxX, minY, maxY]);
 
+  // Format SVG Path for 95% Confidence Band
+  const confidenceBandPath = useMemo(() => {
+    if (!regression.points || regression.points.length === 0) return '';
+    const valid = regression.points.filter(
+      (p) => typeof p.lower === 'number' && typeof p.upper === 'number' && !isNaN(p.x) && !isNaN(p.lower) && !isNaN(p.upper)
+    );
+    if (valid.length === 0) return '';
+
+    // Upper boundary forward
+    const upperPoints = valid.map((pt, i) => {
+      const sx = scaleX(pt.x);
+      const sy = scaleY(pt.upper!);
+      return `${i === 0 ? 'M' : 'L'} ${sx.toFixed(1)} ${sy.toFixed(1)}`;
+    });
+
+    // Lower boundary backward
+    const lowerPoints = [...valid].reverse().map((pt) => {
+      const sx = scaleX(pt.x);
+      const sy = scaleY(pt.lower!);
+      return `L ${sx.toFixed(1)} ${sy.toFixed(1)}`;
+    });
+
+    return `${upperPoints.join(' ')} ${lowerPoints.join(' ')} Z`;
+  }, [regression.points, minX, maxX, minY, maxY]);
+
   const handleDotMouseEnter = (pt: CorrelationPoint, cx: number, cy: number) => {
     clearCloseTimeout();
     const contRect = containerRef.current?.getBoundingClientRect();
@@ -777,6 +802,20 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             className="stroke-slate-300 dark:stroke-slate-700"
             strokeWidth="1.2"
           />
+
+          {/* 95% Confidence Band */}
+          {confidenceBandPath && activeRegression.id !== 'frontier' && (
+            <path
+              d={confidenceBandPath}
+              fill={activeRegression.color}
+              fillOpacity={0.16}
+              stroke={activeRegression.color}
+              strokeWidth="0.8"
+              strokeDasharray="3,3"
+              strokeOpacity={0.4}
+              className="pointer-events-none transition-all duration-300"
+            />
+          )}
 
           {/* Fitted Regression Curve */}
           {regressionPath && (
@@ -1161,6 +1200,12 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             {/* Model Badge */}
             <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
               <Tooltip
+                title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
+                badge={lang === 'de' ? 'Modell' : 'Model'}
+                position="bottom"
+                align="center"
+                width="w-72"
+                className="w-full"
                 content={
                   <div className="space-y-1.5">
                     <p className="leading-snug">{lang === 'de' ? activeRegression.descDe : activeRegression.descEn}</p>
@@ -1174,17 +1219,20 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                         {lang === 'de' ? `LOESS-Glättung (Span ${loessSpan}%)` : `LOESS Smoothing (Span ${loessSpan}%)`}
                       </div>
                     )}
+                    {activeRegression.id !== 'frontier' && (
+                      <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                        <span>
+                          {lang === 'de' ? 'Inkl. 95%-Konfidenzband (Modellunsicherheit)' : 'Includes 95% confidence band (uncertainty ribbon)'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 }
-                position="bottom"
-                align="center"
-                width="w-64"
-                className="w-full"
               >
                 <span
-                  className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                  className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-95 transition-opacity"
                   style={{ backgroundColor: activeRegression.color }}
-                  title={`${lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}: ${lang === 'de' ? activeRegression.descDe : activeRegression.descEn}`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                   <span className="truncate">

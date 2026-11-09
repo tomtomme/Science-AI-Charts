@@ -143,6 +143,81 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
 ];
 
 /**
+ * Historical/retired benchmark components from Columns U through X.
+ * Exclusively available via the slider in the Timeline chart (Zeitreihendiagramm).
+ * Col U: IQ_old (AA-II v4.3)
+ * Col V: Non-Hallu-Rate_old (Non-Hallucination Rate v1)
+ * Col W: Science Knowledge_old (Omniscience v1)
+ * Col X: Trick Questions_old (SimpleBench)
+ */
+export const RETIRED_TIMELINE_BENCHMARKS: BenchmarkComponent[] = [
+  {
+    id: 'iqOld',
+    key: 'iqOld',
+    nameDe: 'IQ (Alt, v4.3)',
+    nameEn: 'IQ (Old, v4.3)',
+    sourceName: 'AA-II v4.3',
+    sourceUrl: 'https://artificialanalysis.ai/methodology/intelligence-benchmarking',
+    color: '#8B5CF6',
+    darkColor: '#7C3AED',
+    lightBg: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    descriptionDe: 'Historischer IQ-Score (AA-II v4.3 aus Spalte U). Nur im Zeitreihendiagramm verfügbar.',
+    descriptionEn: 'Historical IQ score (AA-II v4.3 from Column U). Available exclusively in the timeline chart.',
+    formulaDesc: 'U',
+    weightPct: 0,
+    transform: (val: number) => Math.max(0, Math.min(100, val)),
+  },
+  {
+    id: 'nonHalluOld',
+    key: 'nonHalluOld',
+    nameDe: 'Faktentreue (Alt, v1)',
+    nameEn: 'Non-Hallu-Rate (Old, v1)',
+    sourceName: 'Non-Hallu-Rate v1',
+    sourceUrl: 'https://artificialanalysis.ai/evaluations/omniscience#aa-omniscience-hallucination-rate',
+    color: '#10B981',
+    darkColor: '#059669',
+    lightBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    descriptionDe: 'Historische Nicht-Halluzinations-Rate v1 (aus Spalte V). Nur im Zeitreihendiagramm verfügbar.',
+    descriptionEn: 'Historical Non-Hallucination Rate v1 (from Column V). Available exclusively in the timeline chart.',
+    formulaDesc: 'V',
+    weightPct: 0,
+    transform: (val: number) => Math.max(0, Math.min(100, val)),
+  },
+  {
+    id: 'scienceKnowledgeOld',
+    key: 'scienceKnowledgeOld',
+    nameDe: 'Faktenwissen (Alt)',
+    nameEn: 'Science Knowledge (Old)',
+    sourceName: 'Omniscience v1',
+    sourceUrl: 'https://artificialanalysis.ai/evaluations/omniscience',
+    color: '#3B82F6',
+    darkColor: '#2563EB',
+    lightBg: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+    descriptionDe: 'Historisches Faktenwissen (Omniscience v1 aus Spalte W). Nur im Zeitreihendiagramm verfügbar.',
+    descriptionEn: 'Historical Science Knowledge (Omniscience v1 from Column W). Available exclusively in the timeline chart.',
+    formulaDesc: 'W',
+    weightPct: 0,
+    transform: (val: number) => Math.max(0, Math.min(100, val)),
+  },
+  {
+    id: 'trickQuestionsOld',
+    key: 'trickQuestionsOld',
+    nameDe: '(3D) Trickfragen (Alt)',
+    nameEn: '(3D) Trick Questions (Old)',
+    sourceName: 'SimpleBench',
+    sourceUrl: 'https://simple-bench.com',
+    color: '#6366F1',
+    darkColor: '#4F46E5',
+    lightBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+    descriptionDe: 'Historische SimpleBench Trickfragen (aus Spalte X, skaliert: 1.2 × (X - 16.67)). Nur im Zeitreihendiagramm verfügbar.',
+    descriptionEn: 'Historical SimpleBench Trick Questions (from Column X, rescaled: 1.2 × (X - 16.67)). Available exclusively in the timeline chart.',
+    formulaDesc: '1.2 × (X - 16.67)',
+    weightPct: 0,
+    transform: (val: number) => Math.max(0, Math.min(100, 1.2 * (val - 16.6666))),
+  },
+];
+
+/**
  * Resolves a bilingual score/category label given an optional raw CSV string or BenchmarkComponent.
  * Keeps in sync with original CSV strings while providing precise German translations when German is active.
  */
@@ -157,13 +232,22 @@ export function getBenchmarkCategoryLabel(
 
   if (lang === 'en') {
     // English: return raw CSV string or English component name
-    if (raw && raw !== '-' && !raw.startsWith('Col ')) {
+    if (raw && raw !== '-' && !raw.startsWith('Col ') && !raw.endsWith('Old')) {
       return raw;
     }
     return compFallback?.nameEn || raw;
   }
 
-  // German: translate score label into German
+  // German: check retired components first if matching key
+  if (compFallback && (compFallback.id.endsWith('Old') || compFallback.key.endsWith('Old'))) {
+    return compFallback.nameDe;
+  }
+  if (lower.includes('iqold') || lower.includes('iq (alt')) return 'IQ (Alt, v4.3)';
+  if (lower.includes('nonhalluold') || lower.includes('faktentreue (alt')) return 'Faktentreue (Alt, v1)';
+  if (lower.includes('scienceknowledgeold') || lower.includes('faktenwissen (alt')) return 'Faktenwissen (Alt)';
+  if (lower.includes('trickquestionsold') || lower.includes('trickfragen (alt')) return '(3D) Trickfragen (Alt)';
+
+  // German: translate standard score labels into German
   if (lower.includes('iq') || lower.includes('aa-ii')) return 'IQ';
   if (lower.includes('non-hallu') || lower.includes('faktentreue')) return 'Faktentreue';
   if (lower.includes('science knowledge') || lower.includes('faktenwissen') || lower.includes('omniscience')) return 'Faktenwissen';
@@ -179,3 +263,4 @@ export function getBenchmarkCategoryLabel(
   }
   return raw;
 }
+

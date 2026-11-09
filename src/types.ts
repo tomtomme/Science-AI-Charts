@@ -24,6 +24,11 @@ export interface RawBenchmarkScores {
   excelAgent: number | null; // Col I (ExcelAgent)
   trickQuestions: number | null; // Col J (SimpleBench)
   econLegal: number | null; // Col K (Vals.ai)
+  // Retired benchmark scores from Columns U-X (used historically for old score, available only in timeline)
+  iqOld?: number | null; // Col U (IQ_old AA-II v4.3)
+  nonHalluOld?: number | null; // Col V (Non-Hallu-Rate_old)
+  scienceKnowledgeOld?: number | null; // Col W (Science Knowledge_old Omniscience)
+  trickQuestionsOld?: number | null; // Col X (Trick Questions_old SimpleBench)
 }
 
 export interface ComponentBreakdown {
@@ -184,12 +189,20 @@ export interface TimelineDataPoint {
   flag?: string;
 }
 
+export interface RegressionPoint {
+  x: number;
+  y: number;
+  lower?: number;
+  upper?: number;
+}
+
 export interface RegressionResult {
   type: RegressionType;
   name: string;
   r2: number;
   formula: string;
-  points: Array<{ x: number; y: number }>;
+  points: RegressionPoint[];
+  residualStdDev?: number;
 }
 
 

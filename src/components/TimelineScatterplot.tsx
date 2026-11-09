@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, Sparkles } from 'lucide-react';
 import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint } from '../types';
-import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
+import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS } from '../data/benchmarks';
 import { calculateRegression, extractFrontierPoints } from '../utils/mathRegression';
 import { calculatePearson, calculateSpearman } from '../utils/correlationUtils';
 import { Tooltip } from './Tooltip';
@@ -201,8 +201,16 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     };
   }, []);
 
-  // Active benchmark component if category index is 1..8
-  const activeComponent = selectedCategoryIndex > 0 ? BENCHMARK_COMPONENTS[selectedCategoryIndex - 1] : null;
+  // Active benchmark component if category index is 1..8 (active) or 9..12 (retired)
+  const activeComponent = useMemo(() => {
+    if (selectedCategoryIndex >= 1 && selectedCategoryIndex <= 8) {
+      return BENCHMARK_COMPONENTS[selectedCategoryIndex - 1];
+    }
+    if (selectedCategoryIndex >= 9 && selectedCategoryIndex <= 12) {
+      return RETIRED_TIMELINE_BENCHMARKS[selectedCategoryIndex - 9];
+    }
+    return null;
+  }, [selectedCategoryIndex]);
 
   // Prepare scatter data points from all models in the database
   const scatterPoints: TimelineDataPoint[] = useMemo(() => {
@@ -339,6 +347,31 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       .join(' ');
   }, [regression, minTime, maxTime, minScore, maxScore]);
 
+  // Format SVG Path for 95% Confidence Band
+  const confidenceBandPath = useMemo(() => {
+    if (!regression.points || regression.points.length === 0) return '';
+    const valid = regression.points.filter(
+      (p) => typeof p.lower === 'number' && typeof p.upper === 'number' && !isNaN(p.x) && !isNaN(p.lower) && !isNaN(p.upper)
+    );
+    if (valid.length === 0) return '';
+
+    // Upper boundary forward
+    const upperPoints = valid.map((pt, i) => {
+      const x = scaleX(pt.x);
+      const y = scaleY(pt.upper!);
+      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    });
+
+    // Lower boundary backward
+    const lowerPoints = [...valid].reverse().map((pt) => {
+      const x = scaleX(pt.x);
+      const y = scaleY(pt.lower!);
+      return `L ${x.toFixed(1)} ${y.toFixed(1)}`;
+    });
+
+    return `${upperPoints.join(' ')} ${lowerPoints.join(' ')} Z`;
+  }, [regression.points, minTime, maxTime, minScore, maxScore]);
+
   // Generate adaptive, non-overlapping X-Axis ticks (Months/Quarters/Years)
   const xTicks = useMemo(() => {
     const ticks: Array<{ time: number; label: string }> = [];
@@ -452,7 +485,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   };
 
   const handleUnifiedStep = (step: number) => {
-    const nextVal = Math.max(0, Math.min(10, unifiedSliderValue + step));
+    const nextVal = Math.max(0, Math.min(14, unifiedSliderValue + step));
     handleUnifiedSliderChange(nextVal);
   };
 
@@ -509,27 +542,89 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     return t.score;
   }, [selectedCategoryIndex, scoreMode, t, activeCategoryName]);
 
-  // Scroll targets for all 3 composite scores + all 8 benchmark categories
+  // Scroll targets for all 3 composite scores + all 8 benchmark categories + retired benchmarks
   const scoreScrollTargets = useMemo(() => {
     if (unifiedSliderValue === 0) return { targetId: 'note-col-m' };
     if (unifiedSliderValue === 1) return { targetId: 'note-col-l' };
     if (unifiedSliderValue === 2) return { targetId: 'note-col-n' };
 
-    const catIdx = unifiedSliderValue - 2; // 1..8
-    const colTargets = [
-      'note-col-d',
-      'note-col-e',
-      'note-col-f',
-      'note-col-g',
-      'note-col-h',
-      'note-col-i',
-      'note-col-j',
-      'note-col-k',
-    ];
+    const catIdx = unifiedSliderValue - 2; // 1..8 active, 9..12 retired
+    if (catIdx <= 8) {
+      const colTargets = [
+        'note-col-d',
+        'note-col-e',
+        'note-col-f',
+        'note-col-g',
+        'note-col-h',
+        'note-col-i',
+        'note-col-j',
+        'note-col-k',
+      ];
+      return {
+        targetId: colTargets[catIdx - 1] || 'final-scores-section',
+      };
+    }
+    const retiredTargets = ['note-col-d', 'note-col-e', 'note-col-f', 'note-col-j'];
     return {
-      targetId: colTargets[catIdx - 1] || 'final-scores-section',
+      targetId: retiredTargets[catIdx - 9] || 'csv-notes-section',
     };
   }, [unifiedSliderValue]);
+
+  // Unified tooltip data for the score slider
+  const activeScoreTooltip = useMemo(() => {
+    if (unifiedSliderValue === 0) {
+      return {
+        title: t.scoreModeNew,
+        badge: lang === 'de' ? '8 Benchmarks' : '8 Benchmarks',
+        desc:
+          lang === 'de'
+            ? 'Umfassender Gesamt-Score aus allen 8 gleichgewichteten Benchmark-Kriterien (jeweils 12,5 %). Aktueller Standard für moderne Chatbots.'
+            : 'Comprehensive final score composed of all 8 equally weighted benchmark criteria (12.5% each). Modern standard for current chatbots.',
+        detail: lang === 'de' ? 'Final Score (Spalte M)' : 'Final Score (Col M)',
+      };
+    }
+    if (unifiedSliderValue === 1) {
+      return {
+        title: t.scoreModeOld,
+        badge: lang === 'de' ? '5 Benchmarks' : '5 Benchmarks',
+        desc:
+          lang === 'de'
+            ? 'Historischer Gesamt-Score basierend auf den ursprünglichen 5 Benchmarks. Ermöglicht den Vergleich über einen längeren Zeitraum mit bis zu 224 Modellen.'
+            : 'Historical final score based on the original 5 benchmarks. Enables long-term tracking across up to 224 models.',
+        detail: lang === 'de' ? 'Final Score (Spalte L)' : 'Final Score (Col L)',
+      };
+    }
+    if (unifiedSliderValue === 2) {
+      return {
+        title: t.scoreModeWorstCase,
+        badge: lang === 'de' ? 'Straf-Score' : 'Penalty Score',
+        desc:
+          lang === 'de'
+            ? 'Worst-Case-Score: Der 7-Benchmark-Durchschnitt wird mit der Nicht-Halluzinations-Rate multipliziert. Bestraft unzuverlässige und fabulierende Modelle drastisch.'
+            : 'Worst-case penalty score: 7-benchmark average multiplied by non-hallucination rate. Heavily penalizes fabricating models.',
+        detail: lang === 'de' ? 'Worst-Case IQ (Spalte N)' : 'Worst-Case IQ (Col N)',
+      };
+    }
+    if (activeComponent) {
+      const isRetired = unifiedSliderValue > 10;
+      const numPrefix = !isRetired ? `#${unifiedSliderValue - 2} ` : '';
+      const name = activeCategoryName || (lang === 'de' ? activeComponent.nameDe : activeComponent.nameEn);
+      return {
+        title: `${numPrefix}${name}`,
+        badge: activeComponent.sourceName || (isRetired ? (lang === 'de' ? 'Archiv' : 'Retired') : 'Benchmark'),
+        desc: lang === 'de' ? activeComponent.descriptionDe : activeComponent.descriptionEn,
+        detail:
+          activeComponent.weightPct > 0
+            ? lang === 'de'
+              ? `Gewichtung: ${activeComponent.weightPct}% (${activeComponent.formulaDesc})`
+              : `Weight: ${activeComponent.weightPct}% (${activeComponent.formulaDesc})`
+            : lang === 'de'
+              ? `Aussortierter Benchmark (${activeComponent.formulaDesc})`
+              : `Retired benchmark (${activeComponent.formulaDesc})`,
+      };
+    }
+    return null;
+  }, [unifiedSliderValue, activeComponent, activeCategoryName, lang, t]);
 
   return (
     <div className="w-full space-y-3.5">
@@ -555,7 +650,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             <input
               type="range"
               min={0}
-              max={10}
+              max={14}
               step={1}
               value={unifiedSliderValue}
               onChange={(e) => handleUnifiedSliderChange(Number(e.target.value))}
@@ -564,59 +659,86 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             <button
               type="button"
               onClick={() => handleUnifiedStep(1)}
-              disabled={unifiedSliderValue >= 10}
+              disabled={unifiedSliderValue >= 14}
               className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
               title="+1"
             >
               <Plus className="w-3 h-3" />
             </button>
 
-            {/* Feste Box für das Badge: New Score / Old Score / Worst Case oder Kategorie 1..8 (klickbar als Sprungmarke) */}
-            <div className="w-[140px] sm:w-[170px] shrink-0 overflow-hidden flex items-center">
-              {unifiedSliderValue === 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleScroll('note-col-m')}
-                  className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">{t.scoreModeNew}</span>
-                </button>
-              )}
-              {unifiedSliderValue === 1 && (
-                <button
-                  type="button"
-                  onClick={() => handleScroll('note-col-l')}
-                  className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">{t.scoreModeOld}</span>
-                </button>
-              )}
-              {unifiedSliderValue === 2 && (
-                <button
-                  type="button"
-                  onClick={() => handleScroll('note-col-n')}
-                  className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">{t.scoreModeWorstCase}</span>
-                </button>
-              )}
-              {unifiedSliderValue >= 3 && activeComponent && activeCategoryName && (
-                <button
-                  type="button"
-                  onClick={() => handleScroll(scoreScrollTargets.targetId)}
-                  className="text-xs font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: activeComponent.color }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                  <span className="truncate">
-                    #{unifiedSliderValue - 2} {activeCategoryName}
-                  </span>
-                </button>
-              )}
-            </div>
+            {/* Feste Box für das Badge: New Score / Old Score / Worst Case oder Kategorie 1..8/9..12 (klickbar als Sprungmarke) */}
+            {activeScoreTooltip && (
+              <Tooltip
+                title={activeScoreTooltip.title}
+                badge={activeScoreTooltip.badge}
+                position="bottom"
+                align="center"
+                width="w-72"
+                content={
+                  <div className="space-y-1.5">
+                    <p className="leading-snug">{activeScoreTooltip.desc}</p>
+                    <div className="pt-1.5 border-t border-slate-700/60 font-mono text-[11px] text-amber-300">
+                      {activeScoreTooltip.detail}
+                    </div>
+                    <div className="pt-1 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                      <span>
+                        {lang === 'de'
+                          ? 'Klicken, um zur Erklärung zu springen'
+                          : 'Click to jump to explanation'}
+                      </span>
+                    </div>
+                  </div>
+                }
+              >
+              <div className="w-[140px] sm:w-[170px] shrink-0 overflow-hidden flex items-center">
+                {unifiedSliderValue === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleScroll('note-col-m')}
+                    className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="truncate">{t.scoreModeNew}</span>
+                  </button>
+                )}
+                {unifiedSliderValue === 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleScroll('note-col-l')}
+                    className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="truncate">{t.scoreModeOld}</span>
+                  </button>
+                )}
+                {unifiedSliderValue === 2 && (
+                  <button
+                    type="button"
+                    onClick={() => handleScroll('note-col-n')}
+                    className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="truncate">{t.scoreModeWorstCase}</span>
+                  </button>
+                )}
+                {unifiedSliderValue >= 3 && activeComponent && (
+                  <button
+                    type="button"
+                    onClick={() => handleScroll(scoreScrollTargets.targetId)}
+                    className="text-xs font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
+                    style={{ backgroundColor: activeComponent.color }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="truncate">
+                      {unifiedSliderValue <= 10 ? `#${unifiedSliderValue - 2} ` : ''}
+                      {activeCategoryName || (lang === 'de' ? activeComponent.nameDe : activeComponent.nameEn)}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </Tooltip>
+          )}
           </div>
 
           {/* Right Group: When hideHeaderControls is true, show Pearson & Spearman badges directly here on Row 1. Otherwise show Regression Model Slider + Param */}
@@ -719,6 +841,12 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 {/* Regression Badge */}
                 <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
                   <Tooltip
+                    title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
+                    badge={lang === 'de' ? 'Modell' : 'Model'}
+                    position="bottom"
+                    align="center"
+                    width="w-72"
+                    className="w-full"
                     content={
                       <div className="space-y-1.5">
                         <p className="leading-snug">{lang === 'de' ? activeRegression.descDe : activeRegression.descEn}</p>
@@ -727,17 +855,30 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                             {regression.formula}
                           </div>
                         )}
+                        {activeRegression.id === 'polynomial' && (
+                          <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                            {lang === 'de' ? `Polynom-Regression (Grad ${polyDegree})` : `Polynomial Regression (Degree ${polyDegree})`}
+                          </div>
+                        )}
+                        {activeRegression.id === 'loess' && (
+                          <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
+                            {lang === 'de' ? `LOESS-Glättung (Span ${loessSpan}%)` : `LOESS Smoothing (Span ${loessSpan}%)`}
+                          </div>
+                        )}
+                        {activeRegression.id !== 'frontier' && (
+                          <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                            <span>
+                              {lang === 'de' ? 'Inkl. 95%-Konfidenzband (Modellunsicherheit)' : 'Includes 95% confidence band (uncertainty ribbon)'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     }
-                    position="bottom"
-                    align="center"
-                    width="w-64"
-                    className="w-full"
                   >
                     <span
-                      className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                      className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-95 transition-opacity"
                       style={{ backgroundColor: activeRegression.color }}
-                      title={`${lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}: ${regression.formula || (lang === 'de' ? activeRegression.descDe : activeRegression.descEn)}`}
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                       <span className="truncate">
@@ -1031,6 +1172,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               <stop offset="0%" stopColor={activeRegression.color} stopOpacity="0.85" />
               <stop offset="100%" stopColor="#f43f5e" stopOpacity="1" />
             </linearGradient>
+            <linearGradient id="confidenceBandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor={activeRegression.color} stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.22" />
+            </linearGradient>
             <filter id="dotGlow" x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000000" floodOpacity="0.15" />
             </filter>
@@ -1132,6 +1277,19 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           >
             {yAxisLabel}
           </text>
+
+          {/* 95% Confidence Band (Model uncertainty ribbon) */}
+          {confidenceBandPath && activeRegression.id !== 'frontier' && (
+            <path
+              d={confidenceBandPath}
+              fill="url(#confidenceBandGrad)"
+              stroke={activeRegression.color}
+              strokeWidth="0.8"
+              strokeDasharray="3 3"
+              strokeOpacity="0.4"
+              className="pointer-events-none transition-all duration-300"
+            />
+          )}
 
           {/* Fitted Regression Curve */}
           {regressionPath && (

@@ -1,4 +1,4 @@
-import { RegressionResult, RegressionType, TimelineDataPoint } from '../types';
+import { RegressionPoint, RegressionResult, RegressionType, TimelineDataPoint } from '../types';
 
 /**
  * Extracts Pareto-frontier data points (breakthrough models that set a new benchmark record).
@@ -344,24 +344,73 @@ export function calculateRegression(
     formula = `LOESS (Span = ${(span * 100).toFixed(0)}%)`;
   }
 
-  // Calculate R² (coefficient of determination)
+  // Calculate R² (coefficient of determination) and residuals
   let ssRes = 0;
+  const residuals: number[] = [];
   for (const d of normData) {
     const yHat = predictFn(d.x);
-    ssRes += Math.pow(d.y - yHat, 2);
+    const res = d.y - yHat;
+    residuals.push(res);
+    ssRes += Math.pow(res, 2);
   }
 
   let r2 = ssTotal > 0 ? 1 - ssRes / ssTotal : 0;
   // Clamp R² between 0 and 0.999
   r2 = Math.max(0, Math.min(0.999, r2));
 
-  // Generate curve sample points
-  const points: Array<{ x: number; y: number }> = [];
+  // Degrees of freedom & residual standard deviation
+  const p = type === 'polynomial' ? Math.min(param || 2, n - 1) + 1 : 2;
+  const df = Math.max(1, n - p);
+  const seResidual = Math.sqrt(ssRes / df);
+
+  // Mean & variance of normalized X for leverage calculations
+  const meanNormX = normData.reduce((acc, d) => acc + d.x, 0) / n;
+  const ssNormX = normData.reduce((acc, d) => acc + Math.pow(d.x - meanNormX, 2), 0) || 1e-5;
+
+  // Generate curve sample points with 95% confidence intervals
+  const points: RegressionPoint[] = [];
   for (let step = 0; step <= steps; step++) {
     const nx = step / steps;
     const timeX = minX + nx * rangeX;
     const valY = Math.max(0, predictFn(nx));
-    points.push({ x: timeX, y: valY });
+
+    let marginOfError = 0;
+    if (type === 'frontier') {
+      marginOfError = 0;
+    } else if (type === 'loess') {
+      // Local empirical standard error smoothed across neighboring data points
+      const span = param && param >= 10 && param <= 90 ? param / 100 : Math.max(0.2, Math.min(0.65, 8 / n));
+      const dists = normData.map((d) => Math.abs(d.x - nx));
+      const sortedDists = [...dists].sort((a, b) => a - b);
+      const k = Math.min(dists.length - 1, Math.max(3, Math.floor(dists.length * span)));
+      const maxDist = sortedDists[k] || 0.1;
+
+      let sumW = 0;
+      let sumW2 = 0;
+      let sumWRes2 = 0;
+      for (let i = 0; i < n; i++) {
+        const u = dists[i] / maxDist;
+        if (u < 1) {
+          const w = Math.pow(1 - Math.pow(u, 3), 3);
+          sumW += w;
+          sumW2 += w * w;
+          sumWRes2 += w * Math.pow(residuals[i], 2);
+        }
+      }
+      const localSe = sumW > 0 ? Math.sqrt(sumWRes2 / sumW) : seResidual;
+      const effN = sumW2 > 0 ? Math.pow(sumW, 2) / sumW2 : 1;
+      marginOfError = 1.96 * (localSe / Math.sqrt(Math.max(1, effN)));
+      marginOfError = Math.max(marginOfError, 0.4);
+    } else {
+      // Parametric models: standard leverage formula
+      const leverage = 1 / n + Math.pow(nx - meanNormX, 2) / ssNormX;
+      marginOfError = 1.96 * seResidual * Math.sqrt(Math.max(0, leverage));
+    }
+
+    const lower = Math.max(0, parseFloat((valY - marginOfError).toFixed(2)));
+    const upper = Math.min(100, parseFloat((valY + marginOfError).toFixed(2)));
+
+    points.push({ x: timeX, y: valY, lower, upper });
   }
 
   return {
@@ -370,6 +419,7 @@ export function calculateRegression(
     r2,
     formula,
     points,
+    residualStdDev: parseFloat(seResidual.toFixed(2)),
   };
 }
 

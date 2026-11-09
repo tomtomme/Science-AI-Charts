@@ -10,7 +10,7 @@ import { FALLBACK_LAB_ENTRIES } from './data/rawLabCsvFallback';
 import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset, parseAllModels } from './utils/csvParser';
 import { LoadedDatasets, loadModelsData } from './services/dataService';
 import { fetchLiveLabEntries } from './services/labDataService';
-import { BENCHMARK_COMPONENTS } from './data/benchmarks';
+import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS } from './data/benchmarks';
 import { ExplodedBarChart } from './components/ExplodedBarChart';
 import { ScoreSlider } from './components/ScoreSlider';
 import { SearchBar } from './components/SearchBar';
@@ -519,7 +519,9 @@ export default function App() {
       if (timelineCategoryIndex === 0) {
         score = timelineScoreMode === 'old' ? m.scoreOld : timelineScoreMode === 'worstCase' ? m.scoreWorstCase : m.scoreNewReported;
       } else {
-        const comp = BENCHMARK_COMPONENTS[timelineCategoryIndex - 1];
+        const comp = timelineCategoryIndex > 8
+          ? RETIRED_TIMELINE_BENCHMARKS[timelineCategoryIndex - 9]
+          : BENCHMARK_COMPONENTS[timelineCategoryIndex - 1];
         if (comp && m.rawScores) {
           const raw = m.rawScores[comp.key];
           score = typeof raw === 'number' && raw !== null ? comp.transform(raw) : null;
@@ -543,7 +545,9 @@ export default function App() {
       if (timelineCategoryIndex === 0) {
         score = timelineScoreMode === 'old' ? m.scoreOld : timelineScoreMode === 'worstCase' ? m.scoreWorstCase : m.scoreNewReported;
       } else {
-        const comp = BENCHMARK_COMPONENTS[timelineCategoryIndex - 1];
+        const comp = timelineCategoryIndex > 8
+          ? RETIRED_TIMELINE_BENCHMARKS[timelineCategoryIndex - 9]
+          : BENCHMARK_COMPONENTS[timelineCategoryIndex - 1];
         if (comp && m.rawScores) {
           const raw = m.rawScores[comp.key];
           score = typeof raw === 'number' && raw !== null ? comp.transform(raw) : null;
@@ -783,21 +787,44 @@ export default function App() {
       {/* Clean top bar */}
       <header className="relative z-40 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6 py-2.5">
         <div className="w-full max-w-[1720px] mx-auto flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-          {/* Title & Subtitle directly from CSV cells: links to site & resets on click */}
+          {/* Title directly from CSV: links to site & resets on click; subtitle popup on hover */}
           <div className="min-w-0 flex-1">
-            <a
-              href="https://tomtomme.github.io/Science-AI-Charts/"
-              onClick={handleResetToDefaults}
-              className="group cursor-pointer inline-block max-w-full text-left focus:outline-hidden"
-              title={lang === 'de' ? 'Klicken: Alle Filter und Ansichten auf Standard zurücksetzen' : 'Click: Reset all filters and views to default'}
+            <Tooltip
+              content={
+                <div className="space-y-2 text-xs sm:text-sm text-slate-100 font-normal leading-relaxed">
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-700/60 pb-1.5">
+                    <span className="font-bold text-sm sm:text-base text-blue-400">
+                      {lang === 'de' ? (loadedData.headerMeta?.titleDe || t.title) : (loadedData.headerMeta?.combinedTitle || t.title)}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60 shrink-0">
+                      {lang === 'de' ? 'Methodik & Fokus' : 'Methodology & Focus'}
+                    </span>
+                  </div>
+                  <p className="leading-relaxed text-slate-200">
+                    {lang === 'de' ? (loadedData.headerMeta?.subtitleDe || t.subtitle) : (loadedData.headerMeta?.subtitle || t.subtitle)}
+                  </p>
+                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400 font-mono">
+                    <span>{lang === 'de' ? 'Klicken: Alle Filter & Ansichten auf Standard zurücksetzen' : 'Click: Reset all filters & views to defaults'}</span>
+                    <span className="text-emerald-400 font-semibold">{lang === 'de' ? '↺ Zurücksetzen' : '↺ Reset'}</span>
+                  </div>
+                </div>
+              }
+              position="bottom"
+              align="left"
+              width="w-[90vw] sm:w-[580px] md:w-[720px] lg:w-[840px] xl:w-[920px]"
+              popupClassName="p-3.5 sm:p-4 text-xs sm:text-sm leading-relaxed shadow-2xl rounded-xl bg-slate-900/98 dark:bg-slate-950/98 border border-slate-700/90"
+              className="inline-block max-w-full"
             >
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                {lang === 'de' ? (loadedData.headerMeta?.titleDe || t.title) : (loadedData.headerMeta?.combinedTitle || t.title)}
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-normal font-sans line-clamp-2 transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-300">
-                {lang === 'de' ? (loadedData.headerMeta?.subtitleDe || t.subtitle) : (loadedData.headerMeta?.subtitle || t.subtitle)}
-              </p>
-            </a>
+              <a
+                href="https://tomtomme.github.io/Science-AI-Charts/"
+                onClick={handleResetToDefaults}
+                className="group cursor-pointer inline-block max-w-full text-left focus:outline-hidden"
+              >
+                <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                  {lang === 'de' ? (loadedData.headerMeta?.titleDe || t.title) : (loadedData.headerMeta?.combinedTitle || t.title)}
+                </h1>
+              </a>
+            </Tooltip>
           </div>
 
           {/* Controls, sync, date, language toggle & external link icons */}
@@ -1197,7 +1224,7 @@ export default function App() {
                         }`}
                         aria-pressed={priceFilter === 'free_api'}
                       >
-                        API
+                        API🌐
                       </button>
                     </Tooltip>
 
@@ -1312,14 +1339,16 @@ export default function App() {
             {/* Timeline View Header Controls: ScoreSlider, Scope toggle, Regression slider & badges, and Contextual param input */}
             {activeTab === 'benchmark' && benchmarkView === 'timeline' && (
               <div className="flex flex-wrap items-center gap-2">
-                {/* Score / Category Criteria Slider */}
+                {/* Score / Category Criteria Slider (Timeline includes retired benchmarks from Cols U-X) */}
                 <ScoreSlider
                   scoreMode={timelineScoreMode}
                   onScoreModeChange={setTimelineScoreMode}
                   selectedCategoryIndex={timelineCategoryIndex}
                   onSelectCategoryIndex={(idx) => {
                     setTimelineCategoryIndex(idx);
-                    if (idx > 0) {
+                    if (idx > 8) {
+                      setCategoryInfoComp(RETIRED_TIMELINE_BENCHMARKS[idx - 9]);
+                    } else if (idx > 0) {
                       setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
                     } else {
                       setCategoryInfoComp(null);
@@ -1329,6 +1358,7 @@ export default function App() {
                   onHoverCategory={setCategoryInfoComp}
                   onScrollToParagraph={scrollToParagraph}
                   lang={lang}
+                  allowRetiredScores={true}
                 />
 
                 {/* Scope Segmented Control */}
@@ -1401,6 +1431,12 @@ export default function App() {
                   {/* Model Badge */}
                   <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
                     <Tooltip
+                      title={lang === 'de' ? activeTimelineRegression.labelDe : activeTimelineRegression.labelEn}
+                      badge={lang === 'de' ? 'Modell' : 'Model'}
+                      position="bottom"
+                      align="center"
+                      width="w-72"
+                      className="w-full"
                       content={
                         <div className="space-y-1.5">
                           <p className="leading-snug">{lang === 'de' ? activeTimelineRegression.descDe : activeTimelineRegression.descEn}</p>
@@ -1414,17 +1450,20 @@ export default function App() {
                               {lang === 'de' ? `LOESS-Glättung (Span ${timelineLoessSpan}%)` : `LOESS Smoothing (Span ${timelineLoessSpan}%)`}
                             </div>
                           )}
+                          {activeTimelineRegression.id !== 'frontier' && (
+                            <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                              <span>
+                                {lang === 'de' ? 'Inkl. 95%-Konfidenzband (Modellunsicherheit)' : 'Includes 95% confidence band (uncertainty ribbon)'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       }
-                      position="bottom"
-                      align="center"
-                      width="w-64"
-                      className="w-full"
                     >
                       <span
-                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-95 transition-opacity"
                         style={{ backgroundColor: activeTimelineRegression.color }}
-                        title={`${lang === 'de' ? activeTimelineRegression.labelDe : activeTimelineRegression.labelEn}: ${lang === 'de' ? activeTimelineRegression.descDe : activeTimelineRegression.descEn}`}
                       >
                         <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                         <span className="truncate">
@@ -1564,6 +1603,12 @@ export default function App() {
                   {/* Model Badge */}
                   <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
                     <Tooltip
+                      title={lang === 'de' ? activeCorrelationsRegression.labelDe : activeCorrelationsRegression.labelEn}
+                      badge={lang === 'de' ? 'Modell' : 'Model'}
+                      position="bottom"
+                      align="center"
+                      width="w-72"
+                      className="w-full"
                       content={
                         <div className="space-y-1.5">
                           <p className="leading-snug">{lang === 'de' ? activeCorrelationsRegression.descDe : activeCorrelationsRegression.descEn}</p>
@@ -1577,17 +1622,20 @@ export default function App() {
                               {lang === 'de' ? `LOESS-Glättung (Span ${correlationsLoessSpan}%)` : `LOESS Smoothing (Span ${correlationsLoessSpan}%)`}
                             </div>
                           )}
+                          {activeCorrelationsRegression.id !== 'frontier' && (
+                            <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                              <span>
+                                {lang === 'de' ? 'Inkl. 95%-Konfidenzband (Modellunsicherheit)' : 'Includes 95% confidence band (uncertainty ribbon)'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       }
-                      position="bottom"
-                      align="center"
-                      width="w-64"
-                      className="w-full"
                     >
                       <span
-                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-help"
+                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-95 transition-opacity"
                         style={{ backgroundColor: activeCorrelationsRegression.color }}
-                        title={`${lang === 'de' ? activeCorrelationsRegression.labelDe : activeCorrelationsRegression.labelEn}: ${lang === 'de' ? activeCorrelationsRegression.descDe : activeCorrelationsRegression.descEn}`}
                       >
                         <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                         <span className="truncate">

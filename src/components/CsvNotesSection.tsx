@@ -92,8 +92,14 @@ export function getParagraphAnchorId(heading?: string): string | undefined {
   if (h === 'current' || h.startsWith('current')) return 'note-current';
   if (h === 'history' || h.startsWith('history')) return 'note-history';
 
-  // Major section: Benchmarks explainer
-  if (h.includes('different benchmarks') || h.includes('verschiedenen benchmarks') || h.includes('result in the') || h.includes('comprise')) return 'categories-section';
+  // Major section: Benchmarks explainer ("The different benchmarks which result in the Final Scores")
+  if (
+    (h.includes('different benchmarks') || h.includes('verschiedenen benchmarks') || h.includes('result in the')) &&
+    !h.includes('comprise') &&
+    !h.includes('zusammensetzen')
+  ) {
+    return 'categories-section';
+  }
 
   // Cat 1: IQ (Col D)
   if (h.includes('spalte d') || h.includes('column d') || h.startsWith('iq') || h.includes('aa-ii')) return 'note-col-d';
@@ -119,8 +125,13 @@ export function getParagraphAnchorId(heading?: string): string | undefined {
   // Cat 8: Real Econ & Legal Work (Col K)
   if (h.includes('spalte k') || h.includes('column k') || h.includes('real econ') || h.includes('econ & legal') || h.includes('vals') || h.includes('wirtschaft')) return 'note-col-k';
 
-  // Major section: Final Scores
-  if ((h.includes('final scores') || h.includes('final score') || h.includes('finale scores')) && (h.includes('comprised') || h.includes('zusammensetzen') || (!h.includes('old') && !h.includes('new') && !h.includes('worst')))) return 'final-scores-section';
+  // Major section: Final Scores explainer ("The Final Scores which are comprised of the different benchmarks")
+  if (
+    (h.includes('final scores') || h.includes('final score') || h.includes('finale scores')) &&
+    (h.includes('comprise') || h.includes('comprised') || h.includes('zusammensetzen') || (!h.includes('old') && !h.includes('new') && !h.includes('worst')))
+  ) {
+    return 'final-scores-section';
+  }
 
   // Final Score OLD (Col L)
   if (h.includes('spalte l') || h.includes('column l') || h.includes('score old') || h === 'old' || h.startsWith('old ') || h.startsWith('old:')) return 'note-col-l';
@@ -152,14 +163,17 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
   }
   const cuts: Cut[] = [];
 
-  // 1. Major section dividers with 3+ dashes (e.g. 'Chatbot Ranking------------------', 'The different benchmarks which comprise the "Final Scores"------------------')
-  const secRegex = /([A-Za-z0-9"'\s]+?)\s*-{3,}\s*/g;
+  // 1. Major section dividers with 3+ dashes (e.g. 'Chatbot Ranking\n------------------', 'The different benchmarks which result in the "Final Scores" (explained below)\n------------------')
+  const secRegex = /(?:^|\r?\n)\s*([^\r\n]+?)\s*\r?\n\s*-{3,}\s*/g;
   let match: RegExpExecArray | null;
   while ((match = secRegex.exec(rawText)) !== null) {
+    const full = match[0];
+    const heading = match[1].trim();
+    const headingOffsetInMatch = full.indexOf(heading);
     cuts.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      heading: match[1].trim(),
+      start: match.index + headingOffsetInMatch,
+      end: match.index + full.length,
+      heading,
       isMajor: true,
     });
   }
@@ -642,7 +656,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                     }`}
                   >
                     <div className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg border-l-4 border-slate-700 dark:border-slate-300 mb-1 shadow-2xs">
-                      <h4 className="font-normal text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] tracking-tight leading-snug">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-[13px] tracking-tight leading-snug">
                         {p.heading}
                       </h4>
                     </div>
