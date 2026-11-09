@@ -11,8 +11,8 @@ export type Language = 'de' | 'en';
 export const TRANSLATIONS = {
   de: {
     // Titel & Untertitel (Zelle A1 sowie C1 der CSV)
-    title: 'Science-IQ von ChatBots',
-    subtitle: 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding. Die Bots absolvierten Tests von 3 verschiedenen Benchmark-Anbietern. Final Scores sind Durchschnitte, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden.',
+    title: 'Science IQ of Chatbots',
+    subtitle: 'Unlike conventional tests that primarily measure text-based coding tasks or pure language skills, this composite scoring focusses on capabilities important for science like faktische Genauigkeit (non-hallucination), data analysis, plot-reading, and automated multi-step workflows like diagnostic. To counter potential dependencies of test-suite developers on major AI companies, benchmarks from at least 3 different providers are included. The 3 final composite scores (old, new, worst case) are simple averages, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden. More details below.',
     headerPopupIntro:
       'Im Gegensatz zu herkömmlichen Benchmarks, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen, legt dieser Benchmark-Parcours den Fokus gezielt auf Forschungs- und Wissenschaftsrelevanz:',
     headerPopupItems: [
@@ -136,8 +136,8 @@ export const TRANSLATIONS = {
   },
   en: {
     // Title & Subtitle (Cell A1 and C1 of CSV)
-    title: 'Science-IQ of ChatBots',
-    subtitle: 'The scoring focusses on factual accuracy (non-hallucination), scientific expertise, and data analysis skills instead of coding. The bots completed tests from 3 different benchmark providers. Final scores are averages, with some sub-scores adjusted for guessing probability.',
+    title: 'Science IQ of Chatbots',
+    subtitle: 'Unlike conventional tests that primarily measure text-based coding tasks or pure language skills, this composite scoring focusses on capabilities important for science like factual accuracy (non-hallucination), data analysis, plot-reading, and automated multi-step workflows like diagnostic. To counter potential dependencies of test-suite developers on major AI companies, benchmarks from at least 3 different providers are included. The 3 final composite scores (old, new, worst case) are simple averages, with some sub-scores adjusted for guessing probability. More details below.',
     headerPopupIntro:
       'Unlike conventional benchmarks that primarily measure text-based coding tasks or pure language skills, this benchmark suite focuses specifically on research and scientific relevance:',
     headerPopupItems: [
