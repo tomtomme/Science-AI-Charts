@@ -202,8 +202,8 @@ export const RETIRED_TIMELINE_BENCHMARKS: BenchmarkComponent[] = [
   {
     id: 'trickQuestionsOld',
     key: 'trickQuestionsOld',
-    nameDe: '(3D) Trickfragen (Alt)',
-    nameEn: '(3D) Trick Questions (Old)',
+    nameDe: 'SimpleBench',
+    nameEn: 'SimpleBench',
     sourceName: 'SimpleBench',
     sourceUrl: 'https://simple-bench.com',
     color: '#6366F1',
@@ -232,6 +232,9 @@ export function getBenchmarkCategoryLabel(
 
   if (lang === 'en') {
     // English: return raw CSV string or English component name
+    if (lower.includes('trickquestionsold') || lower.includes('trick questions') || lower.includes('simplebench')) {
+      return 'SimpleBench';
+    }
     if (raw && raw !== '-' && !raw.startsWith('Col ') && !raw.endsWith('Old')) {
       return raw;
     }
@@ -245,7 +248,7 @@ export function getBenchmarkCategoryLabel(
   if (lower.includes('iqold') || lower.includes('iq (alt')) return 'IQ (Alt, v4.3)';
   if (lower.includes('nonhalluold') || lower.includes('faktentreue (alt')) return 'Faktentreue (Alt, v1)';
   if (lower.includes('scienceknowledgeold') || lower.includes('faktenwissen (alt')) return 'Faktenwissen (Alt)';
-  if (lower.includes('trickquestionsold') || lower.includes('trickfragen (alt')) return '(3D) Trickfragen (Alt)';
+  if (lower.includes('trickquestionsold') || lower.includes('trickfragen') || lower.includes('simplebench')) return 'SimpleBench';
 
   // German: translate standard score labels into German
   if (lower.includes('iq') || lower.includes('aa-ii')) return 'IQ';

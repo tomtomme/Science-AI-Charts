@@ -1,6 +1,6 @@
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { getCompanyMeta, getFaviconUrl } from '../data/companies';
-import { ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata } from '../types';
+import { ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata, Row33Metadata } from '../types';
 
 /**
  * Robust RFC-4180 CSV line parser handling quotes, embedded commas, and escaped quotes.
@@ -80,6 +80,7 @@ export interface CsvHeaderMetadata {
   titleDe?: string;
   subtitleDe?: string;
   categoryNames?: string[];
+  row33?: Row33Metadata;
 }
 
 /**
@@ -131,7 +132,138 @@ export function translateHeaderToDe(titleEn: string, subtitleEn: string): { titl
 }
 
 /**
- * Extracts Title (combined A1 and B2), Subtitle (cell C1), and Category Names (cells D2 to K2) directly from CSV
+ * Extracts Row 33 synced text and source URLs from the CSV.
+ * Row 33 in the Google Sheet contains the benchmark acronyms/subtitles and sources.
+ */
+export function extractRow33Metadata(rows: string[][]): Row33Metadata {
+  let targetRow: string[] | null = null;
+
+  for (let r = 0; r < Math.min(60, rows.length); r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const col1 = (row[1] || '').toLowerCase();
+    const col2 = (row[2] || '').toLowerCase();
+    if (
+      col2.includes('sources & notes') ||
+      (col1.includes('current') && col1.includes('history')) ||
+      (r === 32 && row.length > 10)
+    ) {
+      targetRow = row;
+      break;
+    }
+  }
+
+  const getCell = (colIdx: number, fallback: string) => {
+    if (!targetRow || !targetRow[colIdx]) return fallback;
+    const text = targetRow[colIdx].trim();
+    return text || fallback;
+  };
+
+  const resolveUrl = (text: string, defaultUrl: string) => {
+    const trimmed = text.trim();
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (trimmed.includes('semianalysis.com') || trimmed.includes('gdpx')) return 'https://gdpx.semianalysis.com';
+    if (trimmed.includes('simplebench.com') || trimmed.includes('simple-bench')) return 'https://epoch.ai/benchmarks/simplebench?view=graph&tab=leaderboard';
+    if (trimmed.includes('vals.ai')) return 'https://www.vals.ai';
+    if (trimmed.includes('artificialanalysis.ai')) return 'https://artificialanalysis.ai';
+    if (trimmed.includes('mmmu')) return 'https://artificialanalysis.ai/evaluations/mmmu-pro';
+    return defaultUrl;
+  };
+
+  const moreSourcesText = targetRow?.[14]?.trim() || '';
+  const urlMatches = moreSourcesText.match(/https?:\/\/[^\s]+/g) || [];
+
+  const colD = getCell(3, 'AA-Int-Index in % v5');
+  const colE = getCell(4, 'Non-Hallu-Rate v1.1 in %');
+  const colF = getCell(5, 'Accuracy v1.1 in %');
+  const colG = getCell(6, 'MMMU-Pro in %');
+  const colH = getCell(7, 'MLCR-AA in %');
+  const colI = getCell(8, 'ExcelAgent in %');
+  const colJ = getCell(9, 'gdpx.semianalysis.com');
+  const colK = getCell(10, 'Vals Econ Index 2.2 in %');
+
+  const colL = getCell(11, 'historic persp.');
+  const colM = getCell(12, 'if hallus are a small problem');
+  const colN = getCell(13, 'times non hallu-rate');
+
+  const colU = getCell(20, 'AA-Int-Index in % v4.3');
+  const colV = getCell(21, 'Non-Hallu-Rate v1 in %');
+  const colW = getCell(22, 'Omniscience v1 in PTS');
+  const colX = getCell(23, 'simple-bench in %');
+
+  return {
+    scoreNewColM: {
+      text: colM,
+      sourceUrl: '#final-scores-section',
+    },
+    scoreOldColL: {
+      text: colL,
+      sourceUrl: '#final-scores-section',
+    },
+    scoreWorstCaseColN: {
+      text: colN,
+      sourceUrl: '#final-scores-section',
+    },
+    benchmarks: {
+      actCodeReason: {
+        text: colD,
+        sourceUrl: resolveUrl(colD, 'https://artificialanalysis.ai/methodology/intelligence-benchmarking'),
+      },
+      nonHallucination: {
+        text: colE,
+        sourceUrl: resolveUrl(colE, 'https://artificialanalysis.ai/evaluations/omniscience#aa-omniscience-hallucination-rate'),
+      },
+      scienceKnowledge: {
+        text: colF,
+        sourceUrl: resolveUrl(colF, 'https://artificialanalysis.ai/evaluations/omniscience'),
+      },
+      visionPlot: {
+        text: colG,
+        sourceUrl: resolveUrl(colG, 'https://artificialanalysis.ai/evaluations/mmmu-pro'),
+      },
+      medReasoning: {
+        text: colH,
+        sourceUrl: resolveUrl(colH, 'https://artificialanalysis.ai/evaluations/mlcr-aa'),
+      },
+      excelAgent: {
+        text: colI,
+        sourceUrl: resolveUrl(colI, 'https://artificialanalysis.ai/evaluations/aa-analyst-agent'),
+      },
+      trickQuestions: {
+        text: colJ,
+        sourceUrl: resolveUrl(colJ, 'https://gdpx.semianalysis.com'),
+      },
+      econLegal: {
+        text: colK,
+        sourceUrl: resolveUrl(colK, 'https://www.vals.ai'),
+      },
+    },
+    retiredBenchmarks: {
+      iqOld: {
+        text: colU,
+        sourceUrl: resolveUrl(colU, 'https://artificialanalysis.ai/methodology/intelligence-benchmarking'),
+      },
+      nonHalluOld: {
+        text: colV,
+        sourceUrl: resolveUrl(colV, 'https://artificialanalysis.ai/evaluations/omniscience#aa-omniscience-hallucination-rate'),
+      },
+      scienceKnowledgeOld: {
+        text: colW,
+        sourceUrl: resolveUrl(colW, 'https://artificialanalysis.ai/evaluations/omniscience'),
+      },
+      trickQuestionsOld: {
+        text: colX,
+        sourceUrl: resolveUrl(colX, 'https://epoch.ai/benchmarks/simplebench?view=graph&tab=leaderboard'),
+      },
+    },
+    moreSourcesText,
+    moreSourcesUrls: urlMatches,
+  };
+}
+
+/**
+ * Extracts Title (combined A1 and B2), Subtitle (cell C1), Category Names (cells D2 to K2),
+ * and Row 33 synced benchmark metadata directly from CSV.
  */
 export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
   const rows = parseCsvRows(csvText);
@@ -157,6 +289,7 @@ export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
   }
 
   const { titleDe, subtitleDe } = translateHeaderToDe(combinedTitle, cellC1);
+  const row33 = extractRow33Metadata(rows);
 
   return {
     cellA1,
@@ -167,6 +300,7 @@ export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
     titleDe,
     subtitleDe,
     categoryNames: categoryNames.length === 8 ? categoryNames : undefined,
+    row33,
   };
 }
 
@@ -322,19 +456,25 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     }
   }
 
-  // 3. Pre-collect any Column AL (index 37) price / availability notes by displayName & cleaned name
-  const colALMap = new Map<string, string>();
+  // 3. Pre-collect Column T (index 19: model costs in Euro) and Column AL (index 37: notes) by displayName & cleaned name
+  const colPriceMap = new Map<string, string>();
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
-    if (row && row[37]) {
-      const val = row[37].trim();
-      if (val && !val.toLowerCase().includes('abokosten')) {
-        const s = (row[18] || '').trim().toLowerCase();
-        const b = (row[1] || '').trim().toLowerCase();
-        const { cleanText: cleanB } = extractFlag(b);
-        if (s) colALMap.set(s, val);
-        if (cleanB) colALMap.set(cleanB.toLowerCase(), val);
-      }
+    if (!row) continue;
+    const valT = (row[19] || '').trim();
+    const valAL = (row[37] || '').trim();
+    const isHeaderT = valT.toLowerCase().includes('abokosten') || valT.toLowerCase().includes('creator') || valT.toLowerCase().includes('release');
+    const val = (valT && !isHeaderT)
+      ? valT
+      : (valAL && !valAL.toLowerCase().includes('abokosten'))
+        ? valAL
+        : '';
+    if (val) {
+      const s = (row[18] || '').trim().toLowerCase();
+      const b = (row[1] || '').trim().toLowerCase();
+      const { cleanText: cleanB } = extractFlag(b);
+      if (s) colPriceMap.set(s, val);
+      if (cleanB) colPriceMap.set(cleanB.toLowerCase(), val);
     }
   }
 
@@ -540,10 +680,14 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       currentBotNames.has(cleanedName.toLowerCase()) ||
       (!isSupersededOrDiscontinued && (chatLinkLow.startsWith('http') || chatLinkLow.includes('paid') || chatLinkLow.includes('api') || !!parsedApiLink));
 
+    const rawColT = (row[19] || '').trim();
     const rawColAL = (row[37] || '').trim();
-    const priceDeMonthly = (!rawColAL.toLowerCase().includes('abokosten') && rawColAL)
-      ? rawColAL
-      : colALMap.get(displayName.toLowerCase()) || colALMap.get(cleanedName.toLowerCase()) || undefined;
+    const isHeaderT = rawColT.toLowerCase().includes('abokosten') || rawColT.toLowerCase().includes('creator') || rawColT.toLowerCase().includes('release');
+    const priceDeMonthly = (rawColT && !isHeaderT)
+      ? rawColT
+      : (rawColAL && !rawColAL.toLowerCase().includes('abokosten'))
+        ? rawColAL
+        : colPriceMap.get(displayName.toLowerCase()) || colPriceMap.get(cleanedName.toLowerCase()) || undefined;
 
     allModels.push({
       id: `model-${r}-${displayName.replace(/[^a-zA-Z0-9_-]/g, '_')}`,

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { Minus, Plus } from 'lucide-react';
-import { ScoreMode, BenchmarkComponent } from '../types';
+import { Minus, Plus, ExternalLink } from 'lucide-react';
+import { ScoreMode, BenchmarkComponent, Row33Metadata } from '../types';
 import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS, getBenchmarkCategoryLabel } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { Tooltip } from './Tooltip';
@@ -15,6 +15,7 @@ interface ScoreSliderProps {
   onScrollToParagraph?: (targetId: string) => void;
   lang: Language;
   allowRetiredScores?: boolean;
+  row33Meta?: Row33Metadata;
 }
 
 export const ScoreSlider: React.FC<ScoreSliderProps> = ({
@@ -27,6 +28,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
   onScrollToParagraph,
   lang,
   allowRetiredScores = false,
+  row33Meta,
 }) => {
   const t = TRANSLATIONS[lang];
   const maxVal = allowRetiredScores ? 14 : 10;
@@ -116,9 +118,9 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
       };
     }
     // Retired benchmarks: point to related note sections or top of notes
-    const retiredTargets = ['note-col-d', 'note-col-e', 'note-col-f', 'note-col-j'];
+    const retiredTargets = ['note-col-d', 'note-col-e', 'note-col-f', 'note-col-simplebench'];
     return {
-      targetId: retiredTargets[catIdx - 9] || 'csv-notes-section',
+      targetId: retiredTargets[catIdx - 9] || 'note-col-simplebench',
     };
   }, [unifiedSliderValue]);
 
@@ -131,7 +133,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
         container.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       const doScrollToTarget = () => {
-        const el = document.getElementById(targetId) || document.getElementById('final-scores-section');
+        const el = document.getElementById(targetId) || document.getElementById('note-col-simplebench') || document.getElementById('note-col-k') || document.getElementById('final-scores-section');
         const box = document.getElementById('section1-scroll-box');
         if (el) {
           if (box) {
@@ -150,11 +152,46 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
     }
   };
 
+  const renderSyncedBadge = (text: string, sourceUrl?: string) => {
+    if (!text) return null;
+    if (sourceUrl) {
+      const isInternal = sourceUrl.startsWith('#');
+      return (
+        <a
+          href={sourceUrl}
+          target={isInternal ? '_self' : '_blank'}
+          rel={isInternal ? undefined : 'noopener noreferrer'}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isInternal) {
+              const el = document.getElementById(sourceUrl.slice(1));
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }}
+          className="inline-flex items-center gap-1 text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 hover:border-emerald-500/80 hover:text-emerald-300 transition-colors cursor-pointer"
+          title={isInternal ? (lang === 'de' ? 'Zur Erklärung springen' : 'Jump to explanation') : `Quelle: ${sourceUrl}`}
+        >
+          <span className="truncate max-w-[150px]">{text}</span>
+          {!isInternal && <ExternalLink className="w-2.5 h-2.5 opacity-70 shrink-0" />}
+        </a>
+      );
+    }
+    return (
+      <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 block truncate max-w-[150px]">
+        {text}
+      </span>
+    );
+  };
+
   const activeScoreTooltip = useMemo(() => {
     if (unifiedSliderValue === 0) {
+      const item = row33Meta?.scoreNewColM;
       return {
         title: t.scoreModeNew,
-        badge: lang === 'de' ? '8 Benchmarks' : '8 Benchmarks',
+        badge: renderSyncedBadge(
+          item?.text || (lang === 'de' ? '8 Benchmarks' : '8 Benchmarks'),
+          item?.sourceUrl || '#note-col-m'
+        ),
         desc:
           lang === 'de'
             ? 'Umfassender Gesamt-Score aus allen 8 gleichgewichteten Benchmark-Kriterien (jeweils 12,5 %). Aktueller Standard für moderne Chatbots.'
@@ -163,9 +200,13 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
       };
     }
     if (unifiedSliderValue === 1) {
+      const item = row33Meta?.scoreOldColL;
       return {
         title: t.scoreModeOld,
-        badge: lang === 'de' ? '5 Benchmarks' : '5 Benchmarks',
+        badge: renderSyncedBadge(
+          item?.text || (lang === 'de' ? '5 Benchmarks' : '5 Benchmarks'),
+          item?.sourceUrl || '#note-col-l'
+        ),
         desc:
           lang === 'de'
             ? 'Historischer Gesamt-Score basierend auf den ursprünglichen 5 Benchmarks. Ermöglicht den Vergleich über einen längeren Zeitraum mit bis zu 224 Modellen.'
@@ -174,9 +215,13 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
       };
     }
     if (unifiedSliderValue === 2) {
+      const item = row33Meta?.scoreWorstCaseColN;
       return {
         title: t.scoreModeWorstCase,
-        badge: lang === 'de' ? 'Straf-Score' : 'Penalty Score',
+        badge: renderSyncedBadge(
+          item?.text || (lang === 'de' ? 'Straf-Score' : 'Penalty Score'),
+          item?.sourceUrl || '#note-col-n'
+        ),
         desc:
           lang === 'de'
             ? 'Worst-Case-Score: Der 7-Benchmark-Durchschnitt wird mit der Nicht-Halluzinations-Rate multipliziert. Bestraft unzuverlässige und fabulierende Modelle drastisch.'
@@ -188,9 +233,23 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
       const isRetired = unifiedSliderValue > 10;
       const numPrefix = !isRetired ? `#${unifiedSliderValue - 2} ` : '';
       const name = activeCategoryName || (lang === 'de' ? activeCategoryComp.nameDe : activeCategoryComp.nameEn);
+
+      let syncedItem: { text: string; sourceUrl?: string } | undefined;
+      if (row33Meta) {
+        const id = activeCategoryComp.id;
+        if (id in row33Meta.benchmarks) {
+          syncedItem = row33Meta.benchmarks[id as keyof typeof row33Meta.benchmarks];
+        } else if (id in row33Meta.retiredBenchmarks) {
+          syncedItem = row33Meta.retiredBenchmarks[id as keyof typeof row33Meta.retiredBenchmarks];
+        }
+      }
+
+      const badgeText = syncedItem?.text || activeCategoryComp.sourceName || (isRetired ? (lang === 'de' ? 'Archiv' : 'Retired') : 'Benchmark');
+      const badgeUrl = syncedItem?.sourceUrl || activeCategoryComp.sourceUrl;
+
       return {
         title: `${numPrefix}${name}`,
-        badge: activeCategoryComp.sourceName || (isRetired ? (lang === 'de' ? 'Archiv' : 'Retired') : 'Benchmark'),
+        badge: renderSyncedBadge(badgeText, badgeUrl),
         desc: lang === 'de' ? activeCategoryComp.descriptionDe : activeCategoryComp.descriptionEn,
         detail:
           activeCategoryComp.weightPct > 0
@@ -203,7 +262,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
       };
     }
     return null;
-  }, [unifiedSliderValue, activeCategoryComp, activeCategoryName, lang, t]);
+  }, [unifiedSliderValue, activeCategoryComp, activeCategoryName, lang, t, row33Meta]);
 
   return (
     <div className="relative flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0 max-w-full font-mono text-xs">

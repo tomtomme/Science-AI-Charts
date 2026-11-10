@@ -119,11 +119,14 @@ export function getParagraphAnchorId(heading?: string): string | undefined {
   // Cat 6: Excel Analyst (Col I)
   if (h.includes('spalte i') || h.includes('column i') || h.includes('excel')) return 'note-col-i';
 
-  // Cat 7: Agentic Work / GDPx (Col J, formerly (3D) Trick Questions)
-  if (h.includes('spalte j') || h.includes('column j') || h.includes('agentic') || h.includes('gdpx') || h.includes('trick questions') || h.includes('trickfragen') || h.includes('simplebench') || h.includes('(3d)')) return 'note-col-j';
+  // Cat 7: Agentic Work / GDPx (Col J)
+  if (h.includes('spalte j') || h.includes('column j') || h.includes('agentic') || h.includes('gdpx')) return 'note-col-j';
 
   // Cat 8: Real Econ & Legal Work (Col K)
   if (h.includes('spalte k') || h.includes('column k') || h.includes('real econ') || h.includes('econ & legal') || h.includes('vals') || h.includes('wirtschaft')) return 'note-col-k';
+
+  // SimpleBench (historical Benchmark #7 / Col X, located right under Real Econ & Legal Work)
+  if (h.includes('simplebench') || h.includes('trick questions') || h.includes('trickfragen') || h.includes('(3d)')) return 'note-col-simplebench';
 
   // Major section: Final Scores explainer ("The Final Scores which are comprised of the different benchmarks")
   if (
@@ -201,7 +204,7 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
 
   // 3. Explicit known benchmark keywords (e.g. IQ, Non-Hallucination-Rate, Science Knowledge, Agentic Work, etc.)
   // Handles punctuation boundaries, optional dashes, spaces, and 'in %' suffixes
-  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|Agentic(?:\s+Work)?|GDPx|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])\s*/gi;
+  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|Agentic(?:\s+Work)?|GDPx|SimpleBench|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])\s*/gi;
   while ((match = benchmarkKeywordsRegex.exec(rawText)) !== null) {
     cuts.push({
       start: match.index,

@@ -49,7 +49,7 @@ export const CSV_NOTES_DATA: {
       {
         heading: 'Plot Reading',
         text: 'This contains the MMMU Pro image reading score in %. For statistical data analysis we need graph / plot analysis. Consequently MMMU Pro asks 1.7k questions which require interpreting and reasoning over images. Some MMMU Pro estimated of MMMU non-Pro scores, some reflect MMMU Pro score of bolted on Vision model (if main model is text only). Because the lowest score besides 0 is 29, the score is rescaled to assume the bottom of 29 as the real 0.',
-        link: { url: 'https://mmmu-benchmark.github.io', label: 'mmmu-benchmark.github.io' },
+        link: { url: 'https://artificialanalysis.ai/evaluations/mmmu-pro', label: 'artificialanalysis.ai' },
       },
       {
         heading: 'Diagnostic',
@@ -68,6 +68,11 @@ export const CSV_NOTES_DATA: {
         heading: 'Real Econ & Legal Work',
         text: 'Vals.ai score gives us the correctly solved percentage across thousands of tasks including finance (Excel), coding, and legal work. It is similar to the initial IQ benchmark in regard to its evaluations being updated or replaced regularly to prevent cheating & to go along with the ever growing capabilities of bots. To solve the tasks, the bots need to execute multi-step quantitative workflows, process structured datasets, and assist with statistical software environments such as Excel.',
         link: { url: 'https://vals.ai', label: 'Vals.ai' },
+      },
+      {
+        heading: 'SimpleBench',
+        text: 'A benchmark consisting of 200 single-choice (1 of 6) trick questions covering spatial (3D) reasoning and common sense tasks - easy for humans to solve, but notoriously challenging for bots because they require physical 3D spatial imagination. Formerly Benchmark #7 (now replaced in the active 8 benchmarks by Agentic Work / GDPx), SimpleBench is preserved as a historical benchmark in the Timeline & Correlation tabs. Because guessing purely yields 16.67%, the score is rescaled (1.2 × (X - 16.67)) so 16.67% represents 0.',
+        link: { url: 'https://simple-bench.com', label: 'SimpleBench.com' },
       },
       {
         heading: 'The "Final Scores" which are comprised of the benchmarks above',
@@ -126,7 +131,7 @@ export const CSV_NOTES_DATA: {
       {
         heading: 'Plot Reading',
         text: 'Enthält den MMMU-Pro-Score für „Bildlesen“ in %. Für die statistische Datenanalyse benötigen wir Graph- / Plot-Analysen. Dementsprechend stellt MMMU Pro 1.700 Fragen, die das Interpretieren von und logische Schlussfolgern über Bilder erfordern. Einige MMMU-Pro-Werte sind Schätzungen aus MMMU-Non-Pro-Scores, einige spiegeln den MMMU-Pro-Score eines angeflanschten Vision-Modells wider (falls das Hauptmodell rein textbasiert ist). Da der niedrigste Wert neben 0 bei 29 liegt, wird der Score so umskaliert, dass der Tiefstwert von 29 als echte 0 angenommen wird.',
-        link: { url: 'https://mmmu-benchmark.github.io', label: 'mmmu-benchmark.github.io' },
+        link: { url: 'https://artificialanalysis.ai/evaluations/mmmu-pro', label: 'artificialanalysis.ai' },
       },
       {
         heading: 'Diagnostic',
@@ -145,6 +150,11 @@ export const CSV_NOTES_DATA: {
         heading: 'Real Econ & Legal Work',
         text: 'Der Vals.ai-Score gibt den korrekt gelösten Prozentsatz über Tausende von Aufgaben hinweg an, darunter Finanzen (Excel), Programmierung und juristische Arbeit. Er ähnelt dem anfänglichen IQ-Benchmark darin, dass seine Evaluationen regelmäßig aktualisiert oder ersetzt werden, um Täuschungen zu verhindern & mit den stetig wachsenden Fähigkeiten der Bots Schritt zu halten. Um die Aufgaben zu lösen, müssen die Bots mehrstufige quantitative Arbeitsabläufe ausführen, strukturierte Datensätze verarbeiten und bei statistischen Softwareumgebungen wie Excel unterstützen.',
         link: { url: 'https://vals.ai', label: 'Vals.ai' },
+      },
+      {
+        heading: 'SimpleBench',
+        text: 'Ein Benchmark aus 200 Single-Choice-Fangfragen (1 aus 6) zu räumlichem (3D) Vorstellungsvermögen und gesundem Menschenverstand – für Menschen mühelos, für Bots jedoch besonders schwer, da ihnen die physische 3D-Erfahrung fehlt. Ursprünglich Benchmark #7 (im aktuellen 8-Benchmark-Set durch Agentic Work / GDPx abgelöst), bleibt SimpleBench als historischer Benchmark in Zeitreihe und Korrelationen erhalten. Da reines Raten 16,67 % ergibt, wird der Score umskaliert (1,2 × (X - 16,67)), sodass 16,67 % die echte 0 darstellen.',
+        link: { url: 'https://simple-bench.com', label: 'SimpleBench.com' },
       },
       {
         heading: 'Die „Final Scores“, die sich aus den obigen Benchmarks zusammensetzen',

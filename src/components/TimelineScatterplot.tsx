@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, Sparkles } from 'lucide-react';
-import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint } from '../types';
+import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint, Row33Metadata } from '../types';
 import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS } from '../data/benchmarks';
 import { calculateRegression, extractFrontierPoints } from '../utils/mathRegression';
 import { calculatePearson, calculateSpearman } from '../utils/correlationUtils';
@@ -27,6 +27,7 @@ interface TimelineScatterplotProps {
   loessSpan?: number;
   onLoessSpanChange?: (span: number) => void;
   hideHeaderControls?: boolean;
+  row33Meta?: Row33Metadata;
 }
 
 export interface RegressionOption {
@@ -47,8 +48,8 @@ export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
     labelEn: 'Linear (Trendline)',
     shortDe: 'Linear',
     shortEn: 'Linear',
-    descDe: 'Geradliniger Trend über Zeit',
-    descEn: 'Straight-line trend over time',
+    descDe: 'Geht von einem gleichmäßigen Zuwachs pro Zeiteinheit aus. Als elementares Basismodell der deskriptiven Statistik veranschaulicht die Gerade die fundamentale Entwicklungsrichtung, kann jedoch Beschleunigungen oder Sättigungseffekte nicht abbilden.',
+    descEn: 'Assumes a steady rate of improvement over time. As the fundamental baseline in descriptive statistics, this straight line captures the general trajectory, though it cannot reflect acceleration or plateaus.',
     color: '#6366f1', // Indigo
   },
   {
@@ -57,8 +58,8 @@ export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
     labelEn: 'Exponential (Growth)',
     shortDe: 'Expon.',
     shortEn: 'Expon.',
-    descDe: 'Exponentielles Wachstum',
-    descEn: 'Exponential acceleration',
+    descDe: 'Modelliert ein sich selbst verstärkendes, prozentuales Wachstum: Mit jedem Entwicklungsschritt fällt der absolute Punktgewinn größer aus. Eignet sich zur empirischen Prüfung von Thesen eines unaufhaltsamen KI-Sprungs („Law of Accelerating Returns“), stößt in der Realität jedoch unweigerlich an Grenzen.',
+    descEn: 'Models compounding percentage growth: absolute gains expand with every stage. Useful to empirically test hypotheses of runaway AI leaps, though real-world physical and evaluation constraints inevitably lead to saturation.',
     color: '#8b5cf6', // Violet
   },
   {
@@ -67,8 +68,8 @@ export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
     labelEn: 'Power (Scaling)',
     shortDe: 'Power',
     shortEn: 'Power',
-    descDe: 'Potenzgesetz-Entwicklung',
-    descEn: 'Power-law scaling curve',
+    descDe: 'Veranschaulicht klassische Skalierungsgesetze (Power Laws, y ∝ xᵇ): Anfangs steile Fortschritte flachen mit wachsender Modellbasis zunehmend ab (abnehmender Grenznutzen). Verdeutlicht, wie viel mehr Trainingsaufwand für die letzten Prozentpunkte auf dem Weg zur Perfektion nötig wird.',
+    descEn: 'Illustrates classic scaling laws (y ∝ xᵇ): rapid early leaps gradually taper off as the base expands (diminishing returns). Highlights how each subsequent percentage gain demands exponentially greater training effort and compute.',
     color: '#ec4899', // Pink
   },
   {
@@ -77,8 +78,8 @@ export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
     labelEn: 'Polynomial (deg 2-4)',
     shortDe: 'Polynom',
     shortEn: 'Polynom.',
-    descDe: 'Parabolischer Kurventrend (Grad 2, 3 oder 4 wählbar)',
-    descEn: 'Quadratic or higher curve (deg 2, 3 or 4)',
+    descDe: 'Passt eine flexible Bogenkurve an den empirischen Verlauf an. Grad 2 modelliert Beschleunigung oder Verlangsamung (Parabel), höhere Grade (3–4) erfassen auch Wendepunkte. Studierende sollten hierbei das statistische Risiko von „Overfitting“ an den Datenrändern beachten.',
+    descEn: 'Fits a flexible curved trajectory to empirical points. Degree 2 captures simple acceleration or deceleration (parabola), while degrees 3–4 model inflection points. Beware of the statistical risk of "overfitting" near the outer boundaries.',
     color: '#f43f5e', // Rose
   },
   {
@@ -87,8 +88,8 @@ export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
     labelEn: 'LOESS (Smoothing)',
     shortDe: 'LOESS',
     shortEn: 'LOESS',
-    descDe: 'Lokale Glättung empirischer Daten',
-    descEn: 'Locally estimated empirical smoothing',
+    descDe: 'Ein nicht-parametrisches Verfahren: Statt einer starren mathematischen Formel berechnet LOESS für jeden Abschnitt eine gewichtete Regression aus benachbarten Beobachtungen. Folgt realen Entwicklungswellen besonders naturgetreu, ohne theoretische Vorannahmen aufzuzwingen.',
+    descEn: 'A non-parametric approach: instead of imposing a rigid global formula, LOESS fits weighted regressions locally to neighboring observations. Faithfully tracks empirical innovation waves without forcing preconceived mathematical assumptions.',
     color: '#f59e0b', // Amber
   },
   {
@@ -97,8 +98,8 @@ export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
     labelEn: 'Pioneers (Records)',
     shortDe: 'Pioniere',
     shortEn: 'Pioneers',
-    descDe: 'Verlauf der historischen Höchststände (Pioniere / Rekordhalter)',
-    descEn: 'Cumulative maximum pioneer breakthroughs over time',
+    descDe: 'Keine statistische Ausgleichskurve, sondern die empirische Pareto-Front: Sie verbindet ausschließlich historische Meilensteine, die zum jeweiligen Zeitpunkt einen neuen Rekordwert aller bisherigen Chatbots aufgestellt haben. Zeigt die technologische Speerspitze (State of the Art).',
+    descEn: 'Not a statistical best-fit curve, but the empirical Pareto frontier: connects only those milestone models that broke previous all-time records upon release. Highlights the cutting edge of technological capability (State of the Art).',
     color: '#d97706', // Gold / Bronze
   },
 ];
@@ -128,6 +129,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   loessSpan: propLoessSpan,
   onLoessSpanChange,
   hideHeaderControls = false,
+  row33Meta,
 }) => {
   // Regression Model state with controlled/internal fallbacks
   const [internalRegressionIndex, setInternalRegressionIndex] = useState<number>(DEFAULT_TIMELINE_REGRESSION_INDEX);
@@ -505,7 +507,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       container.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     const doScrollToTarget = () => {
-      const el = document.getElementById(targetId) || document.getElementById('final-scores-section');
+      const el = document.getElementById(targetId) || document.getElementById('note-col-simplebench') || document.getElementById('note-col-k') || document.getElementById('final-scores-section');
       const box = document.getElementById('section1-scroll-box');
       if (el) {
         if (box) {
@@ -564,18 +566,53 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
         targetId: colTargets[catIdx - 1] || 'final-scores-section',
       };
     }
-    const retiredTargets = ['note-col-d', 'note-col-e', 'note-col-f', 'note-col-j'];
+    const retiredTargets = ['note-col-d', 'note-col-e', 'note-col-f', 'note-col-simplebench'];
     return {
-      targetId: retiredTargets[catIdx - 9] || 'csv-notes-section',
+      targetId: retiredTargets[catIdx - 9] || 'note-col-simplebench',
     };
   }, [unifiedSliderValue]);
+
+  const renderSyncedBadge = (text: string, sourceUrl?: string) => {
+    if (!text) return null;
+    if (sourceUrl) {
+      const isInternal = sourceUrl.startsWith('#');
+      return (
+        <a
+          href={sourceUrl}
+          target={isInternal ? '_self' : '_blank'}
+          rel={isInternal ? undefined : 'noopener noreferrer'}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isInternal) {
+              const el = document.getElementById(sourceUrl.slice(1));
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }}
+          className="inline-flex items-center gap-1 text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 hover:border-emerald-500/80 hover:text-emerald-300 transition-colors cursor-pointer"
+          title={isInternal ? (lang === 'de' ? 'Zur Erklärung springen' : 'Jump to explanation') : `Quelle: ${sourceUrl}`}
+        >
+          <span className="truncate max-w-[150px]">{text}</span>
+          {!isInternal && <ExternalLink className="w-2.5 h-2.5 opacity-70 shrink-0" />}
+        </a>
+      );
+    }
+    return (
+      <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 block truncate max-w-[150px]">
+        {text}
+      </span>
+    );
+  };
 
   // Unified tooltip data for the score slider
   const activeScoreTooltip = useMemo(() => {
     if (unifiedSliderValue === 0) {
+      const item = row33Meta?.scoreNewColM;
       return {
         title: t.scoreModeNew,
-        badge: lang === 'de' ? '8 Benchmarks' : '8 Benchmarks',
+        badge: renderSyncedBadge(
+          item?.text || (lang === 'de' ? '8 Benchmarks' : '8 Benchmarks'),
+          item?.sourceUrl || '#note-col-m'
+        ),
         desc:
           lang === 'de'
             ? 'Umfassender Gesamt-Score aus allen 8 gleichgewichteten Benchmark-Kriterien (jeweils 12,5 %). Aktueller Standard für moderne Chatbots.'
@@ -584,9 +621,13 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       };
     }
     if (unifiedSliderValue === 1) {
+      const item = row33Meta?.scoreOldColL;
       return {
         title: t.scoreModeOld,
-        badge: lang === 'de' ? '5 Benchmarks' : '5 Benchmarks',
+        badge: renderSyncedBadge(
+          item?.text || (lang === 'de' ? '5 Benchmarks' : '5 Benchmarks'),
+          item?.sourceUrl || '#note-col-l'
+        ),
         desc:
           lang === 'de'
             ? 'Historischer Gesamt-Score basierend auf den ursprünglichen 5 Benchmarks. Ermöglicht den Vergleich über einen längeren Zeitraum mit bis zu 224 Modellen.'
@@ -595,9 +636,13 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       };
     }
     if (unifiedSliderValue === 2) {
+      const item = row33Meta?.scoreWorstCaseColN;
       return {
         title: t.scoreModeWorstCase,
-        badge: lang === 'de' ? 'Straf-Score' : 'Penalty Score',
+        badge: renderSyncedBadge(
+          item?.text || (lang === 'de' ? 'Straf-Score' : 'Penalty Score'),
+          item?.sourceUrl || '#note-col-n'
+        ),
         desc:
           lang === 'de'
             ? 'Worst-Case-Score: Der 7-Benchmark-Durchschnitt wird mit der Nicht-Halluzinations-Rate multipliziert. Bestraft unzuverlässige und fabulierende Modelle drastisch.'
@@ -609,9 +654,23 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       const isRetired = unifiedSliderValue > 10;
       const numPrefix = !isRetired ? `#${unifiedSliderValue - 2} ` : '';
       const name = activeCategoryName || (lang === 'de' ? activeComponent.nameDe : activeComponent.nameEn);
+
+      let syncedItem: { text: string; sourceUrl?: string } | undefined;
+      if (row33Meta) {
+        const id = activeComponent.id;
+        if (id in row33Meta.benchmarks) {
+          syncedItem = row33Meta.benchmarks[id as keyof typeof row33Meta.benchmarks];
+        } else if (id in row33Meta.retiredBenchmarks) {
+          syncedItem = row33Meta.retiredBenchmarks[id as keyof typeof row33Meta.retiredBenchmarks];
+        }
+      }
+
+      const badgeText = syncedItem?.text || activeComponent.sourceName || (isRetired ? (lang === 'de' ? 'Archiv' : 'Retired') : 'Benchmark');
+      const badgeUrl = syncedItem?.sourceUrl || activeComponent.sourceUrl;
+
       return {
         title: `${numPrefix}${name}`,
-        badge: activeComponent.sourceName || (isRetired ? (lang === 'de' ? 'Archiv' : 'Retired') : 'Benchmark'),
+        badge: renderSyncedBadge(badgeText, badgeUrl),
         desc: lang === 'de' ? activeComponent.descriptionDe : activeComponent.descriptionEn,
         detail:
           activeComponent.weightPct > 0
@@ -624,7 +683,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       };
     }
     return null;
-  }, [unifiedSliderValue, activeComponent, activeCategoryName, lang, t]);
+  }, [unifiedSliderValue, activeComponent, activeCategoryName, lang, t, row33Meta]);
 
   return (
     <div className="w-full space-y-3.5">
@@ -807,77 +866,97 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           ) : (
             <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
               {/* Regression Model Slider */}
-              <div className="relative z-30 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-                <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
-                  <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-                  <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setRegressionIndex((prev) => Math.max(0, prev - 1))}
-                  disabled={regressionIndex <= 0}
-                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                >
-                  <Minus className="w-3 h-3" />
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={REGRESSION_OPTIONS.length - 1}
-                  step={1}
-                  value={regressionIndex}
-                  onChange={(e) => setRegressionIndex(Number(e.target.value))}
-                  className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
-                />
-                <button
-                  type="button"
-                  onClick={() => setRegressionIndex((prev) => Math.min(REGRESSION_OPTIONS.length - 1, prev + 1))}
-                  disabled={regressionIndex >= REGRESSION_OPTIONS.length - 1}
-                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-
-                {/* Regression Badge */}
-                <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
-                  <Tooltip
-                    title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
-                    badge={lang === 'de' ? 'Modell' : 'Model'}
-                    position="bottom"
-                    align="center"
-                    width="w-72"
-                    className="w-full"
-                    content={
-                      <div className="space-y-1.5">
-                        <p className="leading-snug">{lang === 'de' ? activeRegression.descDe : activeRegression.descEn}</p>
-                        {regression.formula && (
-                          <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                            {regression.formula}
-                          </div>
-                        )}
-                        {activeRegression.id === 'polynomial' && (
-                          <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                            {lang === 'de' ? `Polynom-Regression (Grad ${polyDegree})` : `Polynomial Regression (Degree ${polyDegree})`}
-                          </div>
-                        )}
-                        {activeRegression.id === 'loess' && (
-                          <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                            {lang === 'de' ? `LOESS-Glättung (Span ${loessSpan}%)` : `LOESS Smoothing (Span ${loessSpan}%)`}
-                          </div>
-                        )}
-                        {activeRegression.id !== 'frontier' && (
-                          <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                            <span>
-                              {lang === 'de' ? 'Inkl. 95%-Konfidenzband (Modellunsicherheit)' : 'Includes 95% confidence band (uncertainty ribbon)'}
-                            </span>
-                          </div>
-                        )}
+              <Tooltip
+                title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
+                badge={lang === 'de' ? 'Modell' : 'Model'}
+                position="bottom"
+                align="center"
+                width="w-80"
+                content={
+                  <div className="space-y-2">
+                    <p className="leading-relaxed text-slate-200">
+                      {lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
+                    </p>
+                    {regression.formula && (
+                      <div className="pt-1.5 border-t border-slate-700/60 font-mono text-[11px] text-amber-300">
+                        {regression.formula}
                       </div>
-                    }
+                    )}
+                    {activeRegression.id === 'polynomial' && (
+                      <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
+                        <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                        <span className="font-bold">
+                          {lang === 'de'
+                            ? `Grad ${polyDegree} (${polyDegree === 2 ? 'Parabel' : polyDegree === 3 ? 'Wendepunkt' : 'Höhere Ordnung'})`
+                            : `Degree ${polyDegree} (${polyDegree === 2 ? 'Parabola' : polyDegree === 3 ? 'Inflection' : 'Higher order'})`}
+                        </span>
+                      </div>
+                    )}
+                    {activeRegression.id === 'loess' && (
+                      <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
+                        <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                        <span className="font-bold">
+                          {lang === 'de' ? `Span = ${loessSpan}% (Fensterbreite)` : `Span = ${loessSpan}% (Window width)`}
+                        </span>
+                      </div>
+                    )}
+                    {activeRegression.id !== 'frontier' && (
+                      <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 leading-snug">
+                        <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                          <span>{lang === 'de' ? '95%-Konfidenzband' : '95% Confidence Band'}</span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-400 leading-normal">
+                          {lang === 'de'
+                            ? 'Das schattierte Band zeigt den statistischen Unsicherheitsbereich der Schätzung: Bei dichter Datenlage ist es schmal, bei wenigen oder streuenden Punkten weitet es sich.'
+                            : 'The shaded ribbon reflects estimation uncertainty: narrow where data is abundant, wider where observations are scarce or dispersed.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                }
+              >
+                <div className="relative z-30 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 cursor-pointer">
+                  <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+                    <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRegressionIndex((prev) => Math.max(0, prev - 1));
+                    }}
+                    disabled={regressionIndex <= 0}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
                   >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={REGRESSION_OPTIONS.length - 1}
+                    step={1}
+                    value={regressionIndex}
+                    onChange={(e) => setRegressionIndex(Number(e.target.value))}
+                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRegressionIndex((prev) => Math.min(REGRESSION_OPTIONS.length - 1, prev + 1));
+                    }}
+                    disabled={regressionIndex >= REGRESSION_OPTIONS.length - 1}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+
+                  {/* Regression Badge */}
+                  <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
                     <span
-                      className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-95 transition-opacity"
+                      className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full hover:opacity-95 transition-opacity"
                       style={{ backgroundColor: activeRegression.color }}
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
@@ -885,9 +964,9 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                         {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
                       </span>
                     </span>
-                  </Tooltip>
+                  </div>
                 </div>
-              </div>
+              </Tooltip>
 
               {/* Contextual Parameter Input (Fixed width, Active for Polynomial & LOESS, otherwise grayed-out) */}
               <Tooltip

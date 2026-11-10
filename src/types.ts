@@ -119,6 +119,35 @@ export interface CsvNotesMetadata {
   section2Paragraphs?: CsvParagraph[];
 }
 
+export interface Row33Item {
+  text: string;
+  sourceUrl?: string;
+}
+
+export interface Row33Metadata {
+  scoreNewColM: Row33Item;
+  scoreOldColL: Row33Item;
+  scoreWorstCaseColN: Row33Item;
+  benchmarks: {
+    actCodeReason: Row33Item; // Col D
+    nonHallucination: Row33Item; // Col E
+    scienceKnowledge: Row33Item; // Col F
+    visionPlot: Row33Item; // Col G
+    medReasoning: Row33Item; // Col H
+    excelAgent: Row33Item; // Col I
+    trickQuestions: Row33Item; // Col J
+    econLegal: Row33Item; // Col K
+  };
+  retiredBenchmarks: {
+    iqOld: Row33Item; // Col U
+    nonHalluOld: Row33Item; // Col V
+    scienceKnowledgeOld: Row33Item; // Col W
+    trickQuestionsOld: Row33Item; // Col X
+  };
+  moreSourcesText?: string;
+  moreSourcesUrls?: string[];
+}
+
 export interface LabEntry {
   id: string;
   group: 'top10' | 'contender' | 'tweakers' | 'small' | 'harness';

@@ -47,8 +47,8 @@ export const CORRELATION_REGRESSION_OPTIONS: CorrelationRegressionOption[] = [
     labelEn: 'Linear (Trendline)',
     shortDe: 'Linear',
     shortEn: 'Linear',
-    descDe: 'Geradlinige Trendlinie (Pearson r Bezug)',
-    descEn: 'Straight-line trend (Pearson r reference)',
+    descDe: 'Klassische Pearson-Regressionsgerade: Zeigt den proportionalen Zusammenhang zwischen zwei Benchmarks. Die Steigung quantifiziert, wie viele Punkte Benchmark Y durchschnittlich pro Punkt in Benchmark X hinzugewinnt.',
+    descEn: 'Standard Pearson regression line: shows the proportional relationship between two benchmarks. The slope quantifies expected gains on benchmark Y per point increase in benchmark X.',
     color: '#6366f1', // Indigo
   },
   {
@@ -57,8 +57,8 @@ export const CORRELATION_REGRESSION_OPTIONS: CorrelationRegressionOption[] = [
     labelEn: 'Polynomial (deg 2-4)',
     shortDe: 'Polynom',
     shortEn: 'Polynom.',
-    descDe: 'Parabolischer oder kubischer Kurventrend',
-    descEn: 'Quadratic or cubic curve',
+    descDe: 'Kurvenförmiger Zusammenhang: Prüft, ob der Fähigkeitstransfer zwischen beiden Benchmarks bei höherer Leistung ansteigt (progressive Synergien) oder abflacht (Sättigungseffekt). Vorsicht vor Überanpassung (Overfitting) an den Rändern.',
+    descEn: 'Curvilinear relationship: tests whether cross-domain transfer accelerates at higher skill tiers (progressive synergies) or tapers off (saturation effect). Beware of boundary overfitting.',
     color: '#f43f5e', // Rose
   },
   {
@@ -67,8 +67,8 @@ export const CORRELATION_REGRESSION_OPTIONS: CorrelationRegressionOption[] = [
     labelEn: 'Power (Scaling)',
     shortDe: 'Power',
     shortEn: 'Power',
-    descDe: 'Potenzgesetz-Entwicklung',
-    descEn: 'Power-law scaling curve',
+    descDe: 'Potenzbeziehung (Power Law, y ∝ xᵇ): Untersucht, ob Fähigkeiten als multiplikativer Hebel wirken, wobei Zuwächse in der Spitze häufig abnehmenden Grenzerträgen unterliegen.',
+    descEn: 'Power-law scaling (y ∝ xᵇ): tests whether one capability acts as a compounding multiplier for another, often showing diminishing returns at the top tier.',
     color: '#ec4899', // Pink
   },
   {
@@ -77,8 +77,8 @@ export const CORRELATION_REGRESSION_OPTIONS: CorrelationRegressionOption[] = [
     labelEn: 'Exponential (Growth)',
     shortDe: 'Expon.',
     shortEn: 'Expon.',
-    descDe: 'Exponentielles Wachstum',
-    descEn: 'Exponential acceleration',
+    descDe: 'Exponentielle Kopplung: Modelliert Szenarien, in denen hohe Punktzahlen in Benchmark X einen überproportionalen, sprunghaften Durchbruch in Benchmark Y auslösen.',
+    descEn: 'Exponential coupling: models scenarios where high mastery in benchmark X triggers disproportionate breakthrough jumps in benchmark Y.',
     color: '#8b5cf6', // Violet
   },
   {
@@ -87,8 +87,8 @@ export const CORRELATION_REGRESSION_OPTIONS: CorrelationRegressionOption[] = [
     labelEn: 'LOESS (Smoothing)',
     shortDe: 'LOESS',
     shortEn: 'LOESS',
-    descDe: 'Lokale Glättung empirischer Daten',
-    descEn: 'Locally estimated empirical smoothing',
+    descDe: 'Lokale Glättung: Bildet den realen Zusammenhang empirisch ab, ohne eine lineare oder quadratische Form zu erzwingen. Deckt auch lokale Schwelleneffekte oder Stagnationsplateaus auf.',
+    descEn: 'Local scatterplot smoothing: maps empirical dependencies without forcing linear or quadratic shapes, revealing local threshold effects or performance plateaus.',
     color: '#f59e0b', // Amber
   },
 ];
@@ -1164,74 +1164,94 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
         {/* Shared Regression Model Slider & Param Input */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Regression Model Picker */}
-          <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-            <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-              <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setRegressionIndex((prev) => Math.max(0, prev - 1))}
-              disabled={regressionIndex <= 0}
-              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-              title="-1"
-            >
-              <Minus className="w-3 h-3" />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={CORRELATION_REGRESSION_OPTIONS.length - 1}
-              step={1}
-              value={regressionIndex}
-              onChange={(e) => setRegressionIndex(Number(e.target.value))}
-              className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
-            />
-            <button
-              type="button"
-              onClick={() => setRegressionIndex((prev) => Math.min(CORRELATION_REGRESSION_OPTIONS.length - 1, prev + 1))}
-              disabled={regressionIndex >= CORRELATION_REGRESSION_OPTIONS.length - 1}
-              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-              title="+1"
-            >
-              <Plus className="w-3 h-3" />
-            </button>
-
-            {/* Model Badge */}
-            <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
-              <Tooltip
-                title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
-                badge={lang === 'de' ? 'Modell' : 'Model'}
-                position="bottom"
-                align="center"
-                width="w-72"
-                className="w-full"
-                content={
-                  <div className="space-y-1.5">
-                    <p className="leading-snug">{lang === 'de' ? activeRegression.descDe : activeRegression.descEn}</p>
-                    {activeRegression.id === 'polynomial' && (
-                      <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                        {lang === 'de' ? `Polynom-Regression (Grad ${polyDegree})` : `Polynomial Regression (Degree ${polyDegree})`}
-                      </div>
-                    )}
-                    {activeRegression.id === 'loess' && (
-                      <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                        {lang === 'de' ? `LOESS-Glättung (Span ${loessSpan}%)` : `LOESS Smoothing (Span ${loessSpan}%)`}
-                      </div>
-                    )}
-                    {activeRegression.id !== 'frontier' && (
-                      <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                        <span>
-                          {lang === 'de' ? 'Inkl. 95%-Konfidenzband (Modellunsicherheit)' : 'Includes 95% confidence band (uncertainty ribbon)'}
-                        </span>
-                      </div>
-                    )}
+          <Tooltip
+            title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
+            badge={lang === 'de' ? 'Modell' : 'Model'}
+            position="bottom"
+            align="center"
+            width="w-80"
+            content={
+              <div className="space-y-2">
+                <p className="leading-relaxed text-slate-200">
+                  {lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
+                </p>
+                {activeRegression.id === 'polynomial' && (
+                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
+                    <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                    <span className="font-bold">
+                      {lang === 'de'
+                        ? `Grad ${polyDegree} (${polyDegree === 2 ? 'Parabel' : polyDegree === 3 ? 'Wendepunkt' : 'Höhere Ordnung'})`
+                        : `Degree ${polyDegree} (${polyDegree === 2 ? 'Parabola' : polyDegree === 3 ? 'Inflection' : 'Higher order'})`}
+                    </span>
                   </div>
-                }
+                )}
+                {activeRegression.id === 'loess' && (
+                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
+                    <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                    <span className="font-bold">
+                      {lang === 'de' ? `Span = ${loessSpan}% (Fensterbreite)` : `Span = ${loessSpan}% (Window width)`}
+                    </span>
+                  </div>
+                )}
+                {activeRegression.id !== 'frontier' && (
+                  <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 leading-snug">
+                    <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                      <span>{lang === 'de' ? '95%-Konfidenzband' : '95% Confidence Band'}</span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-400 leading-normal">
+                      {lang === 'de'
+                        ? 'Das schattierte Band zeigt den statistischen Unsicherheitsbereich der Schätzung: Bei dichter Datenlage ist es schmal, bei wenigen oder streuenden Punkten weitet es sich.'
+                        : 'The shaded ribbon reflects estimation uncertainty: narrow where data is abundant, wider where observations are scarce or dispersed.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            }
+          >
+            <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 cursor-pointer">
+              <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+                <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+                <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRegressionIndex((prev) => Math.max(0, prev - 1));
+                }}
+                disabled={regressionIndex <= 0}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                title="-1"
               >
+                <Minus className="w-3 h-3" />
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={CORRELATION_REGRESSION_OPTIONS.length - 1}
+                step={1}
+                value={regressionIndex}
+                onChange={(e) => setRegressionIndex(Number(e.target.value))}
+                className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRegressionIndex((prev) => Math.min(CORRELATION_REGRESSION_OPTIONS.length - 1, prev + 1));
+                }}
+                disabled={regressionIndex >= CORRELATION_REGRESSION_OPTIONS.length - 1}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                title="+1"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+
+              {/* Model Badge */}
+              <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
                 <span
-                  className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-95 transition-opacity"
+                  className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full hover:opacity-95 transition-opacity"
                   style={{ backgroundColor: activeRegression.color }}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
@@ -1239,9 +1259,9 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                     {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
                   </span>
                 </span>
-              </Tooltip>
+              </div>
             </div>
-          </div>
+          </Tooltip>
 
           {/* Contextual Param Input (Fixed 76px width) */}
           <div

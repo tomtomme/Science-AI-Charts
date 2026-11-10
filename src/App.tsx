@@ -405,7 +405,7 @@ export default function App() {
     }
 
     const doScrollToTarget = () => {
-      const el = document.getElementById(targetId) || document.getElementById('final-scores-section');
+      const el = document.getElementById(targetId) || document.getElementById('note-col-simplebench') || document.getElementById('note-col-k') || document.getElementById('final-scores-section');
       const box = document.getElementById('section1-scroll-box');
       if (el) {
         if (box) {
@@ -1124,7 +1124,7 @@ export default function App() {
           </div>
 
           {/* Right section: Active filter reset notice + Benchmark Controls (accessible on mobile/tablet) */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 lg:ml-auto max-w-full overflow-x-auto no-scrollbar py-0.5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 lg:ml-auto max-w-full py-0.5">
             {/* Active filter reset notice */}
             {searchFilter && activeTab === 'benchmark' && benchmarkView === 'barchart' && (
               <div className="flex items-center gap-2 text-xs shrink-0">
@@ -1150,6 +1150,7 @@ export default function App() {
                   selectedCategoryIndex={selectedCategoryIndex}
                   onSelectCategoryIndex={setSelectedCategoryIndex}
                   categoryNames={loadedData.headerMeta?.categoryNames}
+                  row33Meta={loadedData.headerMeta?.row33}
                   onHoverCategory={setCategoryInfoComp}
                   onScrollToParagraph={scrollToParagraph}
                   lang={lang}
@@ -1355,6 +1356,7 @@ export default function App() {
                     }
                   }}
                   categoryNames={loadedData.headerMeta?.categoryNames}
+                  row33Meta={loadedData.headerMeta?.row33}
                   onHoverCategory={setCategoryInfoComp}
                   onScrollToParagraph={scrollToParagraph}
                   lang={lang}
@@ -1394,75 +1396,95 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Regression Model Controller */}
-                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-                  <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
-                    <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
-                    <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setTimelineRegressionIndex((prev) => Math.max(0, prev - 1))}
-                    disabled={timelineRegressionIndex <= 0}
-                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                    title="-1"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={TIMELINE_REGRESSION_OPTIONS.length - 1}
-                    step={1}
-                    value={timelineRegressionIndex}
-                    onChange={(e) => setTimelineRegressionIndex(Number(e.target.value))}
-                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setTimelineRegressionIndex((prev) => Math.min(TIMELINE_REGRESSION_OPTIONS.length - 1, prev + 1))}
-                    disabled={timelineRegressionIndex >= TIMELINE_REGRESSION_OPTIONS.length - 1}
-                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                    title="+1"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-
-                  {/* Model Badge */}
-                  <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
-                    <Tooltip
-                      title={lang === 'de' ? activeTimelineRegression.labelDe : activeTimelineRegression.labelEn}
-                      badge={lang === 'de' ? 'Modell' : 'Model'}
-                      position="bottom"
-                      align="center"
-                      width="w-72"
-                      className="w-full"
-                      content={
-                        <div className="space-y-1.5">
-                          <p className="leading-snug">{lang === 'de' ? activeTimelineRegression.descDe : activeTimelineRegression.descEn}</p>
-                          {activeTimelineRegression.id === 'polynomial' && (
-                            <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                              {lang === 'de' ? `Polynom-Regression (Grad ${timelinePolyDegree})` : `Polynomial Regression (Degree ${timelinePolyDegree})`}
-                            </div>
-                          )}
-                          {activeTimelineRegression.id === 'loess' && (
-                            <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                              {lang === 'de' ? `LOESS-Glättung (Span ${timelineLoessSpan}%)` : `LOESS Smoothing (Span ${timelineLoessSpan}%)`}
-                            </div>
-                          )}
-                          {activeTimelineRegression.id !== 'frontier' && (
-                            <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                              <span>
-                                {lang === 'de' ? 'Inkl. 95%-Konfidenzband (Modellunsicherheit)' : 'Includes 95% confidence band (uncertainty ribbon)'}
-                              </span>
-                            </div>
-                          )}
+                {/* Regression Model Controller wrapped in Tooltip */}
+                <Tooltip
+                  title={lang === 'de' ? activeTimelineRegression.labelDe : activeTimelineRegression.labelEn}
+                  badge={lang === 'de' ? 'Modell' : 'Model'}
+                  position="bottom"
+                  align="center"
+                  width="w-80"
+                  content={
+                    <div className="space-y-2">
+                      <p className="leading-relaxed text-slate-200">
+                        {lang === 'de' ? activeTimelineRegression.descDe : activeTimelineRegression.descEn}
+                      </p>
+                      {activeTimelineRegression.id === 'polynomial' && (
+                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
+                          <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                          <span className="font-bold">
+                            {lang === 'de'
+                              ? `Grad ${timelinePolyDegree} (${timelinePolyDegree === 2 ? 'Parabel' : timelinePolyDegree === 3 ? 'Wendepunkt' : 'Höhere Ordnung'})`
+                              : `Degree ${timelinePolyDegree} (${timelinePolyDegree === 2 ? 'Parabola' : timelinePolyDegree === 3 ? 'Inflection' : 'Higher order'})`}
+                          </span>
                         </div>
-                      }
+                      )}
+                      {activeTimelineRegression.id === 'loess' && (
+                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
+                          <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                          <span className="font-bold">
+                            {lang === 'de' ? `Span = ${timelineLoessSpan}% (Fensterbreite)` : `Span = ${timelineLoessSpan}% (Window width)`}
+                          </span>
+                        </div>
+                      )}
+                      {activeTimelineRegression.id !== 'frontier' && (
+                        <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 leading-snug">
+                          <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                            <span>{lang === 'de' ? '95%-Konfidenzband' : '95% Confidence Band'}</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-400 leading-normal">
+                            {lang === 'de'
+                              ? 'Das schattierte Band zeigt den statistischen Unsicherheitsbereich der Schätzung: Bei dichter Datenlage ist es schmal, bei wenigen oder streuenden Punkten weitet es sich.'
+                              : 'The shaded ribbon reflects estimation uncertainty: narrow where data is abundant, wider where observations are scarce or dispersed.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  }
+                >
+                  <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 cursor-pointer">
+                    <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+                      <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                      <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTimelineRegressionIndex((prev) => Math.max(0, prev - 1));
+                      }}
+                      disabled={timelineRegressionIndex <= 0}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                      title="-1"
                     >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={TIMELINE_REGRESSION_OPTIONS.length - 1}
+                      step={1}
+                      value={timelineRegressionIndex}
+                      onChange={(e) => setTimelineRegressionIndex(Number(e.target.value))}
+                      className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTimelineRegressionIndex((prev) => Math.min(TIMELINE_REGRESSION_OPTIONS.length - 1, prev + 1));
+                      }}
+                      disabled={timelineRegressionIndex >= TIMELINE_REGRESSION_OPTIONS.length - 1}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                      title="+1"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+
+                    {/* Model Badge */}
+                    <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
                       <span
-                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-95 transition-opacity"
+                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full hover:opacity-95 transition-opacity"
                         style={{ backgroundColor: activeTimelineRegression.color }}
                       >
                         <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
@@ -1470,9 +1492,9 @@ export default function App() {
                           {lang === 'de' ? activeTimelineRegression.shortDe : activeTimelineRegression.shortEn}
                         </span>
                       </span>
-                    </Tooltip>
+                    </div>
                   </div>
-                </div>
+                </Tooltip>
 
                 {/* Contextual Param Input */}
                 <div
@@ -1566,75 +1588,95 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Regression Model Controller */}
-                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-                  <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
-                    <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-                    <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCorrelationsRegressionIndex((prev) => Math.max(0, prev - 1))}
-                    disabled={correlationsRegressionIndex <= 0}
-                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                    title="-1"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={CORRELATION_REGRESSION_OPTIONS.length - 1}
-                    step={1}
-                    value={correlationsRegressionIndex}
-                    onChange={(e) => setCorrelationsRegressionIndex(Number(e.target.value))}
-                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setCorrelationsRegressionIndex((prev) => Math.min(CORRELATION_REGRESSION_OPTIONS.length - 1, prev + 1))}
-                    disabled={correlationsRegressionIndex >= CORRELATION_REGRESSION_OPTIONS.length - 1}
-                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                    title="+1"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-
-                  {/* Model Badge */}
-                  <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
-                    <Tooltip
-                      title={lang === 'de' ? activeCorrelationsRegression.labelDe : activeCorrelationsRegression.labelEn}
-                      badge={lang === 'de' ? 'Modell' : 'Model'}
-                      position="bottom"
-                      align="center"
-                      width="w-72"
-                      className="w-full"
-                      content={
-                        <div className="space-y-1.5">
-                          <p className="leading-snug">{lang === 'de' ? activeCorrelationsRegression.descDe : activeCorrelationsRegression.descEn}</p>
-                          {activeCorrelationsRegression.id === 'polynomial' && (
-                            <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                              {lang === 'de' ? `Polynom-Regression (Grad ${correlationsPolyDegree})` : `Polynomial Regression (Degree ${correlationsPolyDegree})`}
-                            </div>
-                          )}
-                          {activeCorrelationsRegression.id === 'loess' && (
-                            <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs font-semibold text-amber-300">
-                              {lang === 'de' ? `LOESS-Glättung (Span ${correlationsLoessSpan}%)` : `LOESS Smoothing (Span ${correlationsLoessSpan}%)`}
-                            </div>
-                          )}
-                          {activeCorrelationsRegression.id !== 'frontier' && (
-                            <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                              <span>
-                                {lang === 'de' ? 'Inkl. 95%-Konfidenzband (Modellunsicherheit)' : 'Includes 95% confidence band (uncertainty ribbon)'}
-                              </span>
-                            </div>
-                          )}
+                {/* Regression Model Controller wrapped in Tooltip */}
+                <Tooltip
+                  title={lang === 'de' ? activeCorrelationsRegression.labelDe : activeCorrelationsRegression.labelEn}
+                  badge={lang === 'de' ? 'Modell' : 'Model'}
+                  position="bottom"
+                  align="center"
+                  width="w-80"
+                  content={
+                    <div className="space-y-2">
+                      <p className="leading-relaxed text-slate-200">
+                        {lang === 'de' ? activeCorrelationsRegression.descDe : activeCorrelationsRegression.descEn}
+                      </p>
+                      {activeCorrelationsRegression.id === 'polynomial' && (
+                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
+                          <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                          <span className="font-bold">
+                            {lang === 'de'
+                              ? `Grad ${correlationsPolyDegree} (${correlationsPolyDegree === 2 ? 'Parabel' : correlationsPolyDegree === 3 ? 'Wendepunkt' : 'Höhere Ordnung'})`
+                              : `Degree ${correlationsPolyDegree} (${correlationsPolyDegree === 2 ? 'Parabola' : correlationsPolyDegree === 3 ? 'Inflection' : 'Higher order'})`}
+                          </span>
                         </div>
-                      }
+                      )}
+                      {activeCorrelationsRegression.id === 'loess' && (
+                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
+                          <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                          <span className="font-bold">
+                            {lang === 'de' ? `Span = ${correlationsLoessSpan}% (Fensterbreite)` : `Span = ${correlationsLoessSpan}% (Window width)`}
+                          </span>
+                        </div>
+                      )}
+                      {activeCorrelationsRegression.id !== 'frontier' && (
+                        <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 leading-snug">
+                          <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                            <span>{lang === 'de' ? '95%-Konfidenzband' : '95% Confidence Band'}</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-400 leading-normal">
+                            {lang === 'de'
+                              ? 'Das schattierte Band zeigt den statistischen Unsicherheitsbereich der Schätzung: Bei dichter Datenlage ist es schmal, bei wenigen oder streuenden Punkten weitet es sich.'
+                              : 'The shaded ribbon reflects estimation uncertainty: narrow where data is abundant, wider where observations are scarce or dispersed.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  }
+                >
+                  <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 cursor-pointer">
+                    <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
+                      <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+                      <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCorrelationsRegressionIndex((prev) => Math.max(0, prev - 1));
+                      }}
+                      disabled={correlationsRegressionIndex <= 0}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                      title="-1"
                     >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={CORRELATION_REGRESSION_OPTIONS.length - 1}
+                      step={1}
+                      value={correlationsRegressionIndex}
+                      onChange={(e) => setCorrelationsRegressionIndex(Number(e.target.value))}
+                      className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCorrelationsRegressionIndex((prev) => Math.min(CORRELATION_REGRESSION_OPTIONS.length - 1, prev + 1));
+                      }}
+                      disabled={correlationsRegressionIndex >= CORRELATION_REGRESSION_OPTIONS.length - 1}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                      title="+1"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+
+                    {/* Model Badge */}
+                    <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
                       <span
-                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:opacity-95 transition-opacity"
+                        className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full hover:opacity-95 transition-opacity"
                         style={{ backgroundColor: activeCorrelationsRegression.color }}
                       >
                         <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
@@ -1642,9 +1684,9 @@ export default function App() {
                           {lang === 'de' ? activeCorrelationsRegression.shortDe : activeCorrelationsRegression.shortEn}
                         </span>
                       </span>
-                    </Tooltip>
+                    </div>
                   </div>
-                </div>
+                </Tooltip>
 
                 {/* Contextual Param Input */}
                 <div
@@ -1860,6 +1902,7 @@ export default function App() {
               loessSpan={timelineLoessSpan}
               onLoessSpanChange={setTimelineLoessSpan}
               hideHeaderControls={true}
+              row33Meta={loadedData.headerMeta?.row33}
             />
 
             {/* Notes Section under Timeline */}

@@ -185,7 +185,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         name: isDe ? 'Alter Score' : 'OLD Score',
         color: '#D97706', // Amber
         badgeLabel: isDe ? '5 Benchmarks' : '5 Benchmarks',
-        sourceName: 'ArtificialAnalysis · Simple-Bench · Vals.ai',
+        sourceName: 'ArtificialAnalysis · Simple-Bench',
+        sources: [
+          { name: 'ArtificialAnalysis', url: 'https://artificialanalysis.ai' },
+          { name: 'Simple-Bench', url: 'https://simple-bench.com' },
+        ],
         description: isDe
           ? 'Früherer Gesamtscore über 5 Benchmarks vor Integration der Rechts-/Wirtschafts-Kategorie.'
           : 'Earlier composite score across 5 benchmarks prior to legal/economics integration.',
@@ -197,7 +201,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         name: 'Worst-Case',
         color: '#F43F5E', // Rose
         badgeLabel: isDe ? 'Konservatives Szenario' : 'Conservative Scenario',
-        sourceName: 'Non-Hallucination Multiplier',
+        sourceName: 'ArtificialAnalysis · SemiAnalysis GDPx · Vals.ai',
+        sources: [
+          { name: 'ArtificialAnalysis', url: 'https://artificialanalysis.ai' },
+          { name: 'SemiAnalysis GDPx', url: 'https://gdpx.semianalysis.com' },
+          { name: 'Vals.ai', url: 'https://www.vals.ai' },
+        ],
         description: isDe
           ? '7-Benchmark-Durchschnitt multipliziert mit Non-Hallucination-Rate (Spalte N).'
           : 'Conservative scenario: 7-benchmark average multiplied by Non-Hallucination Rate (Column N).',
@@ -209,7 +218,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       name: isDe ? 'Neuer Score' : 'NEW Score',
       color: '#10B981', // Emerald
       badgeLabel: isDe ? '8 Benchmarks (12.5% je)' : '8 Benchmarks (12.5% each)',
-      sourceName: 'ArtificialAnalysis · Simple-Bench · Vals.ai',
+      sourceName: 'ArtificialAnalysis · SemiAnalysis GDPx · Vals.ai',
+      sources: [
+        { name: 'ArtificialAnalysis', url: 'https://artificialanalysis.ai' },
+        { name: 'SemiAnalysis GDPx', url: 'https://gdpx.semianalysis.com' },
+        { name: 'Vals.ai', url: 'https://www.vals.ai' },
+      ],
       description: isDe
         ? 'Gewichteter Gesamtscore über alle 8 wissenschaftlichen Benchmarks mit jeweils 12.5% Gewichtung.'
         : 'Weighted total score across all 8 scientific benchmarks with 12.5% weight each.',
@@ -941,8 +955,23 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 </span>
 
                 <span className="text-slate-400">·</span>
-                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 shrink-0">
-                  {t.sourceLabel} <strong>{currentScoreInfo.sourceName}</strong>
+                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 shrink-0 inline-flex items-center gap-1">
+                  <span>{t.sourceLabel}</span>
+                  {currentScoreInfo.sources.map((src, idx) => (
+                    <React.Fragment key={src.name}>
+                      {idx > 0 && <span className="text-slate-400 dark:text-slate-500 mx-0.5">·</span>}
+                      <a
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-blue-600 dark:hover:text-blue-300 font-bold underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 inline-flex items-center gap-0.5 transition-colors cursor-pointer"
+                        title={`${src.name} (${src.url})`}
+                      >
+                        <span>{src.name}</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                      </a>
+                    </React.Fragment>
+                  ))}
                 </span>
 
                 {sortBy === 'date' && (
