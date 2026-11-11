@@ -693,112 +693,170 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
         {/* Row 1: Score Slider + Regression Model Slider + Contextual Param Input */}
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           {/* Merged Score Slider (Identical styling to bar chart tab) */}
-          <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
-            <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
-              Score:
-            </span>
-            <button
-              type="button"
-              onClick={() => handleUnifiedStep(-1)}
-              disabled={unifiedSliderValue <= 0}
-              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-              title="-1"
-            >
-              <Minus className="w-3 h-3" />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={14}
-              step={1}
-              value={unifiedSliderValue}
-              onChange={(e) => handleUnifiedSliderChange(Number(e.target.value))}
-              className="w-18 sm:w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
-            />
-            <button
-              type="button"
-              onClick={() => handleUnifiedStep(1)}
-              disabled={unifiedSliderValue >= 14}
-              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-              title="+1"
-            >
-              <Plus className="w-3 h-3" />
-            </button>
-
-            {/* Feste Box für das Badge: New Score / Old Score / Worst Case oder Kategorie 1..8/9..12 (klickbar als Sprungmarke) */}
-            {activeScoreTooltip && (
-              <Tooltip
-                title={activeScoreTooltip.title}
-                badge={activeScoreTooltip.badge}
-                position="bottom"
-                align="center"
-                width="w-72"
-                content={
-                  <div className="space-y-1.5">
-                    <p className="leading-snug">{activeScoreTooltip.desc}</p>
-                    <div className="pt-1.5 border-t border-slate-700/60 font-mono text-[11px] text-amber-300">
-                      {activeScoreTooltip.detail}
-                    </div>
-                    <div className="pt-1 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                      <span>
-                        {lang === 'de'
-                          ? 'Klicken, um zur Erklärung zu springen'
-                          : 'Click to jump to explanation'}
-                      </span>
-                    </div>
+          {activeScoreTooltip ? (
+            <Tooltip
+              title={activeScoreTooltip.title}
+              badge={activeScoreTooltip.badge}
+              position="bottom"
+              align="center"
+              width="w-[350px]"
+              content={
+                <div className="space-y-1.5">
+                  <p className="leading-snug">{activeScoreTooltip.desc}</p>
+                  <div className="pt-1.5 border-t border-slate-700/60 font-mono text-[11px] text-amber-300">
+                    {activeScoreTooltip.detail}
                   </div>
-                }
-              >
-              <div className="w-[140px] sm:w-[170px] shrink-0 overflow-hidden flex items-center">
-                {unifiedSliderValue === 0 && (
                   <button
                     type="button"
-                    onClick={() => handleScroll('note-col-m')}
-                    className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleScroll(scoreScrollTargets.targetId);
+                    }}
+                    className="w-full pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer text-left transition-colors group"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                    <span className="truncate">{t.scoreModeNew}</span>
-                  </button>
-                )}
-                {unifiedSliderValue === 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleScroll('note-col-l')}
-                    className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                    <span className="truncate">{t.scoreModeOld}</span>
-                  </button>
-                )}
-                {unifiedSliderValue === 2 && (
-                  <button
-                    type="button"
-                    onClick={() => handleScroll('note-col-n')}
-                    className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                    <span className="truncate">{t.scoreModeWorstCase}</span>
-                  </button>
-                )}
-                {unifiedSliderValue >= 3 && activeComponent && (
-                  <button
-                    type="button"
-                    onClick={() => handleScroll(scoreScrollTargets.targetId)}
-                    className="text-xs font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: activeComponent.color }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                    <span className="truncate">
-                      {unifiedSliderValue <= 10 ? `#${unifiedSliderValue - 2} ` : ''}
-                      {activeCategoryName || (lang === 'de' ? activeComponent.nameDe : activeComponent.nameEn)}
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 group-hover:scale-125 transition-transform" />
+                    <span className="group-hover:underline font-medium">
+                      {lang === 'de'
+                        ? 'Klicken, um zur Erklärung zu springen'
+                        : 'Click to jump to explanation'}
                     </span>
                   </button>
-                )}
+                </div>
+              }
+            >
+              <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 cursor-pointer">
+                <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+                  Score:
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUnifiedStep(-1);
+                  }}
+                  disabled={unifiedSliderValue <= 0}
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                  title="-1"
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={14}
+                  step={1}
+                  value={unifiedSliderValue}
+                  onChange={(e) => handleUnifiedSliderChange(Number(e.target.value))}
+                  className="w-18 sm:w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUnifiedStep(1);
+                  }}
+                  disabled={unifiedSliderValue >= 14}
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                  title="+1"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+
+                {/* Feste Box für das Badge: New Score / Old Score / Worst Case oder Kategorie 1..8/9..12 (klickbar als Sprungmarke) */}
+                <div className="w-[140px] sm:w-[170px] shrink-0 overflow-hidden flex items-center">
+                  {unifiedSliderValue === 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleScroll('note-col-m');
+                      }}
+                      className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                      <span className="truncate">{t.scoreModeNew}</span>
+                    </button>
+                  )}
+                  {unifiedSliderValue === 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleScroll('note-col-l');
+                      }}
+                      className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                      <span className="truncate">{t.scoreModeOld}</span>
+                    </button>
+                  )}
+                  {unifiedSliderValue === 2 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleScroll('note-col-n');
+                      }}
+                      className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                      <span className="truncate">{t.scoreModeWorstCase}</span>
+                    </button>
+                  )}
+                  {unifiedSliderValue >= 3 && activeComponent && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleScroll(scoreScrollTargets.targetId);
+                      }}
+                      className="text-xs font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
+                      style={{ backgroundColor: activeComponent.color }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                      <span className="truncate">
+                        {unifiedSliderValue <= 10 ? `#${unifiedSliderValue - 2} ` : ''}
+                        {activeCategoryName || (lang === 'de' ? activeComponent.nameDe : activeComponent.nameEn)}
+                      </span>
+                    </button>
+                  )}
+                </div>
               </div>
             </Tooltip>
+          ) : (
+            <div className="relative flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0">
+              <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+                Score:
+              </span>
+              <button
+                type="button"
+                onClick={() => handleUnifiedStep(-1)}
+                disabled={unifiedSliderValue <= 0}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                title="-1"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={14}
+                step={1}
+                value={unifiedSliderValue}
+                onChange={(e) => handleUnifiedSliderChange(Number(e.target.value))}
+                className="w-18 sm:w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
+              />
+              <button
+                type="button"
+                onClick={() => handleUnifiedStep(1)}
+                disabled={unifiedSliderValue >= 14}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+                title="+1"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
           )}
-          </div>
 
           {/* Right Group: When hideHeaderControls is true, show Pearson & Spearman badges directly here on Row 1. Otherwise show Regression Model Slider + Param */}
           {hideHeaderControls ? (
@@ -871,7 +929,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 badge={lang === 'de' ? 'Modell' : 'Model'}
                 position="bottom"
                 align="center"
-                width="w-80"
+                width="w-96"
                 content={
                   <div className="space-y-2">
                     <p className="leading-relaxed text-slate-200">

@@ -72,6 +72,9 @@ export function calculateRegression(
   let formula = '';
   const modelName = getRegressionName(type, param);
 
+  let linearM: number | null = null;
+  let linearB: number | null = null;
+
   if (type === 'linear') {
     // y = m*x + b
     let sumX = 0;
@@ -87,6 +90,9 @@ export function calculateRegression(
     const denom = n * sumX2 - sumX * sumX;
     const m = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
     const b = (sumY - m * sumX) / n;
+
+    linearM = m;
+    linearB = b;
 
     predictFn = (nx) => m * nx + b;
     formula = `y = ${m >= 0 ? '+' : ''}${m.toFixed(2)}·t + ${b.toFixed(1)}`;
@@ -367,50 +373,114 @@ export function calculateRegression(
   const meanNormX = normData.reduce((acc, d) => acc + d.x, 0) / n;
   const ssNormX = normData.reduce((acc, d) => acc + Math.pow(d.x - meanNormX, 2), 0) || 1e-5;
 
-  // Generate curve sample points with 95% confidence intervals
-  const points: RegressionPoint[] = [];
-  for (let step = 0; step <= steps; step++) {
-    const nx = step / steps;
-    const timeX = minX + nx * rangeX;
-    const valY = Math.max(0, predictFn(nx));
+  // Determine domain range in normalized space [startNx, endNx]
+  // In accordance with standard statistical modeling, the linear regression line (and its confidence band)
+  // must never form an artificial kink/bend at y = 0. Instead, it is cut off cleanly at its exact intersection
+  // with the x-axis (y = 0).
+  let startNx = 0;
+  let endNx = 1;
 
-    let marginOfError = 0;
-    if (type === 'frontier') {
-      marginOfError = 0;
-    } else if (type === 'loess') {
-      // Local empirical standard error smoothed across neighboring data points
-      const span = param && param >= 10 && param <= 90 ? param / 100 : Math.max(0.2, Math.min(0.65, 8 / n));
-      const dists = normData.map((d) => Math.abs(d.x - nx));
-      const sortedDists = [...dists].sort((a, b) => a - b);
-      const k = Math.min(dists.length - 1, Math.max(3, Math.floor(dists.length * span)));
-      const maxDist = sortedDists[k] || 0.1;
-
-      let sumW = 0;
-      let sumW2 = 0;
-      let sumWRes2 = 0;
-      for (let i = 0; i < n; i++) {
-        const u = dists[i] / maxDist;
-        if (u < 1) {
-          const w = Math.pow(1 - Math.pow(u, 3), 3);
-          sumW += w;
-          sumW2 += w * w;
-          sumWRes2 += w * Math.pow(residuals[i], 2);
+  if (type === 'linear' && linearM !== null && linearB !== null) {
+    if (Math.abs(linearM) > 1e-9) {
+      const rootNx = -linearB / linearM;
+      if (linearM > 0) {
+        // Line slopes upwards: hits 0 at rootNx. Below rootNx, y < 0.
+        if (rootNx >= 1) {
+          // Entirely below 0 within domain
+          startNx = 1;
+          endNx = 0;
+        } else if (rootNx > 0) {
+          // Cut off cleanly at the intersection with the x-axis (y = 0)
+          startNx = rootNx;
+        }
+      } else {
+        // Line slopes downwards: hits 0 at rootNx. Above rootNx, y < 0.
+        if (rootNx <= 0) {
+          // Entirely below 0 within domain
+          startNx = 1;
+          endNx = 0;
+        } else if (rootNx < 1) {
+          // Cut off cleanly at the intersection with the x-axis (y = 0)
+          endNx = rootNx;
         }
       }
-      const localSe = sumW > 0 ? Math.sqrt(sumWRes2 / sumW) : seResidual;
-      const effN = sumW2 > 0 ? Math.pow(sumW, 2) / sumW2 : 1;
-      marginOfError = 1.96 * (localSe / Math.sqrt(Math.max(1, effN)));
-      marginOfError = Math.max(marginOfError, 0.4);
-    } else {
-      // Parametric models: standard leverage formula
-      const leverage = 1 / n + Math.pow(nx - meanNormX, 2) / ssNormX;
-      marginOfError = 1.96 * seResidual * Math.sqrt(Math.max(0, leverage));
+    } else if (linearB < 0) {
+      // Horizontal line entirely below 0
+      startNx = 1;
+      endNx = 0;
     }
+  } else if (type === 'polynomial' || type === 'loess') {
+    // Continuous curves: if monotonic crossing at boundary, adjust startNx/endNx to root
+    const y0 = predictFn(0);
+    const y1 = predictFn(1);
+    if (y0 < 0 && y1 > 0) {
+      let lo = 0;
+      let hi = 1;
+      for (let iter = 0; iter < 24; iter++) {
+        const mid = (lo + hi) / 2;
+        if (predictFn(mid) < 0) lo = mid;
+        else hi = mid;
+      }
+      startNx = hi;
+    } else if (y0 > 0 && y1 < 0) {
+      let lo = 0;
+      let hi = 1;
+      for (let iter = 0; iter < 24; iter++) {
+        const mid = (lo + hi) / 2;
+        if (predictFn(mid) > 0) lo = mid;
+        else hi = mid;
+      }
+      endNx = lo;
+    }
+  }
 
-    const lower = Math.max(0, parseFloat((valY - marginOfError).toFixed(2)));
-    const upper = Math.min(100, parseFloat((valY + marginOfError).toFixed(2)));
+  // Generate curve sample points with 95% confidence intervals
+  const points: RegressionPoint[] = [];
+  if (startNx <= endNx) {
+    for (let step = 0; step <= steps; step++) {
+      const nx = startNx + (step / steps) * (endNx - startNx);
+      const timeX = minX + nx * rangeX;
+      const rawY = predictFn(nx);
+      const valY = Math.max(0, parseFloat(rawY.toFixed(3)));
 
-    points.push({ x: timeX, y: valY, lower, upper });
+      let marginOfError = 0;
+      if (type === 'frontier') {
+        marginOfError = 0;
+      } else if (type === 'loess') {
+        // Local empirical standard error smoothed across neighboring data points
+        const span = param && param >= 10 && param <= 90 ? param / 100 : Math.max(0.2, Math.min(0.65, 8 / n));
+        const dists = normData.map((d) => Math.abs(d.x - nx));
+        const sortedDists = [...dists].sort((a, b) => a - b);
+        const k = Math.min(dists.length - 1, Math.max(3, Math.floor(dists.length * span)));
+        const maxDist = sortedDists[k] || 0.1;
+
+        let sumW = 0;
+        let sumW2 = 0;
+        let sumWRes2 = 0;
+        for (let i = 0; i < n; i++) {
+          const u = dists[i] / maxDist;
+          if (u < 1) {
+            const w = Math.pow(1 - Math.pow(u, 3), 3);
+            sumW += w;
+            sumW2 += w * w;
+            sumWRes2 += w * Math.pow(residuals[i], 2);
+          }
+        }
+        const localSe = sumW > 0 ? Math.sqrt(sumWRes2 / sumW) : seResidual;
+        const effN = sumW2 > 0 ? Math.pow(sumW, 2) / sumW2 : 1;
+        marginOfError = 1.96 * (localSe / Math.sqrt(Math.max(1, effN)));
+        marginOfError = Math.max(marginOfError, 0.4);
+      } else {
+        // Parametric models: standard leverage formula
+        const leverage = 1 / n + Math.pow(nx - meanNormX, 2) / ssNormX;
+        marginOfError = 1.96 * seResidual * Math.sqrt(Math.max(0, leverage));
+      }
+
+      const lower = Math.max(0, parseFloat((valY - marginOfError).toFixed(2)));
+      const upper = Math.min(100, parseFloat((valY + marginOfError).toFixed(2)));
+
+      points.push({ x: timeX, y: valY, lower, upper });
+    }
   }
 
   return {

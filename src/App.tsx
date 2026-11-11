@@ -859,6 +859,29 @@ export default function App() {
               </button>
             </Tooltip>
 
+            {/* Glossar-Knopf direkt in der obersten Zeile zwischen Sync und DE/EN */}
+            <Tooltip
+              title={lang === 'de' ? 'Interaktives Glossar' : 'Interactive Glossary'}
+              badge={lang === 'de' ? 'Fachbegriffe' : 'Key Concepts'}
+              content={
+                lang === 'de'
+                  ? 'Öffnet das Glossar mit anschaulichen Erklärungen für Einsteiger zu wissenschaftlichen Modellen, Regressionen, Konfidenzbändern und KI-Grundlagen.'
+                  : 'Opens the interactive glossary with intuitive explanations of scientific models, regressions, confidence ribbons, and AI concepts.'
+              }
+              align="center"
+              width="w-72"
+            >
+              <button
+                type="button"
+                onClick={scrollToGlossary}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer font-medium text-xs border border-slate-200/80 dark:border-slate-700/80"
+                aria-label={lang === 'de' ? 'Glossar öffnen' : 'Open glossary'}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+                <span>{lang === 'de' ? 'Glossar' : 'Glossary'}</span>
+              </button>
+            </Tooltip>
+
             {/* Language Switcher DE / EN - rechts vom Datum des letzten Syncs */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
               <Tooltip
@@ -1402,7 +1425,7 @@ export default function App() {
                   badge={lang === 'de' ? 'Modell' : 'Model'}
                   position="bottom"
                   align="center"
-                  width="w-80"
+                  width="w-96"
                   content={
                     <div className="space-y-2">
                       <p className="leading-relaxed text-slate-200">
@@ -1594,7 +1617,7 @@ export default function App() {
                   badge={lang === 'de' ? 'Modell' : 'Model'}
                   position="bottom"
                   align="center"
-                  width="w-80"
+                  width="w-96"
                   content={
                     <div className="space-y-2">
                       <p className="leading-relaxed text-slate-200">
@@ -1759,28 +1782,7 @@ export default function App() {
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
 
-                {/* 2. Glossary Pill */}
-                <Tooltip
-                  title={lang === 'de' ? 'Interaktives Glossar' : 'Interactive Glossary'}
-                  content={
-                    lang === 'de'
-                      ? 'Springt direkt zum ausführlichen Glossar am Ende der Seite mit Begriffserklärungen zu LLM-Größen, Quantisierung, Lizenzen und Testplattformen.'
-                      : 'Jump directly to the detailed glossary at the bottom explaining LLM parameter scales, quantization, open weights licenses, and harness frameworks.'
-                  }
-                  align="left"
-                  width="w-72"
-                >
-                  <button
-                    type="button"
-                    onClick={scrollToGlossary}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs cursor-pointer shrink-0"
-                  >
-                    <BookOpen className="w-3.5 h-3.5 text-blue-500" />
-                    <span>{lang === 'de' ? 'Glossar' : 'Glossary'}</span>
-                  </button>
-                </Tooltip>
-
-                {/* 3. Lab Category Pills */}
+                {/* 2. Lab Category Pills */}
                 <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs shrink-0 max-w-full overflow-x-auto no-scrollbar">
                   <button
                     type="button"

@@ -13,20 +13,21 @@ interface CsvNotesSectionProps {
  * Helper to render text with automatically clickable URLs
  */
 function renderTextWithLinks(text: string) {
-  const urlRegex = /(https?:\/\/[^\s,)]+)/g;
+  const urlRegex = /(https?:\/\/[^\s,)]+|www\.[^\s,)]+)/g;
   const parts = text.split(urlRegex);
   return parts.map((part, i) => {
     if (part.match(urlRegex)) {
+      const href = part.startsWith('http') ? part : `https://${part}`;
       return (
         <a
           key={i}
-          href={part}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-emerald-600 dark:text-emerald-400 hover:underline font-mono inline-flex items-center gap-0.5 break-all font-medium"
+          className="text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white font-mono inline-flex items-center gap-0.5 break-all font-semibold underline-offset-2"
         >
           <span>{part}</span>
-          <ExternalLink className="w-2.5 h-2.5 shrink-0 inline ml-0.5" />
+          <ExternalLink className="w-2.5 h-2.5 shrink-0 inline ml-0.5 opacity-80" />
         </a>
       );
     }
@@ -59,8 +60,8 @@ function getBenchmarkHeadingColor(heading?: string): string {
   // 6. Excel Analyst (Col I)
   if (clean.includes('excel analyst') || clean.includes('excel agent') || clean === 'excel') return '#06B6D4';
 
-  // 7. Agentic Work / GDPx (Col J, formerly (3D) Trick Questions)
-  if (clean.includes('agentic') || clean.includes('gdpx') || clean.includes('trick questions') || clean.includes('trickfragen') || clean.includes('simplebench') || clean.includes('(3d)')) return '#6366F1';
+  // 7. Experimenting & Engineering / GDPx (Col J, formerly (3D) Trick Questions)
+  if (clean.includes('experimenting') || clean.includes('engineering') || clean.includes('agentic') || clean.includes('gdpx') || clean.includes('trick questions') || clean.includes('trickfragen') || clean.includes('simplebench') || clean.includes('(3d)')) return '#6366F1';
 
   // 8. Real Econ & Legal Work (Col K)
   if (clean.includes('real econ') || clean.includes('econ & legal') || clean.includes('wirtschaft') || clean.includes('vals')) return '#EA580C';
@@ -119,8 +120,8 @@ export function getParagraphAnchorId(heading?: string): string | undefined {
   // Cat 6: Excel Analyst (Col I)
   if (h.includes('spalte i') || h.includes('column i') || h.includes('excel')) return 'note-col-i';
 
-  // Cat 7: Agentic Work / GDPx (Col J)
-  if (h.includes('spalte j') || h.includes('column j') || h.includes('agentic') || h.includes('gdpx')) return 'note-col-j';
+  // Cat 7: Experimenting & Engineering (formerly Agentic Work / GDPx) (Col J)
+  if (h.includes('spalte j') || h.includes('column j') || h.includes('experimenting') || h.includes('engineering') || h.includes('agentic') || h.includes('gdpx')) return 'note-col-j';
 
   // Cat 8: Real Econ & Legal Work (Col K)
   if (h.includes('spalte k') || h.includes('column k') || h.includes('real econ') || h.includes('econ & legal') || h.includes('vals') || h.includes('wirtschaft')) return 'note-col-k';
@@ -202,9 +203,9 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     });
   }
 
-  // 3. Explicit known benchmark keywords (e.g. IQ, Non-Hallucination-Rate, Science Knowledge, Agentic Work, etc.)
+  // 3. Explicit known benchmark keywords (e.g. IQ, Non-Hallucination-Rate, Science Knowledge, Experimenting & Engineering, etc.)
   // Handles punctuation boundaries, optional dashes, spaces, and 'in %' suffixes
-  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|Agentic(?:\s+Work)?|GDPx|SimpleBench|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])\s*/gi;
+  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|Experimenting(?:\s*&\s*Engineering)?|Agentic(?:\s+Work)?|GDPx|SimpleBench|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])\s*/gi;
   while ((match = benchmarkKeywordsRegex.exec(rawText)) !== null) {
     cuts.push({
       start: match.index,
@@ -444,7 +445,7 @@ function getBilingualSection1Paragraphs(
         const cClean = (c.heading || '').toLowerCase();
         if (pClean.includes('ranking') && (cClean.includes('ranking') || cClean.includes('rangliste'))) return true;
         if (pClean.includes('benchmark') && (cClean.includes('benchmark') || cClean.includes('kategorie'))) return true;
-        if ((pClean.includes('agentic') || pClean.includes('gdpx')) && (cClean.includes('agentic') || cClean.includes('gdpx'))) return true;
+        if ((pClean.includes('experimenting') || pClean.includes('engineering') || pClean.includes('agentic') || pClean.includes('gdpx')) && (cClean.includes('experimenting') || cClean.includes('engineering') || cClean.includes('agentic') || cClean.includes('gdpx'))) return true;
         if (pClean.includes('final score') && (cClean.includes('final score') || cClean.includes('finale score'))) return true;
         if (pClean.includes('storyline') && cClean.includes('storyline')) return true;
         if (pClean === 'current' && cClean === 'current') return true;
@@ -703,10 +704,10 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                       href={p.link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-mono text-emerald-600 dark:text-emerald-400 hover:underline mt-0.5 font-medium"
+                      className="inline-flex items-center gap-1 text-xs font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
                     >
                       <span>{p.link.label}</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
+                      <ExternalLink className="w-2.5 h-2.5 opacity-80" />
                     </a>
                   )}
                 </div>
@@ -743,10 +744,10 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                     href={p.link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline mt-0.5 font-medium"
+                    className="inline-flex items-center gap-1 text-xs font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
                   >
                     <span>{p.link.label}</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
+                    <ExternalLink className="w-2.5 h-2.5 opacity-80" />
                   </a>
                 )}
               </div>

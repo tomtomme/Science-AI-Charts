@@ -60,7 +60,7 @@ export const CSV_NOTES_DATA: {
         text: 'This data analysis benchmark measures the percentage of correctly solved tasks within Excel.',
       },
       {
-        heading: 'Agentic Work',
+        heading: 'Experimenting & Engineering',
         text: 'GDPx is a benchmark that covers agentic capabilities where AI is supposed to be most impactful. It believes AI revenue will be concentrated in sectors that can easily deploy frontier intelligence - thus measuring AI capabilities broadly diffused throughout the economy, like vals.ai does, may be a mistake. GDPx covers Chip design, Cybersecurity, Biology, Finance, Legal, Quant trading, Recursive self-improvement (RSI), Hardware design, Materials science, Alignment, Software engineering.',
         link: { url: 'https://gdpx.semianalysis.com', label: 'gdpx.semianalysis.com' },
       },
@@ -71,7 +71,7 @@ export const CSV_NOTES_DATA: {
       },
       {
         heading: 'SimpleBench',
-        text: 'A benchmark consisting of 200 single-choice (1 of 6) trick questions covering spatial (3D) reasoning and common sense tasks - easy for humans to solve, but notoriously challenging for bots because they require physical 3D spatial imagination. Formerly Benchmark #7 (now replaced in the active 8 benchmarks by Agentic Work / GDPx), SimpleBench is preserved as a historical benchmark in the Timeline & Correlation tabs. Because guessing purely yields 16.67%, the score is rescaled (1.2 × (X - 16.67)) so 16.67% represents 0.',
+        text: 'A benchmark consisting of 200 single-choice (1 of 6) trick questions covering spatial (3D) reasoning and common sense tasks - easy for humans to solve, but notoriously challenging for bots because they require physical 3D spatial imagination. Formerly Benchmark #7 (now replaced in the active 8 benchmarks by Experimenting & Engineering / GDPx), SimpleBench is preserved as a historical benchmark in the Timeline & Correlation tabs. Because guessing purely yields 16.67%, the score is rescaled (1.2 × (X - 16.67)) so 16.67% represents 0.',
         link: { url: 'https://simple-bench.com', label: 'SimpleBench.com' },
       },
       {
@@ -142,8 +142,8 @@ export const CSV_NOTES_DATA: {
         text: 'Dieser Datenanalyse-Benchmark misst den Prozentsatz der korrekt gelösten Aufgaben innerhalb von Excel.',
       },
       {
-        heading: 'Agentic Work',
-        text: 'GDPx ist ein Benchmark, der agentische und autonome Fähigkeiten abdeckt, bei denen KI die größte Wirkung entfaltet. Anstatt allgemeine Wirtschaftsfähigkeiten wie bei vals.ai breit zu streuen, konzentriert sich GDPx gezielt auf Branchen mit hoher Wertschöpfung: Chip-Design, Cybersicherheit, Biologie, Finanzen, Recht, Quant Trading, rekursive Selbstverbesserung (RSI), Hardware-Design, Materialwissenschaften, Alignment und Software-Entwicklung.',
+        heading: 'Experimenting & Engineering',
+        text: 'GDPx ist ein Benchmark, der experimentelle und autonome Engineering-Fähigkeiten abdeckt, bei denen KI die größte Wirkung entfaltet. Anstatt allgemeine Wirtschaftsfähigkeiten wie bei vals.ai breit zu streuen, konzentriert sich GDPx gezielt auf Branchen mit hoher Wertschöpfung: Chip-Design, Cybersicherheit, Biologie, Finanzen, Recht, Quant Trading, rekursive Selbstverbesserung (RSI), Hardware-Design, Materialwissenschaften, Alignment und Software-Entwicklung.',
         link: { url: 'https://gdpx.semianalysis.com', label: 'gdpx.semianalysis.com' },
       },
       {
@@ -153,7 +153,7 @@ export const CSV_NOTES_DATA: {
       },
       {
         heading: 'SimpleBench',
-        text: 'Ein Benchmark aus 200 Single-Choice-Fangfragen (1 aus 6) zu räumlichem (3D) Vorstellungsvermögen und gesundem Menschenverstand – für Menschen mühelos, für Bots jedoch besonders schwer, da ihnen die physische 3D-Erfahrung fehlt. Ursprünglich Benchmark #7 (im aktuellen 8-Benchmark-Set durch Agentic Work / GDPx abgelöst), bleibt SimpleBench als historischer Benchmark in Zeitreihe und Korrelationen erhalten. Da reines Raten 16,67 % ergibt, wird der Score umskaliert (1,2 × (X - 16,67)), sodass 16,67 % die echte 0 darstellen.',
+        text: 'Ein Benchmark aus 200 Single-Choice-Fangfragen (1 aus 6) zu räumlichem (3D) Vorstellungsvermögen und gesundem Menschenverstand – für Menschen mühelos, für Bots jedoch besonders schwer, da ihnen die physische 3D-Erfahrung fehlt. Ursprünglich Benchmark #7 (im aktuellen 8-Benchmark-Set durch Experimenting & Engineering / GDPx abgelöst), bleibt SimpleBench als historischer Benchmark in Zeitreihe und Korrelationen erhalten. Da reines Raten 16,67 % ergibt, wird der Score umskaliert (1,2 × (X - 16,67)), sodass 16,67 % die echte 0 darstellen.',
         link: { url: 'https://simple-bench.com', label: 'SimpleBench.com' },
       },
       {

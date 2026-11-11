@@ -46,6 +46,9 @@ export const BENCHMARK_ANCHOR_MAP: Record<string, string> = {
   excelAgent: 'note-col-i',
   trickQuestions: 'note-col-j',
   agenticWork: 'note-col-j',
+  experimentingEngineering: 'note-col-j',
+  engineering: 'note-col-j',
+  experimenting: 'note-col-j',
   gdpx: 'note-col-j',
   econLegal: 'note-col-k',
 };

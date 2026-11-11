@@ -1169,7 +1169,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             badge={lang === 'de' ? 'Modell' : 'Model'}
             position="bottom"
             align="center"
-            width="w-80"
+            width="w-96"
             content={
               <div className="space-y-2">
                 <p className="leading-relaxed text-slate-200">

@@ -81,7 +81,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
 
     // Keep horizontally within viewport bounds with padding
-    const halfWidth = 144; // approx half of w-72 (288px)
+    const measuredWidth = popupRef.current?.offsetWidth || (width.includes('w-96') ? 384 : width.includes('350') ? 350 : 320);
+    const halfWidth = measuredWidth / 2;
     if (align === 'center') {
       if (left - halfWidth < 12) {
         left = halfWidth + 12;

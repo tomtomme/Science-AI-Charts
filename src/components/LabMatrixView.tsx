@@ -88,6 +88,14 @@ export const WEIGHTS_CONCEPTS = {
   },
 };
 
+export type GlossaryCategory =
+  | 'foundations'
+  | 'statistics'
+  | 'architecture'
+  | 'agentic'
+  | 'evaluation'
+  | 'infrastructure';
+
 export interface GlossaryTermDef {
   id: string;
   termEn: string;
@@ -98,273 +106,368 @@ export interface GlossaryTermDef {
   shortDe: string;
   detailEn: string;
   detailDe: string;
-  category: 'architecture' | 'agentic' | 'infrastructure' | 'evaluation';
+  category: GlossaryCategory;
 }
 
 export const GLOSSARY_TERMS: GlossaryTermDef[] = [
+  // 1. Wissenschaftliche & Allgemeine Modellbegriffe
+  {
+    id: 'term-model-general',
+    termEn: 'Model (General / Scientific Concept)',
+    termDe: 'Modell (Allgemein / Wissenschaftstheorie)',
+    badgeEn: 'Scientific Concept',
+    badgeDe: 'Wissenschaftstheorie',
+    shortEn: 'A deliberate simplification of reality (like a road map) to understand, explain, or predict complex phenomena.',
+    shortDe: 'Eine bewusste Vereinfachung der Wirklichkeit (wie eine Landkarte), um Zusammenhänge zu verstehen, zu erklären oder vorherzusagen.',
+    detailEn: 'Foundational rule: "The map is not the territory; it is useful precisely because it omits trees and pebbles." A 1:1 scale map would be unreadable and useless. In cognitive psychology, models are everywhere (e.g. the multi-store memory model by Atkinson & Shiffrin): it is not a physical box inside the skull, but an abstract framework that explains observable behavior. Every scientific model filters out noise to illuminate the critical drivers.',
+    detailDe: 'Grundsatz: „Eine Landkarte ist nur deshalb nützlich, weil sie nicht jeden einzelnen Baum und Grashalm abbildet.“ Eine Karte im Maßstab 1:1 wäre unbrauchbar. In der Psychologie begegnen uns Modelle überall – etwa das Mehrspeichermodell des Gedächtnisses (Sensorik → Arbeitsgedächtnis → Langzeitgedächtnis): Es ist kein physischer Kasten im Gehirn, sondern ein gedankliches Hilfskonstrukt, das beobachtbares Verhalten erklärt. Jedes wissenschaftliche Modell filtert Störrauschen heraus, um die entscheidenden Hebel sichtbar zu machen.',
+    category: 'foundations',
+  },
+  {
+    id: 'term-model',
+    termEn: 'Model (AI & Large Language Model)',
+    termDe: 'Modell (KI & Sprachmodell / LLM)',
+    badgeEn: 'Machine Learning',
+    badgeDe: 'Künstliche Intelligenz',
+    shortEn: 'A massive mathematical association network of billions of learned knobs (weights) trained to produce probable text continuations.',
+    shortDe: 'Ein mathematisches Assoziationsnetz aus Milliarden gelernten Stellschrauben (Gewichten), das Texteingaben in passende Fortsetzungen übersetzt.',
+    detailEn: 'Analogy: Like an immensely well-read smartphone predictive text engine that digested libraries of books, research papers, and code. It possesses no consciousness or personal intent; rather, it computes statistical word associations. Without an execution scaffold (harness), it remains a passive text-generation tool.',
+    detailDe: 'Metapher: Wie ein extrem belesener Text-Vervollständiger auf dem Smartphone, der Millionen Fachbücher, Webseiten und Programmcode gelesen hat. Es „denkt“ nicht mit Bewusstsein wie ein Mensch, sondern berechnet nach statistischer Mustererkennung, welches nächste Wort (Token) am besten an die bisherigen Wörter anschließt. Ohne Steuerung (Harness) bleibt es ein stummes Textausgabe-Werkzeug.',
+    category: 'architecture',
+  },
+
+  // 2. Statistische Modelle (aus den Modell-Slider Pop-ups)
+  {
+    id: 'term-linear-regression',
+    termEn: 'Linear Regression (OLS Trend Model)',
+    termDe: 'Lineare Regression (OLS-Trendmodell)',
+    badgeEn: 'Statistical Model',
+    badgeDe: 'Statistisches Modell',
+    shortEn: 'The rigid wooden ruler: draws a straight line through a cloud of data points to estimate the average direction of change.',
+    shortDe: 'Das starre Holzlineal: Zieht eine gerade Linie mitten durch eine Punktwolke, um die durchschnittliche Entwicklungsrichtung zu schätzen.',
+    detailEn: 'Analogy: Laying a rigid wooden ruler across scattered data points such that squared distances to the edge are minimized (Ordinary Least Squares). Assumes a constant pace: each unit of time or compute yields an identical score gain. Highly intuitive, but blinds itself to saturation, plateaus, or exponential surges.',
+    detailDe: 'Metapher: Man legt ein starres Holzlineal so zwischen verstreute Punkte auf Papier, dass die Gesamtabstände aller Punkte zur Kante minimal werden (Methode der kleinsten Quadrate / OLS). Die Grundannahme lautet: „Gleichmäßiger Takt – jede Einheit Zeit oder Rechenaufwand bringt einen festen Punktgewinn.“ Vorteil: Äußerst leicht zu verstehen und zu interpretieren (Steigung). Nachteil: Scheitert, wenn Entwicklungen abflachen, explodieren oder Kurven schlagen.',
+    category: 'statistics',
+  },
+  {
+    id: 'term-polynomial-regression',
+    termEn: 'Polynomial Regression (Curvilinear Model)',
+    termDe: 'Polynomielle Regression (Kurvenmodell)',
+    badgeEn: 'Statistical Model',
+    badgeDe: 'Statistisches Modell',
+    shortEn: 'The bendable wire: flexes into parabolic arcs, inflection points, and slowdowns in the data trajectory.',
+    shortDe: 'Der biegsame Draht statt des starren Lineals: Kann Bögen, Wendepunkte und Verlangsamungen im Trendverlauf nachzeichnen.',
+    detailEn: 'Analogy: Swapping the rigid ruler for a bendable metal curve. Degree 2 permits a parabolic arch (initial burst followed by diminishing returns); Degree 3 permits an S-curve (inflection from takeoff to plateau). Caution: higher degrees risk overfitting by chasing random noise instead of real signal.',
+    detailDe: 'Metapher: Statt eines Holzlineals verwendet man einen biegsamen Metalldraht. Der Parameter „Grad“ legt fest, wie oft der Draht die Richtung wechseln darf: Grad 2 erlaubt einen Bogen (Parabel, z. B. steiler Start mit späterer Ermüdung), Grad 3 einen S-förmigen Wendepunkt (langsamer Beginn, steiler Sprint, anschließendes Plateau). Psychologische Warnung: Wählt man einen zu hohen Grad, schmiegt sich der Draht an jeden einzelnen Zufallsausreißer an (Überanpassung / Overfitting) und verliert jede Vorhersagekraft.',
+    category: 'statistics',
+  },
+  {
+    id: 'term-loess-smoothing',
+    termEn: 'LOESS Smoothing (Locally Estimated Smoothing)',
+    termDe: 'LOESS-Glättung (Lokal gewichtetes Modell)',
+    badgeEn: 'Statistical Model',
+    badgeDe: 'Statistisches Modell',
+    shortEn: 'The hiker with a magnifying glass: computes moving averages from immediate neighbors step-by-step without imposing a rigid global formula.',
+    shortDe: 'Die Wanderin mit der Lupe: Berechnet an jeder Stelle einen gleitenden Mittelwert aus der direkten Nachbarschaft, ganz ohne starre Weltformel.',
+    detailEn: 'Analogy: A hiker walking along the timeline with a magnifying glass. At each step, she pauses and inspects only the data points in her immediate vicinity. Closer neighbors carry heavy weight; distant ones fade out. The "span" parameter is the focal width: small spans (30%) detect sharp local turning points; wide spans (80%) smooth fluctuations into a gentle rolling wave.',
+    detailDe: 'Metapher: Eine Wanderin geht Schritt für Schritt die Zeitachse entlang. An jedem Punkt nimmt sie die Lupe und betrachtet nur die Modelle im unmittelbaren Umkreis. Nahe Nachbarn wiegen schwer, weit entfernte Punkte werden ignoriert. Der Parameter „Span“ (Fensterbreite) ist die Zoomstufe der Lupe: Ein kleiner Span (z. B. 30 %) reagiert feinfühlig auf jeden lokalen Innovationssprung; ein großer Span (z. B. 80 %) glättet alles zu einer ruhigen Gesamtwelle.',
+    category: 'statistics',
+  },
+  {
+    id: 'term-confidence-band',
+    termEn: '95% Confidence Band (Uncertainty Ribbon)',
+    termDe: '95 %-Konfidenzband (Statistischer Unsicherheitsbereich)',
+    badgeEn: 'Statistical Precision',
+    badgeDe: 'Schätzgenauigkeit',
+    shortEn: 'The headlight beam flanking a trend line: visually reveals where the true population trend lies with 95% statistical confidence.',
+    shortDe: 'Der Scheinwerferkegel um die Trendlinie: Zeigt bildhaft, wo der wahre Trend mit 95 % statistischer Wahrscheinlichkeit liegt.',
+    detailEn: 'Analogy: A car headlight cutting through fog. Where data points cluster densely, the beam narrows into a tight, confident corridor. Where data is scarce or volatile, the beam fans out widely into a cone, warning researchers: "Caution, estimation variance is high here due to sparse observations."',
+    detailDe: 'Metapher: Ein Autoscheinwerfer im Nebel. Wo viele Testdaten dicht beieinander liegen (z. B. bei häufig getesteten Modellen), bündelt sich das Licht zu einem schmalen, verlässlichen Streifen: Wir sind uns statistisch sehr sicher. Wo Daten spärlich sind oder wild streuen, weitet sich der Kegel trichterförmig auf: Das breite schattierte Band warnt uns: „Vorsicht, hier beruht die Schätzung auf wenigen Datenpunkten!“',
+    category: 'statistics',
+  },
+  {
+    id: 'term-correlation',
+    termEn: 'Correlation (Pearson r vs. Spearman Rho)',
+    termDe: 'Korrelation (Pearson r vs. Spearman Rho)',
+    badgeEn: 'Association Metric',
+    badgeDe: 'Zusammenhangsmaß',
+    shortEn: 'Dance partners in comparison: measures whether two variables move along a locked straight line or strictly by relative rank order.',
+    shortDe: 'Tanzpartner im Vergleich: Misst, ob zwei Merkmale starr auf einer Geraden marschieren (Linear) oder rein nach Rangfolge gekoppelt sind (Monoton).',
+    detailEn: 'Analogy: Dance partners moving across the floor. Pearson r checks for locked-step linear progression along a line. Spearman Rho simply checks rank hierarchy: "Did a larger input result in a higher place?", regardless of step sizes. Key psychological advantage: rogue outliers that warp Pearson leave Spearman Rho completely stable.',
+    detailDe: 'Metapher: Tanzschritte auf dem Parkett. Pearson r prüft den starren Gleichschritt auf einer Geraden (doppelte Rechenkraft = exakt doppelte Punktzahl). Spearmans Rho ist pragmatischer: Es prüft nur die Rangfolge („Wer mehr lernt, landet weiter vorn“), egal ob in Schritten oder Sprüngen. Riesiger Vorteil von Spearman Rho in der empirischen Psychologie: Einzelne extreme Ausreißer verzerren Pearson r dramatisch, lassen Spearman Rho aber völlig unberührt.',
+    category: 'statistics',
+  },
+
+  // 3. Evaluation & Meilensteine
+  {
+    id: 'term-frontier',
+    termEn: 'Frontier Models (Pareto Boundary / Record Wall)',
+    termDe: 'Pionier-Front (Pareto-Grenze / Rekordwand)',
+    badgeEn: 'Efficiency Frontier',
+    badgeDe: 'Effizienzgrenze',
+    shortEn: 'The historical world-record wall: connects only those breakthrough models that set unmatched benchmarks at their time.',
+    shortDe: 'Die ewige Bestenliste: Verbindet nur diejenigen Modelle, die zum Zeitpunkt ihres Erscheinens unübertroffen waren.',
+    detailEn: 'Analogy: The Olympic world-record progression wall. A model qualifies as a pioneer only if no prior model achieved a higher score on that date. Graphically forms an ascending staircase of genuine breakthroughs; points below represent capable models that did not push the frontier forward.',
+    detailDe: 'Metapher: Die Rekordtafel bei den Olympischen Spielen. Ein Modell ist ein „Pionier“, wenn es zum Zeitpunkt seiner Veröffentlichung kein anderes Modell gab, das gleichzeitig besser war. Im Diagramm erzeugt dies eine ansteigende Treppe nach oben: Jeder Sprung markiert einen echten Meilenstein des technisch Machbaren. Alle Punkte unterhalb der Linie waren solide Modelle, haben aber die historische Leistungsgrenze nicht verschoben.',
+    category: 'evaluation',
+  },
+  {
+    id: 'term-benchmark',
+    termEn: 'Benchmark (Standardized Test Battery)',
+    termDe: 'Benchmark (Standardisierter Leistungstest)',
+    badgeEn: 'Standardized Test',
+    badgeDe: 'Testbatterie',
+    shortEn: 'Standardized test battery: a reproducible suite of tasks used to compare model abilities under controlled conditions.',
+    shortDe: 'Standardisierte Testbatterie: Ein reproduzierbarer Aufgabenkatalog, um Modelle unter kontrollierten Bedingungen zu vergleichen.',
+    detailEn: 'Analogy: A standardized psychometric battery (such as the WAIS intelligence scale). Every subject receives the exact same items under strictly identical conditions to produce objective, reproducible comparisons of reasoning and problem-solving skills.',
+    detailDe: 'Metapher: Ein psychologischer Intelligenztest (wie der HAWIK oder die Raven-Matrizen). Allen Modellen werden exakt dieselben Aufgaben unter identischen Laborbedingungen gestellt. Das verhindert Ausreden und macht messbar, welches Modell logisch schlussfolgern, programmieren oder Fachwissen abrufen kann.',
+    category: 'evaluation',
+  },
+  {
+    id: 'term-eval',
+    termEn: 'Eval (Empirical Assessment)',
+    termDe: 'Evaluation (Empirische Güteprüfung)',
+    badgeEn: 'Performance Assessment',
+    badgeDe: 'Leistungsbewertung',
+    shortEn: 'Empirical quality control: systematic measurement of accuracy, logical validity, and reliability in model outputs.',
+    shortDe: 'Empirische Gütekontrolle: Die systematische Überprüfung, wie wahrheitsgetreu, logisch und nützlich Modellausgaben sind.',
+    detailEn: 'Analogy: Double-blind sensory trials. Spans automated unit checks to blind pairwise evaluations (e.g. Chatbot Arena Elo ratings), where human raters judge two anonymized answers side-by-side without knowing which system generated which output.',
+    detailDe: 'Metapher: Die Doppelblindstudie in der Psychologie oder Blindverkostung in der Sensorik. Reicht von automatischen Richtig/Falsch-Vergleichen bis hin zu Blindvergleichen (wie in der Chatbot Arena), bei denen zwei anonyme Modellantworten nebeneinander gezeigt werden und Menschen abstimmen, welche Antwort überzeugender ist.',
+    category: 'evaluation',
+  },
+  {
+    id: 'term-saturation-problem',
+    termEn: 'Saturation Problem (Ceiling Effect)',
+    termDe: 'Saturation-Problem (Deckeneffekt)',
+    badgeEn: 'Ceiling Effect',
+    badgeDe: 'Test-Deckeneffekt',
+    shortEn: 'The psychometric ceiling effect: when tests become too easy and top models cluster near 100%, erasing discriminatory power.',
+    shortDe: 'Der Deckeneffekt in der Testtheorie: Wenn ein Test so leicht wird, dass alle Spitzenmodelle fast 100 % erreichen und nicht mehr trennbar sind.',
+    detailEn: 'Analogy: An exam where 90% of students receive an A+. The test hits a ceiling and loses its discriminatory power, making it impossible to separate true mastery from good preparation. Older benchmarks face this saturation, forcing researchers to design harder, uncontaminated tests.',
+    detailDe: 'Metapher: Eine Statistik-Klausur, in der fast alle Studierenden eine 1,0 schreiben. Der Test verliert seine Trennschärfe: Man kann die Spitzenkönner nicht mehr vom soliden Durchschnitt unterscheiden. Ältere KI-Benchmarks wie MMLU oder GSM8K leiden unter diesem Deckeneffekt, weshalb Forscher ständig schwerere Tests (wie FrontierMath) entwickeln müssen.',
+    category: 'evaluation',
+  },
+
+  // 4. KI- & LLM-Architektur
   {
     id: 'term-llm',
-    termEn: 'LLM',
-    termDe: 'LLM',
-    badgeEn: 'Core Model',
+    termEn: 'LLM (Large Language Model)',
+    termDe: 'LLM (Großes Sprachmodell)',
+    badgeEn: 'Foundation Model',
     badgeDe: 'Kernmodell',
-    shortEn: 'Large Language Model. Neural network trained on text to predict word tokens.',
-    shortDe: 'Großes Sprachmodell. Neuronales Netz, trainiert um Wort-Tokens vorherzusagen.',
-    detailEn: 'A deep learning model trained on large text corpora. Computes probabilities for subsequent words. It does not act independently without a harness.',
-    detailDe: 'Ein neuronales Netz, das auf großen Textmengen trainiert wurde. Berechnet Wahrscheinlichkeiten für Folgewörter. Ohne Steuerung agiert es nicht selbstständig.',
+    shortEn: 'Large Language Model. A neural network trained on vast text corpora to predict probabilistic sequences of word tokens.',
+    shortDe: 'Großes Sprachmodell. Ein gigantischer Textgenerator, der Wortbausteine auf Basis statistischer Wahrscheinlichkeiten aneinanderreiht.',
+    detailEn: 'Analogy: A vast associative memory network. An LLM possesses neither consciousness nor intent; having digested terabytes of text, it knows with uncanny precision which words associate with which contexts, similar to human word association. Without an operational harness, it cannot take independent actions.',
+    detailDe: 'Metapher: Ein Assoziationsgedächtnis gigantischen Ausmaßes. Ein LLM hat keine Gefühle, keine Absichten und kein Weltwissen wie ein Mensch. Es hat Millionen von Texten analysiert und weiß verblüffend genau, welche Wörter in einem bestimmten Kontext zueinander passen – genau wie Menschen beim freien Assoziieren („Nacht“ → „Dunkelheit“). Ohne Steuerungsgerüst (Harness) agiert es nicht selbstständig.',
     category: 'architecture',
   },
   {
     id: 'term-parameter',
     termEn: 'Parameters & Weights',
-    termDe: 'Parameter & Gewichte',
-    badgeEn: 'Size Metric',
-    badgeDe: 'Größenmaß',
-    shortEn: 'Numerical values in the neural network storing learned knowledge (Billions B / Trillions T).',
-    shortDe: 'Numerische Werte im neuronalen Netz, die das Wissen speichern (Milliarden Mrd. / Billionen Bio.).',
-    detailEn: 'Variables adjusted during model training. Higher parameter count requires more compute memory (VRAM) and enables higher reasoning complexity.',
-    detailDe: 'Variablen, die beim Training angepasst werden. Mehr Parameter erfordern mehr Rechenspeicher (VRAM) und erlauben komplexere Denkmuster.',
+    termDe: 'Parameter & Gewichte (Stellschrauben)',
+    badgeEn: 'Model Scale',
+    badgeDe: 'Modellgröße',
+    shortEn: 'Billions of tiny numerical sliders inside the network whose calibrated settings store the model\'s learned knowledge.',
+    shortDe: 'Milliarden kleine Schieberegler im Rechennetz, in deren feiner Abstimmung das gesamte gelernte Wissen gespeichert ist.',
+    detailEn: 'Analogy: An immense audio mixer with billions of faders. At the onset of training, every fader sits at random noise. With every sentence read, the sliders nudge minutely until coherent language emerges. More parameters allow richer reasoning patterns, but demand massive GPU memory.',
+    detailDe: 'Metapher: Ein Tonmischpult mit Milliarden Fadern. Zu Beginn des Trainings stehen alle Regler auf Zufall (nur Rauschen). Mit jedem gelesenen Satz werden die Regler minimal nachjustiert, bis saubere Sätze entstehen. Je mehr Parameter ein Modell hat (z. B. 8 Milliarden vs. 70 Milliarden), desto komplexere Zusammenhänge kann es speichern – desto mehr Grafikspeicher (VRAM) braucht es aber auch.',
     category: 'architecture',
   },
   {
     id: 'term-token',
-    termEn: 'Token',
-    termDe: 'Token',
+    termEn: 'Token (Text Units)',
+    termDe: 'Token (Text-Bausteine)',
     badgeEn: 'Text Units',
     badgeDe: 'Texteinheiten',
-    shortEn: 'Basic unit of text processed by an LLM (typically 3 to 4 characters or parts of a word).',
-    shortDe: 'Grundeinheit von Text, die ein LLM verarbeitet (meist 3 bis 4 Zeichen oder Wortsilben).',
-    detailEn: 'Words are split into tokens before processing. As a rule of thumb, 1000 tokens equal approximately 750 English words.',
-    detailDe: 'Texte werden vor der Verarbeitung in Tokens zerlegt. Als Richtwert entsprechen 1000 Tokens etwa 750 Wörtern.',
-    category: 'architecture',
-  },
-  {
-    id: 'term-harness',
-    termEn: 'Harness (Agent Scaffolding & Runtime)',
-    termDe: 'Harness (Ablauf- & Steuergerüst / Zaumzeug)',
-    badgeEn: 'Agent Scaffolding',
-    badgeDe: 'Agenten- & Ablaufsteuerung',
-    shortEn: 'Scaffolding connecting a raw model to tools, loops, and memory so it can execute complete multi-step workflows.',
-    shortDe: 'Software-Umgebung, die das Modell mit Werkzeugen verbindet, Aufgaben zerlegt und in einer autonomen Schleife hält.',
-    detailEn: 'The metaphorical "harness" or tack: Without a harness, a raw foundation model merely predicts the next word and halts. An agentic harness (e.g. Aider, OpenHands, Cursor) harnesses the model\'s power: it breaks down complex prompts into actionable sub-tasks, provides tools (terminal, file editor, browser), handles error retries, and maintains an autonomous loop (ReAct) until the job is fully done.',
-    detailDe: 'Das sprichwörtliche „Zaumzeug & Geschirr“: Ohne Steuerung sagt ein reines Sprachmodell nur das nächste Wort voraus und bricht ab. Ein Agenten-Harness (wie bei Aider, OpenHands, Cursor) spannt das Modell in eine Arbeitsumgebung ein: Er zerlegt Prompts in Teilschritte, bindet Werkzeuge (Terminal, Dateieditor, Browser) an, fängt Fehler ab und lässt das Modell in einer autonomen Ausführungsschleife (ReAct-Loop) laufen, damit es nicht vorzeitig aufhört, bevor das Gesamtergebnis steht.',
-    category: 'agentic',
-  },
-  {
-    id: 'term-agent',
-    termEn: 'Agent',
-    termDe: 'Agent',
-    badgeEn: 'Autonomous Loop',
-    badgeDe: 'Autonome Schleife',
-    shortEn: 'Model + harness running in a loop toward a goal. Can plan, use tools, and execute actions.',
-    shortDe: 'Modell + Steuerung (Harness), die in einer Schleife planvoll Werkzeuge nutzt und Aufgaben löst.',
-    detailEn: 'An autonomous loop that perceives environment state, plans steps, invokes tools (terminal, browser, APIs), and evaluates results until finished.',
-    detailDe: 'Eine Schleife, die den Zustand analysiert, Schritte plant, Werkzeuge (Terminal, Browser, APIs) aufruft und Ergebnisse prüft, bis das Ziel erreicht ist.',
-    category: 'agentic',
-  },
-  {
-    id: 'term-ade',
-    termEn: 'ADE',
-    termDe: 'ADE',
-    badgeEn: 'Agentic Editor',
-    badgeDe: 'Agenten-Editor',
-    shortEn: 'Agentic Development Environment. Code editor with an agent working directly in the project.',
-    shortDe: 'Agentic Development Environment. Code-Editor, in dem ein KI-Agent direkt im Projekt arbeitet.',
-    detailEn: 'A development editor where an AI coding agent operates as a peer programmer: edits files across the repository, runs commands, and inspects test output.',
-    detailDe: 'Ein Code-Editor, in dem ein KI-Agent als Partner arbeitet: Er editiert Dateien im gesamten Projekt, führt Befehle aus und prüft Testergebnisse.',
-    category: 'agentic',
-  },
-  {
-    id: 'term-ide',
-    termEn: 'IDE',
-    termDe: 'IDE',
-    badgeEn: 'Development Environment',
-    badgeDe: 'Entwicklungsumgebung',
-    shortEn: 'Integrated Development Environment. Desktop application combining code editor, build tools, and debugger.',
-    shortDe: 'Integrated Development Environment. Desktop-Software mit Code-Editor, Build-Tools und Debugger.',
-    detailEn: 'Traditional software application for writing code (e.g. VS Code, PyCharm, Xcode). Often augmented with AI plugins or completions.',
-    detailDe: 'Klassische Programmierumgebung (z. B. VS Code, PyCharm, Xcode). Oft durch KI-Erweiterungen für Autovervollständigung ergänzt.',
-    category: 'agentic',
-  },
-  {
-    id: 'term-cli',
-    termEn: 'CLI',
-    termDe: 'CLI',
-    badgeEn: 'Terminal',
-    badgeDe: 'Terminal',
-    shortEn: 'Command Line Interface. Text-based terminal where commands and agents run directly.',
-    shortDe: 'Command Line Interface. Textbasiertes Terminal, in dem Befehle und Agenten direkt laufen.',
-    detailEn: 'A text-based console without a graphical user interface (GUI). AI CLI tools (e.g. Aider, Claude Code) modify files via terminal commands.',
-    detailDe: 'Eine Textkonsole ohne grafische Benutzeroberfläche. KI-CLI-Werkzeuge (z. B. Aider, Claude Code) bearbeiten Code direkt über Terminalbefehle.',
-    category: 'agentic',
-  },
-  {
-    id: 'term-api',
-    termEn: 'API',
-    termDe: 'API',
-    badgeEn: 'Network Interface',
-    badgeDe: 'Schnittstelle',
-    shortEn: 'Application Programming Interface. Protocol to query remote models over the network.',
-    shortDe: 'Programmierschnittstelle. Protokoll, um Modelle über das Netzwerk abzufragen.',
-    detailEn: 'A standardized HTTP endpoint through which applications transmit prompts and receive structured text responses from servers.',
-    detailDe: 'Ein standardisierter HTTP-Endpunkt, über den Anwendungen Prompts senden und strukturierte Antworten von Servern empfangen.',
-    category: 'infrastructure',
-  },
-  {
-    id: 'term-cloud',
-    termEn: 'Cloud',
-    termDe: 'Cloud',
-    badgeEn: 'Hosting / Compute',
-    badgeDe: 'Rechenzentrum',
-    shortEn: 'Remote data centers hosting models on GPU clusters. No local compute required.',
-    shortDe: 'Rechenzentren mit GPU-Clustern, die Modelle betreiben. Keine lokale Hardware nötig.',
-    detailEn: 'Server infrastructure operated by providers (e.g. AWS, GCP, Azure). Executes model inference remotely without requiring consumer GPU hardware.',
-    detailDe: 'Serverinfrastruktur bei Anbietern (z. B. AWS, GCP, Azure). Führt Modellberechnungen aus, ohne dass Nutzer eigene Grafikkarten benötigen.',
-    category: 'infrastructure',
-  },
-  {
-    id: 'term-neural-network',
-    termEn: 'Neural Network',
-    termDe: 'Neuronales Netz',
-    badgeEn: 'Foundations',
-    badgeDe: 'Grundlagen',
-    shortEn: 'Layered computational graph inspired by biological neurons learning features and token relationships.',
-    shortDe: 'Schichtenweises mathematisches Rechennetzwerk, das Muster und Beziehungen zwischen Daten lernt.',
-    detailEn: 'Consists of interconnected nodes (neurons) organized in layers. Deep learning architectures (especially Transformers) form the mathematical basis of modern generative models and LLMs.',
-    detailDe: 'Besteht aus vernetzten Knoten (Neuronen) in mehreren Schichten. Moderne Deep-Learning-Architekturen (insbesondere Transformer) bilden das mathematische Fundament aller aktuellen Sprachmodelle.',
-    category: 'architecture',
-  },
-  {
-    id: 'term-model',
-    termEn: 'Model',
-    termDe: 'Modell',
-    badgeEn: 'Artifact',
-    badgeDe: 'Artefakt',
-    shortEn: 'Trained mathematical artifact containing learned weights that maps input prompts to output tokens.',
-    shortDe: 'Trainiertes Software-Artefakt aus gelernten Gewichten, das Eingaben (Prompts) auf Ausgaben abbildet.',
-    detailEn: 'The resulting mathematical representation saved after extensive training on GPU clusters. Can be distributed as downloadable files (Open Weights) or operated exclusively in the cloud (Closed Weights).',
-    detailDe: 'Das Ergebnis eines Trainingslaufs auf Rechenclustern. Enthält Millionen bis Billionen Parameter und kann als Datei herunterladbar (Open Weights) oder ausschließlich über Cloud-APIs nutzbar sein (Closed Weights).',
-    category: 'architecture',
-  },
-  {
-    id: 'term-chatbot',
-    termEn: 'Chatbot',
-    termDe: 'Chatbot',
-    badgeEn: 'Interface',
-    badgeDe: 'Oberfläche',
-    shortEn: 'Conversational dialogue application allowing humans to interact naturally with an underlying model.',
-    shortDe: 'Dialogorientierte Anwendung, über die Anwender per natürlicher Sprache mit einem Modell kommunizieren.',
-    detailEn: 'The interactive front-end experience (e.g. ChatGPT, Claude.ai, Le Chat) that manages chat history, context windows, markdown formatting, and streaming responses from the model.',
-    detailDe: 'Die interaktive Benutzeroberfläche (z. B. ChatGPT, Claude.ai, Le Chat), die den Chatverlauf verwaltet, Kontext an das Modell übergibt und gestreamte Antworten darstellt.',
-    category: 'infrastructure',
-  },
-  {
-    id: 'term-generative-ai',
-    termEn: 'Generative AI',
-    termDe: 'Generative KI',
-    badgeEn: 'Technology',
-    badgeDe: 'Technologie',
-    shortEn: 'Subfield of AI focused on synthesizing original content such as text, code, imagery, or audio.',
-    shortDe: 'Teilgebiet der KI, das eigenständig neue Inhalte wie Texte, Programmcode, Bilder oder Sprache erzeugt.',
-    detailEn: 'Unlike discriminative systems that merely classify or filter inputs, generative AI learns probability distributions to produce novel, coherent outputs conditioned on user prompts.',
-    detailDe: 'Im Gegensatz zu rein klassifizierenden Systemen lernen generative Modelle Wahrscheinlichkeitsverteilungen, um auf Basis von Prompts neue, kontextuell passende Antworten und Medien zu synthetisieren.',
-    category: 'architecture',
-  },
-  {
-    id: 'term-benchmark',
-    termEn: 'Benchmark',
-    termDe: 'Benchmark',
-    badgeEn: 'Standardized Test',
-    badgeDe: 'Standardisierter Test',
-    shortEn: 'Standardized test battery used to measure and compare model reasoning, accuracy, and capabilities.',
-    shortDe: 'Standardisierte Testbatterie zur empirischen Messung und zum Leistungsvergleich von Modellen.',
-    detailEn: 'Comparable to psychometric test batteries in psychology: a benchmark presents models with standardized test items (e.g. MMLU, GSM8K, HumanEval, SWE-bench) under controlled conditions to derive objective, reproducible scores.',
-    detailDe: 'Vergleichbar mit psychometrischen Testbatterien in der Psychologie: Ein Benchmark stellt Modellen standardisierte Testaufgaben unter kontrollierten Bedingungen, um reproduzierbare, objektive Leistungswerte zu ermitteln.',
-    category: 'evaluation',
-  },
-  {
-    id: 'term-framework',
-    termEn: 'Framework',
-    termDe: 'Framework',
-    badgeEn: 'Architecture',
-    badgeDe: 'Entwicklungsgerüst',
-    shortEn: 'Pre-structured software foundation providing rules, conventions, and reusable components.',
-    shortDe: 'Vorgefertigtes Programmiergerüst mit Regeln, Bibliotheken und Bausteinen zur Softwareentwicklung.',
-    detailEn: 'Provides the architectural scaffolding and design patterns (e.g. PyTorch, LangChain, React) so developers do not need to write basic infrastructure code from scratch.',
-    detailDe: 'Liefert die methodische Architektur und Grundfunktionen (z. B. PyTorch, LangChain, React), damit Entwickler elementare Basisfunktionen nicht jedes Mal neu programmieren müssen.',
-    category: 'infrastructure',
-  },
-  {
-    id: 'term-eval',
-    termEn: 'Eval (Evaluation)',
-    termDe: 'Eval (Evaluation)',
-    badgeEn: 'Assessment',
-    badgeDe: 'Leistungsbewertung',
-    shortEn: 'Systematic empirical assessment of model responses against defined criteria or human judgments.',
-    shortDe: 'Systematische empirische Beurteilung von Modellausgaben anhand definierter Gütekriterien oder Urteile.',
-    detailEn: 'The methodology of evaluating model quality, ranging from automated exact-match checks to LLM-as-a-judge ratings and blind human pairwise comparisons (Elo rating).',
-    detailDe: 'Die methodische Überprüfung von Qualität und Zuverlässigkeit. Reicht von automatischen Richtig/Falsch-Vergleichen bis hin zu Blindvergleichen durch menschliche Beurteiler (Elo-Rating in der Chatbot Arena).',
-    category: 'evaluation',
-  },
-  {
-    id: 'term-runtime',
-    termEn: 'Runtime Environment',
-    termDe: 'Laufzeitumgebung',
-    badgeEn: 'Execution System',
-    badgeDe: 'Ausführungsumgebung',
-    shortEn: 'The hardware and software system providing the active execution context where models and code run.',
-    shortDe: 'Die Hard- und Softwareumgebung, in der Programme und Modelle zur Ausführungszeit tatsächlich gerechnet werden.',
-    detailEn: 'Encompasses system memory (RAM/VRAM), drivers, execution engines (e.g. Python, Node.js, CUDA), and sandboxes required to execute instructions during runtime.',
-    detailDe: 'Umfasst Arbeitsspeicher (RAM/VRAM), Treiber, Rechenkerne (z. B. Python, Node.js, CUDA) und Sicherheits-Sandboxen, die bereitstehen müssen, damit Befehle zur Laufzeit ausgeführt werden können.',
-    category: 'infrastructure',
-  },
-  {
-    id: 'term-ecosystem',
-    termEn: 'Ecosystem',
-    termDe: 'Ökosystem',
-    badgeEn: 'Network',
-    badgeDe: 'Vernetztes Gefüge',
-    shortEn: 'Interconnected network of models, developer tools, hosting providers, benchmarks, and applications.',
-    shortDe: 'Das vernetzte Zusammenspiel aus Modellen, Software-Tools, Servern, Prüfständen und Anwendern.',
-    detailEn: 'Refers to the collective AI landscape where foundational models, open-source fine-tuners, evaluation platforms, and client applications mutually depend on and reinforce each other.',
-    detailDe: 'Beschreibt das dynamische Gesamtnetzwerk der KI-Landschaft: Entwicklerfirmen, Open-Source-Gemeinschaften, unabhängige Testlabore, Frameworks und Endanwendungen, die aufeinander aufbauen.',
-    category: 'infrastructure',
-  },
-  {
-    id: 'term-saturation-problem',
-    termEn: 'Saturation Problem',
-    termDe: 'Saturation-Problem (Benchmark-Sättigung)',
-    badgeEn: 'Ceiling Effect',
-    badgeDe: 'Decken-Effekt',
-    shortEn: 'Ceiling effect when top models score near 100% on standard benchmarks, losing discriminative power.',
-    shortDe: 'Decken-Effekt: Wenn Spitzenmodelle nahe 100 % in Standardtests erreichen und Benchmarks nicht mehr differenzieren.',
-    detailEn: 'Occurs when standard benchmarks (such as MMLU or GSM8K) are solved nearly perfectly by frontier models. Once scores reach 95–99%, the test hits a ceiling and loses the statistical variance needed to differentiate top models, requiring harder, uncontaminated benchmarks (e.g. FrontierMath, SWE-bench Verified).',
-    detailDe: 'Tritt auf, wenn gängige Benchmarks (wie MMLU oder GSM8K) von neuen Spitzenmodellen nahezu perfekt gelöst werden. Ein Benchmark mit 95–99 % Lösungswahrscheinlichkeit stößt an eine Obergrenze und kann Spitzenmodelle nicht mehr sinnvoll voneinander unterscheiden, was schwerere, neue Testverfahren (z. B. FrontierMath, SWE-bench Verified) erforderlich macht.',
-    category: 'evaluation',
-  },
-  {
-    id: 'term-context-rot',
-    termEn: 'Context Rot',
-    termDe: 'Context Rot (Kontext-Zerfall)',
-    badgeEn: 'Context Window',
-    badgeDe: 'Kontextfenster',
-    shortEn: 'Degradation in reasoning quality, recall, and instruction adherence as the context window fills with tokens.',
-    shortDe: 'Qualitätsabfall des Modell-Denkens, Faktenabrufs und Befolgens von Instruktionen bei sehr langen Verläufen.',
-    detailEn: 'Despite context windows scaling to 1–2 million tokens, reasoning precision, recall accuracy, and strict instruction following degrade as context length grows (attention dilution, lost-in-the-middle effect, distraction from noise tokens in long documents).',
-    detailDe: 'Obwohl moderne LLMs bis zu 1–2 Millionen Tokens fassen können, sinken Treffsicherheit, Faktenabruf und logische Konsistenz, wenn der Kontext mit tausenden Seiten gefüllt wird („Lost-in-the-Middle“-Phänomen, Aufmerksamkeitsverwässerung und Ablenkung durch irrelevante Token).',
+    shortEn: 'Text building blocks: the syllables and 3-to-4 character chunks into which language models chop all input text.',
+    shortDe: 'Wortbausteine: Die kleinen Silben und Häppchen von 3 bis 4 Buchstaben, in die Sprachmodelle jeden Satz zerhacken.',
+    detailEn: 'Analogy: Scrabble tiles or syllable fragments. Models process neither single letters nor whole thoughts; they chop sentences into standardized token fragments (e.g. "psychology" into sub-word tokens). Rule of thumb: 1,000 tokens equal approximately 750 words.',
+    detailDe: 'Metapher: Scrabble-Steinchen oder Buchstabensilben. Ein Modell liest Text nicht Buchstabe für Buchstabe und auch nicht in ganzen Gedanken, sondern teilt Wörter in genormte Tokens auf (z. B. wird „Psychologie“ zu „Psy-cho-lo-gie“). Als Daumenregel entsprechen 1.000 Tokens etwa 750 Wörtern.',
     category: 'architecture',
   },
   {
     id: 'term-reasoning-level',
-    termEn: 'Reasoning / Thinking Level',
-    termDe: 'Reasoning / Thinking Level (Denkstufe)',
+    termEn: 'Reasoning / Thinking Level (System 1 vs. 2)',
+    termDe: 'Reasoning / Denkstufe (System 1 vs. System 2)',
     badgeEn: 'Test-Time Compute',
-    badgeDe: 'Test-Time Compute',
-    shortEn: 'Configurable computation budget ("Chain of Thought") spent thinking and verifying before answering.',
-    shortDe: 'Steuerbares Rechenzeit-Budget („Chain of Thought“), das ein Modell vor der finalen Antwort zum Nachdenken nutzt.',
-    detailEn: 'In reasoning models (e.g. OpenAI o1/o3, DeepSeek-R1, Gemini 2.0 Flash Thinking), this parameter determines how much inference-time compute (internal reasoning tokens) is spent planning, verifying, and backtracking before delivering the final response. Higher levels boost complex problem solving at the expense of latency and cost.',
-    detailDe: 'Bei Reasoning-Modellen (z. B. OpenAI o1/o3, DeepSeek-R1, Gemini 2.0 Flash Thinking) steuert dieser Parameter, wie viele interne Denk-Tokens für Zwischenschritte, Selbstkorrekturen und Logikprüfungen erzeugt werden. Höhere Stufen steigern die Treffsicherheit bei Mathematik, Code und komplexer Logik, benötigen aber mehr Tokens und Zeit.',
+    badgeDe: 'Denkzeit-Budget',
+    shortEn: 'Inference-time thinking budget: how many hidden reasoning steps a model spends verifying logic before speaking.',
+    shortDe: 'Das Denkzeit-Budget: Wie viele unsichtbare Zwischenschritte das Modell zum Nachdenken und Prüfen nutzt, bevor es antwortet.',
+    detailEn: 'Analogy: Daniel Kahneman\'s System 1 (fast, intuitive gut reaction) vs. System 2 (deliberate, slow reasoning). Standard models shoot from the hip. Reasoning models pause: they draft hidden intermediate tokens, cross-check math, backtrack from dead ends, and only present verified answers.',
+    detailDe: 'Metapher: System 1 (schnelles Bauchgefühl) vs. System 2 (langsames, logisches Denken) nach Daniel Kahneman. Normale Modelle feuern sofort das erstbeste Wort ab. Bei aktivierter Denkstufe hält das Modell inne: Es schreibt verdeckte Notizen, rechnet Proben, verwirft Sackgassen und antwortet erst, wenn die Logik wasserdicht ist.',
     category: 'architecture',
+  },
+  {
+    id: 'term-context-rot',
+    termEn: 'Context Rot (Working Memory Overload)',
+    termDe: 'Context Rot (Arbeitsgedächtnis-Überlastung)',
+    badgeEn: 'Context Dilution',
+    badgeDe: 'Aufmerksamkeitsabfall',
+    shortEn: 'Reasoning degradation in long contexts: details in the middle of giant documents get lost or instructions diluted.',
+    shortDe: 'Qualitätsabfall bei Riesen-Texten: Details in der Mitte langer Verläufe werden übersehen oder Anweisungen geraten durcheinander.',
+    detailEn: 'Analogy: A desk buried under mountains of paper (Working Memory Overload). While models can accept hundreds of pages in their context window, retrieval precision degrades across the middle sections ("Lost-in-the-Middle" effect) due to attention dilution.',
+    detailDe: 'Metapher: Ein Schreibtisch voller Aktenberge (Working Memory Overload). Zwar können moderne Modelle theoretisch hunderte Seiten Text erfassen, doch mit zunehmender Länge sinkt die Aufmerksamkeit: Details in der Mitte werden übersehen („Lost-in-the-Middle“-Phänomen), genau wie bei einer Person nach stundenlangem Aktenstudium.',
+    category: 'architecture',
+  },
+
+  // 5. Agenten, Steuerung & Praxis
+  {
+    id: 'term-harness',
+    termEn: 'Harness (Agent Scaffolding & Runtime)',
+    termDe: 'Harness (Zaumzeug & Ablaufsteuerung)',
+    badgeEn: 'Agent Scaffolding',
+    badgeDe: 'Ablaufsteuerung',
+    shortEn: 'The harness for the model: the software scaffolding connecting the raw model to tools and keeping it in an active execution loop.',
+    shortDe: 'Das Zaumzeug für das Modell: Die Software-Umgebung, die ein Sprachmodell mit Werkzeugen verbindet und in einer Arbeitsschleife hält.',
+    detailEn: 'Analogy: A brain in a jar cannot act alone—it can only whisper thoughts. The harness provides the body and toolbelt: it accepts a complex prompt, breaks it into actionable sub-tasks, edits files, executes commands, intercepts errors, and sustains an autonomous loop until the work is verified.',
+    detailDe: 'Metapher: Ein Gehirn im Glas kann allein nichts bewirken – es kann nur Gedanken flüstern. Das Harness ist der Körper und die Werkzeugkiste: Es nimmt eine Aufgabe an, zerlegt sie in Teilschritte, öffnet Dateien, startet das Terminal, fängt Fehlermeldungen ab und lässt das Modell in einer Schleife arbeiten, bis die Aufgabe tatsächlich gelöst ist.',
+    category: 'agentic',
+  },
+  {
+    id: 'term-agent',
+    termEn: 'Agent (Autonomous Action Loop)',
+    termDe: 'Agent (Autonome Handlungsschleife)',
+    badgeEn: 'Action Loop',
+    badgeDe: 'Handlungsschleife',
+    shortEn: 'A model operating in a closed feedback loop: pursues goals, uses external tools, and self-corrects along the way.',
+    shortDe: 'Ein Modell mit geschlossener Rückkopplung: Setzt sich Ziele, nutzt selbstständig Werkzeuge und korrigiert eigene Fehler.',
+    detailEn: 'Analogy: The TOTE unit from cognitive psychology (Test – Operate – Test – Exit). A basic chatbot waits passively for user prompts. An agent actively experiments (Operate), inspects feedback (Test), and iterates until the objective is reached.',
+    detailDe: 'Metapher: Das TOTE-Modell aus der Kognitionspsychologie (Test – Operate – Test – Exit). Ein einfacher Chatbot wartet passiv auf die nächste Frage. Ein Agent dagegen handelt aktiv: Er probiert einen Schritt aus (Operate), prüft das Ergebnis (Test) und wiederholt diesen Kreislauf so lange selbstständig, bis das gesetzte Ziel erreicht ist.',
+    category: 'agentic',
+  },
+  {
+    id: 'term-ade',
+    termEn: 'ADE (Agentic Development Environment)',
+    termDe: 'ADE (Agenten-Programmierumgebung)',
+    badgeEn: 'Agentic Editor',
+    badgeDe: 'Agenten-Werkbank',
+    shortEn: 'A code editor where an AI agent works directly inside the repository as an active collaborative peer.',
+    shortDe: 'Eine Programmierumgebung, in der ein KI-Agent als vollwertiger Partner direkt im Projektordner arbeitet.',
+    detailEn: 'Analogy: A co-pilot at your workstation. Unlike simple text editors, the ADE grants the agent full workspace access to inspect project files, execute tests, and fix bugs autonomously.',
+    detailDe: 'Metapher: Ein Co-Pilot am Schreibtisch. Im Gegensatz zu einfachen Schreibprogrammen hat die ADE Zugriff auf das gesamte Projekt: Der Agent liest mehrere Dateien gleichzeitig, führt Tests aus und korrigiert Fehler selbstständig.',
+    category: 'agentic',
+  },
+  {
+    id: 'term-ide',
+    termEn: 'IDE (Integrated Development Environment)',
+    termDe: 'IDE (Klassische Entwickler-Werkbank)',
+    badgeEn: 'Developer Workbench',
+    badgeDe: 'Entwickler-Werkbank',
+    shortEn: 'The traditional programming workbench: combines text editor, debuggers, and build tools in one application.',
+    shortDe: 'Die klassische Werkbank: Vereint Texteditor, Lupen zur Fehlersuche und Werkzeuge zum Bauen von Programmen.',
+    detailEn: 'Analogy: The craftsman\'s workbench equipped with vice, magnifying lamp, and organized tools (e.g. VS Code, or RStudio for psychological statistics). Everything is arranged conveniently in one view.',
+    detailDe: 'Metapher: Die Werkbank des Handwerkers mit Schraubstock, Lupenleuchte und Werkzeugwand (z. B. VS Code oder RStudio in der Psychologie-Statistik). Alle Werkzeuge liegen griffbereit an einem Ort.',
+    category: 'agentic',
+  },
+  {
+    id: 'term-cli',
+    termEn: 'CLI (Command Line Interface)',
+    termDe: 'CLI (Kommandozeile / Terminal)',
+    badgeEn: 'Terminal',
+    badgeDe: 'Text-Konsole',
+    shortEn: 'The text-only console: instructions are typed as bare text commands without graphical buttons or windows.',
+    shortDe: 'Die reine Text-Konsole: Befehle werden direkt als Textzeilen eingetippt, ganz ohne bunte Knöpfe oder Fenster.',
+    detailEn: 'Analogy: A teletypewriter or telegraph. Instead of pointing and clicking graphical icons, you type exact text commands. Ideal for AI agents because textual instructions run with zero graphical overhead.',
+    detailDe: 'Metapher: Ein Fernschreiber oder Telegramm. Statt mit der Maus auf Icons zu klicken, tippt man präzise Textbefehle ein. Für KI-Agenten ist die CLI ideal, weil Textbefehle extrem schnell und ohne grafische Umwege ausgeführt werden können.',
+    category: 'agentic',
+  },
+
+  // 6. Grundlagen & Infrastruktur
+  {
+    id: 'term-neural-network',
+    termEn: 'Neural Network (Computational Graph)',
+    termDe: 'Neuronales Netz (Rechengeflecht)',
+    badgeEn: 'Foundations',
+    badgeDe: 'Grundlagen',
+    shortEn: 'A layered mathematical network of nodes that progressively extracts patterns from massive training data.',
+    shortDe: 'Ein mathematisches Schichtennetz aus Rechenknoten, das schrittweise Muster aus großen Datenmengen erlernt.',
+    detailEn: 'Analogy: Biological neural circuits. Artificial neurons pass numerical signals through layered connections. Successful paths get reinforced during learning, echoing Donald Hebb\'s classic neuropsychological principle: "Neurons that fire together, wire together."',
+    detailDe: 'Metapher: Ein biologisches Nervennetz. Viele kleine Recheneinheiten (künstliche Neuronen) sind in Schichten angeordnet. Eine Schicht reicht Signale an die nächste Schicht weiter. Beim Lernen verstärken sich diejenigen Verbindungen, die zu richtigen Ergebnissen führen – ganz nach dem psychologischen Lernprinzip von Donald Hebb („Neurons that fire together, wire together“).',
+    category: 'foundations',
+  },
+  {
+    id: 'term-generative-ai',
+    termEn: 'Generative AI (Synthesizing Systems)',
+    termDe: 'Generative KI (Schöpfende Systeme)',
+    badgeEn: 'Technology',
+    badgeDe: 'Technologie',
+    shortEn: 'Systems that synthesize original outputs (text, imagery, audio, code) rather than merely filtering or classifying.',
+    shortDe: 'Systeme, die eigenständig neue Inhalte erzeugen (Texte, Bilder, Töne, Code), statt Daten nur zu sortieren.',
+    detailEn: 'Analogy: A painter rather than a bouncer. Discriminative AI acts like a bouncer: sorting inputs ("Spam or Not Spam?"). Generative AI acts like a creative writer or painter: recombining learned rules to synthesize a brand-new essay, program, or illustration.',
+    detailDe: 'Metapher: Ein Maler oder Dichter statt eines Türstehers. Ein klassisches KI-System verhält sich wie ein Türsteher: Es sortiert Daten („Spam oder kein Spam?“, „Katze oder Hund?“). Generative KI verhält sich wie ein Maler: Sie erzeugt aus gelernten Mustern ein völlig neues Bild oder einen neuen Text, der so zuvor noch nie existiert hat.',
+    category: 'foundations',
+  },
+  {
+    id: 'term-api',
+    termEn: 'API (Application Programming Interface)',
+    termDe: 'API (Programmierschnittstelle)',
+    badgeEn: 'Network Interface',
+    badgeDe: 'Schnittstelle',
+    shortEn: 'The digital order counter: enables external software to query remote models across the internet seamlessly.',
+    shortDe: 'Der digitale Bestellkanal: Ermöglicht Programmen, fertige Modelle auf entfernten Großrechnern abzufragen.',
+    detailEn: 'Analogy: The waiter in a restaurant. You do not walk into the kitchen (the remote server cluster); you hand your order (the prompt) to the waiter (the API), who returns with the prepared meal (the response). Allows external scripts (e.g. Python, JASP) to harness models on demand.',
+    detailDe: 'Metapher: Die Kellnerin im Restaurant. Man geht als Gast nicht selbst in die Restaurantküche (das Rechenzentrum), sondern übergibt der Kellnerin (der API) die Bestellung (den Prompt). Die Kellnerin bringt kurz darauf das fertige Gericht (die Antwort) zurück an den Tisch. So können z. B. Statistikprogramme wie JASP oder Python-Skripte Modelle nutzen, ohne sie selbst betreiben zu müssen.',
+    category: 'infrastructure',
+  },
+  {
+    id: 'term-cloud',
+    termEn: 'Cloud Computing',
+    termDe: 'Cloud (Rechenzentren über Netz)',
+    badgeEn: 'Data Center',
+    badgeDe: 'Rechenzentrum',
+    shortEn: 'Remote data centers executing massive models on specialized GPU clusters without local hardware requirements.',
+    shortDe: 'Vernetzte Großrechenzentren: Führen gigantische Modelle auf Spezialchips aus, ohne dass man eigene Hardware benötigt.',
+    detailEn: 'Analogy: The public electrical grid. Rather than running a private diesel generator in your basement (costly personal GPU server racks), you draw compute power on demand from the grid via the internet.',
+    detailDe: 'Metapher: Das öffentliche Stromnetz. Statt einen eigenen Dieselgenerator im Keller aufzustellen (teure Spezial-Grafikkarten für zehntausende Euro), bezieht man Rechenleistung einfach flexibel nach Bedarf über das Internet aus der Steckdose.',
+    category: 'infrastructure',
+  },
+  {
+    id: 'term-runtime',
+    termEn: 'Runtime Environment',
+    termDe: 'Laufzeitumgebung (Arbeitsbühne)',
+    badgeEn: 'Execution Context',
+    badgeDe: 'Ausführungsumgebung',
+    shortEn: 'The operating stage: the active software and memory environment required for models and code to run live.',
+    shortDe: 'Die Arbeitsbühne: Der Hard- und Softwareraum, der bereitstehen muss, damit ein Modell live rechnen kann.',
+    detailEn: 'Analogy: A concert hall with electricity, stage lighting, and instruments. The model is the musical score, but without the physical hall and orchestra (RAM, drivers, processors), no sound is produced.',
+    detailDe: 'Metapher: Ein Konzertsaal mit Bühne, Strom und Instrumenten. Das Modell ist die Partitur, aber ohne den Saal, den Dirigenten und die Musiker (Arbeitsspeicher, Treiber, Prozessorkerne) erklingt kein einziger Ton.',
+    category: 'infrastructure',
+  },
+  {
+    id: 'term-framework',
+    termEn: 'Framework (Software Scaffolding)',
+    termDe: 'Framework (Vorgefertigtes Baugerüst)',
+    badgeEn: 'Architecture',
+    badgeDe: 'Programmiergerüst',
+    shortEn: 'Prefabricated structural foundation: reusable code conventions and libraries preventing developers from reinventing the wheel.',
+    shortDe: 'Das Fertighaus-Fundament: Vorgefertigte Software-Bausteine und Regeln, damit Entwickler nicht bei Null anfangen müssen.',
+    detailEn: 'Analogy: A prefabricated building frame with pre-installed plumbing. You don\'t cast every brick yourself; you assemble proven components (e.g. PyTorch, React) and focus on your specific design.',
+    detailDe: 'Metapher: Das Fertighaus-Gerüst mit gelegten Rohren und Anschlüssen. Man baut nicht jede Schraube und Steckdose selbst, sondern nutzt bewährte Bauteile (z. B. PyTorch oder React) und konzentriert sich auf die individuelle Gestaltung.',
+    category: 'infrastructure',
+  },
+  {
+    id: 'term-chatbot',
+    termEn: 'Chatbot (Conversational Interface)',
+    termDe: 'Chatbot (Gesprächs-Oberfläche)',
+    badgeEn: 'Dialogue Interface',
+    badgeDe: 'Benutzeroberfläche',
+    shortEn: 'The conversational chat bubble window: allows humans to interact naturally with underlying models using plain language.',
+    shortDe: 'Die Sprechblasen-Oberfläche: Ermöglicht es Menschen, sich in natürlicher Alltagssprache mit einem Modell zu unterhalten.',
+    detailEn: 'Analogy: The customer service booth with a microphone (e.g. ChatGPT or Claude). It formats markdown, manages conversational history, and streams the model\'s generated text smoothly onto the screen.',
+    detailDe: 'Metapher: Der Kundenschalter mit Sprechanlage (z. B. ChatGPT oder Claude). Der Chatbot formatiert Absätze, merkt sich den Gesprächsverlauf und sorgt dafür, dass die Textausgaben des Modells lesbar auf dem Bildschirm einlaufen.',
+    category: 'infrastructure',
+  },
+  {
+    id: 'term-ecosystem',
+    termEn: 'AI Ecosystem',
+    termDe: 'Ökosystem (Vernetztes Biotop)',
+    badgeEn: 'Networked Fabric',
+    badgeDe: 'Vernetztes Gefüge',
+    shortEn: 'The interconnected network of chip makers, model labs, open-source communities, and independent evaluators.',
+    shortDe: 'Das vernetzte Zusammenspiel: Chipbauer, Entwicklerfirmen, Open-Source-Gemeinschaften und Prüflabore.',
+    detailEn: 'Analogy: A coral reef. No model functions in isolation: university researchers publish architectures, open-source communities fine-tune weights, commercial labs invest compute, and independent benchmarks audit claims.',
+    detailDe: 'Metapher: Ein Korallenriff oder Wald. Kein Modell existiert im luftleeren Raum: Universitäten forschen, Open-Source-Tüftler passen Gewichte an, kommerzielle Labore investieren Milliarden und unabhängige Prüfstände messen objektiv nach. Erst dieses Miteinander treibt das Tempo des Fortschritts.',
+    category: 'infrastructure',
   },
 ];
 
@@ -718,6 +821,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [internalShowAdvanced, setInternalShowAdvanced] = useState<boolean>(false);
   const [expandedLabId, setExpandedLabId] = useState<string | null>(null);
+  const [glossaryCategory, setGlossaryCategory] = useState<GlossaryCategory | 'all'>('all');
+  const [glossarySearch, setGlossarySearch] = useState<string>('');
 
   const activeGroup = controlledActiveGroup ?? internalActiveGroup;
   const showAdvanced = controlledShowAdvanced ?? internalShowAdvanced;
@@ -900,6 +1005,21 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
     });
   }, [lang]);
 
+  // Filtered glossary terms based on active category & search
+  const filteredGlossaryTerms = useMemo(() => {
+    return sortedGlossaryTerms.filter((term) => {
+      if (glossaryCategory !== 'all' && term.category !== glossaryCategory) {
+        return false;
+      }
+      if (glossarySearch.trim()) {
+        const query = glossarySearch.toLowerCase().trim();
+        const text = `${term.termDe} ${term.termEn} ${term.badgeDe} ${term.badgeEn} ${term.shortDe} ${term.shortEn} ${term.detailDe} ${term.detailEn}`.toLowerCase();
+        return text.includes(query);
+      }
+      return true;
+    });
+  }, [sortedGlossaryTerms, glossaryCategory, glossarySearch]);
+
   // Horizontal mouse wheel scrolling for overflow button strips
   const handleHorizontalWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY !== 0) {
@@ -920,14 +1040,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   };
 
   const scrollToGlossary = (targetId?: string) => {
+    if (targetId && targetId !== 'glossary-section') {
+      setGlossaryCategory('all');
+      setGlossarySearch('');
+    }
     const targetElementId = targetId || 'glossary-section';
     const el = document.getElementById(targetElementId);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('ring-2', 'ring-blue-500', 'transition-all');
+      el.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2', 'dark:ring-offset-slate-900', 'transition-all');
       setTimeout(() => {
-        el.classList.remove('ring-2', 'ring-blue-500');
-      }, 2500);
+        el.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-2', 'dark:ring-offset-slate-900');
+      }, 3500);
     }
   };
 
@@ -1977,46 +2101,151 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
         className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800 space-y-4"
         aria-label={lang === 'de' ? 'Glossar und Fachbegriffe' : 'Glossary and key terms'}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-blue-500" />
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              {lang === 'de' ? 'Glossar: Fachbegriffe & Abkürzungen' : 'Glossary: Key AI Concepts & Acronyms'}
+              {lang === 'de' ? 'Glossar: Fachbegriffe, Modelltypen & Methoden' : 'Glossary: Key Concepts, Model Types & Methods'}
             </h3>
           </div>
           <span className="text-xs text-slate-500 dark:text-slate-400">
             {lang === 'de'
-              ? 'Kurze, sachliche Definitionen der wichtigsten Kernbegriffe'
-              : 'Short, factual definitions for key model and ecosystem terms'}
+              ? 'Didaktisch aufbereitet für Erstsemester: Metaphern und Symbolbilder statt Fachchinesisch'
+              : 'Intuitive explanations designed for first-semester students: visual metaphors over jargon'}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {sortedGlossaryTerms.map((term) => (
-            <div
-              key={term.id}
-              id={term.id}
-              className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all scroll-mt-20 flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    {lang === 'de' ? term.termDe : term.termEn}
-                  </h4>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0">
-                    {lang === 'de' ? term.badgeDe : term.badgeEn}
+        {/* Filter-Leiste & Suchfeld für das Glossar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-slate-50 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
+          {/* Kategorie-Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs">
+            {[
+              { key: 'all', labelDe: 'Alle Begriffe', labelEn: 'All Terms' },
+              { key: 'foundations', labelDe: 'Wissenschaftstheorie', labelEn: 'Science & Foundations' },
+              { key: 'statistics', labelDe: 'Statistische Modelle & Regression', labelEn: 'Statistical Models' },
+              { key: 'architecture', labelDe: 'Sprachmodelle & KI', labelEn: 'LLMs & AI Architecture' },
+              { key: 'agentic', labelDe: 'Agenten & Steuerung', labelEn: 'Agents & Scaffolding' },
+              { key: 'evaluation', labelDe: 'Tests & Benchmarks', labelEn: 'Tests & Benchmarks' },
+              { key: 'infrastructure', labelDe: 'Infrastruktur & APIs', labelEn: 'Infrastructure' },
+            ].map((cat) => {
+              const count = cat.key === 'all'
+                ? GLOSSARY_TERMS.length
+                : GLOSSARY_TERMS.filter((t) => t.category === cat.key).length;
+              const isActive = glossaryCategory === cat.key;
+              return (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => setGlossaryCategory(cat.key as GlossaryCategory | 'all')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200/80 dark:border-slate-700/80'
+                  }`}
+                >
+                  <span>{lang === 'de' ? cat.labelDe : cat.labelEn}</span>
+                  <span className={`text-[10.5px] px-1 py-0.2 rounded-full font-mono ${isActive ? 'bg-blue-500/80 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                    {count}
                   </span>
-                </div>
-                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 leading-snug mb-2">
-                  {lang === 'de' ? term.shortDe : term.shortEn}
-                </p>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  {lang === 'de' ? term.detailDe : term.detailEn}
-                </p>
-              </div>
-            </div>
-          ))}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Suchleiste */}
+          <div className="relative min-w-[200px] sm:w-64 shrink-0">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={glossarySearch}
+              onChange={(e) => setGlossarySearch(e.target.value)}
+              placeholder={lang === 'de' ? 'Begriff filtern...' : 'Filter concepts...'}
+              className="w-full pl-8 pr-7 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+            />
+            {glossarySearch && (
+              <button
+                type="button"
+                onClick={() => setGlossarySearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+                title="Suche leeren"
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Karten-Raster der Begriffe */}
+        {filteredGlossaryTerms.length === 0 ? (
+          <div className="p-8 text-center bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs">
+            {lang === 'de'
+              ? 'Kein Glossarbegriff entspricht dem aktuellen Filter.'
+              : 'No glossary terms match your current filter.'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {filteredGlossaryTerms.map((term) => {
+              const badgeClass =
+                term.category === 'statistics'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800'
+                  : term.category === 'foundations'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                  : term.category === 'architecture'
+                  ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+                  : term.category === 'agentic'
+                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                  : term.category === 'evaluation'
+                  ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800'
+                  : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+
+              const detailText = lang === 'de' ? term.detailDe : term.detailEn;
+              const hasMetaphor = detailText.includes('Metapher:') || detailText.includes('Grundsatz:') || detailText.includes('Analogy:') || detailText.includes('Foundational rule:');
+
+              return (
+                <div
+                  key={term.id}
+                  id={term.id}
+                  className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all scroll-mt-24 flex flex-col justify-between shadow-2xs hover:shadow-xs"
+                >
+                  <div>
+                    {/* Header: Name + Category Badge */}
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                        {lang === 'de' ? term.termDe : term.termEn}
+                      </h4>
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${badgeClass}`}>
+                        {lang === 'de' ? term.badgeDe : term.badgeEn}
+                      </span>
+                    </div>
+
+                    {/* Short summary definition */}
+                    <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 leading-snug mb-2 pb-1.5 border-b border-slate-100 dark:border-slate-800/80">
+                      {lang === 'de' ? term.shortDe : term.shortEn}
+                    </p>
+
+                    {/* Detailed explanation with highlighted metaphor / symbol */}
+                    <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed space-y-1.5">
+                      {hasMetaphor ? (
+                        detailText.split(/(Grundsatz:|Metapher:|Analogy:|Foundational rule:)/g).map((part, i) => {
+                          if (['Grundsatz:', 'Metapher:', 'Analogy:', 'Foundational rule:'].includes(part)) {
+                            return (
+                              <span key={i} className="font-bold text-slate-800 dark:text-slate-200 block pt-1 text-[11.5px]">
+                                💡 {part}
+                              </span>
+                            );
+                          }
+                          return <span key={i}>{part}</span>;
+                        })
+                      ) : (
+                        <span>{detailText}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     </div>
   );

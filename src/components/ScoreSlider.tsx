@@ -264,14 +264,17 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
     return null;
   }, [unifiedSliderValue, activeCategoryComp, activeCategoryName, lang, t, row33Meta]);
 
-  return (
-    <div className="relative flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0 max-w-full font-mono text-xs">
+  const sliderControl = (
+    <div className="relative flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0 max-w-full font-mono text-xs cursor-pointer">
       <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 pl-1.5 whitespace-nowrap shrink-0">
         Score:
       </span>
       <button
         type="button"
-        onClick={() => handleUnifiedStep(-1)}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleUnifiedStep(-1);
+        }}
         disabled={unifiedSliderValue <= 0}
         aria-label="Previous score criterion"
         className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0 transition-colors"
@@ -290,7 +293,10 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
       />
       <button
         type="button"
-        onClick={() => handleUnifiedStep(1)}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleUnifiedStep(1);
+        }}
         disabled={unifiedSliderValue >= maxVal}
         aria-label="Next score criterion"
         className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0 transition-colors"
@@ -298,79 +304,104 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
         <Plus className="w-3 h-3" />
       </button>
 
-      {/* Badge button showing active criterion/score mode with unified tooltip */}
-      {activeScoreTooltip && (
-        <Tooltip
-          title={activeScoreTooltip.title}
-          badge={activeScoreTooltip.badge}
-          position="bottom"
-          align="center"
-          width="w-72"
-          content={
-            <div className="space-y-1.5">
-              <p className="leading-snug">{activeScoreTooltip.desc}</p>
-              <div className="pt-1.5 border-t border-slate-700/60 font-mono text-[11px] text-amber-300">
-                {activeScoreTooltip.detail}
-              </div>
-              <div className="pt-1 border-t border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                <span>
-                  {lang === 'de'
-                    ? 'Klicken, um zur Erklärung zu springen'
-                    : 'Click to jump to explanation'}
-                </span>
-              </div>
-            </div>
-          }
-        >
-        <div className="w-[130px] sm:w-[165px] shrink-0 overflow-hidden flex items-center pr-0.5">
-          {unifiedSliderValue === 0 && (
-            <button
-              type="button"
-              onClick={() => handleScroll('note-col-m')}
-              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-              <span className="truncate">{t.scoreModeNew}</span>
-            </button>
-          )}
-          {unifiedSliderValue === 1 && (
-            <button
-              type="button"
-              onClick={() => handleScroll('note-col-l')}
-              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-              <span className="truncate">{t.scoreModeOld}</span>
-            </button>
-          )}
-          {unifiedSliderValue === 2 && (
-            <button
-              type="button"
-              onClick={() => handleScroll('note-col-n')}
-              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-              <span className="truncate">{t.scoreModeWorstCase}</span>
-            </button>
-          )}
-          {unifiedSliderValue >= 3 && activeCategoryComp && (
-            <button
-              type="button"
-              onClick={() => handleScroll(scoreScrollTargets.targetId)}
-              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: activeCategoryComp.color }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-              <span className="truncate">
-                {unifiedSliderValue <= 10 ? `#${unifiedSliderValue - 2} ` : ''}
-                {activeCategoryName || (lang === 'de' ? activeCategoryComp.nameDe : activeCategoryComp.nameEn)}
-              </span>
-            </button>
-          )}
-        </div>
-      </Tooltip>
-    )}
+      {/* Badge button showing active criterion/score mode */}
+      <div className="w-[130px] sm:w-[165px] shrink-0 overflow-hidden flex items-center pr-0.5">
+        {unifiedSliderValue === 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleScroll('note-col-m');
+            }}
+            className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+            <span className="truncate">{t.scoreModeNew}</span>
+          </button>
+        )}
+        {unifiedSliderValue === 1 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleScroll('note-col-l');
+            }}
+            className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+            <span className="truncate">{t.scoreModeOld}</span>
+          </button>
+        )}
+        {unifiedSliderValue === 2 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleScroll('note-col-n');
+            }}
+            className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+            <span className="truncate">{t.scoreModeWorstCase}</span>
+          </button>
+        )}
+        {unifiedSliderValue >= 3 && activeCategoryComp && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleScroll(scoreScrollTargets.targetId);
+            }}
+            className="text-xs font-mono font-bold px-1.5 py-0.5 rounded text-white shadow-2xs flex items-center gap-1 truncate w-full cursor-pointer hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: activeCategoryComp.color }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+            <span className="truncate">
+              {unifiedSliderValue <= 10 ? `#${unifiedSliderValue - 2} ` : ''}
+              {activeCategoryName || (lang === 'de' ? activeCategoryComp.nameDe : activeCategoryComp.nameEn)}
+            </span>
+          </button>
+        )}
+      </div>
     </div>
+  );
+
+  if (!activeScoreTooltip) {
+    return sliderControl;
+  }
+
+  return (
+    <Tooltip
+      title={activeScoreTooltip.title}
+      badge={activeScoreTooltip.badge}
+      position="bottom"
+      align="center"
+      width="w-[350px]"
+      content={
+        <div className="space-y-1.5">
+          <p className="leading-snug">{activeScoreTooltip.desc}</p>
+          <div className="pt-1.5 border-t border-slate-700/60 font-mono text-[11px] text-amber-300">
+            {activeScoreTooltip.detail}
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleScroll(scoreScrollTargets.targetId);
+            }}
+            className="w-full pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer text-left transition-colors group"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 group-hover:scale-125 transition-transform" />
+            <span className="group-hover:underline font-medium">
+              {lang === 'de'
+                ? 'Klicken, um zur Erklärung zu springen'
+                : 'Click to jump to explanation'}
+            </span>
+          </button>
+        </div>
+      }
+    >
+      {sliderControl}
+    </Tooltip>
   );
 };

@@ -111,15 +111,15 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
   {
     id: 'trickQuestions',
     key: 'trickQuestions',
-    nameDe: 'Agentic Work',
-    nameEn: 'Agentic Work',
+    nameDe: 'Experimenting & Engineering',
+    nameEn: 'Experimenting & Engineering',
     sourceName: 'GDPx',
     sourceUrl: 'https://gdpx.semianalysis.com',
     color: '#6366F1', // Indigo
     darkColor: '#4F46E5',
     lightBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
-    descriptionDe: 'Agentic Work (GDPx in %): Misst autonome Agentenfähigkeiten in wertschöpfungsstarken Sektoren (Chip-Design, Cybersicherheit, Biologie, Finanzen, Recht, Quant Trading, Software-Entwicklung).',
-    descriptionEn: 'Agentic Work (GDPx in %): Measures autonomous agentic capabilities across high-impact sectors (chip design, cybersecurity, biology, finance, legal, quant trading, software engineering).',
+    descriptionDe: 'Experimenting & Engineering (GDPx in %): Misst autonome Experimentier- und Engineering-Fähigkeiten in wertschöpfungsstarken Sektoren (Chip-Design, Cybersicherheit, Biologie, Finanzen, Recht, Quant Trading, Software-Entwicklung).',
+    descriptionEn: 'Experimenting & Engineering (GDPx in %): Measures autonomous experimenting and engineering capabilities across high-impact sectors (chip design, cybersecurity, biology, finance, legal, quant trading, software engineering).',
     formulaDesc: 'J / 8',
     weightPct: 12.5,
     transform: (val: number) => Math.max(0, Math.min(100, val)),
@@ -257,8 +257,8 @@ export function getBenchmarkCategoryLabel(
   if (lower.includes('plot reading') || lower.includes('plot') || lower.includes('diagramm') || lower.includes('vision') || lower.includes('mmmu')) return 'Diagrammanalyse';
   if (lower.includes('diagnostic') || lower.includes('diagnostik') || lower.includes('medical') || lower.includes('mlcr')) return 'Diagnostik';
   if (lower.includes('excel')) return 'Excel-Analyst';
-  if (lower.includes('agentic') || lower.includes('gdpx')) return 'Agentic Work';
-  if (lower.includes('trick') || lower.includes('simplebench') || lower.includes('(3d)')) return 'Agentic Work';
+  if (lower.includes('experimenting') || lower.includes('engineering') || lower.includes('agentic') || lower.includes('gdpx')) return 'Experimenting & Engineering';
+  if (lower.includes('trick') || lower.includes('simplebench') || lower.includes('(3d)')) return 'SimpleBench';
   if (lower.includes('econ') || lower.includes('legal') || lower.includes('wirtschaft') || lower.includes('recht') || lower.includes('vals')) return 'Wirtschaft & Recht';
 
   if (compFallback) {

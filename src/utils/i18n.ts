@@ -20,7 +20,7 @@ export const TRANSLATIONS = {
       { text: 'Mathematische & tabellarische Datenanalyse (Excel / FinanceBench)', color: '#06B6D4' },
       { text: 'Faktentreue & Non-Hallucination-Rate (Ehrlichkeit bei Nichtwissen statt Erfinden)', color: '#10B981' },
       { text: 'Medizinisches Langkontext-Denken über hunderte Seiten klinischer Fachliteratur', color: '#F43F5E' },
-      { text: 'Autonomes Arbeiten & Agenten-Fähigkeiten (GDPx Agentic Work)', color: '#6366F1' },
+      { text: 'Autonomes Experimentieren & Engineering (GDPx Experimenting & Engineering)', color: '#6366F1' },
       { text: 'Automatisierte mehrstufige quantitative Workflows (Vals.ai)', color: '#EA580C' },
     ],
 
@@ -145,7 +145,7 @@ export const TRANSLATIONS = {
       { text: 'Mathematical & tabular data analysis (Excel / FinanceBench)', color: '#06B6D4' },
       { text: 'Factual accuracy & Non-Hallucination Rate (honesty when uncertain instead of inventing)', color: '#10B981' },
       { text: 'Medical long-context reasoning across hundreds of pages of clinical literature', color: '#F43F5E' },
-      { text: 'Autonomous & agentic workflows in high-impact domains (GDPx Agentic Work)', color: '#6366F1' },
+      { text: 'Autonomous experimenting & engineering workflows in high-impact domains (GDPx Experimenting & Engineering)', color: '#6366F1' },
       { text: 'Automated multi-step quantitative workflows (Vals.ai)', color: '#EA580C' },
     ],
 
