@@ -24,10 +24,10 @@ function renderTextWithLinks(text: string) {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white font-mono inline-flex items-center gap-0.5 break-all font-semibold underline-offset-2"
+          className="text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white font-mono inline-flex items-center gap-0.5 break-all font-semibold underline-offset-2 text-[11px]"
         >
           <span>{part}</span>
-          <ExternalLink className="w-2.5 h-2.5 shrink-0 inline ml-0.5 opacity-80" />
+          <ExternalLink className="w-2 h-2 shrink-0 inline ml-0.5 opacity-80" />
         </a>
       );
     }
@@ -704,10 +704,10 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                       href={p.link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
+                      className="inline-flex items-center gap-1 text-[11px] font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
                     >
                       <span>{p.link.label}</span>
-                      <ExternalLink className="w-2.5 h-2.5 opacity-80" />
+                      <ExternalLink className="w-2 h-2 opacity-80" />
                     </a>
                   )}
                 </div>
@@ -744,10 +744,10 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                     href={p.link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
+                    className="inline-flex items-center gap-1 text-[11px] font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
                   >
                     <span>{p.link.label}</span>
-                    <ExternalLink className="w-2.5 h-2.5 opacity-80" />
+                    <ExternalLink className="w-2 h-2 opacity-80" />
                   </a>
                 )}
               </div>

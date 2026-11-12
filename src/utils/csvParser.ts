@@ -440,18 +440,43 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     if (b) currentBotNames.add(b);
   }
 
-  // 2. Parse dynamic company lookup table from Column AJ (index 35) onwards
-  const companyLookupMap: Record<string, { name: string; domain: string; color: string; flag: string }> = {};
-  for (let r = 180; r < rows.length; r++) {
+  // 2. Parse dynamic company lookup table from Column AI (index 34: Company), AJ (index 35: Domain), AK (index 36: Flag)
+  // Check header row 2 (index 1) or row 1 (index 0) for column indices dynamically
+  let colCompany = 34; // default Col AI (0-indexed 34)
+  let colDomain = 35;  // default Col AJ (0-indexed 35)
+  let colFlag = 36;    // default Col AK (0-indexed 36)
+
+  for (let r = 0; r < Math.min(5, rows.length); r++) {
+    const headerRow = rows[r];
+    if (!headerRow) continue;
+    for (let c = 0; c < headerRow.length; c++) {
+      const cell = (headerRow[c] || '').trim().toLowerCase();
+      if (cell === 'company') colCompany = c;
+      else if (cell === 'domain') colDomain = c;
+      else if (cell === 'flag') colFlag = c;
+    }
+  }
+
+  // Helper to extract clean domain: strip http://, https://, www., and trailing slashes/paths
+  const sanitizeDomain = (rawDomain: string): string => {
+    let d = rawDomain.trim();
+    d = d.replace(/^https?:\/\//i, '');
+    d = d.replace(/^www\./i, '');
+    d = d.split('/')[0].split('?')[0].split('#')[0].trim().toLowerCase();
+    return d;
+  };
+
+  const companyLookupMap: Record<string, { name: string; domain: string; flag: string }> = {};
+  for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
-    if (row && row.length > 35 && row[35]) {
-      const comp = row[35].trim();
+    if (row && row.length > colCompany && row[colCompany]) {
+      const comp = row[colCompany].trim();
       if (!comp || comp.toLowerCase().includes('lookup') || comp.toLowerCase() === 'company') continue;
-      const domain = (row[36] || '').trim();
-      const color = (row[37] || '').trim();
-      const flag = (row[38] || '').trim();
-      if (flag || domain) {
-        companyLookupMap[comp.toLowerCase()] = { name: comp, domain, color, flag };
+      const rawDomain = (row[colDomain] || '').trim();
+      const domain = sanitizeDomain(rawDomain);
+      const flag = (row[colFlag] || '').trim();
+      if (domain || flag) {
+        companyLookupMap[comp.toLowerCase()] = { name: comp, domain, flag };
       }
     }
   }
@@ -526,17 +551,34 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     const { flag: nameFlag, cleanText: cleanedName } = extractFlag(rawNameCell);
     const { flag: creatorFlag, cleanText: cleanedCreator } = extractFlag(rawCreatorCell);
 
-    // Lookup flag from CSV lookup table (cell AJ:232 onwards)
+    // Lookup company info (domain, flag, name) from CSV lookup table (cells AI2:AK onwards)
     let lookupFlag = '';
-    const creatorLow = cleanedCreator.toLowerCase();
+    let lookupDomain = '';
+    let lookupCompName = '';
+    const creatorLow = cleanedCreator.toLowerCase().trim();
+    const colZLow = (row[25] || '').toLowerCase().trim(); // Column Z is model creator
+    const nameLow = cleanedName.toLowerCase().trim();
+
     for (const [key, info] of Object.entries(companyLookupMap)) {
-      if (info.flag && (creatorLow.includes(key) || key.includes(creatorLow))) {
-        lookupFlag = info.flag;
-        break;
+      if (
+        (creatorLow && (creatorLow === key || creatorLow.includes(key) || key.includes(creatorLow))) ||
+        (colZLow && (colZLow === key || colZLow.includes(key) || key.includes(colZLow))) ||
+        (nameLow && (nameLow.startsWith(key) || nameLow.includes(key)))
+      ) {
+        if (info.flag && !lookupFlag) lookupFlag = info.flag;
+        if (info.domain && !lookupDomain) lookupDomain = info.domain;
+        if (info.name && !lookupCompName) lookupCompName = info.name;
+        if (lookupFlag && lookupDomain) break;
       }
     }
 
-    const company = getCompanyMeta(cleanedCreator);
+    const fallbackCompany = getCompanyMeta(cleanedCreator);
+    const company = {
+      name: lookupCompName || fallbackCompany.name,
+      domain: lookupDomain || fallbackCompany.domain,
+      color: fallbackCompany.color,
+      flag: lookupFlag || fallbackCompany.flag,
+    };
     const flag = nameFlag || creatorFlag || lookupFlag || company.flag || '🌐';
 
     // Model badges

@@ -46,6 +46,8 @@ export const COMPANY_LOOKUP: Record<string, CompanyInfo> = {
   'ssi': { name: 'SSI', domain: 'ssi.inc', color: '#111827', flag: '🇺🇸' },
   'baidu': { name: 'Baidu', domain: 'baidu.com', color: '#2932E1', flag: '🇨🇳' },
   'longcat': { name: 'LongCat', domain: 'meituan.com', color: '#FFD100', flag: '🇨🇳' },
+  'tencent': { name: 'Tencent', domain: 'tencent.com', color: '#0052D9', flag: '🇨🇳' },
+  'hunyuan': { name: 'Tencent', domain: 'tencent.com', color: '#0052D9', flag: '🇨🇳' },
 };
 
 export function getCompanyMeta(creatorStr: string): CompanyInfo {
@@ -60,7 +62,7 @@ export function getCompanyMeta(creatorStr: string): CompanyInfo {
   // Default fallback
   return {
     name: creatorStr.split(' ')[0] || 'Unknown',
-    domain: 'ai.google.dev',
+    domain: '',
     color: '#475569',
     flag: '🌐'
   };

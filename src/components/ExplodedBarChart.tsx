@@ -118,12 +118,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const [persistentModel, setPersistentModel] = useState<ModelRecord | null>(null);
   const [persistentSegment, setPersistentSegment] = useState<HoveredSegmentInfo | null>(null);
 
-  // Floating compact price / availability note tooltip
+  // Floating compact price / availability note & free API tooltip
   const [priceTooltip, setPriceTooltip] = useState<{
     title: string;
     text: string;
     x: number;
     y: number;
+    link?: string;
   } | null>(null);
 
   // Horizontal scroll container reference and vertical mousewheel converter
@@ -1761,120 +1762,256 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
                 {/* Euro-Price from Col AL & Free API globe rendered above bar / logo */}
                 {priceInfo.type === 'price' && (
-                  <text
-                    x={barCenterX}
-                    y={priceY}
-                    textAnchor="middle"
-                    className="font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none"
-                    fontSize="14"
-                    style={{
-                      transition: 'y 0.25s ease-out',
-                    }}
-                  >
-                    {priceInfo.displayPrice}
-                    {model.isFreeApi && (
-                      <tspan fontSize="15" fill="#2563EB" fontWeight="bold"> 🌐</tspan>
-                    )}
-                  </text>
+                  <g>
+                    <text
+                      x={model.isFreeApi ? barCenterX - 8 : barCenterX}
+                      y={priceY}
+                      textAnchor="middle"
+                      className="font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none"
+                      fontSize="14"
+                      style={{
+                        transition: 'y 0.25s ease-out',
+                      }}
+                    >
+                      {priceInfo.displayPrice}
+                    </text>
+                    {model.isFreeApi && (() => {
+                      const apiHref = model.apiLink || model.modelUrl;
+                      const tooltipText = lang === 'de'
+                        ? 'klick mich für\nkostenlosen API-Schlüssel'
+                        : 'click me for\nfree API key';
+                      const globeEl = (
+                        <text
+                          x={barCenterX + 10}
+                          y={priceY}
+                          textAnchor="middle"
+                          className={`select-none fill-blue-600 dark:fill-blue-400 font-bold transition-transform duration-150 ${
+                            apiHref ? 'cursor-pointer hover:scale-125 hover:fill-blue-500' : 'pointer-events-none'
+                          }`}
+                          fontSize="15"
+                          style={{
+                            transition: 'y 0.25s ease-out, transform 0.15s ease-out',
+                            transformOrigin: `${barCenterX + 10}px ${priceY - 4}px`,
+                          }}
+                        >
+                          🌐
+                        </text>
+                      );
+                      if (!apiHref) return globeEl;
+                      return (
+                        <a
+                          href={apiHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="cursor-pointer group/globe"
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseEnter={(e) => {
+                            setPriceTooltip({
+                              title: '',
+                              text: tooltipText,
+                              x: e.clientX,
+                              y: e.clientY,
+                            });
+                          }}
+                          onMouseMove={(e) => {
+                            setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                          }}
+                          onMouseLeave={() => setPriceTooltip(null)}
+                        >
+                          {globeEl}
+                        </a>
+                      );
+                    })()}
+                  </g>
                 )}
 
                 {/* Availability / Restriction Notice from Col AL: fixed-anchor notice icon rendered on top with smooth compact popup */}
                 {priceInfo.type === 'note' && (
-                  <g
-                    className="cursor-pointer group/note"
-                    onMouseEnter={(e) => {
-                      setPriceTooltip({
-                        title: priceInfo.tooltipTitle,
-                        text: priceInfo.tooltipText,
-                        x: e.clientX,
-                        y: e.clientY,
-                      });
-                    }}
-                    onMouseMove={(e) => {
-                      setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                    }}
-                    onMouseLeave={() => setPriceTooltip(null)}
-                  >
-                    <circle
-                      cx={model.isFreeApi ? barCenterX - 10 : barCenterX}
-                      cy={priceY - 4}
-                      r={7}
-                      className="fill-amber-100 dark:fill-amber-950 stroke-amber-500 dark:stroke-amber-400 group-hover/note:fill-amber-200 dark:group-hover/note:fill-amber-900 group-hover/note:stroke-amber-600 dark:group-hover/note:stroke-amber-300 transition-colors"
-                      strokeWidth="1.2"
-                      style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
-                    />
-                    <text
-                      x={model.isFreeApi ? barCenterX - 10 : barCenterX}
-                      y={priceY}
-                      textAnchor="middle"
-                      className="fill-amber-800 dark:fill-amber-200 font-bold select-none pointer-events-none"
-                      fontSize="12"
-                      fontFamily="sans-serif"
+                  <g>
+                    <g
+                      className="cursor-pointer group/note"
+                      onMouseEnter={(e) => {
+                        setPriceTooltip({
+                          title: priceInfo.tooltipTitle,
+                          text: priceInfo.tooltipText,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
+                      }}
+                      onMouseMove={(e) => {
+                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                      }}
+                      onMouseLeave={() => setPriceTooltip(null)}
                     >
-                      ℹ
-                    </text>
-                    <circle
-                      cx={model.isFreeApi ? barCenterX - 10 : barCenterX}
-                      cy={priceY - 4}
-                      r={13}
-                      fill="transparent"
-                    />
-                    {model.isFreeApi && (
+                      <circle
+                        cx={model.isFreeApi ? barCenterX - 10 : barCenterX}
+                        cy={priceY - 4}
+                        r={7}
+                        className="fill-amber-100 dark:fill-amber-950 stroke-amber-500 dark:stroke-amber-400 group-hover/note:fill-amber-200 dark:group-hover/note:fill-amber-900 group-hover/note:stroke-amber-600 dark:group-hover/note:stroke-amber-300 transition-colors"
+                        strokeWidth="1.2"
+                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
+                      />
                       <text
-                        x={barCenterX + 10}
+                        x={model.isFreeApi ? barCenterX - 10 : barCenterX}
                         y={priceY}
                         textAnchor="middle"
-                        className="select-none fill-blue-600 dark:fill-blue-400 font-bold pointer-events-none"
-                        fontSize="15"
+                        className="fill-amber-800 dark:fill-amber-200 font-bold select-none pointer-events-none"
+                        fontSize="12"
+                        fontFamily="sans-serif"
                       >
-                        🌐
+                        ℹ
                       </text>
-                    )}
+                      <circle
+                        cx={model.isFreeApi ? barCenterX - 10 : barCenterX}
+                        cy={priceY - 4}
+                        r={13}
+                        fill="transparent"
+                      />
+                    </g>
+                    {model.isFreeApi && (() => {
+                      const apiHref = model.apiLink || model.modelUrl;
+                      const tooltipText = lang === 'de'
+                        ? 'klick mich für\nkostenlosen API-Schlüssel'
+                        : 'click me for\nfree API key';
+                      const globeEl = (
+                        <text
+                          x={barCenterX + 10}
+                          y={priceY}
+                          textAnchor="middle"
+                          className={`select-none fill-blue-600 dark:fill-blue-400 font-bold transition-transform duration-150 ${
+                            apiHref ? 'cursor-pointer hover:scale-125 hover:fill-blue-500' : 'pointer-events-none'
+                          }`}
+                          fontSize="15"
+                          style={{
+                            transition: 'y 0.25s ease-out, transform 0.15s ease-out',
+                            transformOrigin: `${barCenterX + 10}px ${priceY - 4}px`,
+                          }}
+                        >
+                          🌐
+                        </text>
+                      );
+                      if (!apiHref) return globeEl;
+                      return (
+                        <a
+                          href={apiHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="cursor-pointer group/globe"
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseEnter={(e) => {
+                            setPriceTooltip({
+                              title: '',
+                              text: tooltipText,
+                              x: e.clientX,
+                              y: e.clientY,
+                            });
+                          }}
+                          onMouseMove={(e) => {
+                            setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                          }}
+                          onMouseLeave={() => setPriceTooltip(null)}
+                        >
+                          {globeEl}
+                        </a>
+                      );
+                    })()}
                   </g>
                 )}
 
                 {/* Free API globe if no price or note is present */}
-                {priceInfo.type === 'none' && model.isFreeApi && (
-                  <text
-                    x={barCenterX}
-                    y={priceY}
-                    textAnchor="middle"
-                    className="select-none fill-blue-600 dark:fill-blue-400 font-bold pointer-events-none"
-                    fontSize="15"
-                    style={{
-                      transition: 'y 0.25s ease-out',
-                    }}
-                  >
-                    🌐
-                  </text>
-                )}
+                {priceInfo.type === 'none' && model.isFreeApi && (() => {
+                  const apiHref = model.apiLink || model.modelUrl;
+                  const tooltipText = lang === 'de'
+                    ? 'klick mich für\nkostenlosen API-Schlüssel'
+                    : 'click me for\nfree API key';
+                  const globeEl = (
+                    <text
+                      x={barCenterX}
+                      y={priceY}
+                      textAnchor="middle"
+                      className={`select-none fill-blue-600 dark:fill-blue-400 font-bold transition-transform duration-150 ${
+                        apiHref ? 'cursor-pointer hover:scale-125 hover:fill-blue-500' : 'pointer-events-none'
+                      }`}
+                      fontSize="15"
+                      style={{
+                        transition: 'y 0.25s ease-out, transform 0.15s ease-out',
+                        transformOrigin: `${barCenterX}px ${priceY - 4}px`,
+                      }}
+                    >
+                      🌐
+                    </text>
+                  );
+                  if (!apiHref) return globeEl;
+                  return (
+                    <a
+                      href={apiHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="cursor-pointer group/globe"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseEnter={(e) => {
+                        setPriceTooltip({
+                          title: '',
+                          text: tooltipText,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
+                      }}
+                      onMouseMove={(e) => {
+                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                      }}
+                      onMouseLeave={() => setPriceTooltip(null)}
+                    >
+                      {globeEl}
+                    </a>
+                  );
+                })()}
 
                 {/* Rotated Model Name below Baseline: OHNE Flagge, klickbar falls modelUrl vorhanden */}
                 <g transform={`translate(${barCenterX}, ${baselineY + 14})`}>
-                  {model.modelUrl ? (
-                    <a
-                      href={model.modelUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="cursor-pointer group"
-                    >
-                      <text
-                        x="0"
-                        y="0"
-                        textAnchor="end"
-                        transform="rotate(-52)"
-                        fill={isHovered || (hasActiveHighlight && highlighted) ? '#2563EB' : '#475569'}
-                        className="dark:fill-slate-300 transition-colors hover:fill-blue-600 dark:hover:fill-blue-400 cursor-pointer"
-                        fontSize="14"
-                        fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '500'}
+                  {model.modelUrl ? (() => {
+                    const modelNameTooltipText = model.isPaid
+                      ? (lang === 'de' ? 'zum kostenpflichtigen\nChat' : 'to paid\nchat')
+                      : (lang === 'de' ? 'zum Chat' : 'to chat');
+
+                    return (
+                      <a
+                        href={model.modelUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="cursor-pointer group"
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseEnter={(e) => {
+                          setPriceTooltip({
+                            title: '',
+                            text: modelNameTooltipText,
+                            x: e.clientX,
+                            y: e.clientY,
+                          });
+                        }}
+                        onMouseMove={(e) => {
+                          setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                        }}
+                        onMouseLeave={() => setPriceTooltip(null)}
                       >
-                        {model.displayName}
-                        {model.isNew && (
-                          <tspan fill="#F59E0B" fontWeight="bold"> ✦ NEW</tspan>
-                        )}
-                      </text>
-                    </a>
-                  ) : (
+                        <text
+                          x="0"
+                          y="0"
+                          textAnchor="end"
+                          transform="rotate(-52)"
+                          fill={isHovered || (hasActiveHighlight && highlighted) ? '#2563EB' : '#475569'}
+                          className="dark:fill-slate-300 transition-colors hover:fill-blue-600 dark:hover:fill-blue-400 cursor-pointer"
+                          fontSize="14"
+                          fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '500'}
+                        >
+                          {model.displayName}
+                          {model.isNew && (
+                            <tspan fill="#F59E0B" fontWeight="bold"> ✦ NEW</tspan>
+                          )}
+                        </text>
+                      </a>
+                    );
+                  })() : (
                     <text
                       x="0"
                       y="0"
@@ -1900,23 +2037,23 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         )}
       </div>
 
-      {/* Floating compact price / availability note tooltip */}
+      {/* Floating compact price / availability note & free API tooltip */}
       {priceTooltip && (
         <div
           className="pointer-events-none fixed z-50 transition-opacity duration-100"
           style={{
-            left: `${Math.max(12, Math.min(window.innerWidth - 220, priceTooltip.x - 70))}px`,
+            left: `${Math.max(12, Math.min(window.innerWidth - 240, priceTooltip.x - 70))}px`,
             top: `${priceTooltip.y < 80 ? priceTooltip.y + 22 : priceTooltip.y - 12}px`,
             transform: priceTooltip.y < 80 ? 'translateY(0)' : 'translateY(-100%)',
           }}
         >
-          <div className="w-auto min-w-[130px] max-w-[240px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-xs font-sans">
+          <div className="w-auto min-w-[130px] max-w-[260px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-xs font-sans">
             {priceTooltip.title && (
               <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
                 {priceTooltip.title}
               </div>
             )}
-            <div className="font-medium text-slate-100">
+            <div className="font-medium text-slate-100 whitespace-pre-line leading-tight">
               {priceTooltip.text}
             </div>
           </div>

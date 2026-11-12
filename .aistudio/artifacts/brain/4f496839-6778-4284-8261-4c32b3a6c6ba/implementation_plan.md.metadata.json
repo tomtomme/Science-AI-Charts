@@ -1,6 +1,0 @@
-{
-  "summary": "Architectural plan to align and elevate primary interactive controls into the sticky top navigation header alongside the tab switcher for all 4 application views (Bar Chart, Timeline, Correlations, and Ecosystem), honoring confirmed control ordering, fine-tuning parameter inputs, and responsive wrapping.",
-  "updatedAt": "2026-11-05T11:45:33.880933357Z",
-  "requestFeedback": true,
-  "userFacing": true
-}
