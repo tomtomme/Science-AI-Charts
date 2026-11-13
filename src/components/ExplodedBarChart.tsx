@@ -1527,8 +1527,19 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         e.stopPropagation();
                         onSelectCompany?.(model.companyName);
                       }}
+                      onMouseEnter={(e) => {
+                        setPriceTooltip({
+                          title: '',
+                          text: lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
+                      }}
+                      onMouseMove={(e) => {
+                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                      }}
+                      onMouseLeave={() => setPriceTooltip(null)}
                     >
-                      <title>{lang === 'de' ? `Nach Hersteller filtern: ${model.companyName}` : `Filter by manufacturer: ${model.companyName}`}</title>
                       <defs>
                         <clipPath id={clipId}>
                           <circle cx={barCenterX} cy={iconCenterY} r={circleRadius - 0.75} />
@@ -1586,8 +1597,19 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         e.stopPropagation();
                         onSelectCompany?.(model.companyName);
                       }}
+                      onMouseEnter={(e) => {
+                        setPriceTooltip({
+                          title: '',
+                          text: lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
+                      }}
+                      onMouseMove={(e) => {
+                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                      }}
+                      onMouseLeave={() => setPriceTooltip(null)}
                     >
-                      <title>{lang === 'de' ? `Nach Hersteller filtern: ${model.companyName}` : `Filter by manufacturer: ${model.companyName}`}</title>
                       <defs>
                         <clipPath id={clipId}>
                           <circle cx={barCenterX} cy={logoY} r={circleRadius - 0.75} />
@@ -1662,8 +1684,19 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         e.stopPropagation();
                         onSelectCompany?.(model.companyName);
                       }}
+                      onMouseEnter={(e) => {
+                        setPriceTooltip({
+                          title: '',
+                          text: lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
+                      }}
+                      onMouseMove={(e) => {
+                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                      }}
+                      onMouseLeave={() => setPriceTooltip(null)}
                     >
-                      <title>{lang === 'de' ? `Nach Hersteller filtern: ${model.companyName}` : `Filter by manufacturer: ${model.companyName}`}</title>
                       <defs>
                         <clipPath id={clipId}>
                           <circle cx={barCenterX} cy={logoY} r={circleRadius - 0.75} />
@@ -1721,9 +1754,20 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         e.stopPropagation();
                         onSelectCompany?.(model.companyName);
                       }}
+                      onMouseEnter={(e) => {
+                        setPriceTooltip({
+                          title: '',
+                          text: lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
+                      }}
+                      onMouseMove={(e) => {
+                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                      }}
+                      onMouseLeave={() => setPriceTooltip(null)}
                       opacity={isSelected ? '1' : '0.9'}
                     >
-                      <title>{lang === 'de' ? `Nach Hersteller filtern: ${model.companyName}` : `Filter by manufacturer: ${model.companyName}`}</title>
                       <defs>
                         <clipPath id={clipId}>
                           <circle cx={barCenterX} cy={logoY} r={circleRadius - 0.75} />
@@ -2037,28 +2081,42 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         )}
       </div>
 
-      {/* Floating compact price / availability note & free API tooltip */}
-      {priceTooltip && (
-        <div
-          className="pointer-events-none fixed z-50 transition-opacity duration-100"
-          style={{
-            left: `${Math.max(12, Math.min(window.innerWidth - 240, priceTooltip.x - 70))}px`,
-            top: `${priceTooltip.y < 80 ? priceTooltip.y + 22 : priceTooltip.y - 12}px`,
-            transform: priceTooltip.y < 80 ? 'translateY(0)' : 'translateY(-100%)',
-          }}
-        >
-          <div className="w-auto min-w-[130px] max-w-[260px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-xs font-sans">
-            {priceTooltip.title && (
-              <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
-                {priceTooltip.title}
+      {/* Floating compact price / availability note & action tooltip */}
+      {priceTooltip && (() => {
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+        const nearLeft = priceTooltip.x < 90;
+        const nearRight = priceTooltip.x > vw - 90;
+        const nearTop = priceTooltip.y < 80;
+        const tx = nearLeft ? '0%' : nearRight ? '-100%' : '-50%';
+        const ty = nearTop ? '0%' : '-100%';
+        const leftPos = nearLeft
+          ? Math.max(12, priceTooltip.x - 12)
+          : nearRight
+            ? Math.min(vw - 12, priceTooltip.x + 12)
+            : priceTooltip.x;
+
+        return (
+          <div
+            className="pointer-events-none fixed z-50 transition-opacity duration-100"
+            style={{
+              left: `${leftPos}px`,
+              top: `${nearTop ? priceTooltip.y + 22 : priceTooltip.y - 14}px`,
+              transform: `translate(${tx}, ${ty})`,
+            }}
+          >
+            <div className={`w-max max-w-[260px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-xs font-sans ${priceTooltip.title ? 'text-left' : 'text-center'}`}>
+              {priceTooltip.title && (
+                <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
+                  {priceTooltip.title}
+                </div>
+              )}
+              <div className="font-medium text-slate-100 whitespace-pre-line leading-tight">
+                {priceTooltip.text}
               </div>
-            )}
-            <div className="font-medium text-slate-100 whitespace-pre-line leading-tight">
-              {priceTooltip.text}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
