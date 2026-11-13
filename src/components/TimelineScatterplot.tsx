@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, Sparkles } from 'lucide-react';
+import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, Sparkles, Layers } from 'lucide-react';
 import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint, Row33Metadata } from '../types';
 import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS } from '../data/benchmarks';
-import { calculateRegression, extractFrontierPoints } from '../utils/mathRegression';
+import { calculateMultiLevelRegression, calculateRegression, extractFrontierPoints, isMultiLevelSupported } from '../utils/mathRegression';
+import { DEFAULT_TIMELINE_LAB_LEVELS, TIMELINE_MAIN_LAB_LEVELS, TimelineLabLevel } from '../data/labLevels';
 import { calculatePearson, calculateSpearman } from '../utils/correlationUtils';
 import { Tooltip } from './Tooltip';
 import { TRANSLATIONS } from '../utils/i18n';
@@ -26,6 +27,10 @@ interface TimelineScatterplotProps {
   onPolyDegreeChange?: (deg: number) => void;
   loessSpan?: number;
   onLoessSpanChange?: (span: number) => void;
+  multiLevelEnabled?: boolean;
+  onMultiLevelEnabledChange?: (val: boolean | ((prev: boolean) => boolean)) => void;
+  selectedLabLevels?: string[];
+  onSelectedLabLevelsChange?: (labs: string[] | ((prev: string[]) => string[])) => void;
   hideHeaderControls?: boolean;
   row33Meta?: Row33Metadata;
 }
@@ -128,6 +133,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   onPolyDegreeChange,
   loessSpan: propLoessSpan,
   onLoessSpanChange,
+  multiLevelEnabled: propMultiLevelEnabled,
+  onMultiLevelEnabledChange,
+  selectedLabLevels: propSelectedLabLevels,
+  onSelectedLabLevelsChange,
   hideHeaderControls = false,
   row33Meta,
 }) => {
@@ -136,6 +145,9 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   const [internalPolyDegree, setInternalPolyDegree] = useState<number>(2); // Default: degree 2
   const [internalLoessSpan, setInternalLoessSpan] = useState<number>(50); // Default: 50% smoothing span
   const [internalTimelineScope, setInternalTimelineScope] = useState<'all' | 'frontier'>('all');
+  const [internalMultiLevel, setInternalMultiLevel] = useState<boolean>(false);
+  const [internalSelectedLabLevels, setInternalSelectedLabLevels] = useState<string[]>(DEFAULT_TIMELINE_LAB_LEVELS);
+  const [hoveredLabId, setHoveredLabId] = useState<string | null>(null);
 
   const regressionIndex = propRegressionIndex !== undefined ? propRegressionIndex : internalRegressionIndex;
   const setRegressionIndex = onRegressionIndexChange || setInternalRegressionIndex;
@@ -149,7 +161,15 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   const timelineScope = propTimelineScope !== undefined ? propTimelineScope : internalTimelineScope;
   const setTimelineScope = onTimelineScopeChange || setInternalTimelineScope;
 
+  const multiLevelEnabled = propMultiLevelEnabled !== undefined ? propMultiLevelEnabled : internalMultiLevel;
+  const setMultiLevelEnabled = onMultiLevelEnabledChange || setInternalMultiLevel;
+
+  const selectedLabLevels = propSelectedLabLevels !== undefined ? propSelectedLabLevels : internalSelectedLabLevels;
+  const setSelectedLabLevels = onSelectedLabLevelsChange || setInternalSelectedLabLevels;
+
   const activeRegression = REGRESSION_OPTIONS[regressionIndex] || REGRESSION_OPTIONS[0];
+  const isMultiLevelFeasible = isMultiLevelSupported(activeRegression.id);
+  const isMultiLevelActive = multiLevelEnabled && isMultiLevelFeasible;
 
   const [hoveredPoint, setHoveredPoint] = useState<{
     point: TimelineDataPoint;
@@ -246,6 +266,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
         name: m.name,
         displayName: m.displayName,
         company: m.creatorClean || m.companyName || 'LLM Lab',
+        companyName: m.companyName,
         releaseDate: dateStr,
         timestamp,
         score,
@@ -327,6 +348,88 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   const regression = useMemo(() => {
     return calculateRegression(regressionDataPoints, activeRegression.id, 120, regressionParam);
   }, [regressionDataPoints, activeRegression.id, regressionParam]);
+
+  // Map each point in scatterPoints to its matched main lab level (if any)
+  const pointLabMap = useMemo(() => {
+    const map = new Map<string, TimelineLabLevel>();
+    for (const pt of scatterPoints) {
+      const matched = TIMELINE_MAIN_LAB_LEVELS.find((lab) => lab.match(pt));
+      if (matched) {
+        map.set(pt.id, matched);
+      }
+    }
+    return map;
+  }, [scatterPoints]);
+
+  // Point counts per lab in the active regressionDataPoints scope
+  const labPointCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const lab of TIMELINE_MAIN_LAB_LEVELS) {
+      counts[lab.id] = 0;
+    }
+    for (const pt of regressionDataPoints) {
+      const matched = pointLabMap.get(pt.id);
+      if (matched) {
+        counts[matched.id] = (counts[matched.id] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [regressionDataPoints, pointLabMap]);
+
+  // Multi-level regression calculation across selected LLM lab levels
+  const multiLevelResult = useMemo(() => {
+    if (!isMultiLevelActive) {
+      return { curves: [], overallR2: 0 };
+    }
+    const groups = TIMELINE_MAIN_LAB_LEVELS.filter((lab) => selectedLabLevels.includes(lab.id)).map((lab) => ({
+      id: lab.id,
+      label: lab.label,
+      color: lab.color,
+      data: regressionDataPoints.filter((pt) => pointLabMap.get(pt.id)?.id === lab.id),
+    }));
+    return calculateMultiLevelRegression(regressionDataPoints, groups, activeRegression.id, 90, regressionParam ?? 2);
+  }, [isMultiLevelActive, selectedLabLevels, regressionDataPoints, pointLabMap, activeRegression.id, regressionParam]);
+
+  // Precompute SVG paths & confidence bands for each multi-level lab curve
+  const multiLevelSvgCurves = useMemo(() => {
+    return multiLevelResult.curves.map((curve) => {
+      const pts = curve.regression.points;
+      const path =
+        pts.length > 0
+          ? pts
+              .map((pt, i) => {
+                const x = scaleX(pt.x);
+                const y = scaleY(pt.y);
+                return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+              })
+              .join(' ')
+          : '';
+
+      const validBand = pts.filter(
+        (p) => typeof p.lower === 'number' && typeof p.upper === 'number' && !isNaN(p.x) && !isNaN(p.lower) && !isNaN(p.upper)
+      );
+      let bandPath = '';
+      if (validBand.length > 0) {
+        const upperPoints = validBand.map((pt, i) => {
+          const x = scaleX(pt.x);
+          const y = scaleY(pt.upper!);
+          return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+        });
+        const lowerPoints = [...validBand].reverse().map((pt) => {
+          const x = scaleX(pt.x);
+          const y = scaleY(pt.lower!);
+          return `L ${x.toFixed(1)} ${y.toFixed(1)}`;
+        });
+        bandPath = `${upperPoints.join(' ')} ${lowerPoints.join(' ')} Z`;
+      }
+
+      return {
+        ...curve,
+        path,
+        bandPath,
+      };
+    });
+  }, [multiLevelResult.curves, minTime, maxTime, minScore, maxScore]);
 
   // Compute Pearson r & Spearman Rho on timeline data points matching active scope
   const correlationPoints = useMemo(() => {
@@ -588,16 +691,16 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
           }}
-          className="inline-flex items-center gap-1 text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 hover:border-emerald-500/80 hover:text-emerald-300 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 hover:border-emerald-500/80 hover:text-emerald-300 transition-colors cursor-pointer whitespace-normal break-words text-left leading-tight"
           title={isInternal ? (lang === 'de' ? 'Zur Erklärung springen' : 'Jump to explanation') : `Quelle: ${sourceUrl}`}
         >
-          <span className="truncate max-w-[150px]">{text}</span>
+          <span>{text}</span>
           {!isInternal && <ExternalLink className="w-2.5 h-2.5 opacity-70 shrink-0" />}
         </a>
       );
     }
     return (
-      <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 block truncate max-w-[150px]">
+      <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 inline-block whitespace-normal break-words leading-tight">
         {text}
       </span>
     );
@@ -617,7 +720,6 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           lang === 'de'
             ? 'Umfassender Gesamt-Score aus allen 8 gleichgewichteten Benchmark-Kriterien (jeweils 12,5 %). Aktueller Standard für moderne Chatbots.'
             : 'Comprehensive final score composed of all 8 equally weighted benchmark criteria (12.5% each). Modern standard for current chatbots.',
-        detail: lang === 'de' ? 'Final Score (Spalte M)' : 'Final Score (Col M)',
       };
     }
     if (unifiedSliderValue === 1) {
@@ -632,7 +734,6 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           lang === 'de'
             ? 'Historischer Gesamt-Score basierend auf den ursprünglichen 5 Benchmarks. Ermöglicht den Vergleich über einen längeren Zeitraum mit bis zu 224 Modellen.'
             : 'Historical final score based on the original 5 benchmarks. Enables long-term tracking across up to 224 models.',
-        detail: lang === 'de' ? 'Final Score (Spalte L)' : 'Final Score (Col L)',
       };
     }
     if (unifiedSliderValue === 2) {
@@ -647,7 +748,6 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           lang === 'de'
             ? 'Worst-Case-Score: Der 7-Benchmark-Durchschnitt wird mit der Nicht-Halluzinations-Rate multipliziert. Bestraft unzuverlässige und fabulierende Modelle drastisch.'
             : 'Worst-case penalty score: 7-benchmark average multiplied by non-hallucination rate. Heavily penalizes fabricating models.',
-        detail: lang === 'de' ? 'Worst-Case IQ (Spalte N)' : 'Worst-Case IQ (Col N)',
       };
     }
     if (activeComponent) {
@@ -665,21 +765,13 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
         }
       }
 
-      const badgeText = syncedItem?.text || activeComponent.sourceName || (isRetired ? (lang === 'de' ? 'Archiv' : 'Retired') : 'Benchmark');
+      const badgeText = syncedItem?.text || activeComponent.sourceName || 'Benchmark';
       const badgeUrl = syncedItem?.sourceUrl || activeComponent.sourceUrl;
 
       return {
         title: `${numPrefix}${name}`,
         badge: renderSyncedBadge(badgeText, badgeUrl),
         desc: lang === 'de' ? activeComponent.descriptionDe : activeComponent.descriptionEn,
-        detail:
-          activeComponent.weightPct > 0
-            ? lang === 'de'
-              ? `Gewichtung: ${activeComponent.weightPct}% (${activeComponent.formulaDesc})`
-              : `Weight: ${activeComponent.weightPct}% (${activeComponent.formulaDesc})`
-            : lang === 'de'
-              ? `Aussortierter Benchmark (${activeComponent.formulaDesc})`
-              : `Retired benchmark (${activeComponent.formulaDesc})`,
       };
     }
     return null;
@@ -699,13 +791,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               badge={activeScoreTooltip.badge}
               position="bottom"
               align="center"
-              width="w-[350px]"
+              width="w-[380px]"
               content={
                 <div className="space-y-1.5">
                   <p className="leading-snug">{activeScoreTooltip.desc}</p>
-                  <div className="pt-1.5 border-t border-slate-700/60 font-mono text-[11px] text-amber-300">
-                    {activeScoreTooltip.detail}
-                  </div>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1091,6 +1180,60 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   </div>
                 </div>
               </Tooltip>
+
+              {/* Multi-Level Model Switch */}
+              <Tooltip
+                title={lang === 'de' ? 'Multi-Level-Modell' : 'Multi-level model'}
+                badge={
+                  !isMultiLevelFeasible
+                    ? lang === 'de'
+                      ? 'Nicht verfügbar'
+                      : 'Unavailable'
+                    : isMultiLevelActive
+                    ? lang === 'de'
+                      ? 'Aktiv'
+                      : 'Active'
+                    : lang === 'de'
+                    ? 'Aus'
+                    : 'Off'
+                }
+                align="right"
+                width="w-72"
+                content={
+                  isMultiLevelFeasible
+                    ? lang === 'de'
+                      ? 'Schätzt eine hierarchische Multi-Level-Regression (Partial Pooling) mit eigener Trendkurve pro KI-Labor.'
+                      : 'Fits a hierarchical multi-level regression (partial pooling) with separate trajectory curves per LLM lab company.'
+                    : lang === 'de'
+                    ? 'Multi-Level-Regression ist für Linear, Exponential, Power und Polynom verfügbar – nicht für LOESS oder Pioniere.'
+                    : 'Multi-level regression is available for Linear, Exponential, Power, and Polynomial models — not feasible for LOESS or Pioneers.'
+                }
+              >
+                <button
+                  type="button"
+                  disabled={!isMultiLevelFeasible}
+                  onClick={() => isMultiLevelFeasible && setMultiLevelEnabled((prev) => !prev)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold transition-all shrink-0 ${
+                    !isMultiLevelFeasible
+                      ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500'
+                      : isMultiLevelActive
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-2xs ring-2 ring-indigo-500/20 cursor-pointer'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5 shrink-0" />
+                  <span>Multi-level</span>
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      !isMultiLevelFeasible
+                        ? 'bg-slate-400'
+                        : isMultiLevelActive
+                        ? 'bg-emerald-300'
+                        : 'bg-slate-300 dark:bg-slate-600'
+                    }`}
+                  />
+                </button>
+              </Tooltip>
             </div>
           )}
         </div>
@@ -1203,6 +1346,90 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       </div>
       )}
 
+      {/* Multi-Level Lab Company Selector Pills (copied from Bar Chart advanced section; active when Multi-level is ON) */}
+      {isMultiLevelActive && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2 sm:px-3 shadow-2xs flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400 mr-0.5 flex items-center gap-1 shrink-0">
+            <Layers className="w-3.5 h-3.5 text-indigo-500" />
+            <span>{lang === 'de' ? 'Ebenen (Labs):' : 'Levels (Labs):'}</span>
+          </span>
+
+          {/* 'All' / Reset Pills */}
+          <button
+            type="button"
+            onClick={() => {
+              const allIds = TIMELINE_MAIN_LAB_LEVELS.map((l) => l.id);
+              if (selectedLabLevels.length === allIds.length) {
+                setSelectedLabLevels(DEFAULT_TIMELINE_LAB_LEVELS);
+              } else {
+                setSelectedLabLevels(allIds);
+              }
+            }}
+            className={`text-xs px-2.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+              selectedLabLevels.length === TIMELINE_MAIN_LAB_LEVELS.length
+                ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
+                : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            {t.all}
+          </button>
+
+          {!(
+            selectedLabLevels.length === DEFAULT_TIMELINE_LAB_LEVELS.length &&
+            DEFAULT_TIMELINE_LAB_LEVELS.every((id) => selectedLabLevels.includes(id))
+          ) && (
+            <button
+              type="button"
+              onClick={() => setSelectedLabLevels(DEFAULT_TIMELINE_LAB_LEVELS)}
+              className="text-xs px-2 py-0.5 rounded font-mono bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              title={lang === 'de' ? 'Zurücksetzen auf OpenAI, Anthropic, Google' : 'Reset to OpenAI, Anthropic, Google'}
+            >
+              {lang === 'de' ? 'Standard (3)' : 'Default (3)'}
+            </button>
+          )}
+
+          <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block shrink-0 mx-0.5" />
+
+          {TIMELINE_MAIN_LAB_LEVELS.map((lab) => {
+            const isSelected = selectedLabLevels.includes(lab.id);
+            const cnt = labPointCounts[lab.id] || 0;
+            return (
+              <button
+                key={lab.id}
+                type="button"
+                onClick={() => {
+                  setSelectedLabLevels((prev) =>
+                    prev.includes(lab.id) ? prev.filter((id) => id !== lab.id) : [...prev, lab.id]
+                  );
+                }}
+                onMouseEnter={() => isSelected && setHoveredLabId(lab.id)}
+                onMouseLeave={() => setHoveredLabId(null)}
+                title={`${lab.label} (${lab.familyHint}) · ${cnt} ${lang === 'de' ? 'Modelle' : 'models'}`}
+                className={`text-xs px-2.5 py-0.5 rounded font-mono transition-all cursor-pointer inline-flex items-center gap-1.5 border ${
+                  isSelected
+                    ? 'text-white font-bold shadow-2xs'
+                    : 'bg-slate-100 dark:bg-slate-800/80 border-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+                style={
+                  isSelected
+                    ? { backgroundColor: lab.color, borderColor: lab.color }
+                    : undefined
+                }
+              >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: isSelected ? '#ffffff' : lab.color }}
+                />
+                <span>{lab.label}</span>
+                <span className={`text-[10.5px] ${isSelected ? 'opacity-90' : 'text-slate-400 dark:text-slate-500'}`}>
+                  {cnt}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Scatterplot Canvas Container */}
       <div
         ref={containerRef}
@@ -1236,6 +1463,12 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
 
           {/* Side-by-Side Pearson r & Spearmans Rho Badges (Matching Correlations Tab) */}
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            {isMultiLevelActive && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 font-mono font-bold text-xs">
+                <Layers className="w-3 h-3" />
+                <span>Multi-level R²: {(multiLevelResult.overallR2 * 100).toFixed(0)}%</span>
+              </span>
+            )}
             {/* Pearson r Badge */}
             <Tooltip
               title="Pearson r"
@@ -1297,6 +1530,45 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             </Tooltip>
           </div>
         </div>
+
+        {/* Multi-Level Active Curves Legend */}
+        {isMultiLevelActive && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 bg-slate-50/40 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800/80 text-xs font-mono">
+            {multiLevelSvgCurves.length === 0 ? (
+              <span className="text-slate-400 dark:text-slate-500">
+                {lang === 'de'
+                  ? 'Bitte mindestens eine Lab-Ebene oben auswählen.'
+                  : 'Select at least one lab level above to display regression lines.'}
+              </span>
+            ) : (
+              multiLevelSvgCurves.map((curve) => {
+                const hasLine = curve.path.length > 0;
+                return (
+                  <div
+                    key={curve.levelId}
+                    onMouseEnter={() => hasLine && setHoveredLabId(curve.levelId)}
+                    onMouseLeave={() => setHoveredLabId(null)}
+                    className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded transition-opacity ${
+                      hasLine ? 'cursor-pointer' : 'opacity-50'
+                    } ${
+                      hoveredLabId && hoveredLabId !== curve.levelId ? 'opacity-40' : 'opacity-100'
+                    }`}
+                  >
+                    <span
+                      className="w-3.5 h-1 rounded-full shrink-0"
+                      style={{ backgroundColor: curve.color }}
+                    />
+                    <span className="font-bold text-slate-700 dark:text-slate-200">{curve.label}</span>
+                    <span className="text-slate-400 dark:text-slate-500">
+                      (n={curve.count}
+                      {hasLine ? `, R²=${curve.regression.r2.toFixed(2)}` : ', n<2'})
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
 
         {/* SVG Scatterplot Container */}
         <div className="p-4 overflow-hidden relative">
@@ -1415,29 +1687,72 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             {yAxisLabel}
           </text>
 
-          {/* 95% Confidence Band (Model uncertainty ribbon) */}
-          {confidenceBandPath && activeRegression.id !== 'frontier' && (
-            <path
-              d={confidenceBandPath}
-              fill="url(#confidenceBandGrad)"
-              stroke={activeRegression.color}
-              strokeWidth="0.8"
-              strokeDasharray="3 3"
-              strokeOpacity="0.4"
-              className="pointer-events-none transition-all duration-300"
-            />
-          )}
+          {/* 95% Confidence Band(s) & Fitted Regression Curve(s) */}
+          {isMultiLevelActive ? (
+            <>
+              {multiLevelSvgCurves.map((curve) => {
+                const isDimmedCurve = hoveredLabId !== null && hoveredLabId !== curve.levelId;
+                const isHighlightedCurve = hoveredLabId === curve.levelId;
+                return (
+                  <g
+                    key={`ml-curve-${curve.levelId}`}
+                    style={{ opacity: isDimmedCurve ? 0.2 : 1, transition: 'opacity 0.2s' }}
+                  >
+                    {curve.bandPath && (
+                      <path
+                        d={curve.bandPath}
+                        fill={curve.color}
+                        fillOpacity={isHighlightedCurve ? 0.2 : 0.1}
+                        stroke={curve.color}
+                        strokeWidth="0.7"
+                        strokeDasharray="3 3"
+                        strokeOpacity={isHighlightedCurve ? 0.55 : 0.28}
+                        className="pointer-events-none transition-all duration-200"
+                      />
+                    )}
+                    {curve.path && (
+                      <path
+                        d={curve.path}
+                        fill="none"
+                        stroke={curve.color}
+                        strokeWidth={isHighlightedCurve ? '4.2' : '3'}
+                        strokeLinecap="round"
+                        className="drop-shadow-xs transition-all duration-200 cursor-pointer"
+                        onMouseEnter={() => setHoveredLabId(curve.levelId)}
+                        onMouseLeave={() => setHoveredLabId(null)}
+                      />
+                    )}
+                  </g>
+                );
+              })}
+            </>
+          ) : (
+            <>
+              {/* 95% Confidence Band (Model uncertainty ribbon) */}
+              {confidenceBandPath && activeRegression.id !== 'frontier' && (
+                <path
+                  d={confidenceBandPath}
+                  fill="url(#confidenceBandGrad)"
+                  stroke={activeRegression.color}
+                  strokeWidth="0.8"
+                  strokeDasharray="3 3"
+                  strokeOpacity="0.4"
+                  className="pointer-events-none transition-all duration-300"
+                />
+              )}
 
-          {/* Fitted Regression Curve */}
-          {regressionPath && (
-            <path
-              d={regressionPath}
-              fill="none"
-              stroke="url(#regressionGlow)"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              className="drop-shadow-sm"
-            />
+              {/* Fitted Regression Curve */}
+              {regressionPath && (
+                <path
+                  d={regressionPath}
+                  fill="none"
+                  stroke="url(#regressionGlow)"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  className="drop-shadow-sm"
+                />
+              )}
+            </>
           )}
 
           {/* Scatter Data Points */}
@@ -1446,7 +1761,19 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             const cy = scaleY(pt.score);
             const isHovered = hoveredPoint?.point.id === pt.id;
             const isFrontier = frontierPointIds.has(pt.id);
-            const isDimmed = timelineScope === 'frontier' && !isFrontier;
+            const matchedLab = pointLabMap.get(pt.id);
+            const isActiveLabDot = isMultiLevelActive && matchedLab && selectedLabLevels.includes(matchedLab.id);
+            const isOtherLabDimmed =
+              isMultiLevelActive &&
+              (!isActiveLabDot || (hoveredLabId !== null && matchedLab?.id !== hoveredLabId));
+            const isDimmed = (timelineScope === 'frontier' && !isFrontier) || isOtherLabDimmed;
+            const dotColor = isHovered
+              ? '#f43f5e'
+              : isActiveLabDot && matchedLab
+              ? matchedLab.color
+              : isFrontier
+              ? '#d97706'
+              : '#3b82f6';
 
             return (
               <g
@@ -1502,7 +1829,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   cx={cx}
                   cy={cy}
                   r={isHovered ? 7 : isFrontier ? 5 : 4.5}
-                  fill={isHovered ? '#f43f5e' : isFrontier ? '#d97706' : '#3b82f6'}
+                  fill={dotColor}
                   stroke="#ffffff"
                   strokeWidth={isHovered ? 2 : 1.2}
                   filter="url(#dotGlow)"

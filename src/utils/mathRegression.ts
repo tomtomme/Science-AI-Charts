@@ -1,4 +1,4 @@
-import { RegressionPoint, RegressionResult, RegressionType, TimelineDataPoint } from '../types';
+import { MultiLevelCurveResult, RegressionPoint, RegressionResult, RegressionType, TimelineDataPoint } from '../types';
 
 /**
  * Extracts Pareto-frontier data points (breakthrough models that set a new benchmark record).
@@ -515,3 +515,323 @@ export function getRegressionName(type: RegressionType, param?: number): string 
       return 'Linear';
   }
 }
+
+/**
+ * Parametric models where multi-level (hierarchical mixed-effects / partial-pooling)
+ * regression across LLM lab levels is mathematically well-defined.
+ * Non-parametric smoothing (LOESS) and empirical Pareto envelopes (Pioneers) return false.
+ */
+export function isMultiLevelSupported(type: RegressionType): boolean {
+  return type === 'linear' || type === 'exponential' || type === 'power' || type === 'polynomial';
+}
+
+function solveLinearSystem(matrix: number[][], rhs: number[]): number[] | null {
+  const m = rhs.length;
+  const A = matrix.map((row) => [...row]);
+  const B = [...rhs];
+
+  for (let i = 0; i < m; i++) {
+    let pivot = i;
+    for (let r = i + 1; r < m; r++) {
+      if (Math.abs(A[r][i]) > Math.abs(A[pivot][i])) pivot = r;
+    }
+    if (Math.abs(A[pivot][i]) < 1e-12) return null;
+    [A[i], A[pivot]] = [A[pivot], A[i]];
+    [B[i], B[pivot]] = [B[pivot], B[i]];
+
+    const div = A[i][i];
+    for (let c = i; c < m; c++) A[i][c] /= div;
+    B[i] /= div;
+
+    for (let r = 0; r < m; r++) {
+      if (r !== i) {
+        const factor = A[r][i];
+        for (let c = i; c < m; c++) A[r][c] -= factor * A[i][c];
+        B[r] -= factor * B[i];
+      }
+    }
+  }
+
+  return B;
+}
+
+function invertSmallMatrix(matrix: number[][]): number[][] | null {
+  const m = matrix.length;
+  const aug = matrix.map((row, i) => [
+    ...row,
+    ...Array.from({ length: m }, (_, j) => (i === j ? 1 : 0)),
+  ]);
+
+  for (let i = 0; i < m; i++) {
+    let pivot = i;
+    for (let r = i + 1; r < m; r++) {
+      if (Math.abs(aug[r][i]) > Math.abs(aug[pivot][i])) pivot = r;
+    }
+    if (Math.abs(aug[pivot][i]) < 1e-12) return null;
+    [aug[i], aug[pivot]] = [aug[pivot], aug[i]];
+
+    const div = aug[i][i];
+    for (let c = 0; c < 2 * m; c++) aug[i][c] /= div;
+
+    for (let r = 0; r < m; r++) {
+      if (r !== i) {
+        const factor = aug[r][i];
+        for (let c = 0; c < 2 * m; c++) aug[r][c] -= factor * aug[i][c];
+      }
+    }
+  }
+
+  return aug.map((row) => row.slice(m));
+}
+
+/**
+ * Fits a hierarchical / multi-level regression across LLM lab levels using
+ * Empirical Bayes partial pooling (random intercepts & slopes shrunk toward
+ * the Level-2 global fixed-effect fit when group sample size or span is small).
+ */
+export function calculateMultiLevelRegression(
+  allData: TimelineDataPoint[],
+  groups: Array<{ id: string; label: string; color: string; data: TimelineDataPoint[] }>,
+  type: RegressionType,
+  steps = 80,
+  param = 2
+): { curves: MultiLevelCurveResult[]; overallR2: number } {
+  if (!isMultiLevelSupported(type)) {
+    return { curves: [], overallR2: 0 };
+  }
+
+  const validAll = allData
+    .filter((d) => !isNaN(d.timestamp) && !isNaN(d.score) && d.score > 0)
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  if (validAll.length < 3) {
+    return {
+      curves: groups.map((g) => ({
+        levelId: g.id,
+        label: g.label,
+        color: g.color,
+        count: g.data.length,
+        regression: { type, name: getRegressionName(type, param), r2: 0, formula: 'N/A', points: [] },
+      })),
+      overallR2: 0,
+    };
+  }
+
+  const minX = validAll[0].timestamp;
+  const maxX = validAll[validAll.length - 1].timestamp;
+  const rangeX = maxX - minX || 1;
+  const isLogY = type === 'exponential' || type === 'power';
+  const degree = type === 'polynomial' ? Math.max(2, Math.min(4, Math.round(param || 2))) : 1;
+  const pDim = degree + 1;
+
+  const getBasis = (nx: number): number[] => {
+    if (type === 'power') {
+      return [1, Math.log(1 + Math.max(0, nx))];
+    }
+    const vec: number[] = [1];
+    for (let k = 1; k <= degree; k++) {
+      vec.push(Math.pow(nx, k));
+    }
+    return vec;
+  };
+
+  const toTarget = (y: number) => (isLogY ? Math.log(y) : y);
+  const fromTarget = (eta: number) =>
+    isLogY ? Math.exp(Math.max(-10, Math.min(10, eta))) : eta;
+
+  // 1. Fit Level-2 global fixed effects betaGlobal
+  const XTX: number[][] = Array.from({ length: pDim }, () => Array(pDim).fill(0));
+  const XTZ: number[] = Array(pDim).fill(0);
+
+  for (const d of validAll) {
+    const nx = (d.timestamp - minX) / rangeX;
+    const phi = getBasis(nx);
+    const z = toTarget(d.score);
+    for (let i = 0; i < pDim; i++) {
+      XTZ[i] += phi[i] * z;
+      for (let j = 0; j < pDim; j++) {
+        XTX[i][j] += phi[i] * phi[j];
+      }
+    }
+  }
+  for (let i = 0; i < pDim; i++) {
+    XTX[i][i] += 1e-8;
+  }
+
+  const betaGlobal = solveLinearSystem(XTX, XTZ);
+  if (!betaGlobal) {
+    return { curves: [], overallR2: 0 };
+  }
+
+  let globalSsRes = 0;
+  for (const d of validAll) {
+    const nx = (d.timestamp - minX) / rangeX;
+    const phi = getBasis(nx);
+    const eta = phi.reduce((acc, v, idx) => acc + v * betaGlobal[idx], 0);
+    globalSsRes += Math.pow(d.score - fromTarget(eta), 2);
+  }
+  const globalVar = globalSsRes / Math.max(1, validAll.length - pDim);
+
+  // Shrinkage penalties Lambda for random effects (intercept = light, slope = moderate, higher terms = stronger)
+  const lambdas = Array.from({ length: pDim }, (_, k) => {
+    if (k === 0) return 0.25;
+    if (k === 1) return 0.6;
+    return 1.5 * k;
+  });
+
+  const modelName = getRegressionName(type, param);
+  let multiSsRes = 0;
+  const allGroupedY: number[] = [];
+
+  const curves: MultiLevelCurveResult[] = groups.map((g) => {
+    const validGroup = g.data
+      .filter((d) => !isNaN(d.timestamp) && !isNaN(d.score) && d.score > 0)
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    if (validGroup.length < 2) {
+      return {
+        levelId: g.id,
+        label: g.label,
+        color: g.color,
+        count: validGroup.length,
+        regression: {
+          type,
+          name: modelName,
+          r2: 0,
+          formula: 'n < 2',
+          points: [],
+        },
+      };
+    }
+
+    // Solve (X_j^T X_j + Lambda) * delta_j = X_j^T (z_j - X_j * betaGlobal)
+    const GXX: number[][] = Array.from({ length: pDim }, () => Array(pDim).fill(0));
+    const GXR: number[] = Array(pDim).fill(0);
+
+    for (const d of validGroup) {
+      const nx = (d.timestamp - minX) / rangeX;
+      const phi = getBasis(nx);
+      const z = toTarget(d.score);
+      const etaGlobal = phi.reduce((acc, v, idx) => acc + v * betaGlobal[idx], 0);
+      const resZ = z - etaGlobal;
+      for (let i = 0; i < pDim; i++) {
+        GXR[i] += phi[i] * resZ;
+        for (let j = 0; j < pDim; j++) {
+          GXX[i][j] += phi[i] * phi[j];
+        }
+      }
+    }
+    for (let i = 0; i < pDim; i++) {
+      GXX[i][i] += lambdas[i];
+    }
+
+    const delta = solveLinearSystem(GXX, GXR) || Array(pDim).fill(0);
+    const betaGroup = betaGlobal.map((b, idx) => b + delta[idx]);
+    const covInv = invertSmallMatrix(GXX);
+
+    const predictFn = (nx: number) => {
+      const phi = getBasis(nx);
+      const eta = phi.reduce((acc, v, idx) => acc + v * betaGroup[idx], 0);
+      return fromTarget(eta);
+    };
+
+    const groupMeanY = validGroup.reduce((acc, d) => acc + d.score, 0) / validGroup.length;
+    let ssTot = 0;
+    let ssRes = 0;
+    for (const d of validGroup) {
+      const nx = (d.timestamp - minX) / rangeX;
+      const predY = predictFn(nx);
+      const err = d.score - predY;
+      ssRes += err * err;
+      ssTot += Math.pow(d.score - groupMeanY, 2);
+      multiSsRes += err * err;
+      allGroupedY.push(d.score);
+    }
+
+    const r2 = ssTot > 0 ? Math.max(0, Math.min(0.999, 1 - ssRes / ssTot)) : 0;
+    // Stabilized SE blending group residuals with Level-2 variance
+    const seGroup = Math.sqrt((ssRes + 2 * globalVar) / (validGroup.length + 2));
+
+    // Span each lab level across its own observed release timeline
+    const gMinT = validGroup[0].timestamp;
+    const gMaxT = validGroup[validGroup.length - 1].timestamp;
+    let startNx = (gMinT - minX) / rangeX;
+    let endNx = (gMaxT - minX) / rangeX;
+
+    if (endNx <= startNx) {
+      endNx = Math.min(1, startNx + 0.02);
+    }
+
+    // Clip cleanly at y=0 if linear or polynomial crosses zero
+    if (type === 'linear' && Math.abs(betaGroup[1]) > 1e-9) {
+      const rootNx = -betaGroup[0] / betaGroup[1];
+      if (betaGroup[1] > 0 && rootNx > startNx) {
+        startNx = Math.min(endNx, rootNx);
+      } else if (betaGroup[1] < 0 && rootNx < endNx) {
+        endNx = Math.max(startNx, rootNx);
+      }
+    }
+
+    const points: RegressionPoint[] = [];
+    if (startNx < endNx) {
+      for (let s = 0; s <= steps; s++) {
+        const nx = startNx + (s / steps) * (endNx - startNx);
+        const timeX = minX + nx * rangeX;
+        const rawY = predictFn(nx);
+        const valY = Math.max(0, parseFloat(rawY.toFixed(3)));
+
+        let lev = 1 / validGroup.length;
+        if (covInv) {
+          const phi = getBasis(nx);
+          let q = 0;
+          for (let i = 0; i < pDim; i++) {
+            for (let j = 0; j < pDim; j++) {
+              q += phi[i] * covInv[i][j] * phi[j];
+            }
+          }
+          lev = Math.max(0, q);
+        }
+        const marginOfError = 1.96 * seGroup * Math.sqrt(lev);
+        const lower = Math.max(0, parseFloat((valY - marginOfError).toFixed(2)));
+        const upper = Math.min(100, parseFloat((valY + marginOfError).toFixed(2)));
+        points.push({ x: timeX, y: valY, lower, upper });
+      }
+    }
+
+    let formula = '';
+    if (type === 'linear') {
+      formula = `y = ${betaGroup[1] >= 0 ? '+' : ''}${betaGroup[1].toFixed(2)}·t + ${betaGroup[0].toFixed(1)}`;
+    } else if (type === 'exponential') {
+      formula = `y = ${Math.exp(betaGroup[0]).toFixed(1)} · e^(${betaGroup[1].toFixed(2)}·t)`;
+    } else if (type === 'power') {
+      formula = `y = ${Math.exp(betaGroup[0]).toFixed(1)} · (1+t)^${betaGroup[1].toFixed(2)}`;
+    } else {
+      formula = `${modelName} (Lab-Level)`;
+    }
+
+    return {
+      levelId: g.id,
+      label: g.label,
+      color: g.color,
+      count: validGroup.length,
+      regression: {
+        type,
+        name: modelName,
+        r2,
+        formula,
+        points,
+        residualStdDev: parseFloat(seGroup.toFixed(2)),
+      },
+    };
+  });
+
+  let overallR2 = 0;
+  if (allGroupedY.length > 0) {
+    const meanGroupedY = allGroupedY.reduce((a, b) => a + b, 0) / allGroupedY.length;
+    const groupedSsTot = allGroupedY.reduce((acc, y) => acc + Math.pow(y - meanGroupedY, 2), 0);
+    overallR2 = groupedSsTot > 0 ? Math.max(0, Math.min(0.999, 1 - multiSsRes / groupedSsTot)) : 0;
+  }
+
+  return { curves, overallR2 };
+}
+

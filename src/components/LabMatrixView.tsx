@@ -40,7 +40,7 @@ export const WEIGHTS_CONCEPTS = {
       'Der Betrieb erfolgt auf eigenen Geräten oder Servern.',
       'Code-Inspektion und Anpassungen sind ohne Anbieter-Einschränkungen möglich.',
     ],
-    examples: 'Meta (Llama), Alibaba (Qwen), Mistral, DeepSeek',
+    examples: 'Alibaba (Qwen), DeepSeek, Zhipu (GLM), Mistral, Nvidia (Nemotron)',
   },
   hybrid: {
     id: 'weights-hybrid',
@@ -62,7 +62,7 @@ export const WEIGHTS_CONCEPTS = {
       'Kleinere Basismodelle sind als Download verfügbar.',
       'Spitzenmodelle bleiben auf Cloud-Schnittstellen beschränkt.',
     ],
-    examples: 'Google (Gemma vs. Gemini), Microsoft (Phi vs. Copilot)',
+    examples: 'Google (Gemma vs. Gemini), OpenAI, xAI (Grok), Microsoft (Phi vs. MAI)',
   },
   closed: {
     id: 'weights-closed',
@@ -84,7 +84,7 @@ export const WEIGHTS_CONCEPTS = {
       'Die Nutzung erfolgt ausschließlich über Schnittstellen (API) oder Webchat.',
       'Ein Download oder unabhängiger Betrieb ist ausgeschlossen.',
     ],
-    examples: 'OpenAI (GPT-4o), Anthropic (Claude), xAI (Grok)',
+    examples: 'Anthropic (Claude), Amazon (Nova), Inception (Mercury)',
   },
 };
 
@@ -1047,7 +1047,10 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
     const targetElementId = targetId || 'glossary-section';
     const el = document.getElementById(targetElementId);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({
+        behavior: 'smooth',
+        block: targetElementId === 'glossary-section' ? 'start' : 'center',
+      });
       el.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2', 'dark:ring-offset-slate-900', 'transition-all');
       setTimeout(() => {
         el.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-2', 'dark:ring-offset-slate-900');
@@ -2097,11 +2100,13 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
 
       {/* Glossary & Key Concepts Explainer Section */}
       <section
-        id="glossary-section"
         className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800 space-y-4"
         aria-label={lang === 'de' ? 'Glossar und Fachbegriffe' : 'Glossary and key terms'}
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+        <div
+          id="glossary-section"
+          className="scroll-mt-24 flex flex-col md:flex-row md:items-center justify-between gap-2 rounded-lg"
+        >
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-blue-500" />
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">

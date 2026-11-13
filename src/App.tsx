@@ -18,10 +18,11 @@ import { CsvNotesSection } from './components/CsvNotesSection';
 import { LabMatrixView, LabGroup } from './components/LabMatrixView';
 import { TimelineScatterplot, TIMELINE_REGRESSION_OPTIONS, DEFAULT_TIMELINE_REGRESSION_INDEX } from './components/TimelineScatterplot';
 import { CorrelationsScatterplot, CORRELATION_REGRESSION_OPTIONS, DEFAULT_CORRELATION_REGRESSION_INDEX } from './components/CorrelationsScatterplot';
-import { extractFrontierPoints } from './utils/mathRegression';
+import { extractFrontierPoints, isMultiLevelSupported } from './utils/mathRegression';
+import { DEFAULT_TIMELINE_LAB_LEVELS } from './data/labLevels';
 import { Language, TRANSLATIONS } from './utils/i18n';
 import { matchesSearchQuery } from './utils/searchUtils';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink, Layers } from 'lucide-react';
 import { Tooltip } from './components/Tooltip';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
@@ -340,6 +341,8 @@ export default function App() {
   const [timelineRegressionIndex, setTimelineRegressionIndex] = useState<number>(DEFAULT_TIMELINE_REGRESSION_INDEX);
   const [timelinePolyDegree, setTimelinePolyDegree] = useState<number>(2);
   const [timelineLoessSpan, setTimelineLoessSpan] = useState<number>(50);
+  const [timelineMultiLevel, setTimelineMultiLevel] = useState<boolean>(false);
+  const [timelineSelectedLabLevels, setTimelineSelectedLabLevels] = useState<string[]>(DEFAULT_TIMELINE_LAB_LEVELS);
 
   // Correlations State elevated to header
   const [correlationsScope, setCorrelationsScope] = useState<'all' | 'frontier'>('all');
@@ -506,6 +509,8 @@ export default function App() {
 
   // Active regression options for header display
   const activeTimelineRegression = TIMELINE_REGRESSION_OPTIONS[timelineRegressionIndex] || TIMELINE_REGRESSION_OPTIONS[0];
+  const isTimelineMultiLevelFeasible = isMultiLevelSupported(activeTimelineRegression.id);
+  const isTimelineMultiLevelActive = timelineMultiLevel && isTimelineMultiLevelFeasible;
   const activeCorrelationsRegression = CORRELATION_REGRESSION_OPTIONS[correlationsRegressionIndex] || CORRELATION_REGRESSION_OPTIONS[0];
 
   // Timeline eligible models count for header scope badge count
@@ -594,13 +599,13 @@ export default function App() {
     setTimeout(() => {
       const el = document.getElementById('glossary-section');
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.classList.add('ring-2', 'ring-blue-500', 'transition-all');
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.add('ring-2', 'ring-blue-500', 'ring-offset-4', 'dark:ring-offset-slate-950', 'transition-all');
         setTimeout(() => {
-          el.classList.remove('ring-2', 'ring-blue-500');
+          el.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-4', 'dark:ring-offset-slate-950');
         }, 2500);
       }
-    }, 60);
+    }, 80);
   }, []);
 
   const hasFilterActive =
@@ -1572,6 +1577,61 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
+                {/* Multi-Level Model Switch */}
+                <Tooltip
+                  title={lang === 'de' ? 'Multi-Level-Modell' : 'Multi-level model'}
+                  badge={
+                    !isTimelineMultiLevelFeasible
+                      ? lang === 'de'
+                        ? 'Nicht verfügbar'
+                        : 'Unavailable'
+                      : isTimelineMultiLevelActive
+                      ? lang === 'de'
+                        ? 'Aktiv'
+                        : 'Active'
+                      : lang === 'de'
+                      ? 'Aus'
+                      : 'Off'
+                  }
+                  position="bottom"
+                  align="right"
+                  width="w-72"
+                  content={
+                    isTimelineMultiLevelFeasible
+                      ? lang === 'de'
+                        ? 'Schätzt eine hierarchische Multi-Level-Regression (Partial Pooling) mit eigener Trendkurve pro KI-Labor.'
+                        : 'Fits a hierarchical multi-level regression (partial pooling) with separate trajectory curves per LLM lab company.'
+                      : lang === 'de'
+                      ? 'Multi-Level-Regression ist für Linear, Exponential, Power und Polynom verfügbar – nicht für LOESS oder Pioniere.'
+                      : 'Multi-level regression is available for Linear, Exponential, Power, and Polynomial models — not feasible for LOESS or Pioneers.'
+                  }
+                >
+                  <button
+                    type="button"
+                    disabled={!isTimelineMultiLevelFeasible}
+                    onClick={() => isTimelineMultiLevelFeasible && setTimelineMultiLevel((prev) => !prev)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all shrink-0 ${
+                      !isTimelineMultiLevelFeasible
+                        ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500'
+                        : isTimelineMultiLevelActive
+                        ? 'bg-indigo-600 text-white border-indigo-500 shadow-2xs ring-2 ring-indigo-500/20 cursor-pointer'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5 shrink-0" />
+                    <span>Multi-level</span>
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        !isTimelineMultiLevelFeasible
+                          ? 'bg-slate-400'
+                          : isTimelineMultiLevelActive
+                          ? 'bg-emerald-300'
+                          : 'bg-slate-300 dark:bg-slate-600'
+                      }`}
+                    />
+                  </button>
+                </Tooltip>
               </div>
             )}
 
@@ -1903,6 +1963,10 @@ export default function App() {
               onPolyDegreeChange={setTimelinePolyDegree}
               loessSpan={timelineLoessSpan}
               onLoessSpanChange={setTimelineLoessSpan}
+              multiLevelEnabled={timelineMultiLevel}
+              onMultiLevelEnabledChange={setTimelineMultiLevel}
+              selectedLabLevels={timelineSelectedLabLevels}
+              onSelectedLabLevelsChange={setTimelineSelectedLabLevels}
               hideHeaderControls={true}
               row33Meta={loadedData.headerMeta?.row33}
             />

@@ -481,17 +481,26 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     }
   }
 
-  // 3. Pre-collect Column T (index 19: model costs in Euro) and Column AL (index 37: notes) by displayName & cleaned name
+  // 3. Pre-collect Column T (index 19: monthly cost in Germany) — or legacy Column AL (index 37) only if AL is actually the pricing column
+  const colTHeader = `${rows[0]?.[19] || ''} ${rows[1]?.[19] || ''}`.toLowerCase();
+  const colALHeader = `${rows[0]?.[37] || ''} ${rows[1]?.[37] || ''}`.toLowerCase();
+  const useColTPricing = colTHeader.includes('cost') || colTHeader.includes('abokosten') || colTHeader.includes('paid') || !colTHeader.includes('creator');
+  const useColALPricing = !useColTPricing && (colALHeader.includes('abokosten') || colALHeader.includes('cost'));
+
+  const isPriceHeaderText = (v: string) => {
+    const low = v.toLowerCase();
+    return low.includes('abokosten') || low.includes('creator') || low.includes('release') || low.includes('monthly cost') || low.includes('if paid');
+  };
+
   const colPriceMap = new Map<string, string>();
-  for (let r = 1; r < rows.length; r++) {
+  for (let r = 2; r < rows.length; r++) {
     const row = rows[r];
     if (!row) continue;
-    const valT = (row[19] || '').trim();
-    const valAL = (row[37] || '').trim();
-    const isHeaderT = valT.toLowerCase().includes('abokosten') || valT.toLowerCase().includes('creator') || valT.toLowerCase().includes('release');
-    const val = (valT && !isHeaderT)
+    const valT = useColTPricing ? (row[19] || '').trim() : '';
+    const valAL = useColALPricing ? (row[37] || '').trim() : '';
+    const val = (valT && !isPriceHeaderText(valT))
       ? valT
-      : (valAL && !valAL.toLowerCase().includes('abokosten'))
+      : (valAL && !isPriceHeaderText(valAL))
         ? valAL
         : '';
     if (val) {
@@ -722,12 +731,11 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       currentBotNames.has(cleanedName.toLowerCase()) ||
       (!isSupersededOrDiscontinued && (chatLinkLow.startsWith('http') || chatLinkLow.includes('paid') || chatLinkLow.includes('api') || !!parsedApiLink));
 
-    const rawColT = (row[19] || '').trim();
-    const rawColAL = (row[37] || '').trim();
-    const isHeaderT = rawColT.toLowerCase().includes('abokosten') || rawColT.toLowerCase().includes('creator') || rawColT.toLowerCase().includes('release');
-    const priceDeMonthly = (rawColT && !isHeaderT)
+    const rawColT = useColTPricing ? (row[19] || '').trim() : '';
+    const rawColAL = useColALPricing ? (row[37] || '').trim() : '';
+    const priceDeMonthly = (rawColT && !isPriceHeaderText(rawColT))
       ? rawColT
-      : (rawColAL && !rawColAL.toLowerCase().includes('abokosten'))
+      : (rawColAL && !isPriceHeaderText(rawColAL))
         ? rawColAL
         : colPriceMap.get(displayName.toLowerCase()) || colPriceMap.get(cleanedName.toLowerCase()) || undefined;
 

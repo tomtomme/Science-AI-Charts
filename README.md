@@ -1,111 +1,72 @@
-# Science AI-Arena: Chatbot „Wissenschafts-IQ“ Ranking
+# Science AI-Arena: KI-Chatbots für Studium & Forschung
 
-🤖 **Hinweis**: Diese README und die **Live-Web-App** wurden KI-generiert. Die Daten auf welchen die App beruht sind allerdings handverlesen.
+**Hinweis**: Diese README und die Web-App wurden KI-generiert. Die Daten, auf denen die Auswertung beruht, sind handverlesen.
 
-> **Live-Web-App**: [tomtomme.github.io/Science-AI-Charts](https://tomtomme.github.io/Science-AI-Charts/)  
-> **Original Google Sheet (Benchmarks)**: [Google Sheets Tabelle (gid=170267419)](https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=170267419#gid=170267419)  
-> **Original Google Sheet (Labs & Ökosystem)**: [Google Sheets Tabelle (gid=355721692)](https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=355721692#gid=355721692)  
-> **GitHub Repository**: [github.com/tomtomme/Science-AI-Charts](https://github.com/tomtomme/Science-AI-Charts)
-
-
----
-
-## 📌 Über das Projekt
-
-Dieses interaktive Dashboard visualisiert den **Wissenschafts- und Datenanalyse-„IQ“ moderner KI-Chatbots** bei maximaler Denkstufe (*Reasoning*). 
-
-Im Gegensatz zu herkömmlichen Benchmarks, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen, legt dieser Benchmark-Parcours den Fokus gezielt auf **Forschungs- und Wissenschaftsrelevanz**:
-* **Multimodales Verstehen wissenschaftlicher Abbildungen & Plots** (MMMU-Pro)
-* **Mathematische & tabellarische Datenanalyse** (Excel / FinanceBench)
-* **Faktentreue & Non-Hallucination-Rate** (Ehrlichkeit bei Nichtwissen statt Erfinden)
-* **Medizinisches Langkontext-Denken** über hunderte Seiten klinischer Fachliteratur
-* **Räumliches Vorstellungsvermögen & gesunder Menschenverstand** (SimpleBench)
-* **Automatisierte mehrstufige quantitative Workflows** (Vals.ai)
+> **Web-App**: [tomtomme.github.io/Science-AI-Charts](https://tomtomme.github.io/Science-AI-Charts/)  
+> **Google Sheet (Benchmarks)**: [Tabelle öffnen](https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=170267419#gid=170267419)  
+> **Google Sheet (Labs & Ökosystem)**: [Tabelle öffnen](https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=355721692#gid=355721692)  
+> **GitHub**: [github.com/tomtomme/Science-AI-Charts](https://github.com/tomtomme/Science-AI-Charts)
 
 ---
 
-## ✨ Wichtigste Funktionen
+## Worum geht es?
 
-### 1. Interaktives Explosions-Balkendiagramm (*Exploded Bar Chart*)
-* **Mouse-Over-Explosion**: Beim Überfahren eines Modells fächert sich dessen Balken (zusammen mit den direkten Nachbarn) in die 8 individuellen Benchmark-Komponenten auf.
-* **Permanente Kriterien-Details**: Verlässt die Maus den Balken, bleibt die detaillierte Beschreibung des zuletzt gewählten Kriteriums samt direkt anklickbarem Link zur offiziellen Primärquelle erhalten. Die Anzeige wechselt erst, wenn ein anderes Element überfahren oder der Kategorie-Schieberegler betätigt wird.
-* **Volle Explosion (ON / OFF)**: Schalter, um alle Balken im gesamten Diagramm gleichzeitig aufgefächert darzustellen.
-* **Nationale Identifikatoren**: Subtile Muster für Entwicklerherkunft (USA, Europa, China).
+Viele KI-Tests prüfen vor allem, wie gut ein Chatbot programmiert oder flüssig formuliert. Für Studium und Forschung (z. B. in der Psychologie) zählen andere Fähigkeiten:
 
-### 2. Modus-Schalter (*NEW Score vs. OLD Score*)
-* **NEW Score**: Moderner 8-Benchmark-Standard (mit 17,25 % Gewichtung der Faktentreue).
-* **OLD Score**: Historischer 5-Benchmark-Durchschnitt bis 2023 (mit 27,6 % Gewichtung der Faktentreue).
+* ob ein Modell Fakten erfindet („halluziniert“), wenn es etwas nicht weiß,
+* ob es Diagramme und Abbildungen richtig abliest,
+* ob es über lange Fachtexte hinweg den roten Faden behält,
+* ob es mit Tabellen und Aufgaben aus Statistik und Arbeitsalltag zurechtkommt.
 
-### 3. Modell-Umfang (*Current vs. All*)
-* **Current**: Filtert die Anzeige auf Chatbots, die derzeit aktiv und öffentlich zugänglich sind.
-* **All**: Zeigt den kompletten Datensatz inklusive historischer Meilensteine (z. B. GPT-4 Turbo von November 2023).
-
-### 4. Platzsparender Kategorie-Schieberegler (*Category Slider*)
-* Schieberegler von `0` bis `8` mit `-` und `+` Tasten:
-  * `0`: **Alles** (Gesamtwertung über alle 8 Benchmarks)
-  * `1` bis `8`: Isoliert eine einzelne Benchmark-Kategorie (z. B. nur Faktentreue oder nur MMMU-Pro). Die Balken werden automatisch nach der Punktzahl in diesem spezifischen Kriterium sortiert und zeigen den direkten Prozentwert.
-
-### 5. Flexible Sortierung
-* **Punktzahl**: Sortiert absteigend nach dem Gesamtscore oder der aktiven Einzelkategorie.
-* **Datum**: Sortiert chronologisch nach dem Veröffentlichungsdatum des Chatbots (neueste Modelle zuerst).
-
-### 6. Chatbot-Anzahl (*Count Slider*)
-* Steuerung der angezeigten Modellanzahl in 5er-Schritten (5, 10, 15, 20, 25, 30 ... bis zum Maximum).
-
-### 7. Hersteller-Schnellauswahl
-* Direkte Filterknöpfe für führende LLM-Familien: `ChatGPT`, `Claude`, `DeepSeek`, `Gemini`, `GLM`, `Grok`, `Kimi`, `MiMo`, `MiniMax`, `Mistral`, `Muse`, `Qwen`.
-
-### 8. Live Google-Sheets Synchronisation
-* Das Dashboard lädt beim Start verzögerungsfrei die Daten und synchronisiert im Hintergrund stündlich (oder per Klick auf den **Sync**-Button) mit der Live-Google-Sheets-Tabelle.
-* Synchronisiert werden neben den Modellen und Benchmark-Punktzahlen auch alle Titel und Texte:
-  * **Titel & Untertitel**: Direkt aus den Zellen `A1`, `B2` und `C1`.
-  * **Bereich 1 (Anleitung / How To Read)**: Titel direkt synchronisiert aus Zelle `A34`, Inhalt 1:1 aus Zelle `C34`.
-  * **Bereich 2 (Was Bots können / What Bots can & can't do)**: Titel aus Zelle `N34`, Inhalt 1:1 aus Zelle `O34`.
-* Ein Hover-Infokärtchen am Sync-Button zeigt das Datum der letzten Synchronisierung (ohne Uhrzeit).
-
-### 9. Vollständige Zweisprachigkeit (DE / EN)
-* Nahtloser Wechsel zwischen deutscher und englischer Sprache über den `DE / EN`-Schalter im Header.
-
-### 10. Tab „LLM-Labs & Ökosystem“ (gid=355721692)
-* **Zusätzlicher Navigations-Tab**: Ermöglicht den direkten Wechsel zwischen dem visuellen Benchmark-Balkendiagramm und einer strukturierten Ökosystem-Matrix.
-* **Top 10 LLM Labs & 24 Contenders**: Schneller Wechsel zwischen den Top 10 Labs (Zeilen 2–17) und den 24 Contenders (Zeilen 19–28) oder allen 34 Organisationen.
-* **Modellgrößen & Tooling-Matrix**: Visualisiert Parameterklassen (<32B bis 15T+), Software Development Kits (The Harness), Web-Agenten (Daily Agent), Coding-Agenten und Abonnement-Stufen.
-* **Modell-Synchronisation**: Ein Klick auf ein Lab filtert und markiert die entsprechenden Modelle sofort im Benchmark-Diagramm.
-
+Die App fasst Ergebnisse aus mehreren unabhängigen Testreihen zusammen (gemessen auf der höchsten jeweils verfügbaren Denkstufe). Alle Zahlen und Begleittexte werden aus dem verlinkten Google Sheet geladen und regelmäßig abgeglichen. Über **DE / EN** oben rechts lässt sich die Sprache jederzeit wechseln.
 
 ---
 
-## 🔬 Die 8 Benchmark-Komponenten im Detail
+## Ansichten in der App
 
-| Nr. | Benchmark | Disziplin & Fokus | Gewicht |
-|:---:|:---|:---|:---:|
-| 1 | **AA-Intelligence Index** (AA-II v4.3) | Umfassender Standard-IQ-Test aus tausenden Aufgaben aller Fachrichtungen | 12,5 % |
-| 2 | **Faktentreue / Non-Hallucination Rate** | Prozentualer Anteil nicht erfundener Antworten bei unbekanntem Wissen | 17,25 % |
-| 3 | **AA-Omniscience** | Wissenschaftliches Fachwissen (67 %) + Faktentreue (33 %) | 12,5 % |
-| 4 | **MMMU-Pro** | Multimodales Verstehen von Diagrammen, Plots & wissenschaftlichen Abbildungen | 12,5 % |
-| 5 | **Medical Long Context Reasoning** | Konsistenzprüfung über hunderte Seiten klinischer Literatur | 12,5 % |
-| 6 | **Excel-Datenanalyse** (FinanceBench) | Tabellen- und Datenanalyse im Tabellenkalkulations-Kontext | 12,5 % |
-| 7 | **SimpleBench** | 200 Fangfragen zu räumlichem Vorstellungsvermögen und Logik | 12,5 % |
-| 8 | **Vals.ai** | Mehrstufige quantitative Workflows, Programmierung & Finanzen | 12,5 % |
+### 1. Balkendiagramm
+Vergleicht die Chatbots direkt miteinander.
+
+* **Score-Regler**: Wechselt zwischen den drei Gesamtwerten und den acht Einzeltests:
+  * **Neuer Score**: Durchschnitt aus allen 8 aktuellen Tests.
+  * **Alter Score**: Durchschnitt aus 5 älteren Tests, der weiter in die Vergangenheit zurückreicht.
+  * **Worst Case**: Multipliziert den Leistungsdurchschnitt mit der Faktentreue – Modelle, die häufiger raten oder Dinge erfinden, fallen hier stark ab.
+  * **Einzeltests (`#1` bis `#8`)**: Zeigt gezielt nur eine Fähigkeit (z. B. Diagrammanalyse oder Faktentreue) und sortiert danach.
+* **Preis- und Zugangsfilter (`Free API | Free Chat | Paid | All`)**: Unterscheidet zwischen Modellen, die nur im Browser kostenlos sind (`Free Chat`), und Modellen mit kostenlosem **API-Zugang** (eine Schnittstelle, über die sich eine KI z. B. direkt in Statistikprogrammen wie JASP einbinden lässt; erkennbar am blauen Globus-Symbol über dem Balken).
+* **Balken-Details**: Fährt man mit der Maus über einen Balken, teilt sich der Balken in die einzelnen Testwerte auf. Ein Klick auf den Modellnamen öffnet den jeweiligen Chat; das Globus-Symbol führt zum kostenlosen API-Schlüssel.
+* **Filter & Sortierung**: Nach Anbietern filtern, die Anzahl der angezeigten Modelle anpassen oder nach Punktzahl bzw. Erscheinungsdatum sortieren.
+
+### 2. Zeitreihe
+Zeigt, wie sich die Testergebnisse über die Monate entwickelt haben. Hier lassen sich neben den aktuellen Tests auch vier frühere Tests ansehen (z. B. `SimpleBench` mit räumlichen Denk- und Fangfragen). Mit „Pioniere“ werden nur Modelle hervorgehoben, die zu ihrer Zeit einen neuen Bestwert aufgestellt haben.
+
+### 3. Korrelationen
+Stellt jeweils zwei Tests gegeneinander dar – entweder als Punktwolke (Streudiagramm) oder als **Heatmap** (Farbmatrix aller Testkombinationen). So lässt sich ablesen, ob Modelle, die in einem Bereich stark sind, auch in einem anderen gut abschneiden (`Pearson r` und `Spearman Rho`).
+
+### 4. Ökosystem & Glossar
+Gibt einen Überblick über die KI-Anbieter, Modellgrößen und verfügbaren Werkzeuge. Im **Glossar** darunter werden Fachbegriffe aus Statistik, Wissenschaftstheorie und KI (z. B. *Halluzination*, *Regression*, *Konfidenzband*, *API*) mit Alltagsvergleichen ohne Vorkenntnisse erklärt.
+
+### 5. Anleitung & Tipps (unter den Diagrammen)
+Enthält Erklärungen zu jedem Test und praktische Hinweise zum Umgang mit Chatbots im Studium, direkt aus dem Google Sheet übernommen. Über die kleinen Link-Symbole an den Achsen und Reglern springt die Seite direkt zum passenden Abschnitt.
 
 ---
 
-## 🌐 Zentrale Sprachdatei (`src/utils/i18n.ts`)
+## Die 8 Einzeltests im Überblick
 
-Alle UI-Texte, Button-Beschriftungen, Tooltips, Statusmeldungen und Hilfetexte, **die nicht direkt aus den Zellen der CSV stammen**, sind zentral in folgender Datei gebündelt:
-
-```
-src/utils/i18n.ts
-```
-
-In dieser Datei können Sie sämtliche deutschen (`TRANSLATIONS.de`) und englischen (`TRANSLATIONS.en`) Strings direkt einsehen, prüfen und nach Ihren Wünschen anpassen.
+| Nr. | Test / Bereich | Was wird geprüft? |
+|:---:|:---|:---|
+| 1 | **IQ** (`AA-Intelligence Index`) | Gemischte Aufgaben aus Logik, Recherche, Rechnen und Programmieren |
+| 2 | **Faktentreue** (`Non-Hallucination Rate`) | Wie oft ein Modell ehrlich passt, statt bei Nichtwissen etwas zu erfinden |
+| 3 | **Faktenwissen** (`AA-Omniscience Accuracy`) | Wissenschaftliches Fachwissen aus 6 Gebieten |
+| 4 | **Diagrammanalyse** (`MMMU-Pro`) | Ablesen und Interpretieren von Grafiken, Plots und Abbildungen |
+| 5 | **Diagnostik** (`MLCR-AA`) | Widerspruchsfreies Schließen über sehr lange klinische Fachtexte hinweg |
+| 6 | **Excel-Analyst** (`AA-AnalystAgent`) | Auswerten und Bearbeiten von Daten in Tabellenkalkulationen |
+| 7 | **Experimenting & Engineering** (`GDPx`) | Eigenständiges Bearbeiten von Fachaufgaben aus Technik, Naturwissenschaft, Finanzen und Recht |
+| 8 | **Wirtschaft & Recht** (`Vals.ai`) | Mehrstufige Aufgaben aus Finanzen, Recht und Datenverarbeitung |
 
 ---
 
-## 🛠️ Technische Umsetzung
+## Hinweise zur Anpassung
 
-* **Framework**: React 18 mit Vite & TypeScript
-* **Styling**: Tailwind CSS mit responsivem Design und Dark-Mode-Unterstützung
-* **Grafik**: Reine, barrierefreie SVG-Vektorgrafiken für ultraschnelles Rendern ohne externe Charting-Abhängigkeiten
-* **Icons**: Lucide React
-* **Parser**: Eigener robuster RFC-4180 CSV-Streaming-Parser mit Anführungszeichen- und Sonderzeichenunterstützung
+* **Daten & Erklärtexte** lassen sich direkt im verlinkten Google Sheet pflegen und über den **Sync**-Button in der App neu laden.
+* **Oberflächentexte** (Schaltflächen, Menüs, Hinweise) liegen gebündelt auf Deutsch und Englisch in `src/utils/i18n.ts`.
+* **Technik**: React, TypeScript, Vite und Tailwind CSS.

@@ -203,9 +203,9 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     });
   }
 
-  // 3. Explicit known benchmark keywords (e.g. IQ, Non-Hallucination-Rate, Science Knowledge, Experimenting & Engineering, etc.)
-  // Handles punctuation boundaries, optional dashes, spaces, and 'in %' suffixes
-  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|Experimenting(?:\s*&\s*Engineering)?|Agentic(?:\s+Work)?|GDPx|SimpleBench|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])\s*/gi;
+  // 3. Explicit known benchmark keywords (e.g. IQ, Non-Hallucination-Rate, Science Knowledge, Experimenting & Engineering, SimpleBench.com, etc.)
+  // Handles punctuation boundaries, optional dashes, spaces, domain suffixes, and 'in %' suffixes
+  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|Experimenting(?:\s*&\s*Engineering)?|Agentic(?:\s+Work)?|GDPx|Simple-?Bench(?:\.[a-z]+)?|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])(?!\/\/)\s*/gi;
   while ((match = benchmarkKeywordsRegex.exec(rawText)) !== null) {
     cuts.push({
       start: match.index,
@@ -215,8 +215,8 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     });
   }
 
-  // 4. General bullets starting with '-' followed by label with ':' or '=' (now supporting %, /, &, and unicode dashes)
-  const bulletRegex = /(?:^|\r?\n|[.!?):]|\bquestions|[^\w\s])\s*-+\s*([A-Z(][A-Za-z0-9()&'"\/%\s–—-]*?)([:=])\s*/g;
+  // 4. General bullets starting with '-' followed by label with ':' or '=' (supporting ., %, /, &, and unicode dashes, while never matching URLs like https://)
+  const bulletRegex = /(?:^|\r?\n|[.!?):]|\bquestions|[^\w\s])\s*-+\s*([A-Z(][A-Za-z0-9().&'"\/%\s–—-]*?)([:=])(?!\/\/)\s*/g;
   while ((match = bulletRegex.exec(rawText)) !== null) {
     cuts.push({
       start: match.index,

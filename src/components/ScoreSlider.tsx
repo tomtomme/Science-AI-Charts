@@ -168,16 +168,16 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
           }}
-          className="inline-flex items-center gap-1 text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 hover:border-emerald-500/80 hover:text-emerald-300 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 hover:border-emerald-500/80 hover:text-emerald-300 transition-colors cursor-pointer whitespace-normal break-words text-left leading-tight"
           title={isInternal ? (lang === 'de' ? 'Zur Erklärung springen' : 'Jump to explanation') : `Quelle: ${sourceUrl}`}
         >
-          <span className="truncate max-w-[150px]">{text}</span>
+          <span>{text}</span>
           {!isInternal && <ExternalLink className="w-2.5 h-2.5 opacity-70 shrink-0" />}
         </a>
       );
     }
     return (
-      <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 block truncate max-w-[150px]">
+      <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 inline-block whitespace-normal break-words leading-tight">
         {text}
       </span>
     );
@@ -196,7 +196,6 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
           lang === 'de'
             ? 'Umfassender Gesamt-Score aus allen 8 gleichgewichteten Benchmark-Kriterien (jeweils 12,5 %). Aktueller Standard für moderne Chatbots.'
             : 'Comprehensive final score composed of all 8 equally weighted benchmark criteria (12.5% each). Current standard for modern chatbots.',
-        detail: lang === 'de' ? 'Final Score (Spalte M)' : 'Final Score (Col M)',
       };
     }
     if (unifiedSliderValue === 1) {
@@ -211,7 +210,6 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
           lang === 'de'
             ? 'Historischer Gesamt-Score basierend auf den ursprünglichen 5 Benchmarks. Ermöglicht den Vergleich über einen längeren Zeitraum mit bis zu 224 Modellen.'
             : 'Historical final score based on the original 5 benchmarks. Enables long-term tracking across up to 224 models.',
-        detail: lang === 'de' ? 'Final Score (Spalte L)' : 'Final Score (Col L)',
       };
     }
     if (unifiedSliderValue === 2) {
@@ -226,7 +224,6 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
           lang === 'de'
             ? 'Worst-Case-Score: Der 7-Benchmark-Durchschnitt wird mit der Nicht-Halluzinations-Rate multipliziert. Bestraft unzuverlässige und fabulierende Modelle drastisch.'
             : 'Worst-case penalty score: 7-benchmark average multiplied by non-hallucination rate. Heavily penalizes fabricating models.',
-        detail: lang === 'de' ? 'Worst-Case IQ (Spalte N)' : 'Worst-Case IQ (Col N)',
       };
     }
     if (activeCategoryComp) {
@@ -244,21 +241,13 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
         }
       }
 
-      const badgeText = syncedItem?.text || activeCategoryComp.sourceName || (isRetired ? (lang === 'de' ? 'Archiv' : 'Retired') : 'Benchmark');
+      const badgeText = syncedItem?.text || activeCategoryComp.sourceName || 'Benchmark';
       const badgeUrl = syncedItem?.sourceUrl || activeCategoryComp.sourceUrl;
 
       return {
         title: `${numPrefix}${name}`,
         badge: renderSyncedBadge(badgeText, badgeUrl),
         desc: lang === 'de' ? activeCategoryComp.descriptionDe : activeCategoryComp.descriptionEn,
-        detail:
-          activeCategoryComp.weightPct > 0
-            ? lang === 'de'
-              ? `Gewichtung: ${activeCategoryComp.weightPct}% (${activeCategoryComp.formulaDesc})`
-              : `Weight: ${activeCategoryComp.weightPct}% (${activeCategoryComp.formulaDesc})`
-            : lang === 'de'
-              ? `Aussortierter Benchmark (${activeCategoryComp.formulaDesc})`
-              : `Retired benchmark (${activeCategoryComp.formulaDesc})`,
       };
     }
     return null;
@@ -376,13 +365,10 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
       badge={activeScoreTooltip.badge}
       position="bottom"
       align="center"
-      width="w-[350px]"
+      width="w-[380px]"
       content={
         <div className="space-y-1.5">
           <p className="leading-snug">{activeScoreTooltip.desc}</p>
-          <div className="pt-1.5 border-t border-slate-700/60 font-mono text-[11px] text-amber-300">
-            {activeScoreTooltip.detail}
-          </div>
           <button
             type="button"
             onClick={(e) => {

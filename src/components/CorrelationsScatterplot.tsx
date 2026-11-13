@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { ExternalLink, TrendingUp, Plus, Minus, ArrowLeftRight, Sparkles, ChevronDown, Check } from 'lucide-react';
+import React, { useMemo, useState, useRef, useEffect, useId } from 'react';
+import { ExternalLink, TrendingUp, Plus, Minus, ArrowLeftRight, Sparkles, ChevronDown, Check, Grid3X3 } from 'lucide-react';
 import { ModelRecord, RegressionType, TimelineDataPoint } from '../types';
 import { calculateRegression, extractFrontierPoints } from '../utils/mathRegression';
 import { Tooltip } from './Tooltip';
@@ -306,7 +306,6 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
 
 // Sub-component: A single rectangular correlation scatterplot with clickable axis titles
 interface SingleCorrelationPlotProps {
-  plotLabel: string;
   allModels: ModelRecord[];
   scope: 'all' | 'frontier';
   frontierPointIds: Set<string>;
@@ -320,10 +319,10 @@ interface SingleCorrelationPlotProps {
   onSwapAxes: () => void;
   lang: 'de' | 'en';
   onScrollToParagraph?: (targetId: string) => void;
+  headerToggle?: React.ReactNode;
 }
 
 const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
-  plotLabel,
   allModels,
   scope,
   frontierPointIds,
@@ -337,7 +336,9 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   onSwapAxes,
   lang,
   onScrollToParagraph,
+  headerToggle,
 }) => {
+  const svgUid = useId().replace(/:/g, '');
   const xDim: CorrelationDimension = CORRELATION_DIMENSIONS[xAxisDimIndex] || CORRELATION_DIMENSIONS[0];
   const yDim: CorrelationDimension = CORRELATION_DIMENSIONS[yAxisDimIndex] || CORRELATION_DIMENSIONS[1];
 
@@ -573,12 +574,9 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-visible flex flex-col">
-      {/* Plot Header: Label, Swap Button, Pearson & Spearmans Rho Badges */}
+      {/* Plot Header: Swap Button, Mode Toggle, Pearson & Spearmans Rho Badges */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 rounded-t-2xl">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs">
-            {plotLabel}
-          </span>
           <Tooltip
             content={lang === 'de' ? 'Achsen vertauschen (X ⇄ Y)' : 'Swap axes (X ⇄ Y)'}
             align="left"
@@ -593,6 +591,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               <span>{lang === 'de' ? 'X ⇄ Y' : 'X ⇄ Y'}</span>
             </button>
           </Tooltip>
+          {headerToggle}
         </div>
 
         {/* Side-by-Side Pearson r & Spearmans Rho Badges */}
@@ -726,7 +725,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
           className="w-full h-auto aspect-square overflow-visible"
         >
           <defs>
-            <filter id={`corrDotGlow-${plotLabel}`} x="-50%" y="-50%" width="200%" height="200%">
+            <filter id={`corrDotGlow-${svgUid}`} x="-50%" y="-50%" width="200%" height="200%">
               <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.25" />
             </filter>
           </defs>
@@ -883,7 +882,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   fill={isHovered ? '#f43f5e' : isFrontier ? '#d97706' : xDim.color}
                   stroke="#ffffff"
                   strokeWidth={isHovered ? 2 : 1}
-                  filter={`url(#corrDotGlow-${plotLabel})`}
+                  filter={`url(#corrDotGlow-${svgUid})`}
                   className="transition-all duration-150 hover:opacity-95"
                   pointerEvents="none"
                 />
@@ -1041,6 +1040,422 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   );
 };
 
+function getHeatmapShortLabel(dim: CorrelationDimension, lang: 'de' | 'en'): string {
+  switch (dim.id) {
+    case 'new_score':
+      return lang === 'de' ? 'NEW Score' : 'NEW Score';
+    case 'old_score':
+      return lang === 'de' ? 'OLD Score' : 'OLD Score';
+    case 'worst_case':
+      return 'Worst Case';
+    case 'actCodeReason':
+      return '#1 IQ';
+    case 'nonHallucination':
+      return lang === 'de' ? '#2 Faktentr.' : '#2 Non-Hallu';
+    case 'scienceKnowledge':
+      return lang === 'de' ? '#3 Wissen' : '#3 Science';
+    case 'visionPlot':
+      return lang === 'de' ? '#4 Diagramm' : '#4 Plots';
+    case 'medReasoning':
+      return lang === 'de' ? '#5 Diagn.' : '#5 Diagn.';
+    case 'excelAgent':
+      return '#6 Excel';
+    case 'trickQuestions':
+      return '#7 Exp.&Eng.';
+    case 'econLegal':
+      return lang === 'de' ? '#8 Wirtsch.' : '#8 Econ/Leg.';
+    default:
+      return lang === 'de' ? dim.shortDe : dim.shortEn;
+  }
+}
+
+function getHeatmapCellColors(value: number | null): { bg: string; text: string } {
+  if (value === null || isNaN(value)) {
+    return { bg: '#f1f5f9', text: '#94a3b8' };
+  }
+  const v = Math.max(-1, Math.min(1, value));
+  const abs = Math.abs(v);
+  const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
+  const rgbStr = (r: number, g: number, b: number) => `rgb(${r}, ${g}, ${b})`;
+
+  if (v >= 0) {
+    // 0 -> white (#ffffff), +0.5 -> blue-300 (#93c5fd), +1.0 -> blue-900 (#1e3a8a)
+    if (abs <= 0.5) {
+      const t = abs / 0.5;
+      return {
+        bg: rgbStr(lerp(255, 147, t), lerp(255, 197, t), lerp(255, 253, t)),
+        text: '#0f172a',
+      };
+    }
+    const t = (abs - 0.5) / 0.5;
+    return {
+      bg: rgbStr(lerp(147, 30, t), lerp(197, 58, t), lerp(253, 138, t)),
+      text: abs >= 0.72 ? '#ffffff' : '#0f172a',
+    };
+  }
+
+  // 0 -> white (#ffffff), -0.5 -> red-300 (#fca5a5), -1.0 -> red-900 (#7f1d1d)
+  if (abs <= 0.5) {
+    const t = abs / 0.5;
+    return {
+      bg: rgbStr(lerp(255, 252, t), lerp(255, 165, t), lerp(255, 165, t)),
+      text: '#0f172a',
+    };
+  }
+  const t = (abs - 0.5) / 0.5;
+  return {
+    bg: rgbStr(lerp(252, 127, t), lerp(165, 29, t), lerp(165, 29, t)),
+    text: abs >= 0.72 ? '#ffffff' : '#0f172a',
+  };
+}
+
+interface CorrelationHeatmapProps {
+  allModels: ModelRecord[];
+  scope: 'all' | 'frontier';
+  frontierPointIds: Set<string>;
+  metric: 'pearson' | 'spearman';
+  onToggleMetric: () => void;
+  onSelectPairForOtherPlot?: (xIdx: number, yIdx: number) => void;
+  lang: 'de' | 'en';
+  headerToggle?: React.ReactNode;
+}
+
+const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
+  allModels,
+  scope,
+  frontierPointIds,
+  metric,
+  onToggleMetric,
+  onSelectPairForOtherPlot,
+  lang,
+  headerToggle,
+}) => {
+  const [hoveredCell, setHoveredCell] = useState<{
+    rowIdx: number;
+    colIdx: number;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const scopedModels = useMemo(() => {
+    if (scope === 'frontier') {
+      return allModels.filter((m) => frontierPointIds.has(m.id));
+    }
+    return allModels;
+  }, [allModels, scope, frontierPointIds]);
+
+  const matrix = useMemo(() => {
+    const dims = CORRELATION_DIMENSIONS;
+    return dims.map((rowDim, rIdx) =>
+      dims.map((colDim, cIdx) => {
+        const pairs: Array<{ x: number; y: number }> = [];
+        for (const m of scopedModels) {
+          const vx = colDim.getValue(m);
+          const vy = rowDim.getValue(m);
+          if (typeof vx === 'number' && !isNaN(vx) && typeof vy === 'number' && !isNaN(vy)) {
+            pairs.push({ x: vx, y: vy });
+          }
+        }
+        const n = pairs.length;
+        if (rIdx === cIdx) {
+          return {
+            n,
+            pearson: n >= 1 ? 1 : null,
+            spearman: n >= 1 ? 1 : null,
+            pearsonRes: calculatePearson(pairs),
+            spearmanRes: calculateSpearman(pairs),
+          };
+        }
+        if (n < 3) {
+          return {
+            n,
+            pearson: null,
+            spearman: null,
+            pearsonRes: null,
+            spearmanRes: null,
+          };
+        }
+        const pearsonRes = calculatePearson(pairs);
+        const spearmanRes = calculateSpearman(pairs);
+        return {
+          n,
+          pearson: pearsonRes.value,
+          spearman: spearmanRes.value,
+          pearsonRes,
+          spearmanRes,
+        };
+      })
+    );
+  }, [scopedModels]);
+
+  const hoveredData = hoveredCell ? matrix[hoveredCell.rowIdx]?.[hoveredCell.colIdx] : null;
+  const hoveredRowDim = hoveredCell ? CORRELATION_DIMENSIONS[hoveredCell.rowIdx] : null;
+  const hoveredColDim = hoveredCell ? CORRELATION_DIMENSIONS[hoveredCell.colIdx] : null;
+
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-visible flex flex-col">
+      {/* Header matching SingleCorrelationPlot */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 rounded-t-2xl">
+        <div className="flex items-center gap-2">
+          {/* R / Rho Switch styled identically to X ⇄ Y switch */}
+          <Tooltip
+            content={
+              metric === 'pearson'
+                ? lang === 'de'
+                  ? 'Aktiv: Pearson r (linear). Klicken für Spearmans Rho.'
+                  : 'Active: Pearson r (linear). Click for Spearman Rho.'
+                : lang === 'de'
+                  ? 'Aktiv: Spearmans Rho (Rangfolge). Klicken für Pearson r.'
+                  : 'Active: Spearman Rho (rank). Click for Pearson r.'
+            }
+            align="left"
+            width="w-60"
+          >
+            <button
+              type="button"
+              onClick={onToggleMetric}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-xs font-mono shadow-2xs"
+            >
+              <ArrowLeftRight className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+              <span className={metric === 'pearson' ? 'font-bold text-blue-600 dark:text-blue-400' : 'opacity-55'}>
+                r
+              </span>
+              <span className="opacity-45">⇄</span>
+              <span className={metric === 'spearman' ? 'font-bold text-rose-600 dark:text-rose-400' : 'opacity-55'}>
+                Rho
+              </span>
+            </button>
+          </Tooltip>
+
+          {headerToggle}
+        </div>
+
+        {/* Diverging Color Scale Legend (-1 Red -> 0 White -> +1 Blue) */}
+        <div className="flex items-center gap-2 text-xs font-mono">
+          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">
+            {metric === 'pearson' ? 'Pearson r' : 'Spearman Rho'}
+          </span>
+          <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
+            <span className="text-[10px] font-bold text-red-700 dark:text-red-400">-1</span>
+            <div
+              className="w-16 sm:w-20 h-2.5 rounded-xs border border-slate-300/70 dark:border-slate-700"
+              style={{
+                background: 'linear-gradient(to right, #7f1d1d, #fca5a5, #ffffff, #93c5fd, #1e3a8a)',
+              }}
+            />
+            <span className="text-[10px] font-bold text-blue-800 dark:text-blue-400">+1</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Matrix Container */}
+      <div className="relative p-3 pt-2 bg-white dark:bg-slate-900 rounded-b-2xl select-none flex-1 flex flex-col justify-between">
+        <div className="w-full overflow-x-auto sm:overflow-visible flex-1 flex flex-col justify-center">
+          <div className="min-w-[440px] w-full pr-6">
+            {/* Rotated Column Headers */}
+            <div
+              className="grid items-end gap-[2px] mb-1"
+              style={{
+                gridTemplateColumns: '94px repeat(3, minmax(0, 1fr)) 4px repeat(8, minmax(0, 1fr))',
+              }}
+            >
+              <div className="h-[68px]" />
+              {CORRELATION_DIMENSIONS.map((colDim, cIdx) => {
+                const isColHovered = hoveredCell?.colIdx === cIdx;
+                return (
+                  <React.Fragment key={colDim.id}>
+                    {cIdx === 3 && <div />}
+                    <div className="relative h-[68px] flex items-end justify-center">
+                      <div
+                        className={`absolute bottom-1 left-1/2 -rotate-45 origin-bottom-left whitespace-nowrap flex items-center gap-1 text-[10px] font-mono transition-colors ${
+                          isColHovered
+                            ? 'text-slate-950 dark:text-white font-bold'
+                            : 'text-slate-600 dark:text-slate-400 font-medium'
+                        }`}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: colDim.color }}
+                        />
+                        <span>{getHeatmapShortLabel(colDim, lang)}</span>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+
+            {/* 11 Matrix Rows */}
+            <div className="space-y-[2px]">
+              {CORRELATION_DIMENSIONS.map((rowDim, rIdx) => {
+                const isRowHovered = hoveredCell?.rowIdx === rIdx;
+                return (
+                  <React.Fragment key={rowDim.id}>
+                    {rIdx === 3 && (
+                      <div className="h-[4px]" />
+                    )}
+                    <div
+                      className="grid items-center gap-[2px]"
+                      style={{
+                        gridTemplateColumns: '94px repeat(3, minmax(0, 1fr)) 4px repeat(8, minmax(0, 1fr))',
+                      }}
+                    >
+                      {/* Row Header Label */}
+                      <div
+                        className={`pr-1.5 flex items-center justify-end gap-1 text-[10px] font-mono truncate transition-colors ${
+                          isRowHovered
+                            ? 'text-slate-950 dark:text-white font-bold'
+                            : 'text-slate-600 dark:text-slate-400 font-medium'
+                        }`}
+                        title={lang === 'de' ? rowDim.nameDe : rowDim.nameEn}
+                      >
+                        <span className="truncate">{getHeatmapShortLabel(rowDim, lang)}</span>
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: rowDim.color }}
+                        />
+                      </div>
+
+                      {/* Score Cells (Diagonal omitted) */}
+                      {CORRELATION_DIMENSIONS.map((colDim, cIdx) => {
+                        const isDiag = rIdx === cIdx;
+                        const cell = matrix[rIdx][cIdx];
+                        const val = metric === 'pearson' ? cell.pearson : cell.spearman;
+                        const { bg, text } = getHeatmapCellColors(val);
+                        const isHovered = hoveredCell?.rowIdx === rIdx && hoveredCell?.colIdx === cIdx;
+
+                        return (
+                          <React.Fragment key={`${rowDim.id}-${colDim.id}`}>
+                            {cIdx === 3 && <div />}
+                            {isDiag ? (
+                              <div className="aspect-square w-full" aria-hidden="true" />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onSelectPairForOtherPlot) {
+                                    onSelectPairForOtherPlot(cIdx, rIdx);
+                                  }
+                                }}
+                                onMouseEnter={(e) => {
+                                  setHoveredCell({ rowIdx: rIdx, colIdx: cIdx, x: e.clientX, y: e.clientY });
+                                }}
+                                onMouseMove={(e) => {
+                                  setHoveredCell({ rowIdx: rIdx, colIdx: cIdx, x: e.clientX, y: e.clientY });
+                                }}
+                                onMouseLeave={() => setHoveredCell(null)}
+                                style={{
+                                  backgroundColor: bg,
+                                  color: text,
+                                }}
+                                className={`aspect-square w-full flex items-center justify-center rounded-[3px] border border-slate-200/90 dark:border-slate-700/70 cursor-pointer hover:scale-110 hover:z-20 text-[11px] sm:text-[13px] lg:text-[11.5px] xl:text-[13px] font-mono font-bold leading-none tabular-nums tracking-tighter transition-transform duration-100 ${
+                                  isHovered ? 'ring-2 ring-slate-900 dark:ring-white z-20 scale-110' : ''
+                                }`}
+                              >
+                                {val !== null ? val.toFixed(2).replace(/^-0\.00$/, '0.00') : '—'}
+                              </button>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Footnote */}
+        <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+          <span>
+            {lang === 'de'
+              ? `Basis: ${scopedModels.length} Modelle (${scope === 'frontier' ? 'Pioniere' : 'Alle'})`
+              : `Sample: ${scopedModels.length} models (${scope === 'frontier' ? 'Pioneers' : 'All'})`}
+          </span>
+          <span>
+            {lang === 'de'
+              ? 'Klick auf Zelle → Paar im Streudiagramm laden'
+              : 'Click cell → load pair in scatterplot'}
+          </span>
+        </div>
+
+        {/* Floating Cell Detail Tooltip */}
+        {hoveredCell && hoveredData && hoveredRowDim && hoveredColDim && (() => {
+          const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+          const nearLeft = hoveredCell.x < 120;
+          const nearRight = hoveredCell.x > vw - 120;
+          const nearTop = hoveredCell.y < 140;
+          const tx = nearLeft ? '0%' : nearRight ? '-100%' : '-50%';
+          const ty = nearTop ? '0%' : '-100%';
+          const leftPos = nearLeft
+            ? Math.max(12, hoveredCell.x - 12)
+            : nearRight
+              ? Math.min(vw - 12, hoveredCell.x + 12)
+              : hoveredCell.x;
+
+          return (
+            <div
+              className="pointer-events-none fixed z-50 transition-opacity duration-100"
+              style={{
+                left: `${leftPos}px`,
+                top: `${nearTop ? hoveredCell.y + 18 : hoveredCell.y - 14}px`,
+                transform: `translate(${tx}, ${ty})`,
+              }}
+            >
+              <div className="w-max max-w-[280px] px-3 py-2 rounded-xl shadow-2xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-xs font-sans">
+                <div className="space-y-1 pb-1.5 mb-1.5 border-b border-slate-800">
+                  <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredRowDim.color }} />
+                    <span className="truncate">{lang === 'de' ? hoveredRowDim.nameDe : hoveredRowDim.nameEn}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredColDim.color }} />
+                    <span className="truncate">{lang === 'de' ? hoveredColDim.nameDe : hoveredColDim.nameEn}</span>
+                  </div>
+                </div>
+
+                {hoveredData.pearson !== null && hoveredData.spearman !== null ? (
+                  <div className="space-y-0.5 font-mono text-[11px]">
+                    <div className={`flex items-center justify-between gap-4 ${metric === 'pearson' ? 'text-blue-300 font-bold' : 'text-slate-400'}`}>
+                      <span>Pearson r:</span>
+                      <span>
+                        {hoveredData.pearson >= 0 ? '+' : ''}
+                        {hoveredData.pearson.toFixed(2)}
+                        {hoveredData.pearsonRes && ` (${lang === 'de' ? hoveredData.pearsonRes.strengthDe : hoveredData.pearsonRes.strengthEn})`}
+                      </span>
+                    </div>
+                    <div className={`flex items-center justify-between gap-4 ${metric === 'spearman' ? 'text-rose-300 font-bold' : 'text-slate-400'}`}>
+                      <span>Spearman Rho:</span>
+                      <span>
+                        {hoveredData.spearman >= 0 ? '+' : ''}
+                        {hoveredData.spearman.toFixed(2)}
+                        {hoveredData.spearmanRes && ` (${lang === 'de' ? hoveredData.spearmanRes.strengthDe : hoveredData.spearmanRes.strengthEn})`}
+                      </span>
+                    </div>
+                    <div className="pt-1 mt-1 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+                      <span>n = {hoveredData.n}</span>
+                      {hoveredCell.rowIdx !== hoveredCell.colIdx && (
+                        <span className="text-emerald-400">
+                          {lang === 'de' ? 'Klick → Streudiagramm' : 'Click → Scatterplot'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="font-mono text-[11px] text-slate-400">
+                    {lang === 'de' ? `Zu wenige Daten (n = ${hoveredData.n})` : `Insufficient data (n = ${hoveredData.n})`}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+};
+
 export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = ({
   allModels,
   onScrollToParagraph,
@@ -1063,6 +1478,12 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
   // Plot 2 Dimension selection (Default: X = Old Score, Y = New Score)
   const [plot2XDimIndex, setPlot2XDimIndex] = useState<number>(1);
   const [plot2YDimIndex, setPlot2YDimIndex] = useState<number>(0);
+
+  // Plot 1 & Plot 2 Mode Toggles: Scatterplot vs Correlation Heatmap (with R / Rho switch)
+  const [plot1Mode, setPlot1Mode] = useState<'scatter' | 'heatmap'>('scatter');
+  const [plot1HeatmapMetric, setPlot1HeatmapMetric] = useState<'pearson' | 'spearman'>('pearson');
+  const [plot2Mode, setPlot2Mode] = useState<'scatter' | 'heatmap'>('scatter');
+  const [plot2HeatmapMetric, setPlot2HeatmapMetric] = useState<'pearson' | 'spearman'>('pearson');
 
   // Model & Regression State: default to LOESS with Param 50%
   const [internalRegressionIndex, setInternalRegressionIndex] = useState<number>(DEFAULT_CORRELATION_REGRESSION_INDEX);
@@ -1322,41 +1743,145 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
 
       {/* 2 CORRELATION PLOTS SIDE-BY-SIDE (Quadratic 1:1 Aspect Ratio) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Plot 1 (Left) */}
-        <SingleCorrelationPlot
-          plotLabel={lang === 'de' ? 'Plot 1' : 'Plot 1'}
-          allModels={allModels}
-          scope={scope}
-          frontierPointIds={frontierPointIds}
-          activeRegression={activeRegression}
-          polyDegree={polyDegree}
-          loessSpan={loessSpan}
-          xAxisDimIndex={plot1XDimIndex}
-          yAxisDimIndex={plot1YDimIndex}
-          onXAxisDimChange={setPlot1XDimIndex}
-          onYAxisDimChange={setPlot1YDimIndex}
-          onSwapAxes={handleSwapPlot1}
-          lang={lang}
-          onScrollToParagraph={onScrollToParagraph}
-        />
+        {/* Plot 1 (Left): Either Scatterplot or Heatmap */}
+        {(() => {
+          const heatmapToggleButton1 = (
+            <Tooltip
+              content={
+                plot1Mode === 'heatmap'
+                  ? lang === 'de'
+                    ? 'Zurück zum Scatterplot wechseln'
+                    : 'Switch back to scatterplot'
+                  : lang === 'de'
+                    ? 'Alle Score-Korrelationen als Heatmap anzeigen'
+                    : 'Show all score correlations as a heatmap'
+              }
+              align="left"
+              width="w-60"
+            >
+              <button
+                type="button"
+                onClick={() => setPlot1Mode((m) => (m === 'scatter' ? 'heatmap' : 'scatter'))}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-all cursor-pointer text-xs font-mono shadow-2xs ${
+                  plot1Mode === 'heatmap'
+                    ? 'bg-blue-600 dark:bg-blue-500 border-blue-600 dark:border-blue-500 text-white font-bold hover:bg-blue-700'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400'
+                }`}
+              >
+                <Grid3X3 className={`w-3 h-3 ${plot1Mode === 'heatmap' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+                <span>Heatmap</span>
+              </button>
+            </Tooltip>
+          );
 
-        {/* Plot 2 (Right) */}
-        <SingleCorrelationPlot
-          plotLabel={lang === 'de' ? 'Plot 2' : 'Plot 2'}
-          allModels={allModels}
-          scope={scope}
-          frontierPointIds={frontierPointIds}
-          activeRegression={activeRegression}
-          polyDegree={polyDegree}
-          loessSpan={loessSpan}
-          xAxisDimIndex={plot2XDimIndex}
-          yAxisDimIndex={plot2YDimIndex}
-          onXAxisDimChange={setPlot2XDimIndex}
-          onYAxisDimChange={setPlot2YDimIndex}
-          onSwapAxes={handleSwapPlot2}
-          lang={lang}
-          onScrollToParagraph={onScrollToParagraph}
-        />
+          if (plot1Mode === 'heatmap') {
+            return (
+              <CorrelationHeatmap
+                allModels={allModels}
+                scope={scope}
+                frontierPointIds={frontierPointIds}
+                metric={plot1HeatmapMetric}
+                onToggleMetric={() => setPlot1HeatmapMetric((prev) => (prev === 'pearson' ? 'spearman' : 'pearson'))}
+                onSelectPairForOtherPlot={(xIdx, yIdx) => {
+                  setPlot2XDimIndex(xIdx);
+                  setPlot2YDimIndex(yIdx);
+                  setPlot2Mode('scatter');
+                }}
+                lang={lang}
+                headerToggle={heatmapToggleButton1}
+              />
+            );
+          }
+
+          return (
+            <SingleCorrelationPlot
+              allModels={allModels}
+              scope={scope}
+              frontierPointIds={frontierPointIds}
+              activeRegression={activeRegression}
+              polyDegree={polyDegree}
+              loessSpan={loessSpan}
+              xAxisDimIndex={plot1XDimIndex}
+              yAxisDimIndex={plot1YDimIndex}
+              onXAxisDimChange={setPlot1XDimIndex}
+              onYAxisDimChange={setPlot1YDimIndex}
+              onSwapAxes={handleSwapPlot1}
+              lang={lang}
+              onScrollToParagraph={onScrollToParagraph}
+              headerToggle={heatmapToggleButton1}
+            />
+          );
+        })()}
+
+        {/* Plot 2 (Right): Either Scatterplot or Heatmap */}
+        {(() => {
+          const heatmapToggleButton2 = (
+            <Tooltip
+              content={
+                plot2Mode === 'heatmap'
+                  ? lang === 'de'
+                    ? 'Zurück zum Scatterplot wechseln'
+                    : 'Switch back to scatterplot'
+                  : lang === 'de'
+                    ? 'Alle Score-Korrelationen als Heatmap anzeigen'
+                    : 'Show all score correlations as a heatmap'
+              }
+              align="left"
+              width="w-60"
+            >
+              <button
+                type="button"
+                onClick={() => setPlot2Mode((m) => (m === 'scatter' ? 'heatmap' : 'scatter'))}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-all cursor-pointer text-xs font-mono shadow-2xs ${
+                  plot2Mode === 'heatmap'
+                    ? 'bg-blue-600 dark:bg-blue-500 border-blue-600 dark:border-blue-500 text-white font-bold hover:bg-blue-700'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400'
+                }`}
+              >
+                <Grid3X3 className={`w-3 h-3 ${plot2Mode === 'heatmap' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+                <span>Heatmap</span>
+              </button>
+            </Tooltip>
+          );
+
+          if (plot2Mode === 'heatmap') {
+            return (
+              <CorrelationHeatmap
+                allModels={allModels}
+                scope={scope}
+                frontierPointIds={frontierPointIds}
+                metric={plot2HeatmapMetric}
+                onToggleMetric={() => setPlot2HeatmapMetric((prev) => (prev === 'pearson' ? 'spearman' : 'pearson'))}
+                onSelectPairForOtherPlot={(xIdx, yIdx) => {
+                  setPlot1XDimIndex(xIdx);
+                  setPlot1YDimIndex(yIdx);
+                  setPlot1Mode('scatter');
+                }}
+                lang={lang}
+                headerToggle={heatmapToggleButton2}
+              />
+            );
+          }
+
+          return (
+            <SingleCorrelationPlot
+              allModels={allModels}
+              scope={scope}
+              frontierPointIds={frontierPointIds}
+              activeRegression={activeRegression}
+              polyDegree={polyDegree}
+              loessSpan={loessSpan}
+              xAxisDimIndex={plot2XDimIndex}
+              yAxisDimIndex={plot2YDimIndex}
+              onXAxisDimChange={setPlot2XDimIndex}
+              onYAxisDimChange={setPlot2YDimIndex}
+              onSwapAxes={handleSwapPlot2}
+              lang={lang}
+              onScrollToParagraph={onScrollToParagraph}
+              headerToggle={heatmapToggleButton2}
+            />
+          );
+        })()}
       </div>
     </div>
   );

@@ -240,11 +240,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     ? 100
     : Math.max(70, ...models.map((m) => m.score ?? m.scoreNewReported ?? 0));
   const maxAxisScore = activeComp ? 100 : Math.ceil((maxScoreInPlot + 2) / 10) * 10;
-  const chartHeight = 515;
-  const topPadding = 62; // Generous headroom for price & notice icon above hovered favicon
+  const chartHeight = 531;
+  const topPadding = 78; // Generous headroom for price, staggered tiers & notice icon above hovered favicon
   const bottomPadding = 200; // Generous space below baseline for rotated model names with badges without clipping
   const availablePlotHeight = chartHeight - topPadding - bottomPadding; // 253px
-  const baselineY = chartHeight - bottomPadding; // 315px
+  const baselineY = chartHeight - bottomPadding; // 331px
 
   const barWidth = 26;
   const barGap = 12;
@@ -496,7 +496,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     return 'url(#pattern-usa)';
   };
 
-  // Parses CSV Column AL: min. Abokosten/Monat für Chatzugriff in DE (or availability note like 'US only')
+  // Parses CSV Column T: min. Abokosten/Monat für Chatzugriff in DE (or availability note like 'US only')
   interface PriceColInfo {
     type: 'price' | 'note' | 'none';
     text: string;
@@ -512,22 +512,26 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
     }
 
-    const cleanNumStr = clean.replace(/€/g, '').replace(/\$/g, '').trim();
-    const num = parseFloat(cleanNumStr.replace(',', '.'));
-    const isPureNumber = !isNaN(num) && /^-?\d+([.,]\d+)?$/.test(cleanNumStr);
-
-    if (isPureNumber) {
-      const isDe = lang === 'de';
+    const isDe = lang === 'de';
+    if (clean.includes('€')) {
+      const compactPrice = clean.replace(/\s*€/g, '€');
+      const amountOnly = compactPrice.replace(/€/g, '').trim();
+      const isRange = /[-–—]/.test(amountOnly);
+      const priceLine = isDe ? `${amountOnly} € / Monat` : `€${amountOnly} / month`;
+      const rangeSuffix = isRange
+        ? (isDe
+            ? '\nbei Zahlung für 1 Jahr vs. monatlicher Zahlung'
+            : '\nif paid for 1 year vs. if paid monthly')
+        : '';
       return {
         type: 'price',
         text: clean,
-        displayPrice: `${num}€`,
-        tooltipTitle: isDe ? 'Min. monatliche Abokosten in DE' : 'Min. monthly subscription in DE',
-        tooltipText: isDe ? `${num} € / Monat für Chatzugriff in DE` : `€${num} / month for chat access in DE`,
+        displayPrice: compactPrice,
+        tooltipTitle: isDe ? 'Chatzugriff in DE' : 'Chat access in DE',
+        tooltipText: `${priceLine}${rangeSuffix}`,
       };
     }
 
-    const isDe = lang === 'de';
     return {
       type: 'note',
       text: clean,
@@ -603,6 +607,174 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     if (model.isPaid && !label.includes('💲')) label += ' 💲';
     return label;
   };
+
+  // Precompute bar geometry & collision-free price/note label positions so adjacent price ranges never overlap
+  const barLayouts = (() => {
+    const placedLabels: Array<{ leftX: number; rightX: number; y: number }> = [];
+    return models.map((model, index) => {
+      const barX = marginLeft + index * totalBarSlot;
+      const barCenterX = barX + barWidth / 2;
+      const exploded = isExploded(index);
+      const isHovered = hoveredIndex === index;
+      const highlighted = isModelHighlighted(model);
+
+      const catRaw = activeComp ? (model.rawScores[activeComp.key] ?? 0) : 0;
+      const catBreakdown = activeComp ? model.breakdown.find((b) => b.id === activeComp.id) : null;
+      const catPoints =
+        catBreakdown?.pointsContribution ??
+        (activeComp ? activeComp.transform(catRaw) / (scoreMode === 'old' ? 5 : 8) : 0);
+
+      const score =
+        activeCategoryIndex === 0
+          ? (scoreMode === 'worstCase'
+              ? (model.scoreWorstCase ?? model.score)
+              : scoreMode === 'old'
+              ? (model.scoreOld ?? model.score)
+              : (model.scoreNew ?? model.scoreNewReported ?? model.score))
+          : (model.score ?? model.scoreNewReported ?? model.scoreNewCalculated);
+
+      let totalBarHeight: number;
+      let barTopY: number;
+      let barBottomY: number;
+      let barCenterY: number;
+
+      if (activeComp) {
+        totalBarHeight = scaleY(catRaw);
+        barTopY = baselineY - totalBarHeight;
+        barBottomY = baselineY;
+        barCenterY = baselineY - totalBarHeight / 2;
+      } else {
+        totalBarHeight = scaleY(score);
+        barTopY = baselineY - totalBarHeight;
+        barBottomY = baselineY;
+        barCenterY = baselineY - totalBarHeight / 2;
+      }
+
+      const explosionGap = !exploded
+        ? 0
+        : isHovered
+        ? 2.5
+        : currentExplosionMode === 'on'
+        ? 2.2
+        : 1.8;
+
+      const effectiveBreakdown =
+        activeCategoryIndex === 0
+          ? createModelBreakdown(model.rawScores, score, scoreMode)
+          : model.breakdown;
+
+      let currentOffset = 0;
+      const segments = effectiveBreakdown.map((comp, segIdx) => {
+        const segHeight = scaleY(comp.pointsContribution);
+        const gapOffset = exploded ? segIdx * explosionGap : 0;
+        const segY = baselineY - (currentOffset + segHeight + gapOffset);
+        currentOffset += segHeight;
+        return {
+          comp,
+          segHeight,
+          segY,
+        };
+      });
+
+      const topSegment = segments[segments.length - 1];
+      if (!activeComp) {
+        barTopY = exploded && topSegment ? topSegment.segY : (baselineY - totalBarHeight);
+      }
+
+      const priceInfo = getPriceColInfo(model.priceDeMonthly);
+      const isBelowBar = catRaw < 0 && isScienceKnowledge;
+      let basePriceY = barTopY - 8;
+      if (activeComp && totalBarHeight < 36) {
+        const logoY = Math.max(24, barTopY - 18);
+        basePriceY = logoY - 18;
+      } else if (isBelowBar) {
+        basePriceY = sortBy === 'date' ? barBottomY + 28 : barBottomY + 16;
+      } else if (exploded && isHovered) {
+        const logoY = Math.max(26, barTopY - 26);
+        basePriceY = logoY - 24;
+      } else if (exploded && !isHovered) {
+        const logoY = Math.max(20, barTopY - 22);
+        basePriceY = logoY - 18;
+      } else if (sortBy === 'date') {
+        basePriceY = barTopY - 20;
+      }
+
+      const displayPrice = priceInfo.displayPrice || '';
+      const isLongPrice = displayPrice.length >= 5;
+      const priceFontSize = isLongPrice ? 11.5 : 13.5;
+      const charAdvance = isLongPrice ? priceFontSize * 0.56 : priceFontSize * 0.6;
+      const textWidth = displayPrice.length * charAdvance;
+      const priceX = model.isFreeApi ? barCenterX - 9 : barCenterX;
+      const globeX = priceX + textWidth / 2 + 10;
+
+      let priceY = basePriceY;
+      const hasAboveLabel = priceInfo.type !== 'none' || model.isFreeApi;
+      if (hasAboveLabel) {
+        let leftX = barCenterX - 8;
+        let rightX = barCenterX + 8;
+        if (priceInfo.type === 'price') {
+          leftX = priceX - textWidth / 2;
+          rightX = model.isFreeApi ? globeX + 8 : priceX + textWidth / 2;
+        } else if (priceInfo.type === 'note') {
+          const noteX = model.isFreeApi ? barCenterX - 10 : barCenterX;
+          leftX = noteX - 7;
+          rightX = model.isFreeApi ? barCenterX + 18 : noteX + 7;
+        }
+
+        if (isBelowBar) {
+          while (
+            placedLabels.some(
+              (p) =>
+                Math.abs(priceY - p.y) < 14 &&
+                leftX - 3 < p.rightX &&
+                rightX + 3 > p.leftX
+            )
+          ) {
+            priceY += 14;
+          }
+        } else {
+          while (
+            priceY > 14 &&
+            placedLabels.some(
+              (p) =>
+                Math.abs(priceY - p.y) < 14 &&
+                leftX - 3 < p.rightX &&
+                rightX + 3 > p.leftX
+            )
+          ) {
+            priceY -= 14;
+          }
+        }
+        placedLabels.push({ leftX, rightX, y: priceY });
+      }
+
+      return {
+        model,
+        index,
+        barX,
+        barCenterX,
+        exploded,
+        isHovered,
+        highlighted,
+        catRaw,
+        catPoints,
+        totalBarHeight,
+        barTopY,
+        barBottomY,
+        barCenterY,
+        explosionGap,
+        segments,
+        priceInfo,
+        basePriceY,
+        priceY,
+        priceFontSize,
+        isLongPrice,
+        textWidth,
+        priceX,
+        globeX,
+      };
+    });
+  })();
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 sm:p-3.5 shadow-xs transition-colors">
@@ -693,30 +865,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
                 {displayedModel.priceDeMonthly && (() => {
                   const pInfo = getPriceColInfo(displayedModel.priceDeMonthly);
-                  if (pInfo.type === 'price') {
-                    return (
-                      <>
-                        <span className="text-slate-400">·</span>
-                        <Tooltip
-                          content={pInfo.tooltipText}
-                          position="bottom"
-                          align="left"
-                          width="w-auto max-w-xs"
-                        >
-                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 shrink-0 cursor-default">
-                            <span>💶</span>
-                            <span>{pInfo.displayPrice} {lang === 'de' ? '/ Monat' : '/ mo'}</span>
-                          </span>
-                        </Tooltip>
-                      </>
-                    );
-                  }
                   if (pInfo.type === 'note') {
                     return (
                       <>
                         <span className="text-slate-400">·</span>
                         <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 shrink-0">
-                          <span className="text-xs">ℹ️</span>
+                          <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-100 dark:bg-amber-950 border border-amber-500 text-amber-800 dark:text-amber-200 text-[10px] font-bold leading-none">!</span>
                           <span>{pInfo.text}</span>
                         </span>
                       </>
@@ -1219,80 +1373,31 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
           })}
 
           {/* Model Bars */}
-          {models.map((model, index) => {
-            const barX = marginLeft + index * totalBarSlot;
-            const barCenterX = barX + barWidth / 2;
-            const exploded = isExploded(index);
-            const isHovered = hoveredIndex === index;
-            const highlighted = isModelHighlighted(model);
-
-            // In single category mode, measure that category's raw score
-            const catRaw = activeComp ? (model.rawScores[activeComp.key] ?? 0) : 0;
-            const catBreakdown = activeComp ? model.breakdown.find((b) => b.id === activeComp.id) : null;
-            const catPoints = catBreakdown?.pointsContribution ?? (activeComp ? activeComp.transform(catRaw) / (scoreMode === 'old' ? 5 : 8) : 0);
-
-            const score =
-              activeCategoryIndex === 0
-                ? (scoreMode === 'worstCase'
-                    ? (model.scoreWorstCase ?? model.score)
-                    : scoreMode === 'old'
-                    ? (model.scoreOld ?? model.score)
-                    : (model.scoreNew ?? model.scoreNewReported ?? model.score))
-                : (model.score ?? model.scoreNewReported ?? model.scoreNewCalculated);
-
-            let totalBarHeight: number;
-            let barTopY: number;
-            let barBottomY: number;
-            let barCenterY: number;
-
-            if (activeComp) {
-              totalBarHeight = scaleY(catRaw);
-              barTopY = baselineY - totalBarHeight;
-              barBottomY = baselineY;
-              barCenterY = baselineY - totalBarHeight / 2;
-            } else {
-              totalBarHeight = scaleY(score);
-              barTopY = baselineY - totalBarHeight;
-              barBottomY = baselineY;
-              barCenterY = baselineY - totalBarHeight / 2;
-            }
-
-            // Explosion gap: 0 when not exploded (including in 'off' mode), 2.5 when hovered & exploded, 2.2 when forced 'on', 1.8 for neighbors in 'hover'
-            const explosionGap = !exploded
-              ? 0
-              : isHovered
-              ? 2.5
-              : currentExplosionMode === 'on'
-              ? 2.2
-              : 1.8;
-
-            // Ensure multi-category breakdown segments strictly match the active composite score (NEW Score, Worst Case, OLD):
-            // When values change in the CSV for any benchmark, segments and bar heights are dynamically recalculated.
-            const effectiveBreakdown =
-              activeCategoryIndex === 0
-                ? createModelBreakdown(model.rawScores, score, scoreMode)
-                : model.breakdown;
-
-            // Stack segments from bottom to top (for multi-category mode)
-            let currentOffset = 0;
-            const segments = effectiveBreakdown.map((comp, segIdx) => {
-              const segHeight = scaleY(comp.pointsContribution);
-              const gapOffset = exploded ? segIdx * explosionGap : 0;
-              const segY = baselineY - (currentOffset + segHeight + gapOffset);
-              currentOffset += segHeight;
-              return {
-                comp,
-                segHeight,
-                segY,
-              };
-            });
-
-            // Top of the bar (multi-category exploded)
-            const topSegment = segments[segments.length - 1];
-            if (!activeComp) {
-              barTopY = exploded && topSegment ? topSegment.segY : (baselineY - totalBarHeight);
-            }
-
+          {barLayouts.map(({
+            model,
+            index,
+            barX,
+            barCenterX,
+            exploded,
+            isHovered,
+            highlighted,
+            catRaw,
+            catPoints,
+            totalBarHeight,
+            barTopY,
+            barBottomY,
+            barCenterY,
+            explosionGap,
+            segments,
+            priceInfo,
+            basePriceY,
+            priceY,
+            priceFontSize,
+            isLongPrice,
+            textWidth,
+            priceX,
+            globeX,
+          }) => {
             // Unexploded country color fill: USA stars, China sickle, Europe blue-yellow
             const countryFill = getCountryBarFill(model);
 
@@ -1304,22 +1409,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               }
             }
 
-            const priceInfo = getPriceColInfo(model.priceDeMonthly);
-            let priceY = barTopY - 8;
-            if (activeComp && totalBarHeight < 36) {
-              const logoY = Math.max(24, barTopY - 18);
-              priceY = logoY - 18;
-            } else if (catRaw < 0 && isScienceKnowledge) {
-              priceY = barBottomY + 16;
-            } else if (exploded && isHovered) {
-              const logoY = Math.max(26, barTopY - 26);
-              priceY = logoY - 24;
-            } else if (exploded && !isHovered) {
-              const logoY = Math.max(20, barTopY - 22);
-              priceY = logoY - 18;
-            } else if (sortBy === 'date') {
-              priceY = barTopY - 20;
-            }
+            const isStaggeredUp = priceY < basePriceY - 6;
 
             return (
               <g
@@ -1804,21 +1894,60 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   );
                 })()}
 
-                {/* Euro-Price from Col AL & Free API globe rendered above bar / logo */}
-                {priceInfo.type === 'price' && (
+                {/* Euro-Price from Col T & Free API globe rendered above bar / logo */}
+                {priceInfo.type === 'price' && (() => {
+                  const displayPrice = priceInfo.displayPrice || '';
+                  return (
                   <g>
-                    <text
-                      x={model.isFreeApi ? barCenterX - 8 : barCenterX}
-                      y={priceY}
-                      textAnchor="middle"
-                      className="font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none"
-                      fontSize="14"
-                      style={{
-                        transition: 'y 0.25s ease-out',
+                    {isStaggeredUp && (
+                      <line
+                        x1={barCenterX}
+                        y1={priceY + 3}
+                        x2={barCenterX}
+                        y2={basePriceY - 2}
+                        stroke="#10B981"
+                        strokeOpacity={0.4}
+                        strokeWidth={1}
+                        strokeDasharray="2,2"
+                        pointerEvents="none"
+                      />
+                    )}
+                    <g
+                      className="cursor-help"
+                      onMouseEnter={(e) => {
+                        setPriceTooltip({
+                          title: priceInfo.tooltipTitle,
+                          text: priceInfo.tooltipText,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
                       }}
+                      onMouseMove={(e) => {
+                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+                      }}
+                      onMouseLeave={() => setPriceTooltip(null)}
                     >
-                      {priceInfo.displayPrice}
-                    </text>
+                      <rect
+                        x={priceX - textWidth / 2 - 4}
+                        y={priceY - priceFontSize}
+                        width={textWidth + 8}
+                        height={priceFontSize + 5}
+                        fill="transparent"
+                      />
+                      <text
+                        x={priceX}
+                        y={priceY}
+                        textAnchor="middle"
+                        className="font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none"
+                        fontSize={priceFontSize}
+                        style={{
+                          letterSpacing: isLongPrice ? '-0.03em' : undefined,
+                          transition: 'y 0.25s ease-out',
+                        }}
+                      >
+                        {displayPrice}
+                      </text>
+                    </g>
                     {model.isFreeApi && (() => {
                       const apiHref = model.apiLink || model.modelUrl;
                       const tooltipText = lang === 'de'
@@ -1826,7 +1955,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         : 'click me for\nfree API key';
                       const globeEl = (
                         <text
-                          x={barCenterX + 10}
+                          x={globeX}
                           y={priceY}
                           textAnchor="middle"
                           className={`select-none fill-blue-600 dark:fill-blue-400 font-bold transition-transform duration-150 ${
@@ -1835,7 +1964,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           fontSize="15"
                           style={{
                             transition: 'y 0.25s ease-out, transform 0.15s ease-out',
-                            transformOrigin: `${barCenterX + 10}px ${priceY - 4}px`,
+                            transformOrigin: `${globeX}px ${priceY - 4}px`,
                           }}
                         >
                           🌐
@@ -1867,7 +1996,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       );
                     })()}
                   </g>
-                )}
+                  );
+                })()}
 
                 {/* Availability / Restriction Notice from Col AL: fixed-anchor notice icon rendered on top with smooth compact popup */}
                 {priceInfo.type === 'note' && (
@@ -1903,7 +2033,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         fontSize="12"
                         fontFamily="sans-serif"
                       >
-                        ℹ
+                        !
                       </text>
                       <circle
                         cx={model.isFreeApi ? barCenterX - 10 : barCenterX}

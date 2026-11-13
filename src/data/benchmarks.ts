@@ -54,8 +54,8 @@ export const BENCHMARK_COMPONENTS: BenchmarkComponent[] = [
     color: '#3B82F6', // Blue
     darkColor: '#2563EB',
     lightBg: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    descriptionDe: 'AA-Omniscience in % (0–100%): Bewertet wissenschaftliches Faktenwissen und Genauigkeit. Belohnt korrekte Antworten, bestraft Halluzinationen und ist neutral bei Nichtwissen.',
-    descriptionEn: 'AA-Omniscience in % (0–100%): Evaluates scientific domain knowledge and factual accuracy. Rewards correct answers, penalizes hallucinations, zero penalty for refusing.',
+    descriptionDe: 'AA-Omniscience Accuracy (0–100%): Bewertet wissenschaftliches Fachwissen und faktische Genauigkeit über 6 Fachgebiete hinweg. v1.1 umfasst 3.000 Fragen (zuvor 6.000 in v1), nachdem gesättigte, mehrdeutige oder fehlerhafte Fragen herausgefiltert wurden, sowie 600 öffentliche Fragen.',
+    descriptionEn: 'AA-Omniscience Accuracy (0–100%): Evaluates scientific domain knowledge and factual accuracy across 6 domains. v1.1 contains 3,000 questions, down from 6,000 in v1, filtering out saturated, ambiguous or erroneous questions, and 600 public questions.',
     formulaDesc: 'F / 8',
     weightPct: 12.5,
     transform: (val: number) => Math.max(0, Math.min(100, val)),
@@ -154,15 +154,15 @@ export const RETIRED_TIMELINE_BENCHMARKS: BenchmarkComponent[] = [
   {
     id: 'iqOld',
     key: 'iqOld',
-    nameDe: 'IQ (Alt, v4.3)',
-    nameEn: 'IQ (Old, v4.3)',
+    nameDe: 'IQ',
+    nameEn: 'IQ',
     sourceName: 'AA-II v4.3',
     sourceUrl: 'https://artificialanalysis.ai/methodology/intelligence-benchmarking',
     color: '#8B5CF6',
     darkColor: '#7C3AED',
     lightBg: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-    descriptionDe: 'Historischer IQ-Score (AA-II v4.3 aus Spalte U). Nur im Zeitreihendiagramm verfügbar.',
-    descriptionEn: 'Historical IQ score (AA-II v4.3 from Column U). Available exclusively in the timeline chart.',
+    descriptionDe: 'Historischer IQ-Score (AA-II v4.3). Nur im Zeitreihendiagramm verfügbar.',
+    descriptionEn: 'Historical IQ score (AA-II v4.3). Available exclusively in the timeline chart.',
     formulaDesc: 'U',
     weightPct: 0,
     transform: (val: number) => Math.max(0, Math.min(100, val)),
@@ -170,15 +170,15 @@ export const RETIRED_TIMELINE_BENCHMARKS: BenchmarkComponent[] = [
   {
     id: 'nonHalluOld',
     key: 'nonHalluOld',
-    nameDe: 'Faktentreue (Alt, v1)',
-    nameEn: 'Non-Hallu-Rate (Old, v1)',
+    nameDe: 'Faktentreue',
+    nameEn: 'Non-Hallu-Rate',
     sourceName: 'Non-Hallu-Rate v1',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/omniscience#aa-omniscience-hallucination-rate',
     color: '#10B981',
     darkColor: '#059669',
     lightBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    descriptionDe: 'Historische Nicht-Halluzinations-Rate v1 (aus Spalte V). Nur im Zeitreihendiagramm verfügbar.',
-    descriptionEn: 'Historical Non-Hallucination Rate v1 (from Column V). Available exclusively in the timeline chart.',
+    descriptionDe: 'Historische Nicht-Halluzinations-Rate v1. Nur im Zeitreihendiagramm verfügbar.',
+    descriptionEn: 'Historical Non-Hallucination Rate v1. Available exclusively in the timeline chart.',
     formulaDesc: 'V',
     weightPct: 0,
     transform: (val: number) => Math.max(0, Math.min(100, val)),
@@ -186,15 +186,15 @@ export const RETIRED_TIMELINE_BENCHMARKS: BenchmarkComponent[] = [
   {
     id: 'scienceKnowledgeOld',
     key: 'scienceKnowledgeOld',
-    nameDe: 'Faktenwissen (Alt)',
-    nameEn: 'Science Knowledge (Old)',
+    nameDe: 'Faktenwissen',
+    nameEn: 'Science Knowledge',
     sourceName: 'Omniscience v1',
     sourceUrl: 'https://artificialanalysis.ai/evaluations/omniscience',
     color: '#3B82F6',
     darkColor: '#2563EB',
     lightBg: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    descriptionDe: 'Historisches Faktenwissen (Omniscience v1 aus Spalte W). Nur im Zeitreihendiagramm verfügbar.',
-    descriptionEn: 'Historical Science Knowledge (Omniscience v1 from Column W). Available exclusively in the timeline chart.',
+    descriptionDe: 'Historisches Faktenwissen (Omniscience v1). Nur im Zeitreihendiagramm verfügbar.',
+    descriptionEn: 'Historical Science Knowledge (Omniscience v1). Available exclusively in the timeline chart.',
     formulaDesc: 'W',
     weightPct: 0,
     transform: (val: number) => Math.max(0, Math.min(100, val)),
@@ -209,8 +209,8 @@ export const RETIRED_TIMELINE_BENCHMARKS: BenchmarkComponent[] = [
     color: '#6366F1',
     darkColor: '#4F46E5',
     lightBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
-    descriptionDe: 'Historische SimpleBench Trickfragen (aus Spalte X, skaliert: 1.2 × (X - 16.67)). Nur im Zeitreihendiagramm verfügbar.',
-    descriptionEn: 'Historical SimpleBench Trick Questions (from Column X, rescaled: 1.2 × (X - 16.67)). Available exclusively in the timeline chart.',
+    descriptionDe: 'Historische SimpleBench Trickfragen (umskaliert: 1,2 × (Score - 16,67)). Nur im Zeitreihendiagramm verfügbar.',
+    descriptionEn: 'Historical SimpleBench Trick Questions (rescaled: 1.2 × (Score - 16.67)). Available exclusively in the timeline chart.',
     formulaDesc: '1.2 × (X - 16.67)',
     weightPct: 0,
     transform: (val: number) => Math.max(0, Math.min(100, 1.2 * (val - 16.6666))),
@@ -245,9 +245,9 @@ export function getBenchmarkCategoryLabel(
   if (compFallback && (compFallback.id.endsWith('Old') || compFallback.key.endsWith('Old'))) {
     return compFallback.nameDe;
   }
-  if (lower.includes('iqold') || lower.includes('iq (alt')) return 'IQ (Alt, v4.3)';
-  if (lower.includes('nonhalluold') || lower.includes('faktentreue (alt')) return 'Faktentreue (Alt, v1)';
-  if (lower.includes('scienceknowledgeold') || lower.includes('faktenwissen (alt')) return 'Faktenwissen (Alt)';
+  if (lower.includes('iqold') || lower.includes('iq (alt') || lower.includes('iq (old')) return 'IQ';
+  if (lower.includes('nonhalluold') || lower.includes('faktentreue (alt') || lower.includes('non-hallu-rate (old')) return 'Faktentreue';
+  if (lower.includes('scienceknowledgeold') || lower.includes('faktenwissen (alt') || lower.includes('science knowledge (old')) return 'Faktenwissen';
   if (lower.includes('trickquestionsold') || lower.includes('trickfragen') || lower.includes('simplebench')) return 'SimpleBench';
 
   // German: translate standard score labels into German

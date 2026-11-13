@@ -210,6 +210,7 @@ export interface TimelineDataPoint {
   name: string;
   displayName: string;
   company: string;
+  companyName?: string;
   releaseDate: string;
   timestamp: number;
   score: number;
@@ -233,5 +234,14 @@ export interface RegressionResult {
   points: RegressionPoint[];
   residualStdDev?: number;
 }
+
+export interface MultiLevelCurveResult {
+  levelId: string;
+  label: string;
+  color: string;
+  count: number;
+  regression: RegressionResult;
+}
+
 
 
