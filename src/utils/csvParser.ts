@@ -1,6 +1,7 @@
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { getCompanyMeta, getFaviconUrl } from '../data/companies';
-import { ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata, Row33Metadata } from '../types';
+import { lookupResearchedUsPrice } from '../data/usPricingData';
+import { ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata, Row33Metadata, SheetColumnLayout } from '../types';
 
 /**
  * Robust RFC-4180 CSV line parser handling quotes, embedded commas, and escaped quotes.
@@ -58,17 +59,23 @@ export function parseCsvRows(csvText: string): string[][] {
 }
 
 /**
- * Extracts sheet date (e.g. "2026-10-11") from the first lines of the CSV.
+ * Extracts sheet date (e.g. "2026-10-11") from a 2D row matrix.
  */
-export function extractSheetDate(csvText: string): string | null {
-  const rows = parseCsvRows(csvText.slice(0, 1500));
+export function extractSheetDateFromRows(rows: string[][]): string | null {
   for (let r = 0; r < Math.min(5, rows.length); r++) {
-    for (const cell of rows[r]) {
-      const match = cell.match(/(\d{4}-\d{2}-\d{2})/);
+    for (const cell of rows[r] || []) {
+      const match = String(cell || '').match(/(\d{4}-\d{2}-\d{2})/);
       if (match) return match[1];
     }
   }
   return null;
+}
+
+/**
+ * Extracts sheet date (e.g. "2026-10-11") from the first lines of the CSV.
+ */
+export function extractSheetDate(csvText: string): string | null {
+  return extractSheetDateFromRows(parseCsvRows(csvText.slice(0, 1500)));
 }
 
 export interface CsvHeaderMetadata {
@@ -132,10 +139,114 @@ export function translateHeaderToDe(titleEn: string, subtitleEn: string): { titl
 }
 
 /**
+ * Dynamically detects column indices across both pre-shift (without Col U US pricing)
+ * and post-shift (with Col U US pricing inserted after Col T DE pricing) sheet layouts.
+ */
+export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
+  const row0 = rows[0] || [];
+  const row1 = rows[1] || [];
+  const row32 = rows[32] || [];
+  const maxCols = Math.max(row0.length, row1.length, row32.length, 38);
+
+  const getHeader = (c: number) =>
+    `${row0[c] || ''} ${row1[c] || ''} ${row32[c] || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
+
+  let colDePrice = 19; // Default Col T
+  let colUsPrice: number | null = null;
+  let colIqOld: number | null = null;
+  let colNonHalluOld: number | null = null;
+  let colScienceOld: number | null = null;
+  let colTrickOld: number | null = null;
+  let colReleaseDate: number | null = null;
+  let colModelCreator: number | null = null;
+
+  for (let c = 19; c < maxCols; c++) {
+    const h01 = `${row0[c] || ''} ${row1[c] || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
+    const hAll = getHeader(c);
+    const h1 = (row1[c] || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+    if (
+      /\b(us|usa|united states)\b/i.test(h01) &&
+      (h01.includes('cost') || h01.includes('abokosten') || h01.includes('paid') || h01.includes('chat'))
+    ) {
+      if (colUsPrice === null) colUsPrice = c;
+      continue;
+    }
+
+    if (
+      (h01.includes('germany') || h01.includes('deutschland') || /\bin de\b/.test(h01) || h01.includes('abokosten')) &&
+      (h01.includes('cost') || h01.includes('paid') || h01.includes('abokosten') || h01.includes('chat'))
+    ) {
+      colDePrice = c;
+      continue;
+    }
+
+    if (colIqOld === null && (h1 === 'iq' || (h01.includes('old score') && h01.includes('iq')) || hAll.includes('aa-int-index in % v4'))) {
+      colIqOld = c;
+      continue;
+    }
+    if (colNonHalluOld === null && (h01.includes('non-hallu') || hAll.includes('non-hallu-rate v1 in %'))) {
+      colNonHalluOld = c;
+      continue;
+    }
+    if (colScienceOld === null && (h01.includes('science knowledge') || hAll.includes('omniscience v1 in pts'))) {
+      colScienceOld = c;
+      continue;
+    }
+    if (colTrickOld === null && (h01.includes('trick questions') || hAll.includes('simple-bench in %'))) {
+      colTrickOld = c;
+      continue;
+    }
+    if (colReleaseDate === null && (h1 === 'release' || h01.includes('release'))) {
+      colReleaseDate = c;
+      continue;
+    }
+    if (colModelCreator === null && (h1 === 'model creator' || h01.includes('model creator'))) {
+      colModelCreator = c;
+      continue;
+    }
+  }
+
+  const hasUsPriceCol = colUsPrice !== null;
+  const shift = hasUsPriceCol ? 1 : 0;
+
+  let colCompany = 34 + shift;
+  let colDomain = 35 + shift;
+  let colFlag = 36 + shift;
+
+  for (let r = 0; r < Math.min(5, rows.length); r++) {
+    const headerRow = rows[r];
+    if (!headerRow) continue;
+    for (let c = 0; c < headerRow.length; c++) {
+      const cell = (headerRow[c] || '').trim().toLowerCase();
+      if (cell === 'company') colCompany = c;
+      else if (cell === 'domain') colDomain = c;
+      else if (cell === 'flag') colFlag = c;
+    }
+  }
+
+  return {
+    hasUsPriceCol,
+    colDePrice,
+    colUsPrice,
+    colIqOld: colIqOld ?? (20 + shift),
+    colNonHalluOld: colNonHalluOld ?? (21 + shift),
+    colScienceOld: colScienceOld ?? (22 + shift),
+    colTrickOld: colTrickOld ?? (23 + shift),
+    colReleaseDate: colReleaseDate ?? (24 + shift),
+    colModelCreator: colModelCreator ?? (25 + shift),
+    colCompany,
+    colDomain,
+    colFlag,
+  };
+}
+
+/**
  * Extracts Row 33 synced text and source URLs from the CSV.
  * Row 33 in the Google Sheet contains the benchmark acronyms/subtitles and sources.
  */
 export function extractRow33Metadata(rows: string[][]): Row33Metadata {
+  const layout = detectSheetColumns(rows);
   let targetRow: string[] | null = null;
 
   for (let r = 0; r < Math.min(60, rows.length); r++) {
@@ -186,10 +297,10 @@ export function extractRow33Metadata(rows: string[][]): Row33Metadata {
   const colM = getCell(12, 'if hallus are a small problem');
   const colN = getCell(13, 'times non hallu-rate');
 
-  const colU = getCell(20, 'AA-Int-Index in % v4.3');
-  const colV = getCell(21, 'Non-Hallu-Rate v1 in %');
-  const colW = getCell(22, 'Omniscience v1 in PTS');
-  const colX = getCell(23, 'simple-bench in %');
+  const colU = getCell(layout.colIqOld, 'AA-Int-Index in % v4.3');
+  const colV = getCell(layout.colNonHalluOld, 'Non-Hallu-Rate v1 in %');
+  const colW = getCell(layout.colScienceOld, 'Omniscience v1 in PTS');
+  const colX = getCell(layout.colTrickOld, 'simple-bench in %');
 
   return {
     scoreNewColM: {
@@ -262,11 +373,10 @@ export function extractRow33Metadata(rows: string[][]): Row33Metadata {
 }
 
 /**
- * Extracts Title (combined A1 and B2), Subtitle (cell C1), Category Names (cells D2 to K2),
- * and Row 33 synced benchmark metadata directly from CSV.
+ * Extracts Title (A1), Subtitle (C1), Category Names (D2:K2),
+ * and Row 33 synced benchmark metadata directly from a 2D row matrix.
  */
-export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
-  const rows = parseCsvRows(csvText);
+export function extractHeaderMetadataFromRows(rows: string[][]): CsvHeaderMetadata {
   const cellA1 = (rows[0]?.[0] || 'Science-IQ of ChatBots').trim();
   const rawB2 = (rows[1]?.[1] || '').trim();
   const cellB2 = rawB2
@@ -275,10 +385,8 @@ export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
     .replace(/\s+/g, ' ')
     .trim();
   const cellC1 = (rows[0]?.[2] || '').trim();
-  // Title is strictly cell A1 (cell B2 is excluded as requested)
   const combinedTitle = cellA1;
 
-  // Extract category names from row 1, cols 3 to 10 (cells D2 to K2)
   const categoryNames: string[] = [];
   const row1 = rows[1] || [];
   for (let c = 3; c <= 10; c++) {
@@ -305,11 +413,18 @@ export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
 }
 
 /**
- * Extracts Section 1 (Cell A34 title & Cell C34 content) and Section 2 (Cell N34 title & Cell O34 content)
- * directly from CSV, ensuring full synchronization with user updates in Google Sheets.
+ * Extracts Title (combined A1 and B2), Subtitle (cell C1), Category Names (cells D2 to K2),
+ * and Row 33 synced benchmark metadata directly from CSV.
  */
-export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
-  const rows = parseCsvRows(csvText);
+export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
+  return extractHeaderMetadataFromRows(parseCsvRows(csvText));
+}
+
+/**
+ * Extracts Section 1 (Cell A34 title & Cell C34 content) and Section 2 (Cell N34 title & Cell O34 content)
+ * directly from a 2D row matrix.
+ */
+export function extractCsvNotesMetadataFromRows(rows: string[][]): CsvNotesMetadata {
   let notesRow: string[] | null = null;
 
   // 1. Direct check at Row 34 (row index 33 in 0-based indexing)
@@ -383,6 +498,72 @@ export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
   };
 }
 
+export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
+  return extractCsvNotesMetadataFromRows(parseCsvRows(csvText));
+}
+
+/**
+ * Locates key 1-based structural row numbers in the main sheet for safe row insertion & notes updates.
+ */
+export function findSheetStructuralRows(rows: string[][]): {
+  historyStartRow: number;
+  sourcesNotesRow: number | null;
+  notesRow: number;
+} {
+  let historyStartIndex = 35;
+  let matchedHistoryLabel = false;
+  for (let r = 0; r < Math.min(45, rows.length); r++) {
+    const b = (rows[r]?.[1] || '').trim().toLowerCase();
+    if (b === 'history') {
+      historyStartIndex = r + 1;
+      matchedHistoryLabel = true;
+      break;
+    }
+  }
+  if (!matchedHistoryLabel) {
+    for (let r = 0; r < Math.min(45, rows.length); r++) {
+      const c = (rows[r]?.[2] || '').trim().toLowerCase();
+      if (c.includes('full timeline') && c.length < 200) {
+        historyStartIndex = r + 1;
+        break;
+      }
+    }
+  }
+
+  let sourcesNotesRow: number | null = null;
+  for (let r = historyStartIndex; r < rows.length; r++) {
+    const rawNameCell = (rows[r]?.[1] || '').trim();
+    const rawCreatorCell = (rows[r]?.[2] || '').trim();
+    if (
+      rawNameCell.includes('Sources & Notes') ||
+      rawCreatorCell.includes('Sources & Notes') ||
+      rawCreatorCell === 'min' ||
+      rawNameCell === 'min'
+    ) {
+      sourcesNotesRow = r + 1;
+      break;
+    }
+  }
+
+  let notesRow = 34;
+  for (let i = 10; i < Math.min(120, rows.length); i++) {
+    const r = rows[i] || [];
+    const col0 = (r[0] || '').toLowerCase();
+    const col1 = (r[1] || '').toLowerCase();
+    const col2 = r[2] || '';
+    if (col0.includes('how to read') || col1.includes('how to read') || col2.length > 500) {
+      notesRow = i + 1;
+      break;
+    }
+  }
+
+  return {
+    historyStartRow: historyStartIndex + 1,
+    sourcesNotesRow,
+    notesRow,
+  };
+}
+
 /**
  * Parse numeric string safely, supporting European commas like "81,6" or "-40"
  */
@@ -425,8 +606,7 @@ function extractFlag(text: string): { flag: string; cleanText: string } {
  * - Stops at summary / notes rows (Sources & Notes, min, mean, median, max, count).
  * - Treats empty cells as missing (null) rather than zero.
  */
-export function parseAllModels(csvText: string): ModelRecord[] {
-  const rows = parseCsvRows(csvText);
+export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
   if (rows.length < 3) return [];
 
   // 1. Current bot names from top table (rows 2 to 31)
@@ -440,22 +620,12 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     if (b) currentBotNames.add(b);
   }
 
-  // 2. Parse dynamic company lookup table from Column AI (index 34: Company), AJ (index 35: Domain), AK (index 36: Flag)
-  // Check header row 2 (index 1) or row 1 (index 0) for column indices dynamically
-  let colCompany = 34; // default Col AI (0-indexed 34)
-  let colDomain = 35;  // default Col AJ (0-indexed 35)
-  let colFlag = 36;    // default Col AK (0-indexed 36)
+  const layout = detectSheetColumns(rows);
 
-  for (let r = 0; r < Math.min(5, rows.length); r++) {
-    const headerRow = rows[r];
-    if (!headerRow) continue;
-    for (let c = 0; c < headerRow.length; c++) {
-      const cell = (headerRow[c] || '').trim().toLowerCase();
-      if (cell === 'company') colCompany = c;
-      else if (cell === 'domain') colDomain = c;
-      else if (cell === 'flag') colFlag = c;
-    }
-  }
+  // 2. Parse dynamic company lookup table (Company, Domain, Flag)
+  const colCompany = layout.colCompany;
+  const colDomain = layout.colDomain;
+  const colFlag = layout.colFlag;
 
   // Helper to extract clean domain: strip http://, https://, www., and trailing slashes/paths
   const sanitizeDomain = (rawDomain: string): string => {
@@ -481,45 +651,67 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     }
   }
 
-  // 3. Pre-collect Column T (index 19: monthly cost in Germany) — or legacy Column AL (index 37) only if AL is actually the pricing column
-  const colTHeader = `${rows[0]?.[19] || ''} ${rows[1]?.[19] || ''}`.toLowerCase();
+  // 3. Pre-collect DE pricing (Col T) and US pricing (Col U when present) across top & history tables
+  const colDeHeader = `${rows[0]?.[layout.colDePrice] || ''} ${rows[1]?.[layout.colDePrice] || ''}`.toLowerCase();
   const colALHeader = `${rows[0]?.[37] || ''} ${rows[1]?.[37] || ''}`.toLowerCase();
-  const useColTPricing = colTHeader.includes('cost') || colTHeader.includes('abokosten') || colTHeader.includes('paid') || !colTHeader.includes('creator');
-  const useColALPricing = !useColTPricing && (colALHeader.includes('abokosten') || colALHeader.includes('cost'));
+  const useColDePricing = colDeHeader.includes('cost') || colDeHeader.includes('abokosten') || colDeHeader.includes('paid') || !colDeHeader.includes('creator');
+  const useColALPricing = !layout.hasUsPriceCol && !useColDePricing && (colALHeader.includes('abokosten') || colALHeader.includes('cost'));
 
   const isPriceHeaderText = (v: string) => {
     const low = v.toLowerCase();
     return low.includes('abokosten') || low.includes('creator') || low.includes('release') || low.includes('monthly cost') || low.includes('if paid');
   };
 
-  const colPriceMap = new Map<string, string>();
+  const colDePriceMap = new Map<string, string>();
+  const colUsPriceMap = new Map<string, string>();
+
   for (let r = 2; r < rows.length; r++) {
     const row = rows[r];
     if (!row) continue;
-    const valT = useColTPricing ? (row[19] || '').trim() : '';
-    const valAL = useColALPricing ? (row[37] || '').trim() : '';
-    const val = (valT && !isPriceHeaderText(valT))
-      ? valT
-      : (valAL && !isPriceHeaderText(valAL))
-        ? valAL
+
+    const s = (row[18] || '').trim().toLowerCase();
+    const b = (row[1] || '').trim().toLowerCase();
+    const { cleanText: cleanB } = extractFlag(b);
+
+    const valDePrimary = useColDePricing ? (row[layout.colDePrice] || '').trim() : '';
+    const valDeLegacy = useColALPricing ? (row[37] || '').trim() : '';
+    const valDe = (valDePrimary && !isPriceHeaderText(valDePrimary))
+      ? valDePrimary
+      : (valDeLegacy && !isPriceHeaderText(valDeLegacy))
+        ? valDeLegacy
         : '';
-    if (val) {
-      const s = (row[18] || '').trim().toLowerCase();
-      const b = (row[1] || '').trim().toLowerCase();
-      const { cleanText: cleanB } = extractFlag(b);
-      if (s) colPriceMap.set(s, val);
-      if (cleanB) colPriceMap.set(cleanB.toLowerCase(), val);
+    if (valDe) {
+      if (s) colDePriceMap.set(s, valDe);
+      if (cleanB) colDePriceMap.set(cleanB.toLowerCase(), valDe);
+    }
+
+    if (layout.colUsPrice !== null) {
+      const valUsRaw = (row[layout.colUsPrice] || '').trim();
+      if (valUsRaw && !isPriceHeaderText(valUsRaw)) {
+        if (s) colUsPriceMap.set(s, valUsRaw);
+        if (cleanB) colUsPriceMap.set(cleanB.toLowerCase(), valUsRaw);
+      }
     }
   }
 
   // 4. Locate start of history table: Row 36 (index 35) or row after "History"
   let startIndex = 35; // Row 36 in 1-based indexing
+  let matchedHistoryStart = false;
   for (let r = 0; r < Math.min(45, rows.length); r++) {
     const b = (rows[r]?.[1] || '').trim().toLowerCase();
-    const c = (rows[r]?.[2] || '').trim().toLowerCase();
-    if (b === 'history' || c.includes('full timeline')) {
+    if (b === 'history') {
       startIndex = r + 1;
+      matchedHistoryStart = true;
       break;
+    }
+  }
+  if (!matchedHistoryStart) {
+    for (let r = 0; r < Math.min(45, rows.length); r++) {
+      const c = (rows[r]?.[2] || '').trim().toLowerCase();
+      if (c.includes('full timeline') && c.length < 200) {
+        startIndex = r + 1;
+        break;
+      }
     }
   }
 
@@ -565,7 +757,7 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     let lookupDomain = '';
     let lookupCompName = '';
     const creatorLow = cleanedCreator.toLowerCase().trim();
-    const colZLow = (row[25] || '').toLowerCase().trim(); // Column Z is model creator
+    const colZLow = (row[layout.colModelCreator] || '').toLowerCase().trim(); // Dynamic model creator column (Z or AA)
     const nameLow = cleanedName.toLowerCase().trim();
 
     for (const [key, info] of Object.entries(companyLookupMap)) {
@@ -614,11 +806,11 @@ export function parseAllModels(csvText: string): ModelRecord[] {
     const valJ = parseNum(row[9]);
     const valK = parseNum(row[10]);
 
-    // Parse Retired Benchmark Columns (U through X: IQ_old, Non-Hallu-Rate_old, Science Knowledge_old, Trick Questions_old)
-    const valU = parseNum(row[20]); // Col U
-    const valV = parseNum(row[21]); // Col V
-    const valW = parseNum(row[22]); // Col W
-    const valX = parseNum(row[23]); // Col X
+    // Parse Retired Benchmark Columns dynamically (IQ_old, Non-Hallu-Rate_old, Science Knowledge_old, Trick Questions_old)
+    const valU = parseNum(row[layout.colIqOld]);
+    const valV = parseNum(row[layout.colNonHalluOld]);
+    const valW = parseNum(row[layout.colScienceOld]);
+    const valX = parseNum(row[layout.colTrickOld]);
 
     // Benchmark raw scores
     const rawScores: RawBenchmarkScores = {
@@ -700,8 +892,8 @@ export function parseAllModels(csvText: string): ModelRecord[] {
 
     const faviconUrl = getFaviconUrl(company.domain);
 
-    // Release date from Column Y (index 24) with robust fallback
-    const rawReleaseDate = (row[24] || '').trim();
+    // Release date from dynamic release column (Col Y or Col Z) with robust fallback
+    const rawReleaseDate = (row[layout.colReleaseDate] || '').trim();
     let releaseDate = rawReleaseDate;
     if (!releaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
       const combined = `${rawCreatorCell} ${rawNameCell}`;
@@ -731,13 +923,23 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       currentBotNames.has(cleanedName.toLowerCase()) ||
       (!isSupersededOrDiscontinued && (chatLinkLow.startsWith('http') || chatLinkLow.includes('paid') || chatLinkLow.includes('api') || !!parsedApiLink));
 
-    const rawColT = useColTPricing ? (row[19] || '').trim() : '';
+    const rawColDe = useColDePricing ? (row[layout.colDePrice] || '').trim() : '';
     const rawColAL = useColALPricing ? (row[37] || '').trim() : '';
-    const priceDeMonthly = (rawColT && !isPriceHeaderText(rawColT))
-      ? rawColT
+    const priceDeMonthly = (rawColDe && !isPriceHeaderText(rawColDe))
+      ? rawColDe
       : (rawColAL && !isPriceHeaderText(rawColAL))
         ? rawColAL
-        : colPriceMap.get(displayName.toLowerCase()) || colPriceMap.get(cleanedName.toLowerCase()) || undefined;
+        : colDePriceMap.get(displayName.toLowerCase()) || colDePriceMap.get(cleanedName.toLowerCase()) || undefined;
+
+    let priceUsMonthly: string | undefined;
+    if (layout.colUsPrice !== null) {
+      const rawColUs = (row[layout.colUsPrice] || '').trim();
+      priceUsMonthly = (rawColUs && !isPriceHeaderText(rawColUs))
+        ? rawColUs
+        : colUsPriceMap.get(displayName.toLowerCase()) || colUsPriceMap.get(cleanedName.toLowerCase()) || undefined;
+    } else {
+      priceUsMonthly = lookupResearchedUsPrice(displayName, rawNameCell);
+    }
 
     allModels.push({
       id: `model-${r}-${displayName.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
@@ -776,10 +978,16 @@ export function parseAllModels(csvText: string): ModelRecord[] {
       companyColor: company.color,
       faviconUrl,
       priceDeMonthly: priceDeMonthly || undefined,
+      priceUsMonthly: priceUsMonthly || undefined,
+      sheetRowNumber: r + 1,
     });
   }
 
   return allModels;
+}
+
+export function parseAllModels(csvText: string): ModelRecord[] {
+  return parseAllModelsFromRows(parseCsvRows(csvText));
 }
 
 /**
@@ -855,8 +1063,8 @@ export function createModelBreakdown(
  * - 'old': strictly models with Col L ("OLD Score"), recalculating segment breakdown to match target score
  * - 'worstCase': strictly models with Col N ("Worst Case Score"), recalculating segment breakdown to match target score
  */
-export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): ModelRecord[] {
-  const all = parseAllModels(csvText);
+export function parseModelDatasetFromRows(rows: string[][], mode: ScoreMode = 'new'): ModelRecord[] {
+  const all = parseAllModelsFromRows(rows);
 
   let filtered: ModelRecord[] = [];
   if (mode === 'old') {
@@ -906,4 +1114,8 @@ export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): Mod
   });
 
   return filtered;
+}
+
+export function parseModelDataset(csvText: string, mode: ScoreMode = 'new'): ModelRecord[] {
+  return parseModelDatasetFromRows(parseCsvRows(csvText), mode);
 }

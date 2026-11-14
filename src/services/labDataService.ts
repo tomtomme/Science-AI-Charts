@@ -1,6 +1,13 @@
 import { LabEntry } from '../types';
 import { parseCsvRows } from '../utils/csvParser';
 import { DIRECT_EXPORT_LAB_CSV_URL, FALLBACK_LAB_ENTRIES, RAW_LAB_CSV_URL } from '../data/rawLabCsvFallback';
+import {
+  DEFAULT_SPREADSHEET_ID,
+  LABS_SHEET_GID,
+  fetchSpreadsheetMetadata,
+  fetchSheetValues,
+  resolveSheetTab,
+} from './googleSheetsService';
 
 const flagMap: Record<string, string> = {
   'America (US)': '🇺🇸',
@@ -43,8 +50,7 @@ export function normalizeCountry(raw: string): { country: string; flag: string }
   };
 }
 
-export function parseLabCsv(csvText: string): LabEntry[] {
-  const rows = parseCsvRows(csvText);
+export function parseLabRows(rows: string[][]): LabEntry[] {
   if (rows.length < 17) {
     return FALLBACK_LAB_ENTRIES;
   }
@@ -476,12 +482,36 @@ export function parseLabCsv(csvText: string): LabEntry[] {
   return all.length > 0 ? all : FALLBACK_LAB_ENTRIES;
 }
 
-export async function fetchLiveLabEntries(): Promise<{
+export function parseLabCsv(csvText: string): LabEntry[] {
+  return parseLabRows(parseCsvRows(csvText));
+}
+
+export async function fetchLiveLabEntries(options?: {
+  accessToken?: string | null;
+  spreadsheetId?: string;
+}): Promise<{
   entries: LabEntry[];
   isLive: boolean;
+  dataSource: 'sheets_api' | 'csv' | 'fallback';
 }> {
+  const accessToken = options?.accessToken;
+  const spreadsheetId = options?.spreadsheetId || DEFAULT_SPREADSHEET_ID;
+
+  if (accessToken) {
+    try {
+      const meta = await fetchSpreadsheetMetadata(spreadsheetId, accessToken);
+      const tab = meta.sheets.find((s) => s.sheetId === LABS_SHEET_GID) || resolveSheetTab(meta, LABS_SHEET_GID);
+      const rows = await fetchSheetValues(spreadsheetId, tab.title, accessToken, 'FORMATTED_VALUE');
+      const parsed = parseLabRows(rows);
+      if (parsed.length > 0) {
+        return { entries: parsed, isLive: true, dataSource: 'sheets_api' };
+      }
+    } catch (err) {
+      console.warn('Failed fetching lab data via Google Sheets API:', err);
+    }
+  }
+
   const cacheBuster = `_t=${Date.now()}`;
-  // Prioritize published CSV URL first as it consistently allows cross-origin requests
   const endpoints = [
     `${RAW_LAB_CSV_URL}&${cacheBuster}`,
     `${DIRECT_EXPORT_LAB_CSV_URL}&${cacheBuster}`,
@@ -506,7 +536,7 @@ export async function fetchLiveLabEntries(): Promise<{
         if (!text.includes('<HTML>') && !text.includes('<!DOCTYPE') && text.length >= 200) {
           const parsed = parseLabCsv(text);
           if (parsed.length > 0) {
-            return { entries: parsed, isLive: true };
+            return { entries: parsed, isLive: true, dataSource: 'csv' };
           }
         }
       }
@@ -515,5 +545,5 @@ export async function fetchLiveLabEntries(): Promise<{
     }
   }
 
-  return { entries: FALLBACK_LAB_ENTRIES, isLive: false };
+  return { entries: FALLBACK_LAB_ENTRIES, isLive: false, dataSource: 'fallback' };
 }

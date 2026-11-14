@@ -496,7 +496,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     return 'url(#pattern-usa)';
   };
 
-  // Parses CSV Column T: min. Abokosten/Monat für Chatzugriff in DE (or availability note like 'US only')
+  // Parses language-matched pricing cell: Col T in DE (€) or Col U in EN ($), or availability note
   interface PriceColInfo {
     type: 'price' | 'note' | 'none';
     text: string;
@@ -505,10 +505,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     tooltipText: string;
   }
 
-  const getPriceColInfo = (raw: string | undefined): PriceColInfo => {
+  const getPriceColInfo = (raw: string | undefined, expectedRegion: 'de' | 'us' = lang === 'de' ? 'de' : 'us'): PriceColInfo => {
     if (!raw) return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
     const clean = raw.trim();
-    if (!clean || clean === '-' || clean.toLowerCase() === 'n/a' || clean.toLowerCase().includes('abokosten')) {
+    if (!clean || clean === '-' || clean.toLowerCase() === 'n/a' || clean.toLowerCase().includes('abokosten') || clean.toLowerCase().includes('monthly cost')) {
       return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
     }
 
@@ -532,10 +532,31 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       };
     }
 
+    if (clean.includes('$')) {
+      const compactPrice = clean.replace(/\s*\$/g, '$').replace(/\$\s+/g, '$');
+      const amountOnly = compactPrice.replace(/\$/g, '').trim();
+      const isRange = /[-–—]/.test(amountOnly);
+      const priceLine = isDe ? `${amountOnly} $ / Monat` : `$${amountOnly} / month`;
+      const rangeSuffix = isRange
+        ? (isDe
+            ? '\nbei Zahlung für 1 Jahr vs. monatlicher Zahlung'
+            : '\nif paid for 1 year vs. if paid monthly')
+        : '';
+      return {
+        type: 'price',
+        text: clean,
+        displayPrice: compactPrice,
+        tooltipTitle: isDe ? 'Chatzugriff in US' : 'Chat access in US',
+        tooltipText: `${priceLine}${rangeSuffix}`,
+      };
+    }
+
     return {
       type: 'note',
       text: clean,
-      tooltipTitle: isDe ? 'Verfügbarkeit / Hinweis' : 'Availability / Notice',
+      tooltipTitle: expectedRegion === 'us'
+        ? (isDe ? 'Verfügbarkeit US / Hinweis' : 'US Availability / Notice')
+        : (isDe ? 'Verfügbarkeit / Hinweis' : 'Availability / Notice'),
       tooltipText: clean,
     };
   };
@@ -681,7 +702,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         barTopY = exploded && topSegment ? topSegment.segY : (baselineY - totalBarHeight);
       }
 
-      const priceInfo = getPriceColInfo(model.priceDeMonthly);
+      const activeRegionPriceRaw = lang === 'de' ? model.priceDeMonthly : model.priceUsMonthly;
+      const priceInfo = getPriceColInfo(activeRegionPriceRaw, lang === 'de' ? 'de' : 'us');
       const isBelowBar = catRaw < 0 && isScienceKnowledge;
       let basePriceY = barTopY - 8;
       if (activeComp && totalBarHeight < 36) {
@@ -863,8 +885,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   </>
                 )}
 
-                {displayedModel.priceDeMonthly && (() => {
-                  const pInfo = getPriceColInfo(displayedModel.priceDeMonthly);
+                {(() => {
+                  const activeDisplayedPriceRaw = lang === 'de' ? displayedModel.priceDeMonthly : displayedModel.priceUsMonthly;
+                  if (!activeDisplayedPriceRaw) return null;
+                  const pInfo = getPriceColInfo(activeDisplayedPriceRaw, lang === 'de' ? 'de' : 'us');
                   if (pInfo.type === 'note') {
                     return (
                       <>

@@ -211,14 +211,14 @@ export const TRANSLATIONS = {
     priceFree: 'Free',
     priceFreeApi: 'Free API',
     priceFreeChat: 'Free Chat OR API',
-    pricePaid: '€',
+    pricePaid: '$',
     priceAll: 'All',
     priceFreeDesc: 'Show only free chatbots',
     priceFreeApiDesc: 'Only models with free API access (🌐, e.g. for JASP or AI agents)',
     priceFreeChatDesc: 'Free to use in web chat OR with free API',
-    pricePaidDesc: 'Paid chatbots only (€, subscription/paid tier)',
+    pricePaidDesc: 'Paid chatbots only ($, subscription/paid tier)',
     priceAllDesc: 'Show all chatbots (free & paid)',
-    priceFilterDesc: 'Switch between Free API, Free Chat OR API, Paid (€), and all chatbots',
+    priceFilterDesc: 'Switch between Free API, Free Chat OR API, Paid ($), and all chatbots',
 
     // Search & Filters
     searchPlaceholder: 'Filter by company or LLM family (e.g. ChatGPT, Claude, Gemini, Kimi, MiMo)...',

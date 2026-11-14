@@ -85,7 +85,24 @@ export interface ModelRecord {
   companyDomain: string;
   companyColor: string;
   faviconUrl: string;
-  priceDeMonthly?: string; // Col AL: min. Abokosten/Monat für Chatzugriff in DE (or availability note like 'US only')
+  priceDeMonthly?: string; // Col T: min. Abokosten/Monat für Chatzugriff in DE (or availability note like 'US only')
+  priceUsMonthly?: string; // Col U: monthly cost for chat in US (if paid for 1 year vs. if paid monthly)
+  sheetRowNumber?: number; // 1-based row index in Google Sheet for direct cell updates
+}
+
+export interface SheetColumnLayout {
+  hasUsPriceCol: boolean;
+  colDePrice: number;
+  colUsPrice: number | null;
+  colIqOld: number;
+  colNonHalluOld: number;
+  colScienceOld: number;
+  colTrickOld: number;
+  colReleaseDate: number;
+  colModelCreator: number;
+  colCompany: number;
+  colDomain: number;
+  colFlag: number;
 }
 
 export interface CompanyInfo {

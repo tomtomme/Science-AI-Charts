@@ -609,14 +609,14 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             }
           >
             <div
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+              className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border transition-all ${
                 isLinearModel
                   ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
                   : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
               }`}
             >
               <span className="text-xs font-bold text-slate-500 uppercase">r:</span>
-              <span className="font-mono text-xs font-extrabold" style={{ color: pearsonResult.color }}>
+              <span className="text-xs font-extrabold tabular-nums" style={{ color: pearsonResult.color }}>
                 {pearsonResult.value >= 0 ? '+' : ''}
                 {pearsonResult.value.toFixed(2)}
               </span>
@@ -639,14 +639,14 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             }
           >
             <div
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+              className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border transition-all ${
                 !isLinearModel
                   ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
                   : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
               }`}
             >
               <span className="text-xs font-bold text-slate-500 uppercase">Rho:</span>
-              <span className="font-mono text-xs font-extrabold" style={{ color: spearmanResult.color }}>
+              <span className="text-xs font-extrabold tabular-nums" style={{ color: spearmanResult.color }}>
                 {spearmanResult.value >= 0 ? '+' : ''}
                 {spearmanResult.value.toFixed(2)}
               </span>
