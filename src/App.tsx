@@ -892,7 +892,16 @@ export default function App() {
         if (status.lastError) {
           setPricingCheckError(status.lastError);
         }
-        if (dailyAutoCheckEnabled && status.isDue && status.hasGeminiKey && !status.isRunning) {
+        const inCooldown =
+          Boolean(status.cooldownUntil) && new Date(status.cooldownUntil as string).getTime() > Date.now();
+        if (
+          dailyAutoCheckEnabled &&
+          status.isDue &&
+          status.hasGeminiKey &&
+          !status.isRunning &&
+          !status.lastError &&
+          !inCooldown
+        ) {
           await handleRunPricingCheck('daily_auto');
         }
       } catch {
@@ -959,187 +968,8 @@ export default function App() {
             </Tooltip>
           </div>
 
-          {/* Controls, sync, date, language toggle & external link icons */}
+          {/* Language, Glossary & Theme Controls */}
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono shrink-0 self-start xl:self-center">
-            {/* Synchronisieren-Button mit einheitlichem Tooltip */}
-            <Tooltip
-              title="Google Sheets Sync"
-              badge={
-                isSyncing
-                  ? t.syncingText
-                  : loadedData.dataSource === 'sheets_api'
-                  ? 'Sheets API'
-                  : loadedData.isLive
-                  ? 'CSV Live'
-                  : 'Fallback'
-              }
-              content={
-                <div className="flex flex-col gap-1.5 text-xs">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-slate-400 font-medium">{t.lastSync}:</span>
-                    <span className="font-mono text-emerald-400 font-bold">{formatSyncDate(lastSyncedAt)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-slate-400 font-medium">{lang === 'de' ? 'Quelle:' : 'Source:'}</span>
-                    <span className="font-mono text-blue-300 font-semibold">
-                      {loadedData.dataSource === 'sheets_api'
-                        ? `Google Sheets API (${loadedData.activeSheetTitle || 'Live'})`
-                        : loadedData.dataSource === 'csv'
-                        ? 'Public CSV'
-                        : 'Embedded Snapshot'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400 border-t border-slate-700/60 pt-1 leading-normal">
-                    {t.autoSyncNotice}
-                  </div>
-                </div>
-              }
-              align="center"
-              width="w-64"
-            >
-              <button
-                type="button"
-                onClick={() => refreshData()}
-                disabled={isSyncing}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer disabled:opacity-50"
-                aria-label={t.syncButtonTitle}
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-blue-500' : loadedData.dataSource === 'sheets_api' ? 'text-emerald-500' : ''}`} />
-                <span>{t.sync}</span>
-              </button>
-            </Tooltip>
-
-            {/* Google Sign-In / Connected Google Sheets Controls */}
-            {oauthAccessToken ? (
-              <div className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-lg p-0.5">
-                <Tooltip
-                  title={lang === 'de' ? 'Mit Google Sheets API verbunden' : 'Connected to Google Sheets API'}
-                  badge="Read + Write"
-                  content={
-                    lang === 'de'
-                      ? `Angemeldet als ${authUser?.email || authUser?.displayName || 'Google-Konto'}. Daten werden direkt über die Google Sheets API geladen und können bearbeitet werden.`
-                      : `Signed in as ${authUser?.email || authUser?.displayName || 'Google account'}. Data is loaded directly via Google Sheets API and can be written back.`
-                  }
-                  align="center"
-                  width="w-72"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setIsSheetModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <Pencil className="w-3 h-3" />
-                    <span>{lang === 'de' ? 'Sheet bearbeiten' : 'Edit Sheet'}</span>
-                  </button>
-                </Tooltip>
-                <Tooltip
-                  content={lang === 'de' ? 'Von Google abmelden' : 'Sign out of Google'}
-                  align="center"
-                  width="w-40"
-                >
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignOut}
-                    className="p-1 rounded-md text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                    aria-label={lang === 'de' ? 'Abmelden' : 'Sign out'}
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                </Tooltip>
-              </div>
-            ) : (
-              <Tooltip
-                title={lang === 'de' ? 'Google Sheets direkt verbinden' : 'Connect Google Sheets Directly'}
-                badge="OAuth"
-                content={
-                  lang === 'de'
-                    ? 'Melden Sie sich mit Google an, um das Google Sheet direkt über die API (statt CSV) zu lesen und Änderungen zu schreiben.'
-                    : 'Sign in with Google to read the Google Sheet directly via API (instead of CSV) and write updates directly to it.'
-                }
-                align="center"
-                width="w-72"
-              >
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={isSigningIn}
-                  className="gsi-material-button"
-                >
-                  <div className="gsi-material-button-state"></div>
-                  <div className="gsi-material-button-content-wrapper">
-                    <div className="gsi-material-button-icon">
-                      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style={{ display: 'block' }}>
-                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                        <path fill="none" d="M0 0h48v48H0z" />
-                      </svg>
-                    </div>
-                    <span className="gsi-material-button-contents">
-                      {isSigningIn ? (lang === 'de' ? 'Verbinde…' : 'Connecting…') : 'Sign in with Google'}
-                    </span>
-                  </div>
-                </button>
-              </Tooltip>
-            )}
-
-            {/* In-App Daily Pricing Monitor Button (Meta, OpenAI, Anthropic, Google) */}
-            <Tooltip
-              title={lang === 'de' ? 'Täglicher KI-Preis-Monitor' : 'Daily AI Pricing Monitor'}
-              badge={
-                isCheckingPricing
-                  ? lang === 'de'
-                    ? 'Prüfe…'
-                    : 'Checking…'
-                  : pricingReport && pricingReport.changedCount > 0
-                  ? `${pricingReport.changedCount} ${lang === 'de' ? 'Änderung(en)' : 'Change(s)'}`
-                  : pricingReport
-                  ? 'OK'
-                  : '24h'
-              }
-              content={
-                pricingReport
-                  ? lang === 'de'
-                    ? `${pricingReport.summaryDe} Klicken für Details & direkten Sheet-Abgleich.`
-                    : `${pricingReport.summaryEn} Click for details & Sheet comparison.`
-                  : lang === 'de'
-                  ? 'Prüft täglich DE- (€) und US-Preise ($) für Meta, OpenAI, Anthropic und Google direkt in der App.'
-                  : 'Checks DE (€) and US ($) pricing daily for Meta, OpenAI, Anthropic, and Google right inside the app.'
-              }
-              align="center"
-              width="w-72"
-            >
-              <button
-                type="button"
-                onClick={() => setIsPricingModalOpen(true)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer border ${
-                  pricingReport && pricingReport.changedCount > 0
-                    ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50'
-                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-                aria-label={lang === 'de' ? 'KI-Preis-Monitor öffnen' : 'Open AI pricing monitor'}
-              >
-                <Bell
-                  className={`w-3.5 h-3.5 ${
-                    isCheckingPricing
-                      ? 'animate-pulse text-blue-500'
-                      : pricingReport && pricingReport.changedCount > 0
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : pricingReport
-                      ? 'text-emerald-500'
-                      : 'text-slate-500'
-                  }`}
-                />
-                <span>{lang === 'de' ? 'Preis-Monitor' : 'Price Monitor'}</span>
-                {pricingReport && pricingReport.changedCount > 0 && (
-                  <span className="px-1.5 py-0 rounded-full text-[10px] font-mono font-bold bg-amber-600 text-white">
-                    {pricingReport.changedCount}
-                  </span>
-                )}
-              </button>
-            </Tooltip>
 
             {/* Glossar-Knopf direkt in der obersten Zeile zwischen Sync und DE/EN */}
             <Tooltip
@@ -1156,11 +986,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={scrollToGlossary}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer font-medium text-xs border border-slate-200/80 dark:border-slate-700/80"
+                className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center"
                 aria-label={lang === 'de' ? 'Glossar öffnen' : 'Open glossary'}
               >
                 <BookOpen className="w-3.5 h-3.5 text-blue-500" />
-                <span>{lang === 'de' ? 'Glossar' : 'Glossary'}</span>
               </button>
             </Tooltip>
 
@@ -1327,37 +1156,6 @@ export default function App() {
             )}
 
 
-            <Tooltip
-              content={t.googleSheetOpen}
-              align="right"
-              width="w-44"
-            >
-              <a
-                href={`https://docs.google.com/spreadsheets/d/${activeSpreadsheetId}/edit?gid=${loadedData.activeSheetId ?? 170267419}#gid=${loadedData.activeSheetId ?? 170267419}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
-                aria-label={t.googleSheetOpen}
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-              </a>
-            </Tooltip>
-
-            <Tooltip
-              content={t.githubRepoOpen}
-              align="right"
-              width="w-36"
-            >
-              <a
-                href={GITHUB_REPO_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
-                aria-label={t.githubRepoOpen}
-              >
-                <Github className="w-4 h-4" />
-              </a>
-            </Tooltip>
           </div>
         </div>
       </header>
@@ -1877,11 +1675,11 @@ export default function App() {
                   content={
                     isTimelineMultiLevelFeasible
                       ? lang === 'de'
-                        ? 'Schätzt eine hierarchische Multi-Level-Regression (Partial Pooling) mit eigener Trendkurve pro KI-Labor.'
-                        : 'Fits a hierarchical multi-level regression (partial pooling) with separate trajectory curves per LLM lab company.'
+                        ? 'Schätzt pro KI-Labor eine eigene Trendkurve (Partial Pooling für Regression/LOESS bzw. Lab-Frontier für Pioniere).'
+                        : 'Fits separate per-lab trajectory curves (partial pooling for regression/LOESS, per-lab frontier envelopes for Pioneers).'
                       : lang === 'de'
-                      ? 'Multi-Level-Regression ist für Linear, Exponential, Power und Polynom verfügbar – nicht für LOESS oder Pioniere.'
-                      : 'Multi-level regression is available for Linear, Exponential, Power, and Polynomial models — not feasible for LOESS or Pioneers.'
+                      ? 'Multi-Level-Ansicht ist für dieses Modell nicht verfügbar.'
+                      : 'Multi-level view is not available for this model.'
                   }
                 >
                   <button
@@ -2368,6 +2166,275 @@ export default function App() {
         </main>
       )}
 
+      {/* App Footer with Sync, Google Login, Preischecker, Sheets Link & GitHub Link */}
+      <footer className="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6 py-3">
+        <div className="w-full max-w-[1720px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
+          {/* Left: Dataset Source & Last Sync Info */}
+          <div className="flex flex-wrap items-center gap-2 text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-slate-700 dark:text-slate-200">
+              Science-AI Benchmarks
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  loadedData.dataSource === 'sheets_api'
+                    ? 'bg-emerald-500'
+                    : loadedData.isLive
+                    ? 'bg-blue-500'
+                    : 'bg-amber-500'
+                }`}
+              />
+              <span>
+                {loadedData.dataSource === 'sheets_api'
+                  ? `Sheets API (${loadedData.activeSheetTitle || 'Live'})`
+                  : loadedData.dataSource === 'csv'
+                  ? 'CSV Live'
+                  : 'Snapshot'}
+              </span>
+            </span>
+            {lastSyncedAt && (
+              <>
+                <span className="text-slate-300 dark:text-slate-700">·</span>
+                <span>
+                  {t.lastSync}: <strong className="text-slate-700 dark:text-slate-300">{formatSyncDate(lastSyncedAt)}</strong>
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Right: Sync, Google Login, Preischecker, Google Sheets Link & GitHub Link */}
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2">
+            {/* Sync */}
+            <Tooltip
+              title="Google Sheets Sync"
+              badge={
+                isSyncing
+                  ? t.syncingText
+                  : loadedData.dataSource === 'sheets_api'
+                  ? 'Sheets API'
+                  : loadedData.isLive
+                  ? 'CSV Live'
+                  : 'Fallback'
+              }
+              content={
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-400 font-medium">{t.lastSync}:</span>
+                    <span className="font-mono text-emerald-400 font-bold">{formatSyncDate(lastSyncedAt)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-400 font-medium">{lang === 'de' ? 'Quelle:' : 'Source:'}</span>
+                    <span className="font-mono text-blue-300 font-semibold">
+                      {loadedData.dataSource === 'sheets_api'
+                        ? `Google Sheets API (${loadedData.activeSheetTitle || 'Live'})`
+                        : loadedData.dataSource === 'csv'
+                        ? 'Public CSV'
+                        : 'Embedded Snapshot'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 border-t border-slate-700/60 pt-1 leading-normal">
+                    {t.autoSyncNotice}
+                  </div>
+                </div>
+              }
+              position="top"
+              align="center"
+              width="w-64"
+            >
+              <button
+                type="button"
+                onClick={() => refreshData()}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+                aria-label={t.syncButtonTitle}
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${
+                    isSyncing
+                      ? 'animate-spin text-blue-500'
+                      : loadedData.dataSource === 'sheets_api'
+                      ? 'text-emerald-500'
+                      : ''
+                  }`}
+                />
+                <span>{isSyncing ? t.syncingText : 'Sync'}</span>
+              </button>
+            </Tooltip>
+
+            {/* Google Login / Connected Sheet Controls */}
+            {oauthAccessToken ? (
+              <div className="inline-flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-lg p-0.5">
+                <Tooltip
+                  title={lang === 'de' ? 'Mit Google Sheets API verbunden' : 'Connected to Google Sheets API'}
+                  badge="Read + Write"
+                  content={
+                    lang === 'de'
+                      ? `Angemeldet als ${authUser?.email || authUser?.displayName || 'Google-Konto'}. Klicken, um das Google Sheet direkt zu bearbeiten.`
+                      : `Signed in as ${authUser?.email || authUser?.displayName || 'Google account'}. Click to edit your Google Sheet directly.`
+                  }
+                  position="top"
+                  align="center"
+                  width="w-72"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setIsSheetModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer font-semibold"
+                    aria-label={lang === 'de' ? 'Sheet bearbeiten' : 'Edit Sheet'}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <Pencil className="w-3 h-3" />
+                    <span>{lang === 'de' ? 'Sheet bearbeiten' : 'Edit Sheet'}</span>
+                  </button>
+                </Tooltip>
+                <Tooltip
+                  content={lang === 'de' ? 'Von Google abmelden' : 'Sign out of Google'}
+                  position="top"
+                  align="center"
+                  width="w-40"
+                >
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignOut}
+                    className="p-1.5 rounded-md text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    aria-label={lang === 'de' ? 'Abmelden' : 'Sign out'}
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
+              </div>
+            ) : (
+              <Tooltip
+                title={lang === 'de' ? 'Google Login' : 'Google Sign-In'}
+                badge="Sheets OAuth"
+                content={
+                  lang === 'de'
+                    ? 'Melden Sie sich mit Google an, um das Google Sheet direkt über die API (statt CSV) zu lesen und Änderungen zu schreiben.'
+                    : 'Sign in with Google to read the Google Sheet directly via API (instead of CSV) and write updates directly to it.'
+                }
+                position="top"
+                align="center"
+                width="w-72"
+              >
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={isSigningIn}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer disabled:opacity-55 ${
+                    isSigningIn ? 'animate-pulse' : ''
+                  }`}
+                  aria-label={lang === 'de' ? 'Mit Google anmelden' : 'Sign in with Google'}
+                >
+                  <svg className="w-3.5 h-3.5 block shrink-0" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                    <path fill="none" d="M0 0h48v48H0z" />
+                  </svg>
+                  <span>{lang === 'de' ? 'Google Login' : 'Google Login'}</span>
+                </button>
+              </Tooltip>
+            )}
+
+            {/* Preischecker (In-App Daily Pricing Monitor) */}
+            <Tooltip
+              title={lang === 'de' ? 'Preischecker (KI-Preis-Monitor)' : 'Price Checker (AI Pricing Monitor)'}
+              badge={
+                isCheckingPricing
+                  ? lang === 'de'
+                    ? 'Prüfe…'
+                    : 'Checking…'
+                  : pricingReport && pricingReport.changedCount > 0
+                  ? `${pricingReport.changedCount} ${lang === 'de' ? 'Änderung(en)' : 'Change(s)'}`
+                  : pricingReport
+                  ? 'OK'
+                  : '24h'
+              }
+              content={
+                pricingReport
+                  ? lang === 'de'
+                    ? `${pricingReport.summaryDe} Klicken für Details & direkten Sheet-Abgleich.`
+                    : `${pricingReport.summaryEn} Click for details & Sheet comparison.`
+                  : lang === 'de'
+                  ? 'Prüft täglich DE- (€) und US-Preise ($) für Meta, OpenAI, Anthropic und Google direkt in der App.'
+                  : 'Checks DE (€) and US ($) pricing daily for Meta, OpenAI, Anthropic, and Google right inside the app.'
+              }
+              position="top"
+              align="center"
+              width="w-72"
+            >
+              <button
+                type="button"
+                onClick={() => setIsPricingModalOpen(true)}
+                className={`relative inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer border ${
+                  pricingReport && pricingReport.changedCount > 0
+                    ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+                aria-label={lang === 'de' ? 'Preischecker öffnen' : 'Open price checker'}
+              >
+                <Bell
+                  className={`w-3.5 h-3.5 ${
+                    isCheckingPricing
+                      ? 'animate-pulse text-blue-500'
+                      : pricingReport && pricingReport.changedCount > 0
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : pricingReport
+                      ? 'text-emerald-500'
+                      : 'text-slate-500'
+                  }`}
+                />
+                <span>{lang === 'de' ? 'Preischecker' : 'Price Checker'}</span>
+                {pricingReport && pricingReport.changedCount > 0 && (
+                  <span className="min-w-[16px] h-[16px] px-1 rounded-full text-[10px] leading-[16px] text-center font-mono font-bold bg-amber-600 text-white">
+                    {pricingReport.changedCount}
+                  </span>
+                )}
+              </button>
+            </Tooltip>
+
+            {/* Google Sheets Link */}
+            <Tooltip
+              content={t.googleSheetOpen}
+              position="top"
+              align="right"
+              width="w-44"
+            >
+              <a
+                href={`https://docs.google.com/spreadsheets/d/${activeSpreadsheetId}/edit?gid=${loadedData.activeSheetId ?? 170267419}#gid=${loadedData.activeSheetId ?? 170267419}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+                aria-label={t.googleSheetOpen}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Sheets</span>
+              </a>
+            </Tooltip>
+
+            {/* GitHub Link */}
+            <Tooltip
+              content={t.githubRepoOpen}
+              position="top"
+              align="right"
+              width="w-36"
+            >
+              <a
+                href={GITHUB_REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+                aria-label={t.githubRepoOpen}
+              >
+                <Github className="w-3.5 h-3.5" />
+                <span>GitHub</span>
+              </a>
+            </Tooltip>
+          </div>
+        </div>
+      </footer>
 
       {/* Google Sheets Live Sync & Writer Modal */}
       <GoogleSheetModal

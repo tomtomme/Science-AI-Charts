@@ -517,12 +517,19 @@ export function getRegressionName(type: RegressionType, param?: number): string 
 }
 
 /**
- * Parametric models where multi-level (hierarchical mixed-effects / partial-pooling)
- * regression across LLM lab levels is mathematically well-defined.
- * Non-parametric smoothing (LOESS) and empirical Pareto envelopes (Pioneers) return false.
+ * Models where multi-level (hierarchical / per-lab) regression across LLM lab levels
+ * is supported: parametric models (Empirical Bayes partial pooling), hierarchical
+ * residual-smoothed LOESS, and per-lab Pareto Pioneers frontier envelopes.
  */
 export function isMultiLevelSupported(type: RegressionType): boolean {
-  return type === 'linear' || type === 'exponential' || type === 'power' || type === 'polynomial';
+  return (
+    type === 'linear' ||
+    type === 'exponential' ||
+    type === 'power' ||
+    type === 'polynomial' ||
+    type === 'loess' ||
+    type === 'frontier'
+  );
 }
 
 function solveLinearSystem(matrix: number[][], rhs: number[]): number[] | null {
@@ -584,10 +591,65 @@ function invertSmallMatrix(matrix: number[][]): number[][] | null {
   return aug.map((row) => row.slice(m));
 }
 
+function evaluateTriCubeLoess(
+  samples: Array<{ x: number; y: number }>,
+  nx: number,
+  spanFraction: number,
+  fallbackY: number,
+  minNeighborhoodDist = 0.04
+): { yHat: number; effN: number } {
+  const count = samples.length;
+  if (count === 0) return { yHat: fallbackY, effN: 0 };
+
+  const dists = samples.map((d) => Math.abs(d.x - nx));
+  const sortedDists = [...dists].sort((a, b) => a - b);
+  const k = Math.min(count - 1, Math.max(Math.min(3, count - 1), Math.floor(count * spanFraction)));
+  const maxDist = Math.max(sortedDists[k] || 0, minNeighborhoodDist);
+
+  let sumW = 0;
+  let sumW2 = 0;
+  let sumWX = 0;
+  let sumWY = 0;
+  let sumWXX = 0;
+  let sumWXY = 0;
+
+  for (let i = 0; i < count; i++) {
+    const u = dists[i] / maxDist;
+    if (u < 1) {
+      const w = Math.pow(1 - Math.pow(u, 3), 3);
+      const x = samples[i].x;
+      const y = samples[i].y;
+      sumW += w;
+      sumW2 += w * w;
+      sumWX += w * x;
+      sumWY += w * y;
+      sumWXX += w * x * x;
+      sumWXY += w * x * y;
+    }
+  }
+
+  if (sumW <= 1e-9) {
+    return { yHat: fallbackY, effN: 0 };
+  }
+
+  const effN = sumW2 > 0 ? Math.pow(sumW, 2) / sumW2 : 1;
+  const denom = sumW * sumWXX - sumWX * sumWX;
+  if (count >= 3 && effN >= 2.2 && Math.abs(denom) > 1e-6) {
+    const slope = (sumW * sumWXY - sumWX * sumWY) / denom;
+    const intercept = (sumWY - slope * sumWX) / sumW;
+    return { yHat: slope * nx + intercept, effN };
+  }
+
+  return { yHat: sumWY / sumW, effN };
+}
+
 /**
- * Fits a hierarchical / multi-level regression across LLM lab levels using
- * Empirical Bayes partial pooling (random intercepts & slopes shrunk toward
- * the Level-2 global fixed-effect fit when group sample size or span is small).
+ * Fits a hierarchical / multi-level regression across LLM lab levels:
+ * - Parametric models ('linear', 'exponential', 'power', 'polynomial'): Empirical Bayes
+ *   partial pooling (random intercepts & slopes shrunk toward Level-2 fixed effects).
+ * - 'loess': Hierarchical residual-smoothed LOESS (Level-2 global LOESS + Level-1
+ *   tri-cube residual smoothing shrunk toward the global curve by effective local n).
+ * - 'frontier': Per-lab Pareto frontier cumulative-maximum staircase envelopes.
  */
 export function calculateMultiLevelRegression(
   allData: TimelineDataPoint[],
@@ -604,6 +666,8 @@ export function calculateMultiLevelRegression(
     .filter((d) => !isNaN(d.timestamp) && !isNaN(d.score) && d.score > 0)
     .sort((a, b) => a.timestamp - b.timestamp);
 
+  const modelName = getRegressionName(type, param);
+
   if (validAll.length < 3) {
     return {
       curves: groups.map((g) => ({
@@ -611,7 +675,7 @@ export function calculateMultiLevelRegression(
         label: g.label,
         color: g.color,
         count: g.data.length,
-        regression: { type, name: getRegressionName(type, param), r2: 0, formula: 'N/A', points: [] },
+        regression: { type, name: modelName, r2: 0, formula: 'N/A', points: [] },
       })),
       overallR2: 0,
     };
@@ -620,6 +684,244 @@ export function calculateMultiLevelRegression(
   const minX = validAll[0].timestamp;
   const maxX = validAll[validAll.length - 1].timestamp;
   const rangeX = maxX - minX || 1;
+
+  // Dedicated branch 1: Multi-Level Pioneers / Frontier Envelope (per-lab SOTA staircase)
+  if (type === 'frontier') {
+    let multiSsRes = 0;
+    const allGroupedY: number[] = [];
+
+    const curves: MultiLevelCurveResult[] = groups.map((g) => {
+      const validGroup = g.data
+        .filter((d) => !isNaN(d.timestamp) && !isNaN(d.score) && d.score > 0)
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      if (validGroup.length < 2) {
+        return {
+          levelId: g.id,
+          label: g.label,
+          color: g.color,
+          count: validGroup.length,
+          regression: {
+            type,
+            name: modelName,
+            r2: 0,
+            formula: 'n < 2',
+            points: [],
+          },
+        };
+      }
+
+      const labFrontier = extractFrontierPoints(validGroup);
+      const predictFrontier = (t: number) => {
+        let best = labFrontier[0]?.score ?? 0;
+        for (const pt of labFrontier) {
+          if (pt.timestamp <= t) {
+            best = pt.score;
+          } else {
+            break;
+          }
+        }
+        return best;
+      };
+
+      const groupMeanY = validGroup.reduce((acc, d) => acc + d.score, 0) / validGroup.length;
+      let ssTot = 0;
+      let ssRes = 0;
+      for (const d of validGroup) {
+        const pred = predictFrontier(d.timestamp);
+        const err = d.score - pred;
+        ssRes += err * err;
+        ssTot += Math.pow(d.score - groupMeanY, 2);
+        multiSsRes += err * err;
+        allGroupedY.push(d.score);
+      }
+
+      const r2 = ssTot > 0 ? Math.max(0, Math.min(0.999, 1 - ssRes / ssTot)) : 0;
+
+      // Build crisp horizontal-then-vertical staircase points spanning [gMinT, gMaxT]
+      const points: RegressionPoint[] = [];
+      if (labFrontier.length > 0) {
+        let prevTime = labFrontier[0].timestamp;
+        let prevScore = labFrontier[0].score;
+        points.push({ x: prevTime, y: parseFloat(prevScore.toFixed(3)) });
+
+        for (let i = 1; i < labFrontier.length; i++) {
+          const pt = labFrontier[i];
+          if (pt.timestamp > prevTime) {
+            points.push({ x: pt.timestamp - 1, y: parseFloat(prevScore.toFixed(3)) });
+          }
+          points.push({ x: pt.timestamp, y: parseFloat(pt.score.toFixed(3)) });
+          prevTime = pt.timestamp;
+          prevScore = pt.score;
+        }
+
+        const gMaxT = validGroup[validGroup.length - 1].timestamp;
+        if (gMaxT > prevTime) {
+          points.push({ x: gMaxT, y: parseFloat(prevScore.toFixed(3)) });
+        }
+      }
+
+      return {
+        levelId: g.id,
+        label: g.label,
+        color: g.color,
+        count: validGroup.length,
+        regression: {
+          type,
+          name: modelName,
+          r2,
+          formula: `Pioniere Envelope (${labFrontier.length} Lab-Rekorde)`,
+          points,
+        },
+      };
+    });
+
+    let overallR2 = 0;
+    if (allGroupedY.length > 0) {
+      const meanGroupedY = allGroupedY.reduce((a, b) => a + b, 0) / allGroupedY.length;
+      const groupedSsTot = allGroupedY.reduce((acc, y) => acc + Math.pow(y - meanGroupedY, 2), 0);
+      overallR2 = groupedSsTot > 0 ? Math.max(0, Math.min(0.999, 1 - multiSsRes / groupedSsTot)) : 0;
+    }
+
+    return { curves, overallR2 };
+  }
+
+  // Dedicated branch 2: Multi-Level LOESS (Level-2 Global LOESS + Empirical Bayes Local Residual Smoothing)
+  if (type === 'loess') {
+    const span =
+      param && param >= 10 && param <= 90
+        ? param / 100
+        : Math.max(0.2, Math.min(0.65, 8 / validAll.length));
+
+    const normAll = validAll.map((d) => ({
+      x: (d.timestamp - minX) / rangeX,
+      y: d.score,
+    }));
+    const globalMeanY = normAll.reduce((acc, d) => acc + d.y, 0) / normAll.length;
+
+    const globalPredict = (nx: number) =>
+      evaluateTriCubeLoess(normAll, nx, span, globalMeanY, 0.04).yHat;
+
+    let globalSsRes = 0;
+    for (const d of normAll) {
+      const err = d.y - globalPredict(d.x);
+      globalSsRes += err * err;
+    }
+    const globalVar = globalSsRes / Math.max(1, normAll.length - 3);
+
+    let multiSsRes = 0;
+    const allGroupedY: number[] = [];
+
+    const curves: MultiLevelCurveResult[] = groups.map((g) => {
+      const validGroup = g.data
+        .filter((d) => !isNaN(d.timestamp) && !isNaN(d.score) && d.score > 0)
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      if (validGroup.length < 2) {
+        return {
+          levelId: g.id,
+          label: g.label,
+          color: g.color,
+          count: validGroup.length,
+          regression: {
+            type,
+            name: modelName,
+            r2: 0,
+            formula: 'n < 2',
+            points: [],
+          },
+        };
+      }
+
+      const groupResiduals = validGroup.map((d) => {
+        const nx = (d.timestamp - minX) / rangeX;
+        return {
+          x: nx,
+          y: d.score - globalPredict(nx),
+        };
+      });
+
+      const groupSpan = Math.max(span, Math.min(0.85, 3 / validGroup.length));
+
+      const predictGroupWithEffN = (nx: number): { yHat: number; effN: number } => {
+        const base = globalPredict(nx);
+        const { yHat: resSmooth, effN } = evaluateTriCubeLoess(
+          groupResiduals,
+          nx,
+          groupSpan,
+          0,
+          0.08
+        );
+        // Empirical Bayes shrinkage of group residual offset toward 0 (global LOESS curve)
+        const shrinkWeight = effN > 0 ? effN / (effN + 1.5) : 0;
+        return {
+          yHat: base + shrinkWeight * resSmooth,
+          effN,
+        };
+      };
+
+      const groupMeanY = validGroup.reduce((acc, d) => acc + d.score, 0) / validGroup.length;
+      let ssTot = 0;
+      let ssRes = 0;
+      for (const d of validGroup) {
+        const nx = (d.timestamp - minX) / rangeX;
+        const predY = predictGroupWithEffN(nx).yHat;
+        const err = d.score - predY;
+        ssRes += err * err;
+        ssTot += Math.pow(d.score - groupMeanY, 2);
+        multiSsRes += err * err;
+        allGroupedY.push(d.score);
+      }
+
+      const r2 = ssTot > 0 ? Math.max(0, Math.min(0.999, 1 - ssRes / ssTot)) : 0;
+      const seGroup = Math.sqrt((ssRes + 2 * globalVar) / (validGroup.length + 2));
+
+      const gMinT = validGroup[0].timestamp;
+      const gMaxT = validGroup[validGroup.length - 1].timestamp;
+      const startNx = (gMinT - minX) / rangeX;
+      let endNx = (gMaxT - minX) / rangeX;
+      if (endNx <= startNx) {
+        endNx = Math.min(1, startNx + 0.02);
+      }
+
+      const points: RegressionPoint[] = [];
+      for (let s = 0; s <= steps; s++) {
+        const nx = startNx + (s / steps) * (endNx - startNx);
+        const timeX = minX + nx * rangeX;
+        const { yHat, effN } = predictGroupWithEffN(nx);
+        const valY = Math.max(0, parseFloat(yHat.toFixed(3)));
+        const marginOfError = Math.max(0.4, 1.96 * (seGroup / Math.sqrt(Math.max(1, effN))));
+        const lower = Math.max(0, parseFloat((valY - marginOfError).toFixed(2)));
+        const upper = Math.min(100, parseFloat((valY + marginOfError).toFixed(2)));
+        points.push({ x: timeX, y: valY, lower, upper });
+      }
+
+      return {
+        levelId: g.id,
+        label: g.label,
+        color: g.color,
+        count: validGroup.length,
+        regression: {
+          type,
+          name: modelName,
+          r2,
+          formula: `LOESS (Span = ${(span * 100).toFixed(0)}%, Lab-Level)`,
+          points,
+          residualStdDev: parseFloat(seGroup.toFixed(2)),
+        },
+      };
+    });
+
+    let overallR2 = 0;
+    if (allGroupedY.length > 0) {
+      const meanGroupedY = allGroupedY.reduce((a, b) => a + b, 0) / allGroupedY.length;
+      const groupedSsTot = allGroupedY.reduce((acc, y) => acc + Math.pow(y - meanGroupedY, 2), 0);
+      overallR2 = groupedSsTot > 0 ? Math.max(0, Math.min(0.999, 1 - multiSsRes / groupedSsTot)) : 0;
+    }
+
+    return { curves, overallR2 };
+  }
+
   const isLogY = type === 'exponential' || type === 'power';
   const degree = type === 'polynomial' ? Math.max(2, Math.min(4, Math.round(param || 2))) : 1;
   const pDim = degree + 1;
@@ -679,7 +981,6 @@ export function calculateMultiLevelRegression(
     return 1.5 * k;
   });
 
-  const modelName = getRegressionName(type, param);
   let multiSsRes = 0;
   const allGroupedY: number[] = [];
 

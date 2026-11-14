@@ -15,12 +15,14 @@ import type {
 
 const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-pricing-monitor-cache.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const QUOTA_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_SHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/export?format=csv&gid=170267419';
 
 interface PersistedMonitorCache {
   report: PricingCheckReport | null;
   lastError: string | null;
+  cooldownUntil: string | null;
 }
 
 let inMemoryCache: PersistedMonitorCache | null = null;
@@ -57,6 +59,7 @@ async function readCache(): Promise<PersistedMonitorCache> {
       inMemoryCache = {
         report: parsed.report ?? null,
         lastError: parsed.lastError ?? null,
+        cooldownUntil: parsed.cooldownUntil ?? null,
       };
       return inMemoryCache;
     }
@@ -64,7 +67,7 @@ async function readCache(): Promise<PersistedMonitorCache> {
     // Cache file may not exist yet
   }
 
-  inMemoryCache = { report: null, lastError: null };
+  inMemoryCache = { report: null, lastError: null, cooldownUntil: null };
   return inMemoryCache;
 }
 
@@ -77,7 +80,17 @@ async function writeCache(cache: PersistedMonitorCache): Promise<void> {
   }
 }
 
-export function isReportDue(report: PricingCheckReport | null): boolean {
+export function isCooldownActive(cooldownUntil?: string | null): boolean {
+  if (!cooldownUntil) return false;
+  const untilMs = new Date(cooldownUntil).getTime();
+  return Number.isFinite(untilMs) && untilMs > Date.now();
+}
+
+export function isReportDue(
+  report: PricingCheckReport | null,
+  cooldownUntil?: string | null
+): boolean {
+  if (isCooldownActive(cooldownUntil)) return false;
   if (!report?.checkedAt) return true;
   const checkedMs = new Date(report.checkedAt).getTime();
   if (!Number.isFinite(checkedMs)) return true;
@@ -92,11 +105,12 @@ export async function getPricingMonitorStatus(): Promise<PricingMonitorStatusRes
 
   return {
     report: cache.report,
-    isDue: isReportDue(cache.report),
+    isDue: isReportDue(cache.report, cache.cooldownUntil),
     isRunning: inFlightCheck !== null,
     checkIntervalHours: 24,
     hasGeminiKey,
     lastError: cache.lastError,
+    cooldownUntil: cache.cooldownUntil,
   };
 }
 
@@ -363,15 +377,12 @@ Here are the current active/paid models from the sheet (Rows 36+) to compare:
 ${JSON.stringify(
   monitoredModels.map((m) => ({
     id: m.id,
-    displayName: m.displayName,
+    name: m.displayName,
     lab: normalizeLab(m.companyName),
-    sheetRowNumber: m.sheetRowNumber,
-    isPaid: m.isPaid,
-    currentDeColT: m.priceDeMonthly || '',
-    currentUsColU: m.priceUsMonthly || '',
-  })),
-  null,
-  2
+    paid: m.isPaid,
+    de: m.priceDeMonthly || '',
+    us: m.priceUsMonthly || '',
+  }))
 )}
 
 Return ONLY valid JSON matching this exact TypeScript shape (no markdown commentary outside JSON):
@@ -401,14 +412,45 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
   "summaryEn": "1-2 concise English sentences summarizing today's check across Meta, OpenAI, Anthropic, and Google."
 }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-          thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
-        },
-      });
+      const generateWithFallback = async () => {
+        const attempts: Array<{ model: string; thinkingLevel?: ThinkingLevel; delayMs: number }> = [
+          { model: 'gemini-4-hydrogen', thinkingLevel: ThinkingLevel.LOW, delayMs: 0 },
+          { model: 'gemini-3.1-flash-lite', delayMs: 1500 },
+        ];
+
+        let lastErr: unknown;
+        for (const attempt of attempts) {
+          if (attempt.delayMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, attempt.delayMs));
+          }
+          try {
+            return await ai.models.generateContent({
+              model: attempt.model,
+              contents: prompt,
+              config: {
+                tools: [{ googleSearch: {} }],
+                ...(attempt.thinkingLevel
+                  ? { thinkingConfig: { thinkingLevel: attempt.thinkingLevel } }
+                  : {}),
+              },
+            });
+          } catch (err) {
+            lastErr = err;
+            const errStr = err instanceof Error ? err.message : String(err || '');
+            const isRetryable =
+              errStr.includes('429') ||
+              errStr.includes('RESOURCE_EXHAUSTED') ||
+              errStr.includes('quota') ||
+              errStr.includes('503') ||
+              errStr.includes('500') ||
+              errStr.includes('404');
+            if (!isRetryable) throw err;
+          }
+        }
+        throw lastErr;
+      };
+
+      const response = await generateWithFallback();
 
       const rawText = response.text ?? '';
       if (!rawText.trim()) {
@@ -530,12 +572,22 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
         sources: Array.from(sourceMap.values()).slice(0, 12),
       };
 
-      await writeCache({ report, lastError: null });
+      await writeCache({ report, lastError: null, cooldownUntil: null });
       return report;
     } catch (err) {
       const message = formatGeminiError(err);
+      const isQuotaErr =
+        message.includes('429') ||
+        message.includes('RESOURCE_EXHAUSTED') ||
+        message.toLowerCase().includes('quota');
       const existing = await readCache();
-      await writeCache({ report: existing.report, lastError: message });
+      await writeCache({
+        report: existing.report,
+        lastError: message,
+        cooldownUntil: isQuotaErr
+          ? new Date(Date.now() + QUOTA_COOLDOWN_MS).toISOString()
+          : existing.cooldownUntil,
+      });
       throw new Error(message);
     } finally {
       inFlightCheck = null;
@@ -580,16 +632,17 @@ export function startDailyPricingScheduler(): void {
       if (!hasKey) return;
 
       const cache = await readCache();
-      if (isReportDue(cache.report) && !inFlightCheck) {
+      if (isReportDue(cache.report, cache.cooldownUntil) && !inFlightCheck) {
         console.log('[PricingMonitor] Running scheduled 24h pricing check...');
         await runPricingCheck({ trigger: 'daily_auto' });
       }
     } catch (err) {
-      console.warn('[PricingMonitor] Scheduled daily check skipped/failed:', err);
+      const msg = err instanceof Error ? err.message : String(err || '');
+      console.log(`[PricingMonitor] Scheduled check deferred: ${msg}`);
     }
   };
 
-  // Initial check 15s after server startup if >24h stale, then check hourly
+  // Initial check 15s after server startup if >24h stale and not in cooldown, then check hourly
   setTimeout(() => {
     void maybeRunScheduledCheck();
   }, 15_000);

@@ -387,8 +387,14 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       color: lab.color,
       data: regressionDataPoints.filter((pt) => pointLabMap.get(pt.id)?.id === lab.id),
     }));
-    return calculateMultiLevelRegression(regressionDataPoints, groups, activeRegression.id, 90, regressionParam ?? 2);
-  }, [isMultiLevelActive, selectedLabLevels, regressionDataPoints, pointLabMap, activeRegression.id, regressionParam]);
+    return calculateMultiLevelRegression(
+      regressionDataPoints,
+      groups,
+      activeRegression.id,
+      90,
+      regressionParam ?? (activeRegression.id === 'loess' ? loessSpan : 2)
+    );
+  }, [isMultiLevelActive, selectedLabLevels, regressionDataPoints, pointLabMap, activeRegression.id, regressionParam, loessSpan]);
 
   // Precompute SVG paths & confidence bands for each multi-level lab curve
   const multiLevelSvgCurves = useMemo(() => {
@@ -1202,11 +1208,11 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 content={
                   isMultiLevelFeasible
                     ? lang === 'de'
-                      ? 'Schätzt eine hierarchische Multi-Level-Regression (Partial Pooling) mit eigener Trendkurve pro KI-Labor.'
-                      : 'Fits a hierarchical multi-level regression (partial pooling) with separate trajectory curves per LLM lab company.'
+                      ? 'Schätzt pro KI-Labor eine eigene Trendkurve (Partial Pooling für Regression/LOESS bzw. Lab-Frontier für Pioniere).'
+                      : 'Fits separate per-lab trajectory curves (partial pooling for regression/LOESS, per-lab frontier envelopes for Pioneers).'
                     : lang === 'de'
-                    ? 'Multi-Level-Regression ist für Linear, Exponential, Power und Polynom verfügbar – nicht für LOESS oder Pioniere.'
-                    : 'Multi-level regression is available for Linear, Exponential, Power, and Polynomial models — not feasible for LOESS or Pioneers.'
+                    ? 'Multi-Level-Ansicht ist für dieses Modell nicht verfügbar.'
+                    : 'Multi-level view is not available for this model.'
                 }
               >
                 <button
@@ -1698,7 +1704,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                     key={`ml-curve-${curve.levelId}`}
                     style={{ opacity: isDimmedCurve ? 0.2 : 1, transition: 'opacity 0.2s' }}
                   >
-                    {curve.bandPath && (
+                    {curve.bandPath && activeRegression.id !== 'frontier' && (
                       <path
                         d={curve.bandPath}
                         fill={curve.color}

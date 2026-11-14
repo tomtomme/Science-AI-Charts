@@ -66,4 +66,5 @@ export interface PricingMonitorStatusResponse {
   checkIntervalHours: number;
   hasGeminiKey: boolean;
   lastError: string | null;
+  cooldownUntil?: string | null;
 }
