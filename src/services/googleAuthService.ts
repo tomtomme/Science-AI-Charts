@@ -71,6 +71,16 @@ export const clearAccessToken = (): void => {
   cachedAccessToken = null;
 };
 
+export const getFirebaseIdToken = async (forceRefresh = false): Promise<string | null> => {
+  const user = auth.currentUser;
+  if (!user) return null;
+  try {
+    return await user.getIdToken(forceRefresh);
+  } catch {
+    return null;
+  }
+};
+
 export const googleSignOut = async (): Promise<void> => {
   cachedAccessToken = null;
   await signOut(auth);

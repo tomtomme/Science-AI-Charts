@@ -3,7 +3,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import type {
-  GroundingSource,
   LabPlanInfo,
   ModelPricingSnapshot,
   MonitoredLab,
@@ -348,23 +347,101 @@ export async function runPricingCheck(options?: {
           ? options.models
           : await fetchLiveFourLabSnapshotsFromCsv();
 
-      // Strictly enforce Row 36+ and the 4 requested labs
+      // Strictly enforce Row 36+ and the 4 requested labs; ignore discontinued GPT-4 Turbo in pricing monitor
       const monitoredModels = rawModels
         .filter((m) => m.sheetRowNumber >= 36 && normalizeLab(m.companyName) !== null)
+        .filter((m) => !/\bgpt[-\s]?4[-\s]?turbo\b/i.test(m.displayName))
         .filter((m) => m.isAvailable && (m.isPaid || m.priceDeMonthly || m.priceUsMonthly));
 
+      interface OfficialPageExcerpt {
+        lab: MonitoredLab;
+        url: string;
+        excerpt: string;
+      }
+
+      const fetchOfficialPricingExcerpts = async (): Promise<OfficialPageExcerpt[]> => {
+        const targets: Array<{ lab: MonitoredLab; url: string }> = [
+          { lab: 'OpenAI', url: 'https://chatgpt.com/pricing/' },
+          { lab: 'OpenAI', url: 'https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus' },
+          { lab: 'OpenAI', url: 'https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers' },
+          { lab: 'Anthropic', url: 'https://claude.com/pricing' },
+          { lab: 'Google', url: 'https://one.google.com/intl/en_us/about/google-ai-plans/' },
+          { lab: 'Google', url: 'https://one.google.com/intl/de_de/about/google-ai-plans/' },
+          { lab: 'Meta', url: 'https://muse.ai/' },
+        ];
+
+        const stripHtml = (html: string): string => {
+          return html
+            .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+            .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+            .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+            .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
+            .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+            .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/&amp;/gi, '&')
+            .replace(/&euro;/gi, '€')
+            .replace(/\s+/g, ' ')
+            .trim();
+        };
+
+        const results = await Promise.all(
+          targets.map(async (target) => {
+            try {
+              const controller = new AbortController();
+              const timer = setTimeout(() => controller.abort(), 5000);
+              const res = await fetch(target.url, {
+                signal: controller.signal,
+                headers: {
+                  'User-Agent':
+                    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                  Accept: 'text/html,application/xhtml+xml',
+                  'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
+                },
+              });
+              clearTimeout(timer);
+              if (!res.ok) return null;
+              const text = stripHtml(await res.text());
+              if (
+                text.length < 150 ||
+                /just a moment|enable javascript and cookies|cf-browser-verification/i.test(text)
+              ) {
+                return null;
+              }
+              return {
+                lab: target.lab,
+                url: res.url || target.url,
+                excerpt: text.slice(0, 9000),
+              };
+            } catch {
+              return null;
+            }
+          })
+        );
+
+        return results.filter((x): x is OfficialPageExcerpt => x !== null);
+      };
+
       const todayIso = new Date().toISOString().slice(0, 10);
+      const directFetchedSources = await fetchOfficialPricingExcerpts();
+      const fetchedContext =
+        directFetchedSources.length > 0
+          ? `\n\nLIVE OFFICIAL PRICING PAGE EXCERPTS FETCHED TODAY (${todayIso}):\n${directFetchedSources
+              .map((s) => `--- ${s.lab} (${s.url}) ---\n${s.excerpt}`)
+              .join('\n\n')}`
+          : '';
 
       const prompt = `Today's date is ${todayIso}.
-Use Google Search to check the CURRENT official consumer chatbot subscription pricing in BOTH:
+Analyze the live official pricing page excerpts below (combined with current consumer subscription plan knowledge) in BOTH:
 1. United States (USD, "$")
 2. Germany (EUR, "€", incl. VAT — or "US only" if a paid plan/model is currently unavailable in Germany)
 
-You MUST check all 4 AI labs:
-- OpenAI (ChatGPT Plus, ChatGPT Go / Lite if any, ChatGPT Pro $100/$200 tiers)
-- Anthropic (Claude Pro, Claude Max 5x, Claude Max 20x)
-- Google (Google AI Pro / Gemini Advanced, Google AI Ultra)
-- Meta (Meta AI / Muse paid consumer subscription plans if any, and whether available in Germany or US only)
+You MUST include ALL relevant paid consumer & personal-agent plans across all 4 AI labs (including entry paid tiers that currently don't unlock models beyond free tier yet, as well as higher power tiers that could become relevant):
+- OpenAI: ChatGPT Go ($8 / ~8€; currently no model access beyond Luna in Free tier), ChatGPT Plus ($20 / 23€), ChatGPT Pro ($100 / 103€ base tier, plus $200 / $500 higher tiers if listed)
+- Anthropic: Claude Pro ($17-20 / 15-18€), Claude Max ($100 / 90€), Claude Ultra ($200 / 180€)
+- Google: Google AI Plus ($4.99 / ~4.99-9.99€; entry paid tier with double Hydrogen access & 400 GB), Google AI Pro ($17-20 / 14-22€), Google AI Ultra ($100+ / 99€+)
+- Meta: Muse Power ($20 / US only), Muse Code Power ($50 / US only, where Muse Wonder Full is accessed), Muse Maximum ($100 / US only)
 
 CRITICAL FORMATTING RULES (must match the Science-IQ Google Sheet columns T & U):
 - Sheet header rule is: "if paid for 1 year vs. if paid monthly".
@@ -372,6 +449,11 @@ CRITICAL FORMATTING RULES (must match the Science-IQ Google Sheet columns T & U)
 - If there is no annual discount or only monthly pricing exists, format as a single price like "$20", "23€", "$100", "99€", "103€", "$50", "$200", "229€".
 - If a paid plan is available in the US but NOT yet available to consumers in Germany, set DE price to "US only".
 - Compare ONLY against the live/current official subscription tier for each paid model listed below. Do NOT invent changes for cosmetic differences (if the sheet's current price already matches the real current plan price within rounding/VAT, keep the exact current sheet string as liveDe / liveUs so there are no false-positive diffs!).
+
+CONCISENESS RULES (very important for a clean, uncluttered UI):
+- "billingNotes": MAX 50 characters. List only key unlocked models/limits (e.g., "Nur Luna (wie Free)", "GPT-6.1 Sol/Terra, Astra", "5x Pro, Fable, $100 API", "400 GB, 2x Hydrogen"). Do NOT repeat prices, "monthly only", or "Available in US and Germany" — the DE/US columns already show that!
+- "reason": MAX 55 characters. Do NOT write "Matches current X pricing ($Y in US, Z€ in DE)". Just state the concise billing basis if unchanged (e.g., "Jahres-/Monatsabo", "Monatsabo inkl. MwSt", "Muse Coding-Agent (US)") or the exact delta if changed (e.g., "Neu $25 statt $20").
+- "summaryDe" / "summaryEn": ONE short sentence (max 120 characters).
 
 Here are the current active/paid models from the sheet (Rows 36+) to compare:
 ${JSON.stringify(
@@ -383,18 +465,18 @@ ${JSON.stringify(
     de: m.priceDeMonthly || '',
     us: m.priceUsMonthly || '',
   }))
-)}
+)}${fetchedContext}
 
 Return ONLY valid JSON matching this exact TypeScript shape (no markdown commentary outside JSON):
 {
   "labs": [
     {
       "lab": "OpenAI" | "Anthropic" | "Google" | "Meta",
-      "planName": "e.g. ChatGPT Plus",
+      "planName": "e.g. ChatGPT Go",
       "tierKey": "standard" | "pro" | "ultra" | "free",
-      "usMonthly": "$20",
-      "deMonthly": "23€",
-      "billingNotes": "Short note on annual vs monthly pricing & German availability",
+      "usMonthly": "$8",
+      "deMonthly": "8€",
+      "billingNotes": "Nur Luna (wie Free)",
       "sourceUrl": "https://..."
     }
   ],
@@ -404,18 +486,22 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
       "matchedPlanName": "e.g. Claude Pro",
       "liveDe": "15-18€",
       "liveUs": "$17-20",
-      "reason": "Brief factual explanation (e.g. Matches current Claude Pro €18 / $20 monthly or €15/$17 annual pricing, OR Price changed from X to Y)",
+      "reason": "Jahres-/Monatsabo",
       "sourceUrl": "https://..."
     }
   ],
-  "summaryDe": "1-2 concise German sentences summarizing today's check across Meta, OpenAI, Anthropic, and Google.",
-  "summaryEn": "1-2 concise English sentences summarizing today's check across Meta, OpenAI, Anthropic, and Google."
+  "summaryDe": "1 kurzer deutscher Satz zum Ergebnis.",
+  "summaryEn": "1 short English sentence summarizing the check."
 }`;
 
       const generateWithFallback = async () => {
-        const attempts: Array<{ model: string; thinkingLevel?: ThinkingLevel; delayMs: number }> = [
+        const attempts: Array<{
+          model: string;
+          thinkingLevel?: ThinkingLevel;
+          delayMs: number;
+        }> = [
           { model: 'gemini-4-hydrogen', thinkingLevel: ThinkingLevel.LOW, delayMs: 0 },
-          { model: 'gemini-3.1-flash-lite', delayMs: 1500 },
+          { model: 'gemini-3.1-flash-lite', delayMs: 1200 },
         ];
 
         let lastErr: unknown;
@@ -428,7 +514,7 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
               model: attempt.model,
               contents: prompt,
               config: {
-                tools: [{ googleSearch: {} }],
+                responseMimeType: 'application/json',
                 ...(attempt.thinkingLevel
                   ? { thinkingConfig: { thinkingLevel: attempt.thinkingLevel } }
                   : {}),
@@ -437,10 +523,13 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
           } catch (err) {
             lastErr = err;
             const errStr = err instanceof Error ? err.message : String(err || '');
+            console.warn(
+              `[PricingMonitor] Attempt (${attempt.model}) failed: ${errStr.slice(0, 300)}`
+            );
             const isRetryable =
               errStr.includes('429') ||
               errStr.includes('RESOURCE_EXHAUSTED') ||
-              errStr.includes('quota') ||
+              errStr.toLowerCase().includes('quota') ||
               errStr.includes('503') ||
               errStr.includes('500') ||
               errStr.includes('404');
@@ -458,21 +547,6 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
       }
 
       const parsed = extractJsonObject(rawText);
-
-      // Extract grounded web sources from groundingMetadata
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      const sourceMap = new Map<string, GroundingSource>();
-      if (Array.isArray(chunks)) {
-        for (const chunk of chunks) {
-          const web = (chunk as { web?: { uri?: string; title?: string } })?.web;
-          if (web?.uri && !sourceMap.has(web.uri)) {
-            sourceMap.set(web.uri, {
-              title: web.title || web.uri,
-              uri: web.uri,
-            });
-          }
-        }
-      }
 
       const rawLabs = Array.isArray(parsed.labs) ? parsed.labs : [];
       const labs: LabPlanInfo[] = rawLabs
@@ -569,7 +643,7 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
             : changedCount > 0
             ? `Detected ${changedCount} pricing change(s) across Meta, OpenAI, Anthropic, or Google.`
             : 'No pricing changes detected compared to your Google Sheet.',
-        sources: Array.from(sourceMap.values()).slice(0, 12),
+        sources: [],
       };
 
       await writeCache({ report, lastError: null, cooldownUntil: null });

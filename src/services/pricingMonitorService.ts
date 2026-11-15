@@ -7,6 +7,10 @@ import {
 
 const MONITORED_LAB_KEYWORDS = ['openai', 'anthropic', 'google', 'meta'];
 
+export function isIgnoredPricingMonitorModel(displayName: string): boolean {
+  return /\bgpt[-\s]?4[-\s]?turbo\b/i.test(displayName || '');
+}
+
 export function isMonitoredLabCompany(companyName: string): boolean {
   const low = (companyName || '').toLowerCase();
   return MONITORED_LAB_KEYWORDS.some((kw) => low.includes(kw));
@@ -19,6 +23,7 @@ export function extractMonitoredModelSnapshots(models: ModelRecord[]): ModelPric
         typeof m.sheetRowNumber === 'number' &&
         m.sheetRowNumber >= 36 &&
         isMonitoredLabCompany(m.companyName) &&
+        !isIgnoredPricingMonitorModel(m.displayName) &&
         m.isAvailable &&
         (m.isPaid || Boolean(m.priceDeMonthly) || Boolean(m.priceUsMonthly))
     )
@@ -59,7 +64,9 @@ export async function triggerPricingCheck(
 ): Promise<PricingCheckReport> {
   const res = await fetch('/api/pricing-monitor/check', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ models, trigger }),
   });
   const data = await parseJsonResponse<{ report: PricingCheckReport }>(res);

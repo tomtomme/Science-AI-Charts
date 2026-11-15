@@ -185,9 +185,47 @@ export function computeAutoTheme(coords: GeoCoords | null, lang: 'de' | 'en' = '
   };
 }
 
+const LANGUAGE_STORAGE_KEY = 'science_iq_language';
+
+function getInitialLanguage(): Language {
+  try {
+    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (stored === 'de' || stored === 'en') {
+      return stored;
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+
+  if (typeof navigator !== 'undefined') {
+    const browserLangs =
+      Array.isArray(navigator.languages) && navigator.languages.length > 0
+        ? navigator.languages
+        : navigator.language
+        ? [navigator.language]
+        : [];
+
+    for (const candidate of browserLangs) {
+      const normalized = (candidate || '').trim().toLowerCase();
+      if (normalized === 'de' || normalized.startsWith('de-')) return 'de';
+      if (normalized === 'en' || normalized.startsWith('en-')) return 'en';
+    }
+  }
+
+  return 'en';
+}
+
 export default function App() {
-  // Standardeinstellung: Deutsch
-  const [lang, setLang] = useState<Language>('de');
+  // Standardsprache automatisch aus Browser-Präferenz (DE falls bevorzugt, sonst EN)
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const handleSelectLanguage = useCallback((nextLang: Language) => {
+    setLang(nextLang);
+    try {
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLang);
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
   const t = TRANSLATIONS[lang];
 
   // Theme state: 'auto' | 'light' | 'dark' with GPS & timezone auto-switching & manual override
@@ -876,10 +914,9 @@ export default function App() {
     [loadedData.allModels]
   );
 
-  // Check daily pricing monitor status once live/initial data is ready
+  // Load cached pricing monitor status once data is ready, and trigger due daily auto-check if enabled
   useEffect(() => {
-    if (hasAutoCheckedSession || loadedData.allModels.length === 0) return;
-    setHasAutoCheckedSession(true);
+    if (loadedData.allModels.length === 0) return;
 
     let cancelled = false;
     (async () => {
@@ -895,6 +932,7 @@ export default function App() {
         const inCooldown =
           Boolean(status.cooldownUntil) && new Date(status.cooldownUntil as string).getTime() > Date.now();
         if (
+          !hasAutoCheckedSession &&
           dailyAutoCheckEnabled &&
           status.isDue &&
           status.hasGeminiKey &&
@@ -902,6 +940,7 @@ export default function App() {
           !status.lastError &&
           !inCooldown
         ) {
+          setHasAutoCheckedSession(true);
           await handleRunPricingCheck('daily_auto');
         }
       } catch {
@@ -1002,7 +1041,7 @@ export default function App() {
               >
                 <button
                   type="button"
-                  onClick={() => setLang('de')}
+                  onClick={() => handleSelectLanguage('de')}
                   className={`px-2 py-0.5 rounded text-xs font-bold transition-colors cursor-pointer ${
                     lang === 'de'
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
@@ -1019,7 +1058,7 @@ export default function App() {
               >
                 <button
                   type="button"
-                  onClick={() => setLang('en')}
+                  onClick={() => handleSelectLanguage('en')}
                   className={`px-2 py-0.5 rounded text-xs font-bold transition-colors cursor-pointer ${
                     lang === 'en'
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
@@ -1179,7 +1218,7 @@ export default function App() {
                 }`}
               >
                 <BarChart2 className="w-3.5 h-3.5" />
-                <span>{lang === 'de' ? 'Balkendiagramm' : 'Bar Chart'}</span>
+                <span>{lang === 'de' ? 'Rangliste' : 'Ranking'}</span>
               </button>
 
               <button
@@ -1194,7 +1233,7 @@ export default function App() {
                 }`}
               >
                 <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-                <span>{lang === 'de' ? 'Zeitreihe' : 'Timeline'}</span>
+                <span>{lang === 'de' ? 'Historie' : 'History'}</span>
               </button>
 
               <button
@@ -1209,7 +1248,7 @@ export default function App() {
                 }`}
               >
                 <GitCompare className="w-3.5 h-3.5 text-indigo-500" />
-                <span>{lang === 'de' ? 'Korrelationen' : 'Correlations'}</span>
+                <span>{lang === 'de' ? 'Analyse' : 'Analysis'}</span>
               </button>
             </div>
 
@@ -1265,8 +1304,8 @@ export default function App() {
                   role="group"
                   aria-label={t.priceFilterDesc}
                 >
-                  {/* Free Group: Free(API|Chat) */}
-                  <div className="flex items-center">
+                  {/* Free Group: Free(API🌐|Chat) */}
+                  <div className="flex items-center gap-0 pl-1 pr-0.5">
                     {/* Free( prefix */}
                     <Tooltip
                       title={<span className="text-emerald-400">Free ({lang === 'de' ? 'Kostenlos' : 'Free'})</span>}
@@ -1281,7 +1320,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setPriceFilter(priceFilter === 'free_api' ? 'free_chat' : 'free_api')}
-                        className={`pl-1 font-bold text-xs select-none cursor-pointer transition-colors ${
+                        className={`px-0 font-bold text-xs select-none cursor-pointer transition-colors ${
                           priceFilter === 'free_api' || priceFilter === 'free_chat'
                             ? 'text-emerald-700 dark:text-emerald-300'
                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -1321,7 +1360,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setPriceFilter('free_api')}
-                        className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
+                        className={`px-0 py-0.5 rounded transition-all cursor-pointer ${
                           priceFilter === 'free_api'
                             ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
                             : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -1332,7 +1371,7 @@ export default function App() {
                       </button>
                     </Tooltip>
 
-                    <span className="text-slate-400 dark:text-slate-600 text-xs px-0.5 select-none">|</span>
+                    <span className="text-slate-400 dark:text-slate-600 text-xs px-0 select-none">|</span>
 
                     {/* Chat Button */}
                     <Tooltip
@@ -1348,7 +1387,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setPriceFilter('free_chat')}
-                        className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
+                        className={`px-0 py-0.5 rounded transition-all cursor-pointer ${
                           priceFilter === 'free_chat'
                             ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
                             : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -1360,7 +1399,7 @@ export default function App() {
                     </Tooltip>
 
                     <span
-                      className={`pr-1 font-bold text-xs select-none ${
+                      className={`px-0 font-bold text-xs select-none ${
                         priceFilter === 'free_api' || priceFilter === 'free_chat'
                           ? 'text-emerald-700 dark:text-emerald-300'
                           : 'text-slate-600 dark:text-slate-400'
