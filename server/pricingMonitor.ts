@@ -15,8 +15,6 @@ import type {
 const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-pricing-monitor-cache.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const QUOTA_COOLDOWN_MS = 6 * 60 * 60 * 1000;
-const DEFAULT_SHEET_CSV_URL =
-  'https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/export?format=csv&gid=170267419';
 
 interface PersistedMonitorCache {
   report: PricingCheckReport | null;
@@ -26,7 +24,6 @@ interface PersistedMonitorCache {
 
 let inMemoryCache: PersistedMonitorCache | null = null;
 let inFlightCheck: Promise<PricingCheckReport> | null = null;
-let schedulerStarted = false;
 
 function getGeminiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -113,56 +110,6 @@ export async function getPricingMonitorStatus(): Promise<PricingMonitorStatusRes
   };
 }
 
-function parseCsvRowsSimple(csvText: string): string[][] {
-  const rows: string[][] = [];
-  let currentRow: string[] = [];
-  let currentField = '';
-  let insideQuotes = false;
-
-  for (let i = 0; i < csvText.length; i++) {
-    const char = csvText[i];
-    const nextChar = csvText[i + 1];
-
-    if (insideQuotes) {
-      if (char === '"') {
-        if (nextChar === '"') {
-          currentField += '"';
-          i++;
-        } else {
-          insideQuotes = false;
-        }
-      } else {
-        currentField += char;
-      }
-    } else if (char === '"') {
-      insideQuotes = true;
-    } else if (char === ',') {
-      currentRow.push(currentField);
-      currentField = '';
-    } else if (char === '\r') {
-      if (nextChar === '\n') i++;
-      currentRow.push(currentField);
-      rows.push(currentRow);
-      currentRow = [];
-      currentField = '';
-    } else if (char === '\n') {
-      currentRow.push(currentField);
-      rows.push(currentRow);
-      currentRow = [];
-      currentField = '';
-    } else {
-      currentField += char;
-    }
-  }
-
-  if (currentField.length > 0 || currentRow.length > 0) {
-    currentRow.push(currentField);
-    rows.push(currentRow);
-  }
-
-  return rows;
-}
-
 function normalizeLab(raw: string): MonitoredLab | null {
   const low = raw.toLowerCase();
   if (low.includes('openai')) return 'OpenAI';
@@ -170,111 +117,6 @@ function normalizeLab(raw: string): MonitoredLab | null {
   if (low.includes('google')) return 'Google';
   if (low.includes('meta')) return 'Meta';
   return null;
-}
-
-async function fetchLiveFourLabSnapshotsFromCsv(): Promise<ModelPricingSnapshot[]> {
-  const res = await fetch(DEFAULT_SHEET_CSV_URL);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch live sheet CSV (HTTP ${res.status})`);
-  }
-  const csvText = await res.text();
-  const rows = parseCsvRowsSimple(csvText);
-  if (rows.length < 36) return [];
-
-  const row0 = rows[0] || [];
-  const row1 = rows[1] || [];
-  let colDe = 19;
-  let colUs: number | null = null;
-  let colCreator = 25;
-
-  for (let c = 19; c < Math.max(row0.length, row1.length, 30); c++) {
-    const h01 = `${row0[c] || ''} ${row1[c] || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
-    const h1 = (row1[c] || '').replace(/\s+/g, ' ').trim().toLowerCase();
-    if (
-      /\b(us|usa|united states)\b/i.test(h01) &&
-      (h01.includes('cost') || h01.includes('abokosten') || h01.includes('paid') || h01.includes('chat'))
-    ) {
-      if (colUs === null) colUs = c;
-    } else if (
-      (h01.includes('germany') || h01.includes('deutschland') || /\bin de\b/.test(h01) || h01.includes('abokosten')) &&
-      (h01.includes('cost') || h01.includes('paid') || h01.includes('abokosten') || h01.includes('chat'))
-    ) {
-      colDe = c;
-    } else if (h1 === 'model creator' || h01.includes('model creator')) {
-      colCreator = c;
-    }
-  }
-
-  const currentBotNames = new Set<string>();
-  for (let r = 1; r < Math.min(32, rows.length); r++) {
-    const s = (rows[r]?.[18] || '').trim().toLowerCase();
-    const b = (rows[r]?.[1] || '').trim().toLowerCase();
-    if (s) currentBotNames.add(s);
-    if (b) currentBotNames.add(b);
-  }
-
-  let startIndex = 35;
-  for (let r = 0; r < Math.min(45, rows.length); r++) {
-    if ((rows[r]?.[1] || '').trim().toLowerCase() === 'history') {
-      startIndex = r + 1;
-      break;
-    }
-  }
-  startIndex = Math.max(35, startIndex);
-
-  const snapshots: ModelPricingSnapshot[] = [];
-  for (let r = startIndex; r < rows.length; r++) {
-    const row = rows[r];
-    if (!row || row.length < 5) continue;
-    const rawB = (row[1] || '').trim();
-    const rawC = (row[2] || '').trim();
-    const colS = (row[18] || '').trim();
-
-    if (
-      rawB.includes('Sources & Notes') ||
-      rawC.includes('Sources & Notes') ||
-      rawC === 'min' ||
-      rawB === 'min'
-    ) {
-      break;
-    }
-    if (!colS) continue;
-
-    const lab = normalizeLab(`${rawC} ${row[colCreator] || ''} ${colS}`);
-    if (!lab) continue;
-
-    const isPaid = rawB.includes('💲');
-    const chatLink = (row[15] || '').trim().toLowerCase();
-    const apiLink = (row[16] || '').trim().toLowerCase();
-    const isSuperseded =
-      chatLink.includes('better') || chatLink.includes('discontinued') || chatLink === '';
-    const isAvailable =
-      currentBotNames.has(colS.toLowerCase()) ||
-      currentBotNames.has(rawB.toLowerCase()) ||
-      (!isSuperseded &&
-        (chatLink.startsWith('http') ||
-          chatLink.includes('paid') ||
-          chatLink.includes('api') ||
-          apiLink.startsWith('http')));
-
-    const priceDeMonthly = (row[colDe] || '').trim() || undefined;
-    const priceUsMonthly = colUs !== null ? (row[colUs] || '').trim() || undefined : undefined;
-
-    if (!isAvailable && !isPaid && !priceDeMonthly && !priceUsMonthly) continue;
-
-    snapshots.push({
-      id: `model-${r}-${colS.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
-      displayName: colS,
-      companyName: lab,
-      sheetRowNumber: r + 1,
-      isAvailable,
-      isPaid,
-      priceDeMonthly,
-      priceUsMonthly,
-    });
-  }
-
-  return snapshots;
 }
 
 function normalizePriceForComparison(val: string | undefined | null): string {
@@ -342,10 +184,12 @@ export async function runPricingCheck(options?: {
     try {
       const ai = getGeminiClient();
 
-      let rawModels =
-        Array.isArray(options?.models) && options.models.length > 0
-          ? options.models
-          : await fetchLiveFourLabSnapshotsFromCsv();
+      const rawModels = Array.isArray(options?.models) ? options.models : [];
+      if (rawModels.length === 0) {
+        throw new Error(
+          'Google Sheets connection required: live Sheet models are missing. Sign in with Google Sheets first.'
+        );
+      }
 
       // Strictly enforce Row 36+ and the 4 requested labs; ignore discontinued GPT-4 Turbo in pricing monitor
       const monitoredModels = rawModels
@@ -355,19 +199,132 @@ export async function runPricingCheck(options?: {
 
       interface OfficialPageExcerpt {
         lab: MonitoredLab;
+        title: string;
         url: string;
         excerpt: string;
       }
 
+      const extractPricingFocusedExcerpt = (text: string, maxChars = 9500): string => {
+        if (text.length <= maxChars) return text;
+
+        // Always keep top overview/hero, then capture all windows with price/plan tokens
+        const headBudget = 2000;
+        const head = text.slice(0, headBudget);
+        const tokenRegex =
+          /(?:\$\s?\d+(?:\.\d{2})?|€\s?\d+(?:[.,]\d{2})?|\d+[.,]\d+\s?€|\d+\s?€|\bEUR\b|\bUSD\b|\/month|\/mo\b|\/Monat|\/Jahr|\bMeta One\b|\bCore\b|\bPremium\b|\bMuse Power\b|\bMuse Maximum\b|\bMuse Wonder\b|\bMuse Spark\b|\bmuse\.ai\b|\bmeta\.ai\b|\bChatGPT Go\b|\bChatGPT Plus\b|\bChatGPT Pro\b|\bClaude Pro\b|\bClaude Max\b|\bClaude Ultra\b|\bGoogle AI Plus\b|\bGoogle AI Pro\b|\bGoogle AI Ultra\b)/gi;
+
+        const ranges: Array<[number, number]> = [];
+        let match: RegExpExecArray | null;
+        while ((match = tokenRegex.exec(text)) !== null) {
+          const start = Math.max(headBudget, match.index - 180);
+          const end = Math.min(text.length, match.index + 380);
+          if (ranges.length > 0 && start <= ranges[ranges.length - 1][1] + 60) {
+            ranges[ranges.length - 1][1] = Math.max(ranges[ranges.length - 1][1], end);
+          } else {
+            ranges.push([start, end]);
+          }
+          if (ranges.length >= 30) break;
+        }
+
+        let result = head;
+        for (const [start, end] of ranges) {
+          const chunk = text.slice(start, end).trim();
+          if (!chunk) continue;
+          if (result.length + chunk.length + 5 > maxChars) {
+            const remaining = maxChars - result.length - 5;
+            if (remaining > 120) {
+              result += ' ... ' + chunk.slice(0, remaining);
+            }
+            break;
+          }
+          result += ' ... ' + chunk;
+        }
+        return result;
+      };
+
       const fetchOfficialPricingExcerpts = async (): Promise<OfficialPageExcerpt[]> => {
-        const targets: Array<{ lab: MonitoredLab; url: string }> = [
-          { lab: 'OpenAI', url: 'https://chatgpt.com/pricing/' },
-          { lab: 'OpenAI', url: 'https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus' },
-          { lab: 'OpenAI', url: 'https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers' },
-          { lab: 'Anthropic', url: 'https://claude.com/pricing' },
-          { lab: 'Google', url: 'https://one.google.com/intl/en_us/about/google-ai-plans/' },
-          { lab: 'Google', url: 'https://one.google.com/intl/de_de/about/google-ai-plans/' },
-          { lab: 'Meta', url: 'https://muse.ai/' },
+        const targets: Array<{ lab: MonitoredLab; title: string; url: string }> = [
+          // OpenAI (help/announcement pages contain full server-rendered prices & model matrices; chatgpt.com/pricing is client-hydrated)
+          {
+            lab: 'OpenAI',
+            title: 'OpenAI ChatGPT Go Announcement',
+            url: 'https://openai.com/index/introducing-chatgpt-go/',
+          },
+          {
+            lab: 'OpenAI',
+            title: 'OpenAI Help: ChatGPT Plus',
+            url: 'https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus',
+          },
+          {
+            lab: 'OpenAI',
+            title: 'OpenAI Help: ChatGPT Pro Tiers',
+            url: 'https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers',
+          },
+          {
+            lab: 'OpenAI',
+            title: 'OpenAI Help: Models in ChatGPT',
+            url: 'https://help.openai.com/en/articles/20001354-gpt-6-and-other-models-in-chatgpt',
+          },
+          // Anthropic
+          {
+            lab: 'Anthropic',
+            title: 'Anthropic Claude Pricing',
+            url: 'https://claude.com/pricing',
+          },
+          {
+            lab: 'Anthropic',
+            title: 'Anthropic Support: Claude Pro',
+            url: 'https://support.claude.com/en/articles/8325606-what-is-the-pro-plan',
+          },
+          {
+            lab: 'Anthropic',
+            title: 'Anthropic Support: Claude Max',
+            url: 'https://support.claude.com/en/articles/11049741-what-is-the-max-plan',
+          },
+          // Google (gemini.google/subscriptions renders exact US $ and DE € numbers in static HTML)
+          {
+            lab: 'Google',
+            title: 'Google Gemini Subscriptions (US)',
+            url: 'https://gemini.google/us/subscriptions/?hl=en',
+          },
+          {
+            lab: 'Google',
+            title: 'Google Gemini Subscriptions (DE)',
+            url: 'https://gemini.google/de/subscriptions/?hl=de',
+          },
+          {
+            lab: 'Google',
+            title: 'Google One Help: AI Pro (DE)',
+            url: 'https://support.google.com/googleone/answer/14534406?hl=de',
+          },
+          // Meta: consumer browser & personal agent plans (Meta One Core/Premium + muse.ai Free/$20/$100)
+          // Note: Muse Code is a developer terminal CLI tool and excluded as a consumer baseline;
+          // dev.meta.ai/models/muse-wonder is fetched solely to detect if Muse Wonder Full expands beyond CLI.
+          {
+            lab: 'Meta',
+            title: 'Meta Newsroom: Meta One Consumer Bundles ($7.99 / $19.99)',
+            url: 'https://about.fb.com/news/2026/09/introducing-meta-one-subscription-service-more-features-ai/',
+          },
+          {
+            lab: 'Meta',
+            title: 'Meta Newsroom: Introducing Muse Personal Browser Agent',
+            url: 'https://about.fb.com/news/2026/09/introducing-muse/',
+          },
+          {
+            lab: 'Meta',
+            title: 'Meta Newsroom: Muse Wonder & Wonder Full Rollout',
+            url: 'https://about.fb.com/news/2026/10/introducing-muse-wonder-models/',
+          },
+          {
+            lab: 'Meta',
+            title: 'Wikipedia: Meta Muse Agent Pricing (Free / $20 / $100)',
+            url: 'https://en.wikipedia.org/wiki/Meta_Muse',
+          },
+          {
+            lab: 'Meta',
+            title: 'Meta Dev: Muse Wonder Availability Check',
+            url: 'https://dev.meta.ai/models/muse-wonder',
+          },
         ];
 
         const stripHtml = (html: string): string => {
@@ -382,6 +339,7 @@ export async function runPricingCheck(options?: {
             .replace(/&nbsp;/gi, ' ')
             .replace(/&amp;/gi, '&')
             .replace(/&euro;/gi, '€')
+            .replace(/&#x27;/gi, "'")
             .replace(/\s+/g, ' ')
             .trim();
         };
@@ -411,8 +369,9 @@ export async function runPricingCheck(options?: {
               }
               return {
                 lab: target.lab,
+                title: target.title,
                 url: res.url || target.url,
-                excerpt: text.slice(0, 9000),
+                excerpt: extractPricingFocusedExcerpt(text, 8500),
               };
             } catch {
               return null;
@@ -427,35 +386,52 @@ export async function runPricingCheck(options?: {
       const directFetchedSources = await fetchOfficialPricingExcerpts();
       const fetchedContext =
         directFetchedSources.length > 0
-          ? `\n\nLIVE OFFICIAL PRICING PAGE EXCERPTS FETCHED TODAY (${todayIso}):\n${directFetchedSources
-              .map((s) => `--- ${s.lab} (${s.url}) ---\n${s.excerpt}`)
+          ? `\n\nLIVE PRICING & MODEL PAGES FETCHED TODAY (${todayIso}):\n${directFetchedSources
+              .map((s) => `--- ${s.lab} · ${s.title} (${s.url}) ---\n${s.excerpt}`)
               .join('\n\n')}`
           : '';
 
       const prompt = `Today's date is ${todayIso}.
-Analyze the live official pricing page excerpts below (combined with current consumer subscription plan knowledge) in BOTH:
+Audience focus: NON-CODER browser chat / web app users (first-semester psychology students). NEVER use developer terminal CLI tools like "Muse Code" as the consumer pricing baseline!
+Analyze the live fetched pricing & model pages below (combined with verified current plan knowledge where regional VAT/annual conversions apply) in BOTH:
 1. United States (USD, "$")
-2. Germany (EUR, "€", incl. VAT — or "US only" if a paid plan/model is currently unavailable in Germany)
+2. Germany (EUR, "€", incl. VAT — or "US only" if a paid consumer plan/model is currently unavailable in Germany)
 
-You MUST include ALL relevant paid consumer & personal-agent plans across all 4 AI labs (including entry paid tiers that currently don't unlock models beyond free tier yet, as well as higher power tiers that could become relevant):
-- OpenAI: ChatGPT Go ($8 / ~8€; currently no model access beyond Luna in Free tier), ChatGPT Plus ($20 / 23€), ChatGPT Pro ($100 / 103€ base tier, plus $200 / $500 higher tiers if listed)
-- Anthropic: Claude Pro ($17-20 / 15-18€), Claude Max ($100 / 90€), Claude Ultra ($200 / 180€)
-- Google: Google AI Plus ($4.99 / ~4.99-9.99€; entry paid tier with double Hydrogen access & 400 GB), Google AI Pro ($17-20 / 14-22€), Google AI Ultra ($100+ / 99€+)
-- Meta: Muse Power ($20 / US only), Muse Code Power ($50 / US only, where Muse Wonder Full is accessed), Muse Maximum ($100 / US only)
+You MUST include ALL relevant CONSUMER browser/app plans across all 4 AI labs in "labs" (excluding CLI-only tools like Muse Code):
+- OpenAI: ChatGPT Go ($8 / ~8€; expanded free-tier features, no Pro/Plus-exclusive models), ChatGPT Plus ($20 / 23€), ChatGPT Pro 100 ($100 / 103€), ChatGPT Pro 200 ($200 / 200€), ChatGPT Pro 500 ($500 / 500€)
+- Anthropic: Claude Pro ($17-20 / 15-18€; includes Opus 5.5), Claude Max ($100 / 90€; includes Fable 5.2), Claude Ultra ($200 / 180€)
+- Google: Google AI Plus ($4.99 / 4.99-9.99€; 2x Hydrogen, 400 GB), Google AI Pro ($17-20 / 14-22€; Gemini 4 Argon, 5 TB), Google AI Ultra ($100+ / 99€+; Gemini 4 Carbon, 20 TB)
+- Meta (Consumer Browser / App Plans ONLY — do NOT list Muse Code CLI plans in "labs"!):
+  * Meta AI Free ($0 / 0€ — meta.ai chat, Muse Spark 1.1)
+  * Meta One Core ($7.99 / ~8-9€ — app perks + extra media gen; NO Muse Wonder)
+  * Meta One Premium ($19.99 / ~20-23€ — max Meta AI media gen; NO Muse Wonder)
+  * Muse Free ($0 / US only — muse.ai browser agent, baseline weekly quota)
+  * Muse Power ($20 / US only — muse.ai browser agent, 500M tok/wk)
+  * Muse Maximum ($100 / US only — muse.ai browser agent, 3B tok/wk; quota only)
 
-CRITICAL FORMATTING RULES (must match the Science-IQ Google Sheet columns T & U):
-- Sheet header rule is: "if paid for 1 year vs. if paid monthly".
-- If annual billing is cheaper than monthly, format as a compact range like "$17-20" or "15-18€" or "14-22€".
-- If there is no annual discount or only monthly pricing exists, format as a single price like "$20", "23€", "$100", "99€", "103€", "$50", "$200", "229€".
-- If a paid plan is available in the US but NOT yet available to consumers in Germany, set DE price to "US only".
-- Compare ONLY against the live/current official subscription tier for each paid model listed below. Do NOT invent changes for cosmetic differences (if the sheet's current price already matches the real current plan price within rounding/VAT, keep the exact current sheet string as liveDe / liveUs so there are no false-positive diffs!).
+CRITICAL VERIFICATION & MODEL-TO-TIER RULES:
+1. NEVER blindly trust or copy the Google Sheet's current "de" / "us" values! Verify EVERY model strictly against the fetched sources below first.
+2. Always match each paid model to the CHEAPEST / LOWEST CONSUMER BROWSER subscription tier that grants access to that model — NEVER assign a consumer baseline to a CLI coding plan ("Muse Code" $5/$15/$50/$200) or to a higher-quota tier just to match the sheet:
+   - Meta (Consumer browser / non-coder baseline):
+     * Casual meta.ai browser chat is FREE ($0 / 0€) and Meta One ($7.99 / $19.99) only increases media/app perks — Meta One does NOT unlock Muse Spark 1.3, Muse Wonder, or Muse Wonder Full.
+     * "Muse Spark 1.3": Consumer browser access is via muse.ai ("Meta Muse" web/app, US only — not in meta.ai chat). Paid consumer browser tier is "Muse Power" ($20 / US only) — NEVER assign "Muse Code Everyday ($5)" CLI or "Muse Maximum ($100)"!
+     * "Muse Wonder": Rolling out to muse.ai consumer subscribers — consumer browser baseline is "Muse Power" ($20 / US only), NOT "Muse Code Everyday ($5)" CLI!
+     * "Muse Wonder Full": Currently has NO consumer browser chat plan on meta.ai or muse.ai (only available via developer CLI "Muse Code Power" at $50 / US only). Unless the fetched sources show Muse Wonder Full launching in muse.ai/meta.ai browser chat, match it as "Muse Code Power (CLI only)" with liveDe="US only". For liveUs: if the sheet's current "us" already mentions "no chat", "CLI", or "coder" alongside "$50" (e.g. "no chat / $50 for coders"), KEEP that exact sheet string unchanged as liveUs so the user's note is preserved; otherwise set liveUs="$50". State "CLI only (kein Browser-Chat)" in "reason".
+   - OpenAI: GPT-6.1 Sol / Terra unlock at ChatGPT Plus ($20 / 23€); GPT-6 Astra unlocks at ChatGPT Pro 100 ($100 / 103€).
+   - Anthropic: Claude Opus 5.5 unlocks at Claude Pro ($17-20 / 15-18€); Claude Fable 5.2 unlocks at Claude Max ($100 / 90€).
+   - Google: Gemini 4 Argon unlocks at Google AI Pro ($17-20 / 14-22€); Gemini 4 Carbon unlocks at Google AI Ultra ($100 / 99€).
+3. Sheet formatting rules (Columns T & U, "if paid for 1 year vs. if paid monthly"):
+   - Annual discount < monthly -> compact range like "$17-20", "15-18€", "14-22€".
+   - Monthly-only / flat -> "$20", "23€", "$100", "99€", "103€", "$50", "$7.99", "$19.99".
+   - Paid plan unavailable in Germany -> DE price = "US only".
+   - ONLY keep an identical sheet string for minor currency/VAT/annual rounding when the model is matched to the RIGHT consumer tier (do NOT suppress real tier changes!).
 
-CONCISENESS RULES (very important for a clean, uncluttered UI):
-- "billingNotes": MAX 50 characters. List only key unlocked models/limits (e.g., "Nur Luna (wie Free)", "GPT-6.1 Sol/Terra, Astra", "5x Pro, Fable, $100 API", "400 GB, 2x Hydrogen"). Do NOT repeat prices, "monthly only", or "Available in US and Germany" — the DE/US columns already show that!
-- "reason": MAX 55 characters. Do NOT write "Matches current X pricing ($Y in US, Z€ in DE)". Just state the concise billing basis if unchanged (e.g., "Jahres-/Monatsabo", "Monatsabo inkl. MwSt", "Muse Coding-Agent (US)") or the exact delta if changed (e.g., "Neu $25 statt $20").
-- "summaryDe" / "summaryEn": ONE short sentence (max 120 characters).
+CONCISENESS RULES (for clean UI):
+- "billingNotes": MAX 50 chars. Only key unlocked models/limits (e.g., "meta.ai chat (Spark 1.1)", "muse.ai agent, 500M tok/wk", "App perks+media (no Wonder)").
+- "reason": MAX 55 chars. Concise tier note or exact delta (e.g., "muse.ai Power $20 (CLI $5 ign.)", "CLI-only $50 (kein Browser-Chat)").
+- "summaryDe" / "summaryEn": ONE short sentence (max 120 chars).
 
-Here are the current active/paid models from the sheet (Rows 36+) to compare:
+Here are the current active/paid models from the sheet (Rows 36+) to verify:
 ${JSON.stringify(
   monitoredModels.map((m) => ({
     id: m.id,
@@ -472,21 +448,21 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
   "labs": [
     {
       "lab": "OpenAI" | "Anthropic" | "Google" | "Meta",
-      "planName": "e.g. ChatGPT Go",
+      "planName": "e.g. Muse Power",
       "tierKey": "standard" | "pro" | "ultra" | "free",
-      "usMonthly": "$8",
-      "deMonthly": "8€",
-      "billingNotes": "Nur Luna (wie Free)",
+      "usMonthly": "$20",
+      "deMonthly": "US only",
+      "billingNotes": "muse.ai agent, 500M tok/wk",
       "sourceUrl": "https://..."
     }
   ],
   "modelComparisons": [
     {
       "modelId": "matching id from input",
-      "matchedPlanName": "e.g. Claude Pro",
-      "liveDe": "15-18€",
-      "liveUs": "$17-20",
-      "reason": "Jahres-/Monatsabo",
+      "matchedPlanName": "e.g. Muse Power (muse.ai)",
+      "liveDe": "US only",
+      "liveUs": "$20",
+      "reason": "muse.ai Power $20 (CLI $5 ign.)",
       "sourceUrl": "https://..."
     }
   ],
@@ -643,7 +619,10 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
             : changedCount > 0
             ? `Detected ${changedCount} pricing change(s) across Meta, OpenAI, Anthropic, or Google.`
             : 'No pricing changes detected compared to your Google Sheet.',
-        sources: [],
+        sources: directFetchedSources.map((s) => ({
+          title: `${s.lab}: ${s.title}`,
+          uri: s.url,
+        })),
       };
 
       await writeCache({ report, lastError: null, cooldownUntil: null });
@@ -692,36 +671,4 @@ function formatGeminiError(err: unknown): string {
     return 'Gemini API key permission denied or invalid. Please check your key in Settings > Secrets.';
   }
   return parsedMsg;
-}
-
-export function startDailyPricingScheduler(): void {
-  if (schedulerStarted) return;
-  schedulerStarted = true;
-
-  const maybeRunScheduledCheck = async () => {
-    try {
-      const hasKey = Boolean(
-        process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY'
-      );
-      if (!hasKey) return;
-
-      const cache = await readCache();
-      if (isReportDue(cache.report, cache.cooldownUntil) && !inFlightCheck) {
-        console.log('[PricingMonitor] Running scheduled 24h pricing check...');
-        await runPricingCheck({ trigger: 'daily_auto' });
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err || '');
-      console.log(`[PricingMonitor] Scheduled check deferred: ${msg}`);
-    }
-  };
-
-  // Initial check 15s after server startup if >24h stale and not in cooldown, then check hourly
-  setTimeout(() => {
-    void maybeRunScheduledCheck();
-  }, 15_000);
-
-  setInterval(() => {
-    void maybeRunScheduledCheck();
-  }, 60 * 60 * 1000);
 }

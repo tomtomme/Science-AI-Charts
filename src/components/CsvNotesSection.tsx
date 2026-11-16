@@ -67,12 +67,12 @@ function getBenchmarkHeadingColor(heading?: string): string {
   if (clean.includes('real econ') || clean.includes('econ & legal') || clean.includes('wirtschaft') || clean.includes('vals')) return '#EA580C';
 
   // Sub-headings under Chatbot Ranking
-  if (clean === 'current' || clean.startsWith('current')) return '#2563EB';
-  if (clean === 'history' || clean.startsWith('history')) return '#7C3AED';
+  if (clean === 'current' || clean.startsWith('current') || clean === 'aktuell' || clean.startsWith('aktuell')) return '#2563EB';
+  if (clean === 'history' || clean.startsWith('history') || clean === 'verlauf' || clean.startsWith('verlauf') || clean === 'historie') return '#7C3AED';
 
   // Final scores & other sub-headings
-  if (clean === 'old' || clean.startsWith('old') || clean.includes('spalte l') || clean.includes('column l')) return '#D97706';
-  if (clean === 'new' || clean.startsWith('new') || clean.includes('spalte m') || clean.includes('column m')) return '#10B981';
+  if (clean === 'old' || clean.startsWith('old') || clean === 'alt' || clean.startsWith('alt ') || clean.includes('spalte l') || clean.includes('column l')) return '#D97706';
+  if (clean === 'new' || clean.startsWith('new') || clean === 'neu' || clean.startsWith('neu ') || clean.includes('spalte m') || clean.includes('column m')) return '#10B981';
   if (clean.includes('worst-case') || clean.includes('worst case') || clean.includes('spalte n') || clean.includes('column n') || clean.includes('why') || clean.includes('warum')) return '#F43F5E';
   if (clean.includes('storyline')) return '#06B6D4';
 
@@ -87,11 +87,11 @@ export function getParagraphAnchorId(heading?: string): string | undefined {
   const h = heading.toLowerCase().replace(/^[-–—\s]+/, '').replace(/[:=.]/g, '').trim();
 
   // Major section: Chatbot Ranking
-  if (h.includes('chatbot ranking') || h.includes('chatbot-rangliste') || h.includes('chatbot rangliste') || h === 'ranking') return 'ranking-section';
+  if (h.includes('chatbot ranking') || h.includes('chatbot-ranking') || h.includes('chatbot-rangliste') || h.includes('chatbot rangliste') || h === 'ranking') return 'ranking-section';
 
   // Sub-headings under Chatbot Ranking
-  if (h === 'current' || h.startsWith('current')) return 'note-current';
-  if (h === 'history' || h.startsWith('history')) return 'note-history';
+  if (h === 'current' || h.startsWith('current') || h === 'aktuell' || h.startsWith('aktuell')) return 'note-current';
+  if (h === 'history' || h.startsWith('history') || h === 'verlauf' || h.startsWith('verlauf') || h === 'historie') return 'note-history';
 
   // Major section: Benchmarks explainer ("The different benchmarks which result in the Final Scores")
   if (
@@ -131,17 +131,17 @@ export function getParagraphAnchorId(heading?: string): string | undefined {
 
   // Major section: Final Scores explainer ("The Final Scores which are comprised of the different benchmarks")
   if (
-    (h.includes('final scores') || h.includes('final score') || h.includes('finale scores')) &&
+    (h.includes('final scores') || h.includes('final score') || h.includes('finale scores') || h.includes('gesamtwerte')) &&
     (h.includes('comprise') || h.includes('comprised') || h.includes('zusammensetzen') || (!h.includes('old') && !h.includes('new') && !h.includes('worst')))
   ) {
     return 'final-scores-section';
   }
 
   // Final Score OLD (Col L)
-  if (h.includes('spalte l') || h.includes('column l') || h.includes('score old') || h === 'old' || h.startsWith('old ') || h.startsWith('old:')) return 'note-col-l';
+  if (h.includes('spalte l') || h.includes('column l') || h.includes('score old') || h === 'old' || h.startsWith('old ') || h.startsWith('old:') || h === 'alt' || h.startsWith('alt ') || h.startsWith('alt:')) return 'note-col-l';
 
   // Final Score NEW (Col M)
-  if (h.includes('spalte m') || h.includes('column m') || h.includes('score new') || h === 'new' || h.startsWith('new ') || h.startsWith('new:')) return 'note-col-m';
+  if (h.includes('spalte m') || h.includes('column m') || h.includes('score new') || h === 'new' || h.startsWith('new ') || h.startsWith('new:') || h === 'neu' || h.startsWith('neu ') || h.startsWith('neu:')) return 'note-col-m';
 
   // Worst-Case (Col N)
   if (h.includes('spalte n') || h.includes('column n') || h.includes('worst-case') || h.includes('worst case') || h.startsWith('worst')) return 'note-col-n';
@@ -182,63 +182,71 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     });
   }
 
-  // 2. Sub-headings: Current & History under Chatbot Ranking
-  const currentRegex = /(?:^|\r?\n|[:.!?)]|[^\w\s])\s*-+\s*(Current)\b(?:\s*[:=]|\s*\r?\n|\s+(?=is\b))/gi;
+  // 2. Sub-headings: Current & History under Chatbot Ranking (EN + DE)
+  // Note: Never use unflagged [^\w\s] before '-' because UTF-16 surrogate-pair emojis (e.g. '🌐-Weltkugel-Symbol') get split in half!
+  const currentRegex = /(?:^|\r?\n|[.!?):]\s*)\s*-+\s*(Current|Aktuell)\b(?:\s*[:=]|\s*\r?\n|\s+(?=is\b|ist\b|beschränkt\b))/giu;
   while ((match = currentRegex.exec(rawText)) !== null) {
+    const dashOffset = match[0].indexOf('-');
     cuts.push({
-      start: match.index,
+      start: match.index + (dashOffset >= 0 ? dashOffset : 0),
       end: match.index + match[0].length,
-      heading: 'Current',
+      heading: match[1].trim(),
       isMajor: false,
     });
   }
 
-  const historyRegex = /(?:^|\r?\n|[:.!?)]|[^\w\s])\s*-+\s*(History)\b(?:\s*[:=]|\s*\r?\n|\s+(?=shows\b))/gi;
+  const historyRegex = /(?:^|\r?\n|[.!?):]\s*)\s*-+\s*(History|Verlauf|Historie)\b(?:\s*[:=]|\s*\r?\n|\s+(?=shows\b|zeigt\b))/giu;
   while ((match = historyRegex.exec(rawText)) !== null) {
+    const dashOffset = match[0].indexOf('-');
     cuts.push({
-      start: match.index,
+      start: match.index + (dashOffset >= 0 ? dashOffset : 0),
       end: match.index + match[0].length,
-      heading: 'History',
+      heading: match[1].trim(),
       isMajor: false,
     });
   }
 
-  // 3. Explicit known benchmark keywords (e.g. IQ, Non-Hallucination-Rate, Science Knowledge, Experimenting & Engineering, SimpleBench.com, etc.)
-  // Handles punctuation boundaries, optional dashes, spaces, domain suffixes, and 'in %' suffixes
-  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]|\bquestions)\s*(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Science Knowledge|Plot Reading|Diagnostics?|Excel Analyst|Experimenting(?:\s*&\s*Engineering)?|Agentic(?:\s+Work)?|GDPx|Simple-?Bench(?:\.[a-z]+)?|\(3D\)\s*Trick Questions|Real Econ\s*&\s*Legal\s*Work)\s*([:=])(?!\/\/)\s*/gi;
+  // 3. Explicit known benchmark keywords (EN + DE)
+  const benchmarkKeywordsRegex = /(?:^|\r?\n|[.!?):]\s*|\bquestions\s+|\bFragen\s+)(?:-+\s*)?(IQ|Non-Hallu(?:cination)?-Rate(?:\s+in\s+%)?|Faktentreue(?:\s*\([^)]+\))?|Science Knowledge|Faktenwissen(?:\s*\([^)]+\))?|Plot Reading|Diagrammanalyse(?:\s*\([^)]+\))?|Diagnostics?|Diagnostik|Excel[\s-]Analyst|Experimenting(?:\s*&\s*Engineering)?|Agentic(?:\s+Work)?|GDPx|Simple-?Bench(?:\.[a-z]+)?|\(3D\)\s*Trick Questions|Trickfragen|Real Econ\s*&\s*Legal\s*Work|Wirtschaft\s*&\s*Recht)\s*([:=])(?!\/\/)\s*/giu;
   while ((match = benchmarkKeywordsRegex.exec(rawText)) !== null) {
+    const dashOffset = match[0].indexOf('-');
+    const headingOffset = match[0].indexOf(match[1]);
+    const relStart = dashOffset >= 0 && dashOffset < headingOffset ? dashOffset : headingOffset;
     cuts.push({
-      start: match.index,
+      start: match.index + Math.max(0, relStart),
       end: match.index + match[0].length,
       heading: match[1].trim(),
       isMajor: false,
     });
   }
 
-  // 4. General bullets starting with '-' followed by label with ':' or '=' (supporting ., %, /, &, and unicode dashes, while never matching URLs like https://)
-  const bulletRegex = /(?:^|\r?\n|[.!?):]|\bquestions|[^\w\s])\s*-+\s*([A-Z(][A-Za-z0-9().&'"\/%\s–—-]*?)([:=])(?!\/\/)\s*/g;
+  // 4. General bullets starting with '-' followed by single-line label with ':' or '=' (never spanning newlines, never splitting UTF-16 emojis like 🌐-Weltkugel-Symbol)
+  const bulletRegex = /(?:^|\r?\n|[.!?):]\s+)\s*-+\s*([A-ZÄÖÜ(][A-Za-zÄÖÜäöüß0-9().&'"\/% –—-]{0,64}?)([:=])(?!\/\/)\s*/gu;
   while ((match = bulletRegex.exec(rawText)) !== null) {
+    const dashOffset = match[0].indexOf('-');
+    const heading = match[1].trim();
+    if (!heading || heading.includes('\n') || heading.includes('\r')) continue;
     cuts.push({
-      start: match.index,
+      start: match.index + (dashOffset >= 0 ? dashOffset : 0),
       end: match.index + match[0].length,
-      heading: match[1].trim(),
+      heading,
       isMajor: false,
     });
   }
 
-  // 4. Match 'OLD:' right after Final Scores divider
-  const idxOld = rawText.indexOf('OLD:');
-  if (idxOld !== -1) {
+  // 5. Match 'OLD:' / 'ALT:' right after Final Scores divider
+  const oldMatch = /\b(OLD|ALT):/i.exec(rawText);
+  if (oldMatch) {
     cuts.push({
-      start: idxOld,
-      end: idxOld + 4,
-      heading: 'OLD',
+      start: oldMatch.index,
+      end: oldMatch.index + oldMatch[0].length,
+      heading: oldMatch[1].toUpperCase(),
       isMajor: false,
     });
   }
 
-  // 5. Match 'Storyline' note (with or without dash or colon)
-  const storyRegex = /(?:^|\r?\n)\s*(?:-+\s*)?Storyline\b(?:\s*[:=]|\s+contains\b)?/gi;
+  // 6. Match 'Storyline' note (with or without dash or colon)
+  const storyRegex = /(?:^|\r?\n)\s*(?:-+\s*)?Storyline\b(?:\s*[:=]|\s+(?:contains|enthält)\b)?/gi;
   while ((match = storyRegex.exec(rawText)) !== null) {
     cuts.push({
       start: match.index,
@@ -286,7 +294,7 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
     const cur = filtered[i];
     const nextStart = i + 1 < filtered.length ? filtered[i + 1].start : rawText.length;
     let chunk = rawText.slice(cur.end, nextStart).trim();
-    chunk = chunk.replace(/^[.\s\-]+/, '').trim();
+    chunk = chunk.replace(/^[.\s]+/, '').trim();
     if (chunk || cur.isMajor) {
       result.push({
         heading: cur.heading,
@@ -307,17 +315,18 @@ export function parseSection1Text(rawText: string): CsvParagraph[] {
 export function parseSection2Text(rawText: string): CsvParagraph[] {
   if (!rawText) return [];
 
-  // Dedicated cues targeting the exact bullet structure of cell O34
+  // Dedicated cues targeting the exact bullet structure of cell O34 (DE + EN variations)
+  // Always preserves the actual matched heading from rawText so EN displays EN headings and DE displays DE headings.
   const topicCues = [
-    { key: 'censorship', regex: /(?:^|\r?\n|\s)-\s*(Zensur\s*&\s*Datenschutz|Censorship\s*&\s*Data\s*Privacy)(?::|\r?\n|\s+)/i, defaultHeading: 'Zensur & Datenschutz' },
-    { key: 'iq', regex: /(?:^|\r?\n|\s)-\s*(IQ)(?::|\r?\n|\s+)/i, defaultHeading: 'IQ' },
-    { key: 'frugal', regex: /(?:^|\r?\n|\s)-\s*(Sparfuchs-Tipp|Frugal\s*Tip)(?::|\r?\n|\s+)/i, defaultHeading: 'Sparfuchs-Tipp' },
-    { key: 'saturation', regex: /(?:^|\r?\n|\s)-\s*(Sättigungs-Problem|"Saturation"\s*Problem|Saturation\s*Problem)(?::|\r?\n|\s+)/i, defaultHeading: 'Sättigungs-Problem' },
-    { key: 'conversation', regex: /(?:^|\r?\n|\s)-\s*(Konversations-Tipp|Conversation\s*Tip)(?::|\r?\n|\s+)/i, defaultHeading: 'Konversations-Tipp' },
-    { key: 'antibullshit', regex: /(?:^|\r?\n|\s)-\s*(Anti-Unsinn-Tipp|Anti-Bullshit\s*Tip)(?::|\r?\n|\s+)/i, defaultHeading: 'Anti-Unsinn-Tipp' },
-    { key: 'whentouse', regex: /(?:^|\r?\n|\s)-\s*(Wann\s+KI\s+nutzen\s+und\s+wann\s+nicht\?|When\s+to\s+use\s+AI\s+and\s+when\s+not\?)(?:\s+|\r?\n|$)/i, defaultHeading: 'Wann KI nutzen und wann nicht?' },
-    { key: 'statsmachines', regex: /(?:^|\r?\n|\s)-\s*(KIs\s+sind\s+statistische\s+Maschinen\s+bzw\.\s+neuronale\s+Netze|AIs\s+are\s+statistical\s+machines\s+\(neural\s+networks\))(?:[.:]|\s+|\r?\n|$)/i, defaultHeading: 'KIs sind statistische Maschinen bzw. neuronale Netze' },
-    { key: 'newreqs', regex: /(?:^|\r?\n|\s)-\s*(Neue\s+Anforderungen|Higher\s+Evaluation\s+Standards\s*&\s*Academic\s*Integrity)(?::|\s+|\r?\n|$)/i, defaultHeading: 'Neue Anforderungen' },
+    { key: 'censorship', regex: /(?:^|\r?\n|\s)-\s*(Zensur\s*&\s*Datenschutz|Censorship\s*(?:&|and)\s*Data\s*Privacy)(?::|\r?\n|\s+)/iu },
+    { key: 'iq', regex: /(?:^|\r?\n|\s)-\s*(IQ)(?::|\r?\n|\s+)/iu },
+    { key: 'frugal', regex: /(?:^|\r?\n|\s)-\s*(Sparfuchs-Tipp|Frugal\s*Tip|Budget\s*Tip|Bargain(?:\s*Hunter)?\s*Tip|Money[- ]Saving\s*Tip)(?::|\r?\n|\s+)/iu },
+    { key: 'saturation', regex: /(?:^|\r?\n|\s)-\s*(Sättigungs-Problem|"Saturation"\s*Problem|Saturation\s*Problem)(?::|\r?\n|\s+)/iu },
+    { key: 'conversation', regex: /(?:^|\r?\n|\s)-\s*(Konversations-Tipp|Conversation\s*Tip)(?::|\r?\n|\s+)/iu },
+    { key: 'antibullshit', regex: /(?:^|\r?\n|\s)-\s*(Anti-Unsinn-Tipp|Anti-Bullshit\s*Tip|Anti-Nonsense\s*Tip)(?::|\r?\n|\s+)/iu },
+    { key: 'whentouse', regex: /(?:^|\r?\n|\s)-\s*(Wann\s+KI\s+nutzen\s+und\s+wann\s+nicht\??|When\s+to\s+use\s+AI\s+and\s+when\s+not(?:\s+to)?\??)(?:\s+|\r?\n|$)/iu },
+    { key: 'statsmachines', regex: /(?:^|\r?\n|\s)-\s*(KIs\s+sind\s+statistische\s+Maschinen(?:\s+bzw\.?\s+neuronale\s+Netze|\s*\(neuronale\s+Netze\))?|AIs\s+are\s+statistical\s+machines(?:\s*\(neural\s+networks\)|\s+or\s+neural\s+networks)?)(?:[.:]|\s+|\r?\n|$)/iu },
+    { key: 'newreqs', regex: /(?:^|\r?\n|\s)-\s*(Neue\s+Anforderungen|Higher\s+Evaluation\s+Standards\s*&\s*Academic\s*Integrity|New\s+Requirements(?:\s+for\s+academic\s+work)?)(?::|\s+|\r?\n|$)/iu },
   ];
 
   interface Cut {
@@ -331,23 +340,49 @@ export function parseSection2Text(rawText: string): CsvParagraph[] {
   for (const cue of topicCues) {
     const m = cue.regex.exec(rawText);
     if (m) {
+      const dashOffset = m[0].indexOf('-');
+      const heading = m[1].trim().replace(/[:.]$/, '').trim();
       cuts.push({
-        start: m.index,
+        start: m.index + (dashOffset >= 0 ? dashOffset : 0),
         end: m.index + m[0].length,
-        heading: cue.defaultHeading,
+        heading,
         key: cue.key,
       });
     }
   }
 
-  // Also match general bullets starting with '-' followed by heading (using negative lookahead :(?!//) to never break on URLs)
-  const generalBulletRegex = /(?:^|\r?\n)\s*-\s*([A-Za-z0-9ÄÖÜäöü"&(),.?!' -]{3,65}?)(?::(?!\/\/)|[?]\s+|\r?\n|$)\s*/g;
+  // Also match general bullets starting with '-' (at line start or after sentence punctuation with colon)
+  // Using negative lookahead :(?!//) to never break on URLs, and never matching mid-quote prose dashes like '" - I see it...'
+  const generalBulletRegex = /(?:^|\r?\n)\s*-\s*([A-Za-z0-9ÄÖÜäöüß"&(),.!' –—-]{3,65}?\??)(?::(?!\/\/)|\s*\r?\n|$)\s*/gu;
   let gMatch: RegExpExecArray | null;
   while ((gMatch = generalBulletRegex.exec(rawText)) !== null) {
-    const heading = gMatch[1].trim();
-    if (heading.length > 0 && !cuts.some((c) => Math.abs(c.start - gMatch!.index) < 10)) {
+    const dashOffset = gMatch[0].indexOf('-');
+    const gStart = gMatch.index + (dashOffset >= 0 ? dashOffset : 0);
+    const heading = gMatch[1].trim().replace(/[:.]$/, '').trim();
+    if (
+      heading.length > 0 &&
+      !cuts.some((c) => (gStart >= c.start && gStart < c.end) || Math.abs(c.start - gStart) < 12)
+    ) {
       cuts.push({
-        start: gMatch.index,
+        start: gStart,
+        end: gMatch.index + gMatch[0].length,
+        heading,
+      });
+    }
+  }
+
+  // Also allow inline '. - Heading:' bullets when a new bullet has an explicit trailing ':'
+  const inlineColonBulletRegex = /(?:[.!?)]\s+)-\s*([A-ZÄÖÜ"][^\r\n:]{2,60}?):(?!\/\/)\s*/gu;
+  while ((gMatch = inlineColonBulletRegex.exec(rawText)) !== null) {
+    const dashOffset = gMatch[0].indexOf('-');
+    const gStart = gMatch.index + (dashOffset >= 0 ? dashOffset : 0);
+    const heading = gMatch[1].trim();
+    if (
+      heading.length > 0 &&
+      !cuts.some((c) => (gStart >= c.start && gStart < c.end) || Math.abs(c.start - gStart) < 12)
+    ) {
+      cuts.push({
+        start: gStart,
         end: gMatch.index + gMatch[0].length,
         heading,
       });
@@ -394,13 +429,13 @@ function matchSection2Topic(heading?: string, text?: string): string {
   const cleanHeading = (heading || '').trim().toLowerCase();
   if (norm.includes('zensur') || norm.includes('censor') || norm.includes('datenschutz') || norm.includes('privacy')) return 'censorship';
   if (cleanHeading === 'iq' || cleanHeading.startsWith('iq:') || norm.includes('iq-tests') || norm.includes('aa-ii') || norm.includes('artificialanalysis')) return 'iq';
-  if (norm.includes('sparfuchs') || norm.includes('frugal') || norm.includes('kostenpflichtig') || norm.includes('drittanbieter')) return 'frugal';
+  if (norm.includes('sparfuchs') || norm.includes('frugal') || norm.includes('budget tip') || norm.includes('money-saving tip') || norm.includes('kostenpflichtig') || norm.includes('drittanbieter')) return 'frugal';
   if (norm.includes('saturation') || norm.includes('sättigung') || norm.includes('geleakte fragen')) return 'saturation';
   if (norm.includes('konversation') || norm.includes('conversation') || norm.includes('deep think')) return 'conversation';
-  if (norm.includes('anti-unsinn') || norm.includes('anti-bullshit') || norm.includes('fake news') || norm.includes('fakenews')) return 'antibullshit';
+  if (norm.includes('anti-unsinn') || norm.includes('anti-bullshit') || norm.includes('anti-nonsense') || norm.includes('fake news') || norm.includes('fakenews')) return 'antibullshit';
   if (norm.includes('wann ki') || norm.includes('when to use') || norm.includes('wichtige kriterien') || norm.includes('inspiration')) return 'whentouse';
-  if (norm.includes('statistische maschine') || norm.includes('statistical machine') || norm.includes('neuronale netze') || norm.includes('flowingdata') || norm.includes('terence tao')) return 'statsmachines';
-  if (norm.includes('neue anforderung') || norm.includes('higher evaluation') || norm.includes('lischke') || norm.includes('wissenschaftlich arbeiten')) return 'newreqs';
+  if (norm.includes('statistische maschine') || norm.includes('statistical machine') || norm.includes('neuronale netze') || norm.includes('neural networks') || norm.includes('flowingdata') || norm.includes('terence tao')) return 'statsmachines';
+  if (norm.includes('neue anforderung') || norm.includes('new requirement') || norm.includes('higher evaluation') || norm.includes('lischke') || norm.includes('wissenschaftlich arbeiten')) return 'newreqs';
   return '';
 }
 
@@ -544,7 +579,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
   const { columnsGuide, practicalGuide } = CSV_NOTES_DATA;
   const isDe = appLang === 'de';
 
-  // Section 1 Title: dynamically from Cell A34 / B34 (synced from CSV)
+  // Section 1 Title: dynamically from Cell B34 (legacy fallback A34), weekly translated in DE
   const dynamicSec1Title = notesMeta?.section1Title?.trim();
   const isSec1TitleEn = !dynamicSec1Title || dynamicSec1Title.toLowerCase().includes('how to');
   const isSec1TitleDe = dynamicSec1Title && (
@@ -552,10 +587,10 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
     dynamicSec1Title.toLowerCase().includes('lesen')
   );
   const title1 = isDe
-    ? (isSec1TitleEn ? columnsGuide.titleDe : dynamicSec1Title)
+    ? (notesMeta?.section1TitleDe || (isSec1TitleEn ? columnsGuide.titleDe : dynamicSec1Title))
     : (isSec1TitleDe ? columnsGuide.titleEn : (dynamicSec1Title || columnsGuide.titleEn));
 
-  // Section 2 Title: dynamically from Cell N34 (synced from CSV)
+  // Section 2 Title: dynamically from Cell N34, weekly translated in DE
   const dynamicSec2Title = notesMeta?.section2Title?.trim();
   const isSec2TitleEn = !dynamicSec2Title || dynamicSec2Title.toLowerCase().includes('what bot');
   const isSec2TitleDe = dynamicSec2Title && (
@@ -563,10 +598,10 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
     dynamicSec2Title.toLowerCase().includes('tun können')
   );
   const title2 = isDe
-    ? (isSec2TitleEn ? practicalGuide.titleDe : dynamicSec2Title)
+    ? (notesMeta?.section2TitleDe || (isSec2TitleEn ? practicalGuide.titleDe : dynamicSec2Title))
     : (isSec2TitleDe ? practicalGuide.titleEn : (dynamicSec2Title || practicalGuide.titleEn));
 
-  // Dynamically parse live CSV strings from C34 and O34
+  // Dynamically parse live CSV strings from C34 and O34 (or weekly AI-translated versions)
   const dynamicP1 = notesMeta?.section1Content
     ? parseSection1Text(notesMeta.section1Content)
     : [];
@@ -574,29 +609,35 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
     ? parseSection2Text(notesMeta.section2Content)
     : [];
 
-  // Paragraphs for Box 1 (Cell C34):
-  // Synchronized with live CSV, presenting German when 'de' is selected and English when 'en' is selected
-  const paragraphs1 = getBilingualSection1Paragraphs(
-    dynamicP1,
-    columnsGuide.paragraphsDe,
-    columnsGuide.paragraphsEn,
-    isDe
-  );
+  // Paragraphs for Box 1 (Cell C34)
+  const paragraphs1 =
+    isDe && notesMeta?.section1ContentDe
+      ? parseSection1Text(notesMeta.section1ContentDe)
+      : getBilingualSection1Paragraphs(
+          dynamicP1,
+          columnsGuide.paragraphsDe,
+          columnsGuide.paragraphsEn,
+          isDe
+        );
 
-  // Paragraphs for Box 2 (Cell O34):
-  // Synchronized with live CSV, presenting German when 'de' is selected and English when 'en' is selected
-  const paragraphs2 = getBilingualSection2Paragraphs(
-    dynamicP2,
-    practicalGuide.paragraphsDe,
-    practicalGuide.paragraphsEn,
-    isDe
-  );
+  // Paragraphs for Box 2 (Cell O34)
+  const paragraphs2 =
+    isDe && notesMeta?.section2ContentDe
+      ? parseSection2Text(notesMeta.section2ContentDe)
+      : !isDe && notesMeta?.section2ContentEn
+      ? parseSection2Text(notesMeta.section2ContentEn)
+      : getBilingualSection2Paragraphs(
+          dynamicP2,
+          practicalGuide.paragraphsDe,
+          practicalGuide.paragraphsEn,
+          isDe
+        );
 
   return (
     <section id="csv-notes-section" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
       {/* Zwei visuell getrennte Bereiche direkt aus der CSV */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-        {/* Bereich 1: How To Read (Titel aus Zelle A34, Inhalt aus Zelle C34) */}
+        {/* Bereich 1: How to read this (Titel aus Zelle B34, Inhalt aus Zelle C34) */}
         <div className="flex flex-col bg-slate-50/70 dark:bg-slate-950/40 border border-slate-200/90 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs">
           {/* Header Bereich 1 */}
           <div className="flex items-center gap-2 pb-1.5 mb-1.5">

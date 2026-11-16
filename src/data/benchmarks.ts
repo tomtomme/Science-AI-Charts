@@ -224,7 +224,8 @@ export const RETIRED_TIMELINE_BENCHMARKS: BenchmarkComponent[] = [
 export function getBenchmarkCategoryLabel(
   rawCsvOrKey: string | undefined,
   lang: 'de' | 'en',
-  compFallback?: BenchmarkComponent | null
+  compFallback?: BenchmarkComponent | null,
+  isPreTranslatedDe = false
 ): string {
   if (!rawCsvOrKey && !compFallback) return '';
   const raw = (rawCsvOrKey || compFallback?.key || '').trim();
@@ -239,6 +240,11 @@ export function getBenchmarkCategoryLabel(
       return raw;
     }
     return compFallback?.nameEn || raw;
+  }
+
+  // German: if already translated via weekly AI sync of D2:K2, preserve directly
+  if (isPreTranslatedDe && raw && raw !== '-' && !raw.startsWith('Col ') && !raw.endsWith('Old')) {
+    return raw;
   }
 
   // German: check retired components first if matching key

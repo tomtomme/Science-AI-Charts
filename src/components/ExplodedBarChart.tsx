@@ -30,6 +30,7 @@ interface ExplodedBarChartProps {
   priceFilter?: PriceFilter;
   onPriceFilterChange?: (filter: PriceFilter) => void;
   categoryNames?: string[];
+  isPreTranslatedCategoryNames?: boolean;
   onScrollToParagraph?: (targetId: string) => void;
   onSelectCompany?: (company: string) => void;
 }
@@ -92,6 +93,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   priceFilter = 'paid',
   onPriceFilterChange,
   categoryNames,
+  isPreTranslatedCategoryNames = false,
   onScrollToParagraph,
   onSelectCompany,
 }) => {
@@ -1013,8 +1015,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 <Tooltip
                   content={
                     lang === 'de'
-                      ? `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'de', displayedCategoryComp)}: Zur Erläuterung in „How to read this“ springen`
-                      : `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'en', displayedCategoryComp)}: Jump to explanation in "How to read this"`
+                      ? `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'de', displayedCategoryComp, isPreTranslatedCategoryNames)}: Zur Erläuterung in „How to read this“ springen`
+                      : `${getBenchmarkCategoryLabel(categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined, 'en', displayedCategoryComp, false)}: Jump to explanation in "How to read this"`
                   }
                   align="left"
                   position="bottom"
@@ -1034,7 +1036,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       {getBenchmarkCategoryLabel(
                         categoryNames && activeCategoryIndex > 0 ? categoryNames[activeCategoryIndex - 1] : undefined,
                         lang,
-                        displayedCategoryComp
+                        displayedCategoryComp,
+                        isPreTranslatedCategoryNames
                       )}
                     </span>
                   </button>

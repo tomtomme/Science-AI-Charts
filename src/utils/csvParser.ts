@@ -1,5 +1,5 @@
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
-import { getCompanyMeta, getFaviconUrl } from '../data/companies';
+import { getCompanyMeta, getFaviconUrl, normalizeCompanyLookupKey } from '../data/companies';
 import { lookupResearchedUsPrice } from '../data/usPricingData';
 import { ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata, Row33Metadata, SheetColumnLayout } from '../types';
 
@@ -80,13 +80,15 @@ export function extractSheetDate(csvText: string): string | null {
 
 export interface CsvHeaderMetadata {
   cellA1: string;
-  cellB2: string;
   cellC1: string;
   combinedTitle: string;
   subtitle: string;
   titleDe?: string;
   subtitleDe?: string;
   categoryNames?: string[];
+  categoryNamesDe?: string[];
+  translatedAt?: string;
+  translationSource?: 'gemini_weekly' | 'local_fallback';
   row33?: Row33Metadata;
 }
 
@@ -160,22 +162,48 @@ export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
   let colReleaseDate: number | null = null;
   let colModelCreator: number | null = null;
 
+  let carriedRow0 = '';
+  let carriedRow0Age = 0;
+
   for (let c = 19; c < maxCols; c++) {
-    const h01 = `${row0[c] || ''} ${row1[c] || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
+    const rawRow0 = (row0[c] || '').replace(/\s+/g, ' ').trim();
+    if (rawRow0) {
+      carriedRow0 = rawRow0;
+      carriedRow0Age = 0;
+    } else if (carriedRow0 && carriedRow0Age < 2) {
+      // Handle horizontal merges like T1:U1 where Row 1 text sits in the leftmost cell (T1) and U1 is blank
+      carriedRow0Age += 1;
+    } else {
+      carriedRow0 = '';
+    }
+
+    const effectiveRow0 = rawRow0 || carriedRow0;
+    const h01 = `${effectiveRow0} ${row1[c] || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
     const hAll = getHeader(c);
     const h1 = (row1[c] || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const hasPricingContext =
+      h01.includes('cost') ||
+      h01.includes('abokosten') ||
+      h01.includes('paid') ||
+      h01.includes('chat') ||
+      h01.includes('monthly');
 
     if (
-      /\b(us|usa|united states)\b/i.test(h01) &&
-      (h01.includes('cost') || h01.includes('abokosten') || h01.includes('paid') || h01.includes('chat'))
+      hasPricingContext &&
+      (h1 === 'us' || h1 === 'usa' || /\b(us|usa|united states)\b/i.test(h01))
     ) {
       if (colUsPrice === null) colUsPrice = c;
       continue;
     }
 
     if (
-      (h01.includes('germany') || h01.includes('deutschland') || /\bin de\b/.test(h01) || h01.includes('abokosten')) &&
-      (h01.includes('cost') || h01.includes('paid') || h01.includes('abokosten') || h01.includes('chat'))
+      hasPricingContext &&
+      (h1 === 'de' ||
+        h01.includes('germany') ||
+        h01.includes('deutschland') ||
+        /\b(in de|de)\b/.test(h1) ||
+        /\bin de\b/.test(h01) ||
+        h01.includes('abokosten'))
     ) {
       colDePrice = c;
       continue;
@@ -378,12 +406,6 @@ export function extractRow33Metadata(rows: string[][]): Row33Metadata {
  */
 export function extractHeaderMetadataFromRows(rows: string[][]): CsvHeaderMetadata {
   const cellA1 = (rows[0]?.[0] || 'Science-IQ of ChatBots').trim();
-  const rawB2 = (rows[1]?.[1] || '').trim();
-  const cellB2 = rawB2
-    .replace(/[\r\n]+/g, ' ')
-    .replace(/\|\s*\|+/g, '|')
-    .replace(/\s+/g, ' ')
-    .trim();
   const cellC1 = (rows[0]?.[2] || '').trim();
   const combinedTitle = cellA1;
 
@@ -401,13 +423,13 @@ export function extractHeaderMetadataFromRows(rows: string[][]): CsvHeaderMetada
 
   return {
     cellA1,
-    cellB2,
     cellC1,
     combinedTitle,
     subtitle: cellC1,
     titleDe,
     subtitleDe,
     categoryNames: categoryNames.length === 8 ? categoryNames : undefined,
+    translationSource: 'local_fallback',
     row33,
   };
 }
@@ -468,7 +490,7 @@ export function extractCsvNotesMetadataFromRows(rows: string[][]): CsvNotesMetad
     }
   }
 
-  let section1Title = (notesRow?.[0] || notesRow?.[1] || 'How To Read').trim();
+  let section1Title = (notesRow?.[1] || notesRow?.[0] || 'How to read this').trim();
   let section1Content = (notesRow?.[2] || '').trim();
   if (!section1Content && notesRow?.[1] && notesRow[1].length > 100) {
     section1Content = notesRow[1].trim();
@@ -752,7 +774,7 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
     const { flag: nameFlag, cleanText: cleanedName } = extractFlag(rawNameCell);
     const { flag: creatorFlag, cleanText: cleanedCreator } = extractFlag(rawCreatorCell);
 
-    // Lookup company info (domain, flag, name) from CSV lookup table (cells AI2:AK onwards)
+    // Lookup company info (domain, flag, name) dynamically from Google Sheets lookup table (Cols AJ-AL)
     let lookupFlag = '';
     let lookupDomain = '';
     let lookupCompName = '';
@@ -760,16 +782,35 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
     const colZLow = (row[layout.colModelCreator] || '').toLowerCase().trim(); // Dynamic model creator column (Z or AA)
     const nameLow = cleanedName.toLowerCase().trim();
 
-    for (const [key, info] of Object.entries(companyLookupMap)) {
-      if (
-        (creatorLow && (creatorLow === key || creatorLow.includes(key) || key.includes(creatorLow))) ||
-        (colZLow && (colZLow === key || colZLow.includes(key) || key.includes(colZLow))) ||
-        (nameLow && (nameLow.startsWith(key) || nameLow.includes(key)))
-      ) {
-        if (info.flag && !lookupFlag) lookupFlag = info.flag;
-        if (info.domain && !lookupDomain) lookupDomain = info.domain;
-        if (info.name && !lookupCompName) lookupCompName = info.name;
-        if (lookupFlag && lookupDomain) break;
+    const normalizedCandidates = [
+      normalizeCompanyLookupKey(creatorLow),
+      creatorLow,
+      normalizeCompanyLookupKey(colZLow),
+      colZLow,
+      normalizeCompanyLookupKey(nameLow),
+      nameLow,
+    ].filter(Boolean);
+
+    for (const candidate of normalizedCandidates) {
+      if (companyLookupMap[candidate]) {
+        const info = companyLookupMap[candidate];
+        lookupFlag = info.flag;
+        lookupDomain = info.domain;
+        lookupCompName = info.name;
+        break;
+      }
+    }
+
+    if (!lookupDomain && !lookupCompName) {
+      for (const [key, info] of Object.entries(companyLookupMap)) {
+        if (
+          normalizedCandidates.some((cand) => cand === key || cand.includes(key) || key.includes(cand))
+        ) {
+          if (info.flag && !lookupFlag) lookupFlag = info.flag;
+          if (info.domain && !lookupDomain) lookupDomain = info.domain;
+          if (info.name && !lookupCompName) lookupCompName = info.name;
+          if (lookupFlag && lookupDomain) break;
+        }
       }
     }
 
@@ -777,7 +818,6 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
     const company = {
       name: lookupCompName || fallbackCompany.name,
       domain: lookupDomain || fallbackCompany.domain,
-      color: fallbackCompany.color,
       flag: lookupFlag || fallbackCompany.flag,
     };
     const flag = nameFlag || creatorFlag || lookupFlag || company.flag || '🌐';
@@ -975,7 +1015,6 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
       modelUrl,
       isAvailable,
       companyDomain: company.domain,
-      companyColor: company.color,
       faviconUrl,
       priceDeMonthly: priceDeMonthly || undefined,
       priceUsMonthly: priceUsMonthly || undefined,

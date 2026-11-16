@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Save,
   Sparkles,
+  LogOut,
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { LoadedDatasets } from '../services/dataService';
@@ -42,8 +43,12 @@ interface PricingMonitorModalProps {
   authUser: User | null;
   isSigningIn: boolean;
   onSignIn: () => Promise<void>;
+  onSignOut?: () => Promise<void> | void;
   activeSpreadsheetId: string;
   onRefreshFromSheets: (spreadsheetIdOverride?: string) => Promise<void>;
+  isSheetsConnected: boolean;
+  apiAvailable?: boolean;
+  onRetryConnection?: () => Promise<void>;
 }
 
 const LAB_ORDER: MonitoredLab[] = ['OpenAI', 'Anthropic', 'Google', 'Meta'];
@@ -86,8 +91,12 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   authUser,
   isSigningIn,
   onSignIn,
+  onSignOut,
   activeSpreadsheetId,
   onRefreshFromSheets,
+  isSheetsConnected,
+  apiAvailable = true,
+  onRetryConnection,
 }) => {
   const [filterMode, setFilterMode] = useState<'actionable' | 'all'>('actionable');
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
@@ -121,6 +130,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     }
   }, [isOpen]);
 
+  const effectiveReport = isSheetsConnected ? report : null;
+
   const layout = loadedData.columnLayout;
   const colDeIdx = layout?.colDePrice ?? 19;
   const colUsIdx = layout?.colUsPrice ?? null;
@@ -128,20 +139,22 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   const colUsLetter = colUsIdx !== null ? columnIndexToA1(colUsIdx) : null;
   const sheetTitle = loadedData.activeSheetTitle || 'Sheet1';
 
-  const hasActionable = report ? report.changedCount + report.missingCount > 0 : false;
+  const hasActionable = effectiveReport
+    ? effectiveReport.changedCount + effectiveReport.missingCount > 0
+    : false;
 
   const visibleDiffs = useMemo(() => {
-    if (!report) return [];
-    if (filterMode === 'all' || !hasActionable) return report.diffs;
-    return report.diffs.filter(
+    if (!effectiveReport) return [];
+    if (filterMode === 'all' || !hasActionable) return effectiveReport.diffs;
+    return effectiveReport.diffs.filter(
       (d) => d.deStatus !== 'unchanged' || d.usStatus !== 'unchanged'
     );
-  }, [report, filterMode, hasActionable]);
+  }, [effectiveReport, filterMode, hasActionable]);
 
   const selectedCount = useMemo(() => {
-    if (!report) return 0;
-    return report.diffs.filter((d) => selectedIds[d.modelId]).length;
-  }, [report, selectedIds]);
+    if (!effectiveReport) return 0;
+    return effectiveReport.diffs.filter((d) => selectedIds[d.modelId]).length;
+  }, [effectiveReport, selectedIds]);
 
   if (!isOpen) return null;
 
@@ -270,7 +283,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
           <div className="flex items-center gap-2.5 min-w-0">
             <div
               className={`p-1.5 rounded-lg shrink-0 ${
-                report && report.changedCount > 0
+                effectiveReport && effectiveReport.changedCount > 0
                   ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
                   : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
               }`}
@@ -283,7 +296,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               </h2>
               <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
                 <Clock className="w-3 h-3 shrink-0" />
-                <span>{formatTimestamp(report?.checkedAt)}</span>
+                <span>{effectiveReport ? formatTimestamp(effectiveReport.checkedAt) : '—'}</span>
               </p>
             </div>
           </div>
@@ -302,8 +315,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             <button
               type="button"
               onClick={() => void onRunCheck()}
-              disabled={isChecking}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-55"
+              disabled={isChecking || !apiAvailable || !isSheetsConnected}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
               <span>
@@ -316,6 +329,18 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                   : 'Check'}
               </span>
             </button>
+
+            {accessToken && onSignOut && (
+              <button
+                type="button"
+                onClick={() => void onSignOut()}
+                title={lang === 'de' ? 'Von Google abmelden' : 'Sign out of Google'}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label={lang === 'de' ? 'Von Google abmelden' : 'Sign out of Google'}
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            )}
 
             <button
               type="button"
@@ -351,7 +376,78 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
           )}
 
-          {!report && isChecking && (
+          {!apiAvailable && !isChecking && (
+            <div className="py-12 px-4 max-w-lg mx-auto text-center space-y-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                {lang === 'de'
+                  ? 'Preischecker benötigt Full-Stack-Server'
+                  : 'Price Checker Requires Full-Stack Server'}
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {lang === 'de'
+                  ? 'In rein statischem Hosting (z. B. GitHub Pages oder „vite preview“) existiert kein /api-Backend für Live-Abrufe und Gemini API. Öffnen Sie die Full-Stack-App in AI Studio oder starten Sie lokal mit „npm run dev“.'
+                  : 'Static hosting (such as GitHub Pages or vite preview) has no /api backend for live fetches or Gemini API calls. Open the full-stack app in AI Studio or run “npm run dev” locally.'}
+              </p>
+              {onRetryConnection && (
+                <button
+                  type="button"
+                  onClick={() => void onRetryConnection()}
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>{lang === 'de' ? 'Serververbindung testen' : 'Retry Server Connection'}</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {apiAvailable && !isSheetsConnected && (
+            <div className="py-12 px-4 max-w-lg mx-auto text-center space-y-4">
+              <div className="w-11 h-11 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {lang === 'de'
+                    ? 'Mit Google Sheets verbinden'
+                    : 'Connect to Google Sheets'}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {lang === 'de'
+                    ? 'Damit immer gegen Ihr aktuelles Live-Google-Sheet geprüft wird (ohne veraltete CSV-Zwischenstände), melden Sie sich bitte direkt hier mit Google an.'
+                    : 'Sign in with Google right here so live pricing is compared strictly against your live Google Sheet (with no stale CSV fallback data).'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void onSignIn()}
+                disabled={isSigningIn}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-55"
+              >
+                <svg className="w-4 h-4 block shrink-0" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                  <path fill="none" d="M0 0h48v48H0z" />
+                </svg>
+                <span>
+                  {isSigningIn
+                    ? lang === 'de'
+                      ? 'Verbinde mit Google…'
+                      : 'Signing in…'
+                    : lang === 'de'
+                    ? 'Mit Google anmelden & prüfen'
+                    : 'Sign in with Google & Check'}
+                </span>
+              </button>
+            </div>
+          )}
+
+          {apiAvailable && isSheetsConnected && !effectiveReport && isChecking && (
             <div className="py-16 text-center space-y-3">
               <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
@@ -361,16 +457,16 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               </p>
               <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
                 {lang === 'de'
-                  ? 'Ruft offizielle Preisseiten direkt ab & vergleicht mit Spalten T/U ab Zeile 36'
-                  : 'Fetching official pricing pages directly & comparing against Columns T/U (Row 36+)'}
+                  ? 'Vergleicht direkt mit Ihrem verbundenen Google Sheet (Spalten T/U ab Zeile 36)'
+                  : 'Comparing directly against your connected Google Sheet (Columns T/U, Row 36+)'}
               </p>
             </div>
           )}
 
-          {!report && !isChecking && (
-            <div className="py-14 px-4 max-w-lg mx-auto text-center space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
-                <Sparkles className="w-6 h-6" />
+          {apiAvailable && isSheetsConnected && !effectiveReport && !isChecking && (
+            <div className="py-12 px-4 max-w-lg mx-auto text-center space-y-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
+                <Sparkles className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 {lang === 'de'
@@ -379,8 +475,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               </h3>
               <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 {lang === 'de'
-                  ? 'Prüft die aktuellen Abo-Preise in Deutschland (€) und den USA ($) für Meta, OpenAI, Anthropic und Google und vergleicht sie direkt mit Ihrem Google Sheet.'
-                  : 'Checks current consumer subscription pricing in Germany (€) and the US ($) for Meta, OpenAI, Anthropic, and Google and compares directly against your Google Sheet.'}
+                  ? 'Prüft die aktuellen Abo-Preise in Deutschland (€) und den USA ($) für Meta, OpenAI, Anthropic und Google und vergleicht sie direkt mit Ihrem verbundenen Google Sheet.'
+                  : 'Checks current subscription pricing in Germany (€) and the US ($) for Meta, OpenAI, Anthropic, and Google and compares directly against your connected Google Sheet.'}
               </p>
               <button
                 type="button"
@@ -388,54 +484,54 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>{lang === 'de' ? 'Erste Preisprüfung starten' : 'Run First Pricing Check'}</span>
+                <span>{lang === 'de' ? 'Preisprüfung starten' : 'Run Pricing Check'}</span>
               </button>
             </div>
           )}
 
-          {report && (
+          {apiAvailable && isSheetsConnected && effectiveReport && (
             <>
               {/* Compact Status Strip */}
               <div
                 className={`px-3.5 py-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
-                  report.changedCount > 0
+                  effectiveReport.changedCount > 0
                     ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
                     : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/25'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  {report.changedCount > 0 ? (
+                  {effectiveReport.changedCount > 0 ? (
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                   ) : (
                     <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   )}
                   <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug">
                     <strong className="font-bold text-slate-900 dark:text-white">
-                      {report.changedCount > 0
+                      {effectiveReport.changedCount > 0
                         ? lang === 'de'
-                          ? `${report.changedCount} Abweichung(en):`
-                          : `${report.changedCount} Change(s):`
+                          ? `${effectiveReport.changedCount} Abweichung(en):`
+                          : `${effectiveReport.changedCount} Change(s):`
                         : lang === 'de'
                         ? 'Alle Preise aktuell:'
                         : 'All prices up to date:'}
                     </strong>{' '}
-                    {lang === 'de' ? report.summaryDe : report.summaryEn}
+                    {lang === 'de' ? effectiveReport.summaryDe : effectiveReport.summaryEn}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-1.5 font-mono text-[11px] shrink-0">
-                  {report.changedCount > 0 && (
+                  {effectiveReport.changedCount > 0 && (
                     <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
-                      {report.changedCount} {lang === 'de' ? 'geändert' : 'changed'}
+                      {effectiveReport.changedCount} {lang === 'de' ? 'geändert' : 'changed'}
                     </span>
                   )}
-                  {report.missingCount > 0 && (
+                  {effectiveReport.missingCount > 0 && (
                     <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
-                      {report.missingCount} {lang === 'de' ? 'fehlt' : 'missing'}
+                      {effectiveReport.missingCount} {lang === 'de' ? 'fehlt' : 'missing'}
                     </span>
                   )}
                   <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
-                    {report.unchangedCount} OK
+                    {effectiveReport.unchangedCount} OK
                   </span>
                 </div>
               </div>
@@ -448,8 +544,10 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                   {LAB_ORDER.map((lab) => {
-                    const labPlans = report.labs.filter((p) => p.lab === lab);
-                    const labUrl = labPlans.find((p) => p.sourceUrl)?.sourceUrl;
+                    const labPlans = effectiveReport.labs.filter((p) => p.lab === lab);
+                    const labUrl =
+                      labPlans.find((p) => p.sourceUrl)?.sourceUrl ||
+                      effectiveReport.sources.find((s) => s.title.startsWith(`${lab}:`))?.uri;
                     return (
                       <div
                         key={lab}
@@ -467,7 +565,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                               className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
                               title={labUrl}
                             >
-                              <span>{lang === 'de' ? 'Preise' : 'Pricing'}</span>
+                              <span>{lang === 'de' ? 'Quellen' : 'Source'}</span>
                               <ExternalLink className="w-2.5 h-2.5" />
                             </a>
                           )}
@@ -485,9 +583,21 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                                 className="py-1.5 space-y-0.5 text-[11px]"
                               >
                                 <div className="flex items-baseline justify-between gap-1.5">
-                                  <span className="font-semibold text-slate-900 dark:text-white truncate">
-                                    {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
-                                  </span>
+                                  {plan.sourceUrl ? (
+                                    <a
+                                      href={plan.sourceUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate"
+                                      title={plan.sourceUrl}
+                                    >
+                                      {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                    </a>
+                                  ) : (
+                                    <span className="font-semibold text-slate-900 dark:text-white truncate">
+                                      {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                    </span>
+                                  )}
                                   <span className="font-mono text-[11px] shrink-0 text-slate-700 dark:text-slate-200">
                                     <strong>{plan.deMonthly || '—'}</strong>
                                     <span className="text-slate-400 mx-1">/</span>
@@ -532,7 +642,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                             : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
-                        {lang === 'de' ? 'Änderungen' : 'Changes'} ({report.changedCount + report.missingCount})
+                        {lang === 'de' ? 'Änderungen' : 'Changes'} ({effectiveReport.changedCount + effectiveReport.missingCount})
                       </button>
                       <button
                         type="button"
@@ -543,7 +653,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                             : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
-                        {lang === 'de' ? 'Alle' : 'All'} ({report.diffs.length})
+                        {lang === 'de' ? 'Alle' : 'All'} ({effectiveReport.diffs.length})
                       </button>
                     </div>
                   )}
@@ -650,7 +760,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 </div>
 
                 {/* Sheet Update Action Bar */}
-                {(report.changedCount > 0 || report.missingCount > 0) && (
+                {(effectiveReport.changedCount > 0 || effectiveReport.missingCount > 0) && (
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                     <span className="text-xs text-slate-500 dark:text-slate-400">
                       {lang === 'de'

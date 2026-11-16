@@ -11,6 +11,7 @@ interface ScoreSliderProps {
   selectedCategoryIndex: number;
   onSelectCategoryIndex: (index: number) => void;
   categoryNames?: string[];
+  isPreTranslatedCategoryNames?: boolean;
   onHoverCategory?: (comp: BenchmarkComponent | null) => void;
   onScrollToParagraph?: (targetId: string) => void;
   lang: Language;
@@ -24,6 +25,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
   selectedCategoryIndex,
   onSelectCategoryIndex,
   categoryNames,
+  isPreTranslatedCategoryNames = false,
   onHoverCategory,
   onScrollToParagraph,
   lang,
@@ -91,7 +93,8 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
     ? getBenchmarkCategoryLabel(
         categoryNames && selectedCategoryIndex > 0 ? categoryNames[selectedCategoryIndex - 1] : undefined,
         lang,
-        activeCategoryComp
+        activeCategoryComp,
+        isPreTranslatedCategoryNames
       )
     : null;
 

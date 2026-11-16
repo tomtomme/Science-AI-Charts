@@ -83,7 +83,6 @@ export interface ModelRecord {
   modelUrl?: string;
   isAvailable: boolean;
   companyDomain: string;
-  companyColor: string;
   faviconUrl: string;
   priceDeMonthly?: string; // Col T: min. Abokosten/Monat für Chatzugriff in DE (or availability note like 'US only')
   priceUsMonthly?: string; // Col U: monthly cost for chat in US (if paid for 1 year vs. if paid monthly)
@@ -108,7 +107,6 @@ export interface SheetColumnLayout {
 export interface CompanyInfo {
   name: string;
   domain: string;
-  color: string;
   flag: string;
 }
 
@@ -128,10 +126,15 @@ export interface CsvParagraph {
 }
 
 export interface CsvNotesMetadata {
-  section1Title: string; // cell A34 (e.g. "How To Read")
+  section1Title: string; // cell B34 (e.g. "How to read this", legacy fallback A34)
   section1Content: string; // cell C34
-  section2Title: string; // cell N34 (e.g. "What Bots can & can't do for you")
+  section2Title: string; // cell N34 (e.g. "What Bots can & cannot do for you")
   section2Content: string; // cell O34
+  section1TitleDe?: string;
+  section1ContentDe?: string;
+  section2TitleDe?: string;
+  section2ContentDe?: string;
+  section2ContentEn?: string;
   section1Paragraphs?: CsvParagraph[];
   section2Paragraphs?: CsvParagraph[];
 }

@@ -5,8 +5,9 @@ import path from 'node:path';
 import {
   getPricingMonitorStatus,
   runPricingCheck,
-  startDailyPricingScheduler,
 } from './server/pricingMonitor.ts';
+import { getOrRefreshWeeklyTranslation } from './server/sheetTranslator.ts';
+import { fetchLabsGridFromPublishedHtml } from './server/labsGrid.ts';
 
 async function createAppServer() {
   const app = express();
@@ -23,6 +24,38 @@ async function createAppServer() {
         process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY'
       ),
     });
+  });
+
+  app.get('/api/labs-grid', async (req, res) => {
+    try {
+      const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true';
+      const grid = await fetchLabsGridFromPublishedHtml(forceRefresh);
+      res.json(grid);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch labs formatting grid.';
+      res.status(502).json({ error: message });
+    }
+  });
+
+  app.post('/api/translations/sheet', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const payload = {
+        a1: String(body.a1 || ''),
+        c1: String(body.c1 || ''),
+        categoryNames: Array.isArray(body.categoryNames) ? body.categoryNames.map(String) : [],
+        b34: String(body.b34 || ''),
+        c34: String(body.c34 || ''),
+        n34: String(body.n34 || ''),
+        o34: String(body.o34 || ''),
+      };
+      const force = body.force === true;
+      const result = await getOrRefreshWeeklyTranslation(payload, force);
+      res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sheet translation failed.';
+      res.status(500).json({ error: message });
+    }
   });
 
   app.get('/api/pricing-monitor/status', async (_req, res) => {
@@ -43,30 +76,37 @@ async function createAppServer() {
       res.json({ report });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Pricing check failed.';
-      const statusCode = message.includes('GEMINI_API_KEY')
-        ? 400
-        : message.includes('429')
-        ? 429
-        : 500;
+      const statusCode =
+        message.includes('GEMINI_API_KEY') || message.includes('Google Sheets connection required')
+          ? 400
+          : message.includes('429')
+          ? 429
+          : 500;
       res.status(statusCode).json({ error: message });
     }
   });
 
+  app.all('/api/*', (_req, res) => {
+    res.status(404).json({ error: 'API endpoint not found.' });
+  });
+
   if (process.env.NODE_ENV !== 'production') {
-    const { createServer: createViteServer } = await import('vite');
     const isHmrDisabled = process.env.DISABLE_HMR === 'true';
-    const vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-        hmr: isHmrDisabled ? false : { server: httpServer },
-        ...(isHmrDisabled ? { ws: false as const } : {}),
-      },
-      appType: 'spa',
-    });
+    const vitePromise = import('vite').then(({ createServer: createViteServer }) =>
+      createViteServer({
+        server: {
+          middlewareMode: true,
+          hmr: !isHmrDisabled,
+          ws: isHmrDisabled ? (false as const) : { server: httpServer },
+        },
+        appType: 'spa',
+      })
+    );
 
     if (isHmrDisabled) {
       app.get('/@vite/client', async (_req, res, next) => {
         try {
+          const vite = await vitePromise;
           const result = await vite.transformRequest('/@vite/client');
           if (!result) return next();
           const code = result.code.replace(
@@ -80,7 +120,14 @@ async function createAppServer() {
       });
     }
 
-    app.use(vite.middlewares);
+    app.use(async (req, res, next) => {
+      try {
+        const vite = await vitePromise;
+        vite.middlewares(req, res, next);
+      } catch (err) {
+        next(err);
+      }
+    });
   } else {
     const distDir = path.resolve(process.cwd(), 'dist');
     app.use(express.static(distDir));
@@ -91,7 +138,6 @@ async function createAppServer() {
 
   httpServer.listen(port, '0.0.0.0', () => {
     console.log(`Server listening on http://0.0.0.0:${port}`);
-    startDailyPricingScheduler();
   });
 }
 

@@ -39,12 +39,22 @@ export function extractMonitoredModelSnapshots(models: ModelRecord[]): ModelPric
     }));
 }
 
+export class StaticPreviewApiError extends Error {
+  readonly isStaticPreview = true;
+  constructor() {
+    super('Pricing monitor API is unavailable in static preview mode. Run with the full-stack server.');
+    this.name = 'StaticPreviewApiError';
+  }
+}
+
+export function isStaticPreviewError(err: unknown): boolean {
+  return err instanceof StaticPreviewApiError || (err as { isStaticPreview?: boolean })?.isStaticPreview === true;
+}
+
 async function parseJsonResponse<T>(res: Response): Promise<T> {
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
-    throw new Error(
-      'Pricing monitor API is unavailable in static preview mode. Run with the full-stack server.'
-    );
+    throw new StaticPreviewApiError();
   }
   const data = await res.json();
   if (!res.ok) {

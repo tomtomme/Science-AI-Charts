@@ -160,6 +160,72 @@ export async function fetchSheetValues(
   );
 }
 
+export interface SheetGridWithFormatting {
+  rows: string[][];
+  greenMask: boolean[][];
+}
+
+/**
+ * Reads formatted values AND cell background colors (e.g. mint green OpenWeights cells)
+ * directly from Google Sheets API v4 via includeGridData=true.
+ */
+export async function fetchSheetGridWithFormatting(
+  spreadsheetId: string,
+  sheetTitle: string,
+  accessToken: string
+): Promise<SheetGridWithFormatting> {
+  const range = encodeURIComponent(quoteSheetTitle(sheetTitle));
+  const fields = encodeURIComponent(
+    'sheets(merges,data(rowData(values(formattedValue,effectiveFormat(backgroundColor)))))'
+  );
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+    spreadsheetId
+  )}?ranges=${range}&includeGridData=true&fields=${fields}`;
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw await parseApiError(res, `Failed to read grid formatting from "${sheetTitle}"`);
+  }
+
+  const data = await res.json();
+  const sheetObj = Array.isArray(data.sheets) ? data.sheets[0] : null;
+  const gridData = Array.isArray(sheetObj?.data) ? sheetObj.data[0] : null;
+  const rowData = Array.isArray(gridData?.rowData) ? gridData.rowData : [];
+
+  const rows: string[][] = [];
+  const greenMask: boolean[][] = [];
+
+  for (const rowItem of rowData) {
+    const cells = Array.isArray(rowItem?.values) ? rowItem.values : [];
+    const rowVals: string[] = [];
+    const rowGreens: boolean[] = [];
+
+    for (const cell of cells) {
+      rowVals.push(cell?.formattedValue !== undefined && cell?.formattedValue !== null ? String(cell.formattedValue) : '');
+      const bg = cell?.effectiveFormat?.backgroundColor;
+      let isGreen = false;
+      if (bg && typeof bg === 'object') {
+        const r = Number(bg.red ?? 0);
+        const g = Number(bg.green ?? 0);
+        const b = Number(bg.blue ?? 0);
+        // Mint / light green background (#d9ead3 -> r≈0.851, g≈0.918, b≈0.827)
+        isGreen = g > r + 0.03 && g > b + 0.03;
+      }
+      rowGreens.push(isGreen);
+    }
+
+    rows.push(rowVals);
+    greenMask.push(rowGreens);
+  }
+
+  return { rows, greenMask };
+}
+
 /**
  * Reads raw formulas/values for a specific 1-based row (Columns A..AB) to detect and protect formulas before editing.
  */

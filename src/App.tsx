@@ -10,6 +10,7 @@ import { FALLBACK_LAB_ENTRIES } from './data/rawLabCsvFallback';
 import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset, parseAllModels, parseCsvRows, detectSheetColumns } from './utils/csvParser';
 import { LoadedDatasets, loadModelsData } from './services/dataService';
 import { fetchLiveLabEntries } from './services/labDataService';
+import { fetchWeeklySheetTranslations } from './services/translationService';
 import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS } from './data/benchmarks';
 import { ExplodedBarChart } from './components/ExplodedBarChart';
 import { ScoreSlider } from './components/ScoreSlider';
@@ -22,15 +23,14 @@ import { extractFrontierPoints, isMultiLevelSupported } from './utils/mathRegres
 import { DEFAULT_TIMELINE_LAB_LEVELS } from './data/labLevels';
 import { Language, TRANSLATIONS } from './utils/i18n';
 import { matchesSearchQuery } from './utils/searchUtils';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink, Layers, Pencil, LogOut, CheckCircle2, Bell } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink, Layers, Bell } from 'lucide-react';
 import { Tooltip } from './components/Tooltip';
 import { User } from 'firebase/auth';
 import { initGoogleAuth, googleSignIn, googleSignOut, clearAccessToken } from './services/googleAuthService';
 import { DEFAULT_SPREADSHEET_ID } from './services/googleSheetsService';
-import { GoogleSheetModal } from './components/GoogleSheetModal';
 import { PricingMonitorModal } from './components/PricingMonitorModal';
 import { PricingCheckReport } from './types/pricingMonitor';
-import { extractMonitoredModelSnapshots, fetchPricingMonitorStatus, triggerPricingCheck } from './services/pricingMonitorService';
+import { extractMonitoredModelSnapshots, fetchPricingMonitorStatus, isStaticPreviewError, triggerPricingCheck } from './services/pricingMonitorService';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
 
@@ -405,14 +405,14 @@ export default function App() {
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [oauthAccessToken, setOauthAccessToken] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState<boolean>(false);
-  const [activeSpreadsheetId, setActiveSpreadsheetId] = useState<string>(DEFAULT_SPREADSHEET_ID);
-  const [isSheetModalOpen, setIsSheetModalOpen] = useState<boolean>(false);
+  const [activeSpreadsheetId] = useState<string>(DEFAULT_SPREADSHEET_ID);
 
   // In-App Daily AI Pricing Monitor state (Meta, OpenAI, Anthropic, Google)
   const [isPricingModalOpen, setIsPricingModalOpen] = useState<boolean>(false);
   const [pricingReport, setPricingReport] = useState<PricingCheckReport | null>(null);
   const [isCheckingPricing, setIsCheckingPricing] = useState<boolean>(false);
   const [pricingCheckError, setPricingCheckError] = useState<string | null>(null);
+  const [pricingApiAvailable, setPricingApiAvailable] = useState<boolean>(true);
   const [dailyAutoCheckEnabled, setDailyAutoCheckEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('science_iq_daily_pricing_auto');
@@ -819,6 +819,34 @@ export default function App() {
         }
         if (result.newModels.length > 0 || result.oldModels.length > 0) {
           setLoadedData(result);
+          if (result.isLive) {
+            fetchWeeklySheetTranslations(result.headerMeta, result.notesMeta).then((tr) => {
+              if (!tr?.translation) return;
+              const translated = tr.translation;
+              setLoadedData((prev) => ({
+                ...prev,
+                headerMeta: {
+                  ...prev.headerMeta,
+                  titleDe: translated.titleDe || prev.headerMeta.titleDe,
+                  subtitleDe: translated.subtitleDe || prev.headerMeta.subtitleDe,
+                  categoryNamesDe:
+                    Array.isArray(translated.categoryNamesDe) && translated.categoryNamesDe.length === 8
+                      ? translated.categoryNamesDe
+                      : prev.headerMeta.categoryNamesDe,
+                  translatedAt: tr.translatedAt ?? prev.headerMeta.translatedAt,
+                  translationSource: 'gemini_weekly',
+                },
+                notesMeta: {
+                  ...prev.notesMeta,
+                  section1TitleDe: translated.section1TitleDe || prev.notesMeta.section1TitleDe,
+                  section1ContentDe: translated.section1ContentDe || prev.notesMeta.section1ContentDe,
+                  section2TitleDe: translated.section2TitleDe || prev.notesMeta.section2TitleDe,
+                  section2ContentDe: translated.section2ContentDe || prev.notesMeta.section2ContentDe,
+                  section2ContentEn: translated.section2ContentEn || prev.notesMeta.section2ContentEn,
+                },
+              }));
+            });
+          }
         }
         if (labRes.entries && labRes.entries.length > 0) {
           setLabs(labRes.entries);
@@ -868,6 +896,9 @@ export default function App() {
     await googleSignOut();
     setAuthUser(null);
     setOauthAccessToken(null);
+    setPricingReport(null);
+    setPricingCheckError(null);
+    setHasAutoCheckedSession(false);
   }, []);
 
   // Sync on mount
@@ -896,62 +927,131 @@ export default function App() {
     } catch {}
   }, []);
 
+  const isSheetsConnected =
+    Boolean(oauthAccessToken) && loadedData.dataSource === 'sheets_api';
+
+  const doesReportMatchLiveSheet = useCallback(
+    (report: PricingCheckReport, allModels: ModelRecord[]): boolean => {
+      const liveSnapshots = extractMonitoredModelSnapshots(allModels);
+      if (liveSnapshots.length === 0 || report.diffs.length !== liveSnapshots.length) {
+        return false;
+      }
+      const liveById = new Map(liveSnapshots.map((m) => [m.id, m]));
+      for (const diff of report.diffs) {
+        const live = liveById.get(diff.modelId);
+        if (!live) return false;
+        if ((live.priceDeMonthly || '').trim() !== (diff.currentDe || '').trim()) return false;
+        if ((live.priceUsMonthly || '').trim() !== (diff.currentUs || '').trim()) return false;
+      }
+      return true;
+    },
+    []
+  );
+
   const handleRunPricingCheck = useCallback(
     async (trigger: 'manual' | 'daily_auto' = 'manual') => {
+      if (!oauthAccessToken || loadedData.dataSource !== 'sheets_api') {
+        return;
+      }
       setIsCheckingPricing(true);
       setPricingCheckError(null);
       try {
         const snapshots = extractMonitoredModelSnapshots(loadedData.allModels);
         const report = await triggerPricingCheck(snapshots, trigger);
+        setPricingApiAvailable(true);
         setPricingReport(report);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Pricing check failed.';
-        setPricingCheckError(msg);
+        if (isStaticPreviewError(err)) {
+          setPricingApiAvailable(false);
+          setPricingCheckError(null);
+        } else {
+          const msg = err instanceof Error ? err.message : 'Pricing check failed.';
+          setPricingCheckError(msg);
+        }
       } finally {
         setIsCheckingPricing(false);
       }
     },
-    [loadedData.allModels]
+    [oauthAccessToken, loadedData.dataSource, loadedData.allModels]
   );
 
-  // Load cached pricing monitor status once data is ready, and trigger due daily auto-check if enabled
-  useEffect(() => {
-    if (loadedData.allModels.length === 0) return;
+  const checkPricingMonitorStatus = useCallback(async () => {
+    try {
+      const status = await fetchPricingMonitorStatus();
+      setPricingApiAvailable(true);
+      if (
+        isSheetsConnected &&
+        status.report &&
+        doesReportMatchLiveSheet(status.report, loadedData.allModels)
+      ) {
+        setPricingReport(status.report);
+      } else if (!isSheetsConnected) {
+        setPricingReport(null);
+      }
+      if (isSheetsConnected && status.lastError) {
+        setPricingCheckError(status.lastError);
+      }
+      return status;
+    } catch (err) {
+      if (isStaticPreviewError(err)) {
+        setPricingApiAvailable(false);
+      }
+      return null;
+    }
+  }, [isSheetsConnected, loadedData.allModels, doesReportMatchLiveSheet]);
 
+  // Probe pricing backend availability on mount; only load/run pricing checks once connected to Google Sheets API
+  useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const status = await fetchPricingMonitorStatus();
-        if (cancelled) return;
-        if (status.report) {
-          setPricingReport(status.report);
-        }
-        if (status.lastError) {
-          setPricingCheckError(status.lastError);
-        }
-        const inCooldown =
-          Boolean(status.cooldownUntil) && new Date(status.cooldownUntil as string).getTime() > Date.now();
-        if (
-          !hasAutoCheckedSession &&
-          dailyAutoCheckEnabled &&
-          status.isDue &&
-          status.hasGeminiKey &&
-          !status.isRunning &&
-          !status.lastError &&
-          !inCooldown
-        ) {
-          setHasAutoCheckedSession(true);
-          await handleRunPricingCheck('daily_auto');
-        }
-      } catch {
-        // Ignore silently in static builds (e.g. GitHub Pages) where /api/* is unavailable
+      const status = await checkPricingMonitorStatus();
+      if (cancelled || !status || !isSheetsConnected || loadedData.allModels.length === 0) {
+        return;
+      }
+
+      const cachedMatchesLive =
+        Boolean(status.report) &&
+        doesReportMatchLiveSheet(status.report as PricingCheckReport, loadedData.allModels);
+      const needsRun = !cachedMatchesLive || status.isDue;
+      const inCooldown =
+        Boolean(status.cooldownUntil) &&
+        new Date(status.cooldownUntil as string).getTime() > Date.now();
+
+      if (isPricingModalOpen && !cachedMatchesLive && !isCheckingPricing && !pricingCheckError) {
+        setHasAutoCheckedSession(true);
+        await handleRunPricingCheck('manual');
+        return;
+      }
+
+      if (
+        !hasAutoCheckedSession &&
+        dailyAutoCheckEnabled &&
+        needsRun &&
+        status.hasGeminiKey &&
+        !status.isRunning &&
+        !status.lastError &&
+        !inCooldown
+      ) {
+        setHasAutoCheckedSession(true);
+        await handleRunPricingCheck('daily_auto');
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [hasAutoCheckedSession, loadedData.allModels.length, dailyAutoCheckEnabled, handleRunPricingCheck]);
+  }, [
+    isSheetsConnected,
+    hasAutoCheckedSession,
+    loadedData.allModels,
+    dailyAutoCheckEnabled,
+    isPricingModalOpen,
+    isCheckingPricing,
+    pricingCheckError,
+    handleRunPricingCheck,
+    checkPricingMonitorStatus,
+    doesReportMatchLiveSheet,
+  ]);
 
   const formatSyncDate = (d: Date | null) => {
     if (!d) return '';
@@ -972,20 +1072,19 @@ export default function App() {
             <Tooltip
               content={
                 <div className="space-y-2 text-xs sm:text-sm text-slate-100 font-normal leading-relaxed">
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-700/60 pb-1.5">
-                    <span className="font-bold text-sm sm:text-base text-blue-400">
-                      {lang === 'de' ? (loadedData.headerMeta?.titleDe || t.title) : (loadedData.headerMeta?.combinedTitle || t.title)}
-                    </span>
-                    <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60 shrink-0">
-                      {lang === 'de' ? 'Methodik & Fokus' : 'Methodology & Focus'}
-                    </span>
-                  </div>
                   <p className="leading-relaxed text-slate-200">
                     {lang === 'de' ? (loadedData.headerMeta?.subtitleDe || t.subtitle) : (loadedData.headerMeta?.subtitle || t.subtitle)}
                   </p>
-                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400 font-mono">
-                    <span>{lang === 'de' ? 'Klicken: Alle Filter & Ansichten auf Standard zurücksetzen' : 'Click: Reset all filters & views to defaults'}</span>
-                    <span className="text-emerald-400 font-semibold">{lang === 'de' ? '↺ Zurücksetzen' : '↺ Reset'}</span>
+                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center text-xs font-mono">
+                    <button
+                      type="button"
+                      onClick={handleResetToDefaults}
+                      className="text-left text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer focus:outline-hidden"
+                    >
+                      {lang === 'de'
+                        ? 'Titel klicken: Alle Filter & Ansichten auf Standard zurücksetzen'
+                        : 'Click title: Reset all filters & views to defaults'}
+                    </button>
                   </div>
                 </div>
               }
@@ -1291,7 +1390,14 @@ export default function App() {
                   onScoreModeChange={setScoreMode}
                   selectedCategoryIndex={selectedCategoryIndex}
                   onSelectCategoryIndex={setSelectedCategoryIndex}
-                  categoryNames={loadedData.headerMeta?.categoryNames}
+                  categoryNames={
+                    lang === 'de'
+                      ? loadedData.headerMeta?.categoryNamesDe || loadedData.headerMeta?.categoryNames
+                      : loadedData.headerMeta?.categoryNames
+                  }
+                  isPreTranslatedCategoryNames={Boolean(
+                    lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+                  )}
                   row33Meta={loadedData.headerMeta?.row33}
                   onHoverCategory={setCategoryInfoComp}
                   onScrollToParagraph={scrollToParagraph}
@@ -1497,7 +1603,14 @@ export default function App() {
                       setCategoryInfoComp(null);
                     }
                   }}
-                  categoryNames={loadedData.headerMeta?.categoryNames}
+                  categoryNames={
+                    lang === 'de'
+                      ? loadedData.headerMeta?.categoryNamesDe || loadedData.headerMeta?.categoryNames
+                      : loadedData.headerMeta?.categoryNames
+                  }
+                  isPreTranslatedCategoryNames={Boolean(
+                    lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+                  )}
                   row33Meta={loadedData.headerMeta?.row33}
                   onHoverCategory={setCategoryInfoComp}
                   onScrollToParagraph={scrollToParagraph}
@@ -2178,7 +2291,14 @@ export default function App() {
                 onToggleAdvanced={() => setShowAdvanced((prev) => !prev)}
                 priceFilter={priceFilter}
                 onPriceFilterChange={setPriceFilter}
-                categoryNames={loadedData.headerMeta?.categoryNames}
+                categoryNames={
+                  lang === 'de'
+                    ? loadedData.headerMeta?.categoryNamesDe || loadedData.headerMeta?.categoryNames
+                    : loadedData.headerMeta?.categoryNames
+                }
+                isPreTranslatedCategoryNames={Boolean(
+                  lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+                )}
                 onScrollToParagraph={scrollToParagraph}
               />
             </div>
@@ -2242,7 +2362,7 @@ export default function App() {
             )}
           </div>
 
-          {/* Right: Sync, Google Login, Preischecker, Google Sheets Link & GitHub Link */}
+          {/* Right: Sync, Preischecker, Data Source Link & Code Source Link */}
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2">
             {/* Sync */}
             <Tooltip
@@ -2301,87 +2421,13 @@ export default function App() {
               </button>
             </Tooltip>
 
-            {/* Google Login / Connected Sheet Controls */}
-            {oauthAccessToken ? (
-              <div className="inline-flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-lg p-0.5">
-                <Tooltip
-                  title={lang === 'de' ? 'Mit Google Sheets API verbunden' : 'Connected to Google Sheets API'}
-                  badge="Read + Write"
-                  content={
-                    lang === 'de'
-                      ? `Angemeldet als ${authUser?.email || authUser?.displayName || 'Google-Konto'}. Klicken, um das Google Sheet direkt zu bearbeiten.`
-                      : `Signed in as ${authUser?.email || authUser?.displayName || 'Google account'}. Click to edit your Google Sheet directly.`
-                  }
-                  position="top"
-                  align="center"
-                  width="w-72"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setIsSheetModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer font-semibold"
-                    aria-label={lang === 'de' ? 'Sheet bearbeiten' : 'Edit Sheet'}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <Pencil className="w-3 h-3" />
-                    <span>{lang === 'de' ? 'Sheet bearbeiten' : 'Edit Sheet'}</span>
-                  </button>
-                </Tooltip>
-                <Tooltip
-                  content={lang === 'de' ? 'Von Google abmelden' : 'Sign out of Google'}
-                  position="top"
-                  align="center"
-                  width="w-40"
-                >
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignOut}
-                    className="p-1.5 rounded-md text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                    aria-label={lang === 'de' ? 'Abmelden' : 'Sign out'}
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                </Tooltip>
-              </div>
-            ) : (
-              <Tooltip
-                title={lang === 'de' ? 'Google Login' : 'Google Sign-In'}
-                badge="Sheets OAuth"
-                content={
-                  lang === 'de'
-                    ? 'Melden Sie sich mit Google an, um das Google Sheet direkt über die API (statt CSV) zu lesen und Änderungen zu schreiben.'
-                    : 'Sign in with Google to read the Google Sheet directly via API (instead of CSV) and write updates directly to it.'
-                }
-                position="top"
-                align="center"
-                width="w-72"
-              >
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={isSigningIn}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer disabled:opacity-55 ${
-                    isSigningIn ? 'animate-pulse' : ''
-                  }`}
-                  aria-label={lang === 'de' ? 'Mit Google anmelden' : 'Sign in with Google'}
-                >
-                  <svg className="w-3.5 h-3.5 block shrink-0" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                    <path fill="none" d="M0 0h48v48H0z" />
-                  </svg>
-                  <span>{lang === 'de' ? 'Google Login' : 'Google Login'}</span>
-                </button>
-              </Tooltip>
-            )}
-
             {/* Preischecker (In-App Daily Pricing Monitor) */}
             <Tooltip
               title={lang === 'de' ? 'Preischecker (KI-Preis-Monitor)' : 'Price Checker (AI Pricing Monitor)'}
               badge={
-                isCheckingPricing
+                !isSheetsConnected
+                  ? 'Google Login'
+                  : isCheckingPricing
                   ? lang === 'de'
                     ? 'Prüfe…'
                     : 'Checking…'
@@ -2392,7 +2438,11 @@ export default function App() {
                   : '24h'
               }
               content={
-                pricingReport
+                !isSheetsConnected
+                  ? lang === 'de'
+                    ? 'Melden Sie sich mit Google an, um Live-Preise direkt gegen Ihr Google Sheet zu prüfen.'
+                    : 'Sign in with Google to compare live pricing directly against your Google Sheet.'
+                  : pricingReport
                   ? lang === 'de'
                     ? `${pricingReport.summaryDe} Klicken für Details & direkten Sheet-Abgleich.`
                     : `${pricingReport.summaryEn} Click for details & Sheet comparison.`
@@ -2408,7 +2458,7 @@ export default function App() {
                 type="button"
                 onClick={() => setIsPricingModalOpen(true)}
                 className={`relative inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer border ${
-                  pricingReport && pricingReport.changedCount > 0
+                  isSheetsConnected && pricingReport && pricingReport.changedCount > 0
                     ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50'
                     : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
                 }`}
@@ -2418,15 +2468,15 @@ export default function App() {
                   className={`w-3.5 h-3.5 ${
                     isCheckingPricing
                       ? 'animate-pulse text-blue-500'
-                      : pricingReport && pricingReport.changedCount > 0
+                      : isSheetsConnected && pricingReport && pricingReport.changedCount > 0
                       ? 'text-amber-600 dark:text-amber-400'
-                      : pricingReport
+                      : isSheetsConnected && pricingReport
                       ? 'text-emerald-500'
                       : 'text-slate-500'
                   }`}
                 />
                 <span>{lang === 'de' ? 'Preischecker' : 'Price Checker'}</span>
-                {pricingReport && pricingReport.changedCount > 0 && (
+                {isSheetsConnected && pricingReport && pricingReport.changedCount > 0 && (
                   <span className="min-w-[16px] h-[16px] px-1 rounded-full text-[10px] leading-[16px] text-center font-mono font-bold bg-amber-600 text-white">
                     {pricingReport.changedCount}
                   </span>
@@ -2434,7 +2484,7 @@ export default function App() {
               </button>
             </Tooltip>
 
-            {/* Google Sheets Link */}
+            {/* Data Source Link */}
             <Tooltip
               content={t.googleSheetOpen}
               position="top"
@@ -2449,11 +2499,11 @@ export default function App() {
                 aria-label={t.googleSheetOpen}
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Sheets</span>
+                <span>Data Source</span>
               </a>
             </Tooltip>
 
-            {/* GitHub Link */}
+            {/* Code Source Link */}
             <Tooltip
               content={t.githubRepoOpen}
               position="top"
@@ -2468,27 +2518,12 @@ export default function App() {
                 aria-label={t.githubRepoOpen}
               >
                 <Github className="w-3.5 h-3.5" />
-                <span>GitHub</span>
+                <span>Code Source</span>
               </a>
             </Tooltip>
           </div>
         </div>
       </footer>
-
-      {/* Google Sheets Live Sync & Writer Modal */}
-      <GoogleSheetModal
-        isOpen={isSheetModalOpen}
-        onClose={() => setIsSheetModalOpen(false)}
-        lang={lang}
-        loadedData={loadedData}
-        accessToken={oauthAccessToken}
-        authUser={authUser}
-        isSigningIn={isSigningIn}
-        onSignIn={handleGoogleSignIn}
-        onRefreshFromSheets={(sheetIdOverride) => refreshData(oauthAccessToken, sheetIdOverride)}
-        activeSpreadsheetId={activeSpreadsheetId}
-        onChangeSpreadsheetId={setActiveSpreadsheetId}
-      />
 
       {/* Daily In-App AI Pricing Monitor Modal */}
       <PricingMonitorModal
@@ -2506,8 +2541,14 @@ export default function App() {
         authUser={authUser}
         isSigningIn={isSigningIn}
         onSignIn={handleGoogleSignIn}
+        onSignOut={handleGoogleSignOut}
         activeSpreadsheetId={activeSpreadsheetId}
         onRefreshFromSheets={(sheetIdOverride) => refreshData(oauthAccessToken, sheetIdOverride)}
+        isSheetsConnected={isSheetsConnected}
+        apiAvailable={pricingApiAvailable}
+        onRetryConnection={async () => {
+          await checkPricingMonitorStatus();
+        }}
       />
     </div>
   );
