@@ -1,0 +1,175 @@
+import { LabPlanInfo, MonitoredLab } from '../types/pricingMonitor';
+
+export const DEFAULT_PRICING_SNAPSHOT_DATE = '2026-11-16T08:00:00.000Z';
+
+export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
+  // OpenAI
+  {
+    lab: 'OpenAI',
+    planName: 'ChatGPT Go',
+    tierKey: 'standard',
+    usMonthly: '$8',
+    deMonthly: '~8€',
+    billingNotes: 'Expanded free limits',
+    sourceUrl: 'https://openai.com/index/introducing-chatgpt-go/',
+  },
+  {
+    lab: 'OpenAI',
+    planName: 'ChatGPT Plus',
+    tierKey: 'standard',
+    usMonthly: '$20',
+    deMonthly: '23€',
+    billingNotes: 'Unlocks Sol & Terra',
+    sourceUrl: 'https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus',
+  },
+  {
+    lab: 'OpenAI',
+    planName: 'ChatGPT Pro 100',
+    tierKey: 'pro',
+    usMonthly: '$100',
+    deMonthly: '103€',
+    billingNotes: 'Unlocks GPT-6 Astra',
+    sourceUrl: 'https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers',
+  },
+  {
+    lab: 'OpenAI',
+    planName: 'ChatGPT Pro 200',
+    tierKey: 'ultra',
+    usMonthly: '$200',
+    deMonthly: '200€',
+    billingNotes: 'Higher Pro limits',
+    sourceUrl: 'https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers',
+  },
+  {
+    lab: 'OpenAI',
+    planName: 'ChatGPT Pro 500',
+    tierKey: 'ultra',
+    usMonthly: '$500',
+    deMonthly: '500€',
+    billingNotes: 'Maximum compute tier',
+    sourceUrl: 'https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers',
+  },
+
+  // Anthropic
+  {
+    lab: 'Anthropic',
+    planName: 'Claude Pro',
+    tierKey: 'standard',
+    usMonthly: '$17-20',
+    deMonthly: '15-18€',
+    billingNotes: 'Unlocks Opus 5.5',
+    sourceUrl: 'https://support.claude.com/en/articles/8325606-what-is-the-pro-plan',
+  },
+  {
+    lab: 'Anthropic',
+    planName: 'Claude Max',
+    tierKey: 'pro',
+    usMonthly: '$100',
+    deMonthly: '90€',
+    billingNotes: '5x Pro; Fable 5.2',
+    sourceUrl: 'https://support.claude.com/en/articles/11049741-what-is-the-max-plan',
+  },
+  {
+    lab: 'Anthropic',
+    planName: 'Claude Ultra',
+    tierKey: 'ultra',
+    usMonthly: '$200',
+    deMonthly: '180€',
+    billingNotes: '20x Pro limits',
+    sourceUrl: 'https://claude.com/pricing',
+  },
+
+  // Google
+  {
+    lab: 'Google',
+    planName: 'Google AI Plus',
+    tierKey: 'standard',
+    usMonthly: '$4.99',
+    deMonthly: '4.99-9.99€',
+    billingNotes: '2x Hydrogen, 400 GB',
+    sourceUrl: 'https://gemini.google/de/subscriptions/?hl=de',
+  },
+  {
+    lab: 'Google',
+    planName: 'Google AI Pro',
+    tierKey: 'pro',
+    usMonthly: '$17-20',
+    deMonthly: '14-22€',
+    billingNotes: 'Gemini 4 Argon, 5 TB',
+    sourceUrl: 'https://gemini.google/de/subscriptions/?hl=de',
+  },
+  {
+    lab: 'Google',
+    planName: 'Google AI Ultra',
+    tierKey: 'ultra',
+    usMonthly: '$100+',
+    deMonthly: '99€+',
+    billingNotes: 'Gemini 4 Carbon, 20 TB',
+    sourceUrl: 'https://gemini.google/de/subscriptions/?hl=de',
+  },
+
+  // Meta (Consumer browser & personal agent plans — Muse Code CLI excluded)
+  {
+    lab: 'Meta',
+    planName: 'Meta AI Free',
+    tierKey: 'free',
+    usMonthly: '$0',
+    deMonthly: '0€',
+    billingNotes: 'meta.ai chat (Spark 1.1)',
+    sourceUrl: 'https://www.meta.ai/',
+  },
+  {
+    lab: 'Meta',
+    planName: 'Meta One Core',
+    tierKey: 'standard',
+    usMonthly: '$7.99',
+    deMonthly: '~8-9€',
+    billingNotes: 'App perks (no Wonder)',
+    sourceUrl: 'https://about.fb.com/news/2026/09/introducing-meta-one-subscription-service-more-features-ai/',
+  },
+  {
+    lab: 'Meta',
+    planName: 'Meta One Premium',
+    tierKey: 'pro',
+    usMonthly: '$19.99',
+    deMonthly: '~20-23€',
+    billingNotes: 'Media perks (no Wonder)',
+    sourceUrl: 'https://about.fb.com/news/2026/09/introducing-meta-one-subscription-service-more-features-ai/',
+  },
+  {
+    lab: 'Meta',
+    planName: 'Muse Free',
+    tierKey: 'free',
+    usMonthly: '$0',
+    deMonthly: 'US only',
+    billingNotes: 'muse.ai browser baseline',
+    sourceUrl: 'https://about.fb.com/news/2026/09/introducing-muse/',
+  },
+  {
+    lab: 'Meta',
+    planName: 'Muse Power',
+    tierKey: 'pro',
+    usMonthly: '$20',
+    deMonthly: 'US only',
+    billingNotes: 'muse.ai, 500M tok/wk',
+    sourceUrl: 'https://about.fb.com/news/2026/10/introducing-muse-wonder-models/',
+  },
+  {
+    lab: 'Meta',
+    planName: 'Muse Maximum',
+    tierKey: 'ultra',
+    usMonthly: '$100',
+    deMonthly: 'US only',
+    billingNotes: 'muse.ai, 3B tok/wk',
+    sourceUrl: 'https://about.fb.com/news/2026/10/introducing-muse-wonder-models/',
+  },
+];
+
+export function matchMonitoredLabKey(creatorOrId: string): MonitoredLab | null {
+  const low = (creatorOrId || '').toLowerCase();
+  if (low.includes('openai')) return 'OpenAI';
+  if (low.includes('anthropic')) return 'Anthropic';
+  if (low.includes('google')) return 'Google';
+  if (low.includes('meta')) return 'Meta';
+  return null;
+}

@@ -23,13 +23,15 @@ import { extractFrontierPoints, isMultiLevelSupported } from './utils/mathRegres
 import { DEFAULT_TIMELINE_LAB_LEVELS } from './data/labLevels';
 import { Language, TRANSLATIONS } from './utils/i18n';
 import { matchesSearchQuery } from './utils/searchUtils';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Building2, SlidersHorizontal, TrendingUp, GitCompare, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink, Layers, Bell } from 'lucide-react';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Building2, SlidersHorizontal, TrendingUp, GitCompare, Columns2, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink, Layers, Bell } from 'lucide-react';
+import { CompareView } from './components/CompareView';
 import { Tooltip } from './components/Tooltip';
 import { User } from 'firebase/auth';
 import { initGoogleAuth, googleSignIn, googleSignOut, clearAccessToken } from './services/googleAuthService';
 import { DEFAULT_SPREADSHEET_ID } from './services/googleSheetsService';
 import { PricingMonitorModal } from './components/PricingMonitorModal';
 import { PricingCheckReport } from './types/pricingMonitor';
+import { DEFAULT_LAB_PLANS } from './data/pricingPlansFallback';
 import { extractMonitoredModelSnapshots, fetchPricingMonitorStatus, isStaticPreviewError, triggerPricingCheck } from './services/pricingMonitorService';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
@@ -379,8 +381,9 @@ export default function App() {
 
   // Tab-Navigation: 'benchmark' vs 'labs'
   const [activeTab, setActiveTab] = useState<'benchmark' | 'labs'>('benchmark');
-  // Three-Way Tab for Benchmark: 'barchart' (Balkendiagramm) vs 'timeline' (Zeitachse) vs 'correlations' (Korrelationen)
-  const [benchmarkView, setBenchmarkView] = useState<'barchart' | 'timeline' | 'correlations'>('barchart');
+  // Four-Way Tab for Benchmark: 'barchart' (Balkendiagramm) vs 'timeline' (Zeitachse) vs 'correlations' (Korrelationen) vs 'compare' (Vergleichen)
+  const [benchmarkView, setBenchmarkView] = useState<'barchart' | 'timeline' | 'correlations' | 'compare'>('barchart');
+  const [compareScope, setCompareScope] = useState<ModelScope>('current');
 
   // Timeline State elevated to header
   const [timelineScope, setTimelineScope] = useState<'all' | 'frontier'>('all');
@@ -511,6 +514,7 @@ export default function App() {
     setShowAdvanced(false);
     setActiveTab('benchmark');
     setBenchmarkView('barchart');
+    setCompareScope('current');
     setTimelineScope('all');
     setTimelineRegressionIndex(DEFAULT_TIMELINE_REGRESSION_INDEX);
     setTimelinePolyDegree(2);
@@ -975,18 +979,17 @@ export default function App() {
     [oauthAccessToken, loadedData.dataSource, loadedData.allModels]
   );
 
+  const isPricingDiffValidForSheet = useMemo(() => {
+    if (!isSheetsConnected || !pricingReport) return false;
+    return doesReportMatchLiveSheet(pricingReport, loadedData.allModels);
+  }, [isSheetsConnected, pricingReport, loadedData.allModels, doesReportMatchLiveSheet]);
+
   const checkPricingMonitorStatus = useCallback(async () => {
     try {
       const status = await fetchPricingMonitorStatus();
       setPricingApiAvailable(true);
-      if (
-        isSheetsConnected &&
-        status.report &&
-        doesReportMatchLiveSheet(status.report, loadedData.allModels)
-      ) {
+      if (status.report) {
         setPricingReport(status.report);
-      } else if (!isSheetsConnected) {
-        setPricingReport(null);
       }
       if (isSheetsConnected && status.lastError) {
         setPricingCheckError(status.lastError);
@@ -998,7 +1001,7 @@ export default function App() {
       }
       return null;
     }
-  }, [isSheetsConnected, loadedData.allModels, doesReportMatchLiveSheet]);
+  }, [isSheetsConnected]);
 
   // Probe pricing backend availability on mount; only load/run pricing checks once connected to Google Sheets API
   useEffect(() => {
@@ -1348,6 +1351,21 @@ export default function App() {
               >
                 <GitCompare className="w-3.5 h-3.5 text-indigo-500" />
                 <span>{lang === 'de' ? 'Analyse' : 'Analysis'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('benchmark');
+                  setBenchmarkView('compare');
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  activeTab === 'benchmark' && benchmarkView === 'compare'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <Columns2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{lang === 'de' ? 'Vergleichen' : 'Compare'}</span>
               </button>
             </div>
 
@@ -2054,6 +2072,63 @@ export default function App() {
               </div>
             )}
 
+            {/* Compare View Header Controls: Score Mode Switcher + Scope Toggle */}
+            {activeTab === 'benchmark' && benchmarkView === 'compare' && (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Score Mode Switcher */}
+                <div
+                  className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0"
+                  role="group"
+                  aria-label={lang === 'de' ? 'Score-Modus für Vergleich' : 'Comparison score mode'}
+                >
+                  {(['new', 'old', 'worstCase'] as ScoreMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setScoreMode(mode)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap ${
+                        scoreMode === mode
+                          ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      {mode === 'new'
+                        ? t.scoreModeNew
+                        : mode === 'old'
+                        ? t.scoreModeOld
+                        : t.scoreModeWorstCase}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Scope Segmented Control */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setCompareScope('current')}
+                    className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      compareScope === 'current'
+                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {t.scopeCurrent} ({loadedData.allModels.filter((m) => m.isAvailable).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCompareScope('all')}
+                    className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      compareScope === 'all'
+                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {t.scopeAll} ({loadedData.allModels.length})
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Ecosystem / Lab Matrix View Header Controls: original sheet pill -> glossary pill -> lab category pills -> advanced toggle */}
             {activeTab === 'labs' && (
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -2227,6 +2302,43 @@ export default function App() {
               <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
             </div>
           </main>
+        ) : benchmarkView === 'compare' ? (
+          <main className="flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-6 py-4 flex flex-col space-y-4">
+            <CompareView
+              allModels={loadedData.allModels}
+              rankedModels={
+                scoreMode === 'old'
+                  ? loadedData.oldModels
+                  : scoreMode === 'worstCase'
+                  ? loadedData.worstCaseModels
+                  : loadedData.newModels
+              }
+              scoreMode={scoreMode}
+              scope={compareScope}
+              lang={lang}
+              categoryNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.categoryNamesDe || loadedData.headerMeta?.categoryNames
+                  : loadedData.headerMeta?.categoryNames
+              }
+              isPreTranslatedCategoryNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+              )}
+              row33Meta={loadedData.headerMeta?.row33}
+              onScrollToParagraph={scrollToParagraph}
+              onSelectCompany={(company) => {
+                setSelectedCompany(company);
+                setActiveTab('benchmark');
+                setBenchmarkView('barchart');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+
+            {/* Notes Section under Compare */}
+            <div className="w-full pt-1 pb-4">
+              <CsvNotesSection appLang={lang} notesMeta={loadedData.notesMeta} />
+            </div>
+          </main>
         ) : (
           <main className="flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-5 py-2.5 sm:py-3 flex flex-col space-y-2.5">
             {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategorie-Slider, 5er-Schritt-Slider, NEW/OLD Score, Current/All Scope, Volle Explosion und alphabetischen Hersteller-Filtern */}
@@ -2314,6 +2426,8 @@ export default function App() {
           <LabMatrixView
             labs={labs}
             models={loadedData.newModels}
+            allModels={loadedData.allModels}
+            pricingPlans={pricingReport?.labs?.length ? pricingReport.labs : DEFAULT_LAB_PLANS}
             onSelectLabForBenchmark={handleSelectLabFromMatrix}
             lang={lang}
             activeGroup={labActiveGroup}
@@ -2421,34 +2535,30 @@ export default function App() {
               </button>
             </Tooltip>
 
-            {/* Preischecker (In-App Daily Pricing Monitor) */}
+            {/* Preischecker / Aktuelle Tarife */}
             <Tooltip
-              title={lang === 'de' ? 'Preischecker (KI-Preis-Monitor)' : 'Price Checker (AI Pricing Monitor)'}
+              title={lang === 'de' ? 'Aktuelle Tarife & Preischecker' : 'Current Plans & Price Checker'}
               badge={
-                !isSheetsConnected
-                  ? 'Google Login'
-                  : isCheckingPricing
+                isCheckingPricing
                   ? lang === 'de'
                     ? 'Prüfe…'
                     : 'Checking…'
-                  : pricingReport && pricingReport.changedCount > 0
-                  ? `${pricingReport.changedCount} ${lang === 'de' ? 'Änderung(en)' : 'Change(s)'}`
-                  : pricingReport
+                  : isPricingDiffValidForSheet && pricingReport && pricingReport.changedCount > 0
+                  ? `${pricingReport.changedCount} Diff`
+                  : isPricingDiffValidForSheet && pricingReport
                   ? 'OK'
-                  : '24h'
+                  : lang === 'de'
+                  ? 'Tarife DE/US'
+                  : 'Plans DE/US'
               }
               content={
-                !isSheetsConnected
+                isPricingDiffValidForSheet && pricingReport
                   ? lang === 'de'
-                    ? 'Melden Sie sich mit Google an, um Live-Preise direkt gegen Ihr Google Sheet zu prüfen.'
-                    : 'Sign in with Google to compare live pricing directly against your Google Sheet.'
-                  : pricingReport
-                  ? lang === 'de'
-                    ? `${pricingReport.summaryDe} Klicken für Details & direkten Sheet-Abgleich.`
-                    : `${pricingReport.summaryEn} Click for details & Sheet comparison.`
+                    ? `${pricingReport.summaryDe} Klicken für aktuelle Tarife & erkannte Preis-Diffs.`
+                    : `${pricingReport.summaryEn} Click for current plans & detected price diffs.`
                   : lang === 'de'
-                  ? 'Prüft täglich DE- (€) und US-Preise ($) für Meta, OpenAI, Anthropic und Google direkt in der App.'
-                  : 'Checks DE (€) and US ($) pricing daily for Meta, OpenAI, Anthropic, and Google right inside the app.'
+                  ? 'Zeigt aktuelle Browser-Chat-Tarife (DE € / US $) für OpenAI, Anthropic, Google & Meta (ohne Login nutzbar).'
+                  : 'View current browser chat plans (DE € / US $) for OpenAI, Anthropic, Google & Meta (available without login).'
               }
               position="top"
               align="center"
@@ -2458,25 +2568,25 @@ export default function App() {
                 type="button"
                 onClick={() => setIsPricingModalOpen(true)}
                 className={`relative inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer border ${
-                  isSheetsConnected && pricingReport && pricingReport.changedCount > 0
+                  isPricingDiffValidForSheet && pricingReport && pricingReport.changedCount > 0
                     ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50'
                     : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
                 }`}
-                aria-label={lang === 'de' ? 'Preischecker öffnen' : 'Open price checker'}
+                aria-label={lang === 'de' ? 'Tarife & Preischecker öffnen' : 'Open plans & price checker'}
               >
                 <Bell
                   className={`w-3.5 h-3.5 ${
                     isCheckingPricing
                       ? 'animate-pulse text-blue-500'
-                      : isSheetsConnected && pricingReport && pricingReport.changedCount > 0
+                      : isPricingDiffValidForSheet && pricingReport && pricingReport.changedCount > 0
                       ? 'text-amber-600 dark:text-amber-400'
-                      : isSheetsConnected && pricingReport
+                      : isPricingDiffValidForSheet && pricingReport
                       ? 'text-emerald-500'
                       : 'text-slate-500'
                   }`}
                 />
                 <span>{lang === 'de' ? 'Preischecker' : 'Price Checker'}</span>
-                {isSheetsConnected && pricingReport && pricingReport.changedCount > 0 && (
+                {isPricingDiffValidForSheet && pricingReport && pricingReport.changedCount > 0 && (
                   <span className="min-w-[16px] h-[16px] px-1 rounded-full text-[10px] leading-[16px] text-center font-mono font-bold bg-amber-600 text-white">
                     {pricingReport.changedCount}
                   </span>
@@ -2531,6 +2641,7 @@ export default function App() {
         onClose={() => setIsPricingModalOpen(false)}
         lang={lang}
         report={pricingReport}
+        isDiffValid={isPricingDiffValidForSheet}
         isChecking={isCheckingPricing}
         checkError={pricingCheckError}
         dailyAutoEnabled={dailyAutoCheckEnabled}

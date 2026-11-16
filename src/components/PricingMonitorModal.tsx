@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   ArrowRight,
   Save,
-  Sparkles,
   LogOut,
 } from 'lucide-react';
 import { User } from 'firebase/auth';
@@ -26,6 +25,10 @@ import {
   PricingCheckReport,
   PricingDiffItem,
 } from '../types/pricingMonitor';
+import {
+  DEFAULT_LAB_PLANS,
+  DEFAULT_PRICING_SNAPSHOT_DATE,
+} from '../data/pricingPlansFallback';
 import { Language } from '../utils/i18n';
 
 interface PricingMonitorModalProps {
@@ -33,6 +36,7 @@ interface PricingMonitorModalProps {
   onClose: () => void;
   lang: Language;
   report: PricingCheckReport | null;
+  isDiffValid?: boolean;
   isChecking: boolean;
   checkError: string | null;
   dailyAutoEnabled: boolean;
@@ -81,6 +85,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   onClose,
   lang,
   report,
+  isDiffValid = true,
   isChecking,
   checkError,
   dailyAutoEnabled,
@@ -98,29 +103,31 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   apiAvailable = true,
   onRetryConnection,
 }) => {
-  const [filterMode, setFilterMode] = useState<'actionable' | 'all'>('actionable');
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
   const [pendingWrite, setPendingWrite] = useState<PendingSheetCellChange[] | null>(null);
   const [isWriting, setIsWriting] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [writeSuccess, setWriteSuccess] = useState<string | null>(null);
 
-  // Pre-select any rows with changed prices & pick sensible default filter whenever report updates
+  const effectiveDiffReport =
+    apiAvailable && isSheetsConnected && isDiffValid && report ? report : null;
+
+  // Pre-select any rows with changed prices whenever live Sheet diff report updates
   useEffect(() => {
-    if (!report) return;
+    if (!effectiveDiffReport) {
+      setSelectedIds({});
+      return;
+    }
     const next: Record<string, boolean> = {};
-    let actionableCount = 0;
-    for (const item of report.diffs) {
+    for (const item of effectiveDiffReport.diffs) {
       const hasChange = item.deStatus === 'changed' || item.usStatus === 'changed';
       const hasMissing = item.deStatus === 'missing' || item.usStatus === 'missing';
       if (hasChange || hasMissing) {
         next[item.modelId] = hasChange;
-        actionableCount++;
       }
     }
     setSelectedIds(next);
-    setFilterMode(actionableCount > 0 ? 'actionable' : 'all');
-  }, [report]);
+  }, [effectiveDiffReport]);
 
   useEffect(() => {
     if (isOpen) {
@@ -130,8 +137,6 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     }
   }, [isOpen]);
 
-  const effectiveReport = isSheetsConnected ? report : null;
-
   const layout = loadedData.columnLayout;
   const colDeIdx = layout?.colDePrice ?? 19;
   const colUsIdx = layout?.colUsPrice ?? null;
@@ -139,22 +144,24 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   const colUsLetter = colUsIdx !== null ? columnIndexToA1(colUsIdx) : null;
   const sheetTitle = loadedData.activeSheetTitle || 'Sheet1';
 
-  const hasActionable = effectiveReport
-    ? effectiveReport.changedCount + effectiveReport.missingCount > 0
-    : false;
-
-  const visibleDiffs = useMemo(() => {
-    if (!effectiveReport) return [];
-    if (filterMode === 'all' || !hasActionable) return effectiveReport.diffs;
-    return effectiveReport.diffs.filter(
+  const actionableDiffs = useMemo(() => {
+    if (!effectiveDiffReport) return [];
+    return effectiveDiffReport.diffs.filter(
       (d) => d.deStatus !== 'unchanged' || d.usStatus !== 'unchanged'
     );
-  }, [effectiveReport, filterMode, hasActionable]);
+  }, [effectiveDiffReport]);
 
   const selectedCount = useMemo(() => {
-    if (!effectiveReport) return 0;
-    return effectiveReport.diffs.filter((d) => selectedIds[d.modelId]).length;
-  }, [effectiveReport, selectedIds]);
+    return actionableDiffs.filter((d) => selectedIds[d.modelId]).length;
+  }, [actionableDiffs, selectedIds]);
+
+  const displayedLabs = useMemo(() => {
+    return report?.labs && report.labs.length > 0 ? report.labs : DEFAULT_LAB_PLANS;
+  }, [report]);
+
+  const displayedSources = report?.sources ?? [];
+  const displayedTimestamp = report?.checkedAt || DEFAULT_PRICING_SNAPSHOT_DATE;
+  const isUsingLiveReport = Boolean(report?.labs && report.labs.length > 0);
 
   if (!isOpen) return null;
 
@@ -176,12 +183,12 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   };
 
   const handlePrepareSheetUpdates = () => {
-    if (!report) return;
+    if (!effectiveDiffReport) return;
     setWriteError(null);
     setWriteSuccess(null);
 
     const changes: PendingSheetCellChange[] = [];
-    for (const item of report.diffs) {
+    for (const item of actionableDiffs) {
       if (!selectedIds[item.modelId]) continue;
       // Strict guard: never write to Rows 1-35 (Top-30 VSTACK lives in Rows 3-32)
       if (item.sheetRowNumber < 36) continue;
@@ -253,7 +260,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     }
   };
 
-  const renderStatusPill = (status: PricingDiffItem['deStatus']) => {
+  const renderStatusLabel = (status: PricingDiffItem['deStatus']) => {
     if (status === 'changed') {
       return (
         <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
@@ -268,11 +275,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         </span>
       );
     }
-    return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
-        {lang === 'de' ? 'Aktuell' : 'Up to date'}
-      </span>
-    );
+    return null;
   };
 
   return (
@@ -283,7 +286,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
           <div className="flex items-center gap-2.5 min-w-0">
             <div
               className={`p-1.5 rounded-lg shrink-0 ${
-                effectiveReport && effectiveReport.changedCount > 0
+                effectiveDiffReport && effectiveDiffReport.changedCount > 0
                   ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
                   : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
               }`}
@@ -292,43 +295,53 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                {lang === 'de' ? 'KI-Preischecker' : 'AI Price Checker'}
+                {lang === 'de' ? 'Tarife & Preischecker' : 'Plans & Price Checker'}
               </h2>
-              <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+              <p className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
                 <Clock className="w-3 h-3 shrink-0" />
-                <span>{effectiveReport ? formatTimestamp(effectiveReport.checkedAt) : '—'}</span>
+                <span>
+                  {isUsingLiveReport
+                    ? `${lang === 'de' ? 'Live-Stand' : 'Live'}: ${formatTimestamp(displayedTimestamp)}`
+                    : `${lang === 'de' ? 'Stand' : 'Snapshot'}: ${formatTimestamp(displayedTimestamp)}`}
+                </span>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-200 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={dailyAutoEnabled}
-                onChange={(e) => onToggleDailyAuto(e.target.checked)}
-                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-              />
-              <span>Auto (24h)</span>
-            </label>
+            {apiAvailable && (
+              <>
+                <label className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={dailyAutoEnabled}
+                    onChange={(e) => onToggleDailyAuto(e.target.checked)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Auto (24h)</span>
+                </label>
 
-            <button
-              type="button"
-              onClick={() => void onRunCheck()}
-              disabled={isChecking || !apiAvailable || !isSheetsConnected}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
-              <span>
-                {isChecking
-                  ? lang === 'de'
-                    ? 'Prüfe…'
-                    : 'Checking…'
-                  : lang === 'de'
-                  ? 'Prüfen'
-                  : 'Check'}
-              </span>
-            </button>
+                {isSheetsConnected && (
+                  <button
+                    type="button"
+                    onClick={() => void onRunCheck()}
+                    disabled={isChecking}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
+                    <span>
+                      {isChecking
+                        ? lang === 'de'
+                          ? 'Prüfe…'
+                          : 'Checking…'
+                        : lang === 'de'
+                        ? 'Live prüfen'
+                        : 'Check Live'}
+                    </span>
+                  </button>
+                )}
+              </>
+            )}
 
             {accessToken && onSignOut && (
               <button
@@ -376,58 +389,137 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
           )}
 
-          {!apiAvailable && !isChecking && (
-            <div className="py-12 px-4 max-w-lg mx-auto text-center space-y-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                {lang === 'de'
-                  ? 'Preischecker benötigt Full-Stack-Server'
-                  : 'Price Checker Requires Full-Stack Server'}
+          {/* Top Section: Current Consumer Plans (DE / US) — Always visible for all users including static GitHub Pages */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                {lang === 'de' ? 'Aktuelle Tarife (DE / US)' : 'Current Plans (DE / US)'}
               </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 {lang === 'de'
-                  ? 'In rein statischem Hosting (z. B. GitHub Pages oder „vite preview“) existiert kein /api-Backend für Live-Abrufe und Gemini API. Öffnen Sie die Full-Stack-App in AI Studio oder starten Sie lokal mit „npm run dev“.'
-                  : 'Static hosting (such as GitHub Pages or vite preview) has no /api backend for live fetches or Gemini API calls. Open the full-stack app in AI Studio or run “npm run dev” locally.'}
-              </p>
+                  ? 'Browser-/Webchat-Tarife pro Monat (ohne reine CLI-Abos)'
+                  : 'Monthly consumer browser & chat plans (CLI-only tiers excluded)'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {LAB_ORDER.map((lab) => {
+                const labPlans = displayedLabs.filter((p) => p.lab === lab);
+                const labUrl =
+                  labPlans.find((p) => p.sourceUrl)?.sourceUrl ||
+                  displayedSources.find((s) => s.title.startsWith(`${lab}:`))?.uri;
+                return (
+                  <div
+                    key={lab}
+                    className={`p-2.5 rounded-xl border ${LAB_ACCENT[lab]} space-y-2`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${LAB_BADGE[lab]}`}>
+                        {lab}
+                      </span>
+                      {labUrl && (
+                        <a
+                          href={labUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
+                          title={labUrl}
+                        >
+                          <span>{lang === 'de' ? 'Quellen' : 'Source'}</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
+                    </div>
+
+                    {labPlans.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {lang === 'de' ? 'Keine Daten.' : 'No data.'}
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-slate-200/70 dark:divide-slate-800/70 rounded-lg bg-white/85 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 px-2">
+                        {labPlans.map((plan, idx) => (
+                          <div
+                            key={`${lab}-${plan.planName}-${idx}`}
+                            className="py-1.5 space-y-0.5 text-[11px]"
+                          >
+                            <div className="flex items-baseline justify-between gap-1.5">
+                              {plan.sourceUrl ? (
+                                <a
+                                  href={plan.sourceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate"
+                                  title={plan.sourceUrl}
+                                >
+                                  {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                </a>
+                              ) : (
+                                <span className="font-semibold text-slate-900 dark:text-white truncate">
+                                  {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                </span>
+                              )}
+                              <span className="font-mono tabular-nums text-[11px] shrink-0 text-slate-700 dark:text-slate-200">
+                                <strong>{plan.deMonthly || '—'}</strong>
+                                <span className="text-slate-400 mx-1">/</span>
+                                <span>{plan.usMonthly || '—'}</span>
+                              </span>
+                            </div>
+                            {plan.billingNotes && (
+                              <p
+                                className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight truncate"
+                                title={plan.billingNotes}
+                              >
+                                {plan.billingNotes}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Diff Section (Full-Stack Server Only): Only renders diff controls & detected diffs when applicable */}
+          {!apiAvailable && (
+            <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
+              <span>
+                {lang === 'de'
+                  ? 'Statische Vorschau ohne Server-Backend: Live-Webprüfung & Google-Sheet-Diff stehen nur mit dem Full-Stack-Server zur Verfügung.'
+                  : 'Static preview without backend server: live web re-checks and Google Sheet diff require the full-stack server.'}
+              </span>
               {onRetryConnection && (
                 <button
                   type="button"
                   onClick={() => void onRetryConnection()}
-                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer shrink-0"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>{lang === 'de' ? 'Serververbindung testen' : 'Retry Server Connection'}</span>
+                  <RefreshCw className="w-3 h-3" />
+                  <span>{lang === 'de' ? 'Server prüfen' : 'Retry Server'}</span>
                 </button>
               )}
             </div>
           )}
 
           {apiAvailable && !isSheetsConnected && (
-            <div className="py-12 px-4 max-w-lg mx-auto text-center space-y-4">
-              <div className="w-11 h-11 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div className="space-y-1.5">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 min-w-0">
+                <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span>
                   {lang === 'de'
-                    ? 'Mit Google Sheets verbinden'
-                    : 'Connect to Google Sheets'}
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  {lang === 'de'
-                    ? 'Damit immer gegen Ihr aktuelles Live-Google-Sheet geprüft wird (ohne veraltete CSV-Zwischenstände), melden Sie sich bitte direkt hier mit Google an.'
-                    : 'Sign in with Google right here so live pricing is compared strictly against your live Google Sheet (with no stale CSV fallback data).'}
-                </p>
+                    ? 'Für einen Live-Preis-Diff gegen Ihr Google Sheet (und direkte Übernahme ab Zeile 36) mit Google anmelden.'
+                    : 'Sign in with Google to run a live pricing diff against your Google Sheet and apply updates.'}
+                </span>
               </div>
               <button
                 type="button"
                 onClick={() => void onSignIn()}
                 disabled={isSigningIn}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-55"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer disabled:opacity-55 shrink-0"
               >
-                <svg className="w-4 h-4 block shrink-0" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                <svg className="w-3.5 h-3.5 block shrink-0" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
                   <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
@@ -437,330 +529,215 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 <span>
                   {isSigningIn
                     ? lang === 'de'
-                      ? 'Verbinde mit Google…'
+                      ? 'Verbinde…'
                       : 'Signing in…'
                     : lang === 'de'
-                    ? 'Mit Google anmelden & prüfen'
-                    : 'Sign in with Google & Check'}
+                    ? 'Mit Google anmelden'
+                    : 'Sign in with Google'}
                 </span>
               </button>
             </div>
           )}
 
-          {apiAvailable && isSheetsConnected && !effectiveReport && isChecking && (
-            <div className="py-16 text-center space-y-3">
-              <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                {lang === 'de'
-                  ? 'Durchsuche aktuelle US- ($) & DE-Preise (€) für Meta, OpenAI, Anthropic und Google…'
-                  : 'Searching current US ($) & DE (€) pricing for Meta, OpenAI, Anthropic, and Google…'}
-              </p>
-              <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                {lang === 'de'
-                  ? 'Vergleicht direkt mit Ihrem verbundenen Google Sheet (Spalten T/U ab Zeile 36)'
-                  : 'Comparing directly against your connected Google Sheet (Columns T/U, Row 36+)'}
-              </p>
+          {apiAvailable && isSheetsConnected && isChecking && !effectiveDiffReport && (
+            <div className="px-3.5 py-3 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/70 dark:bg-blue-950/30 flex items-center gap-3 text-xs">
+              <RefreshCw className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-800 dark:text-slate-200">
+                  {lang === 'de'
+                    ? 'Prüfe Live-Preise gegen Ihr Google Sheet…'
+                    : 'Checking live pricing against your Google Sheet…'}
+                </p>
+                <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                  {lang === 'de'
+                    ? `Spalten ${colDeLetter} / ${colUsLetter || 'US'} ab Zeile 36`
+                    : `Columns ${colDeLetter} / ${colUsLetter || 'US'}, Row 36+`}
+                </p>
+              </div>
             </div>
           )}
 
-          {apiAvailable && isSheetsConnected && !effectiveReport && !isChecking && (
-            <div className="py-12 px-4 max-w-lg mx-auto text-center space-y-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+          {apiAvailable && isSheetsConnected && !isChecking && !effectiveDiffReport && (
+            <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-slate-600 dark:text-slate-300">
                 {lang === 'de'
-                  ? 'Noch keine Preisprüfung durchgeführt'
-                  : 'No Pricing Check Run Yet'}
-              </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                {lang === 'de'
-                  ? 'Prüft die aktuellen Abo-Preise in Deutschland (€) und den USA ($) für Meta, OpenAI, Anthropic und Google und vergleicht sie direkt mit Ihrem verbundenen Google Sheet.'
-                  : 'Checks current subscription pricing in Germany (€) and the US ($) for Meta, OpenAI, Anthropic, and Google and compares directly against your connected Google Sheet.'}
-              </p>
+                  ? 'Google Sheet verbunden. Live-Check ausführen, um etwaige Preis-Diffs zu erkennen.'
+                  : 'Google Sheet connected. Run a live check to detect any pricing diffs.'}
+              </span>
               <button
                 type="button"
                 onClick={() => void onRunCheck()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>{lang === 'de' ? 'Preisprüfung starten' : 'Run Pricing Check'}</span>
+                <span>{lang === 'de' ? 'Diff jetzt prüfen' : 'Check Diff Now'}</span>
               </button>
             </div>
           )}
 
-          {apiAvailable && isSheetsConnected && effectiveReport && (
+          {effectiveDiffReport && (
             <>
-              {/* Compact Status Strip */}
+              {/* Compact Diff Status Strip */}
               <div
                 className={`px-3.5 py-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
-                  effectiveReport.changedCount > 0
+                  effectiveDiffReport.changedCount > 0
                     ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
+                    : actionableDiffs.length > 0
+                    ? 'border-blue-300 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/25'
                     : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/25'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  {effectiveReport.changedCount > 0 ? (
+                  {effectiveDiffReport.changedCount > 0 ? (
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                   ) : (
                     <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   )}
                   <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug">
                     <strong className="font-bold text-slate-900 dark:text-white">
-                      {effectiveReport.changedCount > 0
+                      {effectiveDiffReport.changedCount > 0
                         ? lang === 'de'
-                          ? `${effectiveReport.changedCount} Abweichung(en):`
-                          : `${effectiveReport.changedCount} Change(s):`
+                          ? `${effectiveDiffReport.changedCount} Diff(s) erkannt:`
+                          : `${effectiveDiffReport.changedCount} Diff(s) detected:`
+                        : actionableDiffs.length > 0
+                        ? lang === 'de'
+                          ? `${actionableDiffs.length} fehlende Preiszelle(n):`
+                          : `${actionableDiffs.length} missing price cell(s):`
                         : lang === 'de'
-                        ? 'Alle Preise aktuell:'
-                        : 'All prices up to date:'}
+                        ? 'Kein Preis-Diff:'
+                        : 'No price diff:'}
                     </strong>{' '}
-                    {lang === 'de' ? effectiveReport.summaryDe : effectiveReport.summaryEn}
+                    {lang === 'de' ? effectiveDiffReport.summaryDe : effectiveDiffReport.summaryEn}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1.5 font-mono text-[11px] shrink-0">
-                  {effectiveReport.changedCount > 0 && (
+                <div className="flex items-center gap-1.5 font-mono tabular-nums text-[11px] shrink-0">
+                  {effectiveDiffReport.changedCount > 0 && (
                     <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
-                      {effectiveReport.changedCount} {lang === 'de' ? 'geändert' : 'changed'}
+                      {effectiveDiffReport.changedCount} {lang === 'de' ? 'geändert' : 'changed'}
                     </span>
                   )}
-                  {effectiveReport.missingCount > 0 && (
+                  {effectiveDiffReport.missingCount > 0 && (
                     <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
-                      {effectiveReport.missingCount} {lang === 'de' ? 'fehlt' : 'missing'}
+                      {effectiveDiffReport.missingCount} {lang === 'de' ? 'fehlt' : 'missing'}
                     </span>
                   )}
                   <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
-                    {effectiveReport.unchangedCount} OK
+                    {effectiveDiffReport.unchangedCount} OK
                   </span>
                 </div>
               </div>
 
-              {/* 4-Lab Compact Plans Grid */}
-              <div className="space-y-2">
-                <h3 className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {lang === 'de' ? 'Aktuelle Tarife (DE / US)' : 'Current Plans (DE / US)'}
-                </h3>
+              {/* Diff-Only Table: Only rendered when actual changes or missing cells exist */}
+              {actionableDiffs.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      {lang === 'de'
+                        ? `Abweichungen zum Sheet (${colDeLetter} / ${colUsLetter || 'US'} · ab Z. 36)`
+                        : `Detected Price Diffs (${colDeLetter} / ${colUsLetter || 'US'} · Row 36+)`}
+                    </h3>
+                    <span className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                      {actionableDiffs.length} {lang === 'de' ? 'Einträge' : 'items'}
+                    </span>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                  {LAB_ORDER.map((lab) => {
-                    const labPlans = effectiveReport.labs.filter((p) => p.lab === lab);
-                    const labUrl =
-                      labPlans.find((p) => p.sourceUrl)?.sourceUrl ||
-                      effectiveReport.sources.find((s) => s.title.startsWith(`${lab}:`))?.uri;
-                    return (
-                      <div
-                        key={lab}
-                        className={`p-2.5 rounded-xl border ${LAB_ACCENT[lab]} space-y-2`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${LAB_BADGE[lab]}`}>
-                            {lab}
-                          </span>
-                          {labUrl && (
-                            <a
-                              href={labUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
-                              title={labUrl}
-                            >
-                              <span>{lang === 'de' ? 'Quellen' : 'Source'}</span>
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          )}
-                        </div>
-
-                        {labPlans.length === 0 ? (
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            {lang === 'de' ? 'Keine Daten.' : 'No data.'}
-                          </p>
-                        ) : (
-                          <div className="divide-y divide-slate-200/70 dark:divide-slate-800/70 rounded-lg bg-white/85 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 px-2">
-                            {labPlans.map((plan, idx) => (
-                              <div
-                                key={`${lab}-${plan.planName}-${idx}`}
-                                className="py-1.5 space-y-0.5 text-[11px]"
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                            <th className="py-1.5 px-2.5 w-7"></th>
+                            <th className="py-1.5 px-3">{lang === 'de' ? 'Modell' : 'Model'}</th>
+                            <th className="py-1.5 px-3">{lang === 'de' ? 'Lab · Tarif' : 'Lab · Plan'}</th>
+                            <th className="py-1.5 px-3">DE ({colDeLetter})</th>
+                            <th className="py-1.5 px-3">US ({colUsLetter || 'EN'})</th>
+                            <th className="py-1.5 px-3">{lang === 'de' ? 'Notiz' : 'Note'}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+                          {actionableDiffs.map((item) => {
+                            const isChanged = item.deStatus === 'changed' || item.usStatus === 'changed';
+                            return (
+                              <tr
+                                key={item.modelId}
+                                className={
+                                  isChanged
+                                    ? 'bg-amber-50/45 dark:bg-amber-950/15'
+                                    : 'bg-white dark:bg-slate-900'
+                                }
                               >
-                                <div className="flex items-baseline justify-between gap-1.5">
-                                  {plan.sourceUrl ? (
-                                    <a
-                                      href={plan.sourceUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate"
-                                      title={plan.sourceUrl}
-                                    >
-                                      {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
-                                    </a>
-                                  ) : (
-                                    <span className="font-semibold text-slate-900 dark:text-white truncate">
-                                      {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                <td className="py-2 px-2.5 align-middle">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(selectedIds[item.modelId])}
+                                    onChange={() => handleToggleItem(item.modelId)}
+                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                  />
+                                </td>
+                                <td className="py-2 px-3 align-middle whitespace-nowrap">
+                                  <span className="font-semibold text-slate-900 dark:text-white">
+                                    {item.displayName}
+                                  </span>
+                                  <span className="ml-1.5 text-[10px] font-mono tabular-nums text-slate-400">
+                                    #{item.sheetRowNumber}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 align-middle whitespace-nowrap">
+                                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${LAB_BADGE[item.lab]}`}>
+                                    {item.lab}
+                                  </span>
+                                  {item.matchedPlanName && (
+                                    <span className="ml-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+                                      {item.matchedPlanName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
                                     </span>
                                   )}
-                                  <span className="font-mono text-[11px] shrink-0 text-slate-700 dark:text-slate-200">
-                                    <strong>{plan.deMonthly || '—'}</strong>
-                                    <span className="text-slate-400 mx-1">/</span>
-                                    <span>{plan.usMonthly || '—'}</span>
-                                  </span>
-                                </div>
-                                {plan.billingNotes && (
-                                  <p
-                                    className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight truncate"
-                                    title={plan.billingNotes}
-                                  >
-                                    {plan.billingNotes}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Compact Sheet Comparison Table */}
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    {lang === 'de'
-                      ? `Sheet-Abgleich (${colDeLetter} / ${colUsLetter || 'US'} · ab Z. 36)`
-                      : `Sheet Diff (${colDeLetter} / ${colUsLetter || 'US'} · Row 36+)`}
-                  </h3>
-
-                  {hasActionable && (
-                    <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px]">
-                      <button
-                        type="button"
-                        onClick={() => setFilterMode('actionable')}
-                        className={`px-2 py-0.5 rounded-md font-semibold cursor-pointer transition-colors ${
-                          filterMode === 'actionable'
-                            ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        {lang === 'de' ? 'Änderungen' : 'Changes'} ({effectiveReport.changedCount + effectiveReport.missingCount})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilterMode('all')}
-                        className={`px-2 py-0.5 rounded-md font-semibold cursor-pointer transition-colors ${
-                          filterMode === 'all'
-                            ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        {lang === 'de' ? 'Alle' : 'All'} ({effectiveReport.diffs.length})
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                          {hasActionable && <th className="py-1.5 px-2.5 w-7"></th>}
-                          <th className="py-1.5 px-3">{lang === 'de' ? 'Modell' : 'Model'}</th>
-                          <th className="py-1.5 px-3">{lang === 'de' ? 'Lab · Tarif' : 'Lab · Plan'}</th>
-                          <th className="py-1.5 px-3">DE ({colDeLetter})</th>
-                          <th className="py-1.5 px-3">US ({colUsLetter || 'EN'})</th>
-                          <th className="py-1.5 px-3">{lang === 'de' ? 'Notiz' : 'Note'}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80">
-                        {visibleDiffs.map((item) => {
-                          const isActionable = item.deStatus !== 'unchanged' || item.usStatus !== 'unchanged';
-                          const isChanged = item.deStatus === 'changed' || item.usStatus === 'changed';
-                          return (
-                            <tr
-                              key={item.modelId}
-                              className={
-                                isChanged
-                                  ? 'bg-amber-50/45 dark:bg-amber-950/15'
-                                  : 'bg-white dark:bg-slate-900'
-                              }
-                            >
-                              {hasActionable && (
-                                <td className="py-2 px-2.5 align-middle">
-                                  {isActionable && (
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(selectedIds[item.modelId])}
-                                      onChange={() => handleToggleItem(item.modelId)}
-                                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                    />
-                                  )}
                                 </td>
-                              )}
-                              <td className="py-2 px-3 align-middle whitespace-nowrap">
-                                <span className="font-semibold text-slate-900 dark:text-white">
-                                  {item.displayName}
-                                </span>
-                                <span className="ml-1.5 text-[10px] font-mono text-slate-400">
-                                  #{item.sheetRowNumber}
-                                </span>
-                              </td>
-                              <td className="py-2 px-3 align-middle whitespace-nowrap">
-                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${LAB_BADGE[item.lab]}`}>
-                                  {item.lab}
-                                </span>
-                                {item.matchedPlanName && (
-                                  <span className="ml-1.5 text-[11px] text-slate-600 dark:text-slate-300">
-                                    {item.matchedPlanName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                <td className="py-2 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
+                                  <div className="inline-flex items-center gap-1.5">
+                                    {item.deStatus === 'unchanged' ? (
+                                      <span className="text-slate-700 dark:text-slate-200">{item.currentDe || '—'}</span>
+                                    ) : (
+                                      <>
+                                        <span className="text-slate-400 line-through">{item.currentDe || '—'}</span>
+                                        <ArrowRight className="w-3 h-3 text-slate-400" />
+                                        <span className="font-bold text-slate-900 dark:text-white">{item.liveDe || '—'}</span>
+                                        {renderStatusLabel(item.deStatus)}
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-2 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
+                                  <div className="inline-flex items-center gap-1.5">
+                                    {item.usStatus === 'unchanged' ? (
+                                      <span className="text-slate-700 dark:text-slate-200">{item.currentUs || '—'}</span>
+                                    ) : (
+                                      <>
+                                        <span className="text-slate-400 line-through">{item.currentUs || '—'}</span>
+                                        <ArrowRight className="w-3 h-3 text-slate-400" />
+                                        <span className="font-bold text-slate-900 dark:text-white">{item.liveUs || '—'}</span>
+                                        {renderStatusLabel(item.usStatus)}
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-2 px-3 align-middle max-w-[220px]">
+                                  <span
+                                    className="block truncate text-[11px] text-slate-500 dark:text-slate-400"
+                                    title={item.reason}
+                                  >
+                                    {item.reason || 'OK'}
                                   </span>
-                                )}
-                              </td>
-                              <td className="py-2 px-3 align-middle font-mono whitespace-nowrap">
-                                <div className="inline-flex items-center gap-1.5">
-                                  {item.deStatus === 'unchanged' ? (
-                                    <span className="text-slate-700 dark:text-slate-200">{item.currentDe || '—'}</span>
-                                  ) : (
-                                    <>
-                                      <span className="text-slate-400 line-through">{item.currentDe || '—'}</span>
-                                      <ArrowRight className="w-3 h-3 text-slate-400" />
-                                      <span className="font-bold text-slate-900 dark:text-white">{item.liveDe || '—'}</span>
-                                      {renderStatusPill(item.deStatus)}
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="py-2 px-3 align-middle font-mono whitespace-nowrap">
-                                <div className="inline-flex items-center gap-1.5">
-                                  {item.usStatus === 'unchanged' ? (
-                                    <span className="text-slate-700 dark:text-slate-200">{item.currentUs || '—'}</span>
-                                  ) : (
-                                    <>
-                                      <span className="text-slate-400 line-through">{item.currentUs || '—'}</span>
-                                      <ArrowRight className="w-3 h-3 text-slate-400" />
-                                      <span className="font-bold text-slate-900 dark:text-white">{item.liveUs || '—'}</span>
-                                      {renderStatusPill(item.usStatus)}
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="py-2 px-3 align-middle max-w-[220px]">
-                                <span
-                                  className="block truncate text-[11px] text-slate-500 dark:text-slate-400"
-                                  title={item.reason}
-                                >
-                                  {item.reason || 'OK'}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
 
-                {/* Sheet Update Action Bar */}
-                {(effectiveReport.changedCount > 0 || effectiveReport.missingCount > 0) && (
+                  {/* Sheet Update Action Bar */}
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                     <span className="text-xs text-slate-500 dark:text-slate-400">
                       {lang === 'de'
@@ -805,9 +782,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                       </button>
                     )}
                   </div>
-                )}
-              </div>
-
+                </div>
+              )}
             </>
           )}
         </div>

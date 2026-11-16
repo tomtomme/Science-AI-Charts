@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { LabEntry, ModelRecord } from '../types';
+import { LabPlanInfo } from '../types/pricingMonitor';
+import { DEFAULT_LAB_PLANS, matchMonitoredLabKey } from '../data/pricingPlansFallback';
 import { Search, ExternalLink, Cpu, Wrench, Terminal, Layers, HelpCircle, BookOpen, Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
@@ -8,6 +10,8 @@ export type LabGroup = 'all' | 'top10' | 'contender' | 'tweakers' | 'small' | 'h
 export interface LabMatrixViewProps {
   labs: LabEntry[];
   models?: ModelRecord[];
+  allModels?: ModelRecord[];
+  pricingPlans?: LabPlanInfo[];
   onSelectLabForBenchmark?: (creatorName: string) => void;
   lang?: 'de' | 'en';
   activeGroup?: LabGroup;
@@ -802,8 +806,209 @@ const MiniScaleMeter: React.FC<{ level: number; colorClass?: string }> = ({
   );
 };
 
+function normalizePricingLabKey(raw: string): string {
+  const low = (raw || '').toLowerCase().trim();
+  if (!low) return '';
+  if (low.includes('openai') || low === 'chatgpt') return 'openai';
+  if (low.includes('anthropic') || low === 'claude') return 'anthropic';
+  if (low.includes('google') || low.includes('gemini')) return 'google';
+  if (low.includes('meta') || low.includes('muse')) return 'meta';
+  if (low.includes('spacex') || low === 'xai' || low === 'grok') return 'xai';
+  if (low.includes('alibaba') || low.includes('qwen')) return 'alibaba';
+  if (low.includes('deepseek')) return 'deepseek';
+  if (low.includes('moonshot') || low.includes('kimi')) return 'moonshot';
+  if (low.includes('zhipu') || low === 'z ai' || low === 'z.ai' || low === 'zai' || low.includes('glm')) return 'zhipu';
+  if (low.includes('nvidia') || low.includes('nemotron')) return 'nvidia';
+  if (low.includes('mistral')) return 'mistral';
+  if (low.includes('amazon') || low.includes('nova')) return 'amazon';
+  if (low.includes('inception') || low.includes('mercury')) return 'inception';
+  if (low.includes('microsoft') || low.includes('phi') || low.includes('mai')) return 'microsoft';
+  if (low.includes('reflection')) return 'reflection';
+  if (low.includes('thinking')) return 'thinkingmachines';
+  if (low.includes('xiaomi') || low.includes('mimo')) return 'xiaomi';
+  if (low.includes('minimax')) return 'minimax';
+  if (low.includes('inclusion')) return 'inclusion';
+  if (low.includes('stepfun')) return 'stepfun';
+  if (low.includes('sapiens') || low.includes('agnes')) return 'sapiens';
+  if (low.includes('tencent')) return 'tencent';
+  if (low.includes('upstage') || low.includes('solar')) return 'upstage';
+  if (low.includes('multiverse')) return 'multiverse';
+  if (low.includes('motif')) return 'motif';
+  if (low.includes('longcat')) return 'longcat';
+  if (low.includes('china mobile') || low.includes('chinamobile')) return 'chinamobile';
+  if (low.includes('baidu')) return 'baidu';
+  if (low.includes('apple')) return 'apple';
+  if (low.includes('cohere')) return 'cohere';
+  if (low.includes('apodex')) return 'apodex';
+  if (low.includes('deepl')) return 'deepl';
+  if (low === 'ssi') return 'ssi';
+  return low.replace(/[^a-z0-9]/g, '');
+}
+
+function cleanSheetPriceValue(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === '-' || trimmed.toLowerCase() === 'n/a') return null;
+  const low = trimmed.toLowerCase();
+  if (low.includes('abokosten') || low.includes('monthly cost')) return null;
+  return trimmed;
+}
+
+function formatPlanShortLabel(plan: LabPlanInfo, lang: 'de' | 'en'): string {
+  const price = (lang === 'de' ? plan.deMonthly : plan.usMonthly) || (lang === 'de' ? plan.usMonthly : plan.deMonthly) || '';
+  const name = plan.planName
+    .replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')
+    .replace(/^Meta AI\s+/i, 'meta.ai ')
+    .replace(/^Meta One\s+/i, 'One ')
+    .trim();
+  return price ? `${name} ${price}` : name;
+}
+
+interface LabPricingSummary {
+  accessFlags: string[];
+  hasFreeAccess: boolean;
+  hasFreeApi: boolean;
+  isPaidOnly: boolean;
+  primaryText: string;
+  secondaryText?: string;
+  consumerPlans: LabPlanInfo[];
+  subscriptionTiers?: string;
+  sheetModelPrices: string[];
+}
+
+function resolveLabPricingSummary(
+  lab: LabEntry,
+  matchedModels: ModelRecord[],
+  allConsumerPlans: LabPlanInfo[],
+  lang: 'de' | 'en'
+): LabPricingSummary | null {
+  const monitoredLab = matchMonitoredLabKey(lab.creator) || matchMonitoredLabKey(lab.id);
+  const consumerPlans = monitoredLab
+    ? allConsumerPlans.filter((p) => p.lab === monitoredLab)
+    : [];
+
+  const available = matchedModels.filter((m) => m.isAvailable);
+  const pool = available.length > 0 ? available : matchedModels;
+
+  const hasFreeChat = pool.some((m) => !m.isPaid);
+  const hasPaidModel = pool.some((m) => m.isPaid);
+  const hasFreeApi = pool.some((m) => m.isFreeApi);
+
+  const rawSheetPrices: string[] = [];
+  const seenPrices = new Set<string>();
+  for (const m of pool) {
+    const val = cleanSheetPriceValue(lang === 'de' ? m.priceDeMonthly : m.priceUsMonthly);
+    if (val && !seenPrices.has(val.toLowerCase())) {
+      seenPrices.add(val.toLowerCase());
+      rawSheetPrices.push(val);
+    }
+  }
+
+  const rawTiers = (lab.subscriptionTiers || '').trim();
+  const hasTiers = Boolean(rawTiers && rawTiers !== '-' && rawTiers.toLowerCase() !== 'n/a');
+  const displayTiersText = hasTiers
+    ? /^per\s+token\s+price$/i.test(rawTiers)
+      ? lang === 'de'
+        ? 'Pay-per-Token (API)'
+        : 'Per-token API pricing'
+      : rawTiers
+    : '';
+
+  const accessFlags: string[] = [];
+  const hasConsumerFree = consumerPlans.some((p) => p.tierKey === 'free');
+  if (hasFreeChat || hasConsumerFree) {
+    accessFlags.push(lang === 'de' ? 'Gratis' : 'Free');
+  }
+  if (consumerPlans.some((p) => p.tierKey !== 'free') || hasPaidModel || (hasTiers && !/per\s+token/i.test(rawTiers))) {
+    accessFlags.push(lang === 'de' ? 'Abo' : 'Paid');
+  }
+  if (hasFreeApi) {
+    accessFlags.push('🌐 Free API');
+  }
+
+  let primaryText = '';
+  let secondaryText: string | undefined;
+
+  if (consumerPlans.length > 0) {
+    if (monitoredLab === 'OpenAI') {
+      const go = consumerPlans.find((p) => /go/i.test(p.planName));
+      const plus = consumerPlans.find((p) => /plus/i.test(p.planName));
+      const pros = consumerPlans.filter((p) => /pro/i.test(p.planName));
+      const parts: string[] = [];
+      if (go) parts.push(formatPlanShortLabel(go, lang));
+      if (plus) parts.push(formatPlanShortLabel(plus, lang));
+      if (pros.length >= 2) {
+        const firstPrice = lang === 'de' ? pros[0].deMonthly : pros[0].usMonthly;
+        const lastPrice = lang === 'de' ? pros[pros.length - 1].deMonthly : pros[pros.length - 1].usMonthly;
+        parts.push(`Pro ${firstPrice}–${lastPrice}`);
+      } else if (pros.length === 1) {
+        parts.push(formatPlanShortLabel(pros[0], lang));
+      }
+      primaryText = parts.join(' · ');
+    } else if (monitoredLab === 'Meta') {
+      const metaFree = consumerPlans.find((p) => /meta ai free/i.test(p.planName));
+      const oneCore = consumerPlans.find((p) => /meta one core/i.test(p.planName));
+      const onePrem = consumerPlans.find((p) => /meta one premium/i.test(p.planName));
+      const musePower = consumerPlans.find((p) => /muse power/i.test(p.planName));
+      const museMax = consumerPlans.find((p) => /muse maximum/i.test(p.planName));
+      const parts: string[] = [];
+      if (metaFree) parts.push(formatPlanShortLabel(metaFree, lang));
+      if (oneCore && onePrem) {
+        const p1 = lang === 'de' ? oneCore.deMonthly : oneCore.usMonthly;
+        const p2 = lang === 'de' ? onePrem.deMonthly : onePrem.usMonthly;
+        parts.push(`One ${p1} / ${p2}`);
+      }
+      if (lang === 'de') {
+        parts.push('Muse US only');
+      } else if (musePower && museMax) {
+        parts.push(`Muse $0 / ${musePower.usMonthly} / ${museMax.usMonthly}`);
+      }
+      primaryText = parts.join(' · ');
+    } else {
+      primaryText = consumerPlans.map((p) => formatPlanShortLabel(p, lang)).join(' · ');
+    }
+  } else if (rawSheetPrices.length > 0 && displayTiersText) {
+    primaryText = `${rawSheetPrices.join(', ')} · ${displayTiersText}`;
+  } else if (rawSheetPrices.length > 0) {
+    primaryText = rawSheetPrices.join(' · ');
+  } else if (displayTiersText) {
+    primaryText = displayTiersText;
+  } else if (pool.length > 0) {
+    primaryText = hasFreeChat
+      ? lang === 'de'
+        ? 'Webchat kostenlos'
+        : 'Free web chat'
+      : lang === 'de'
+      ? 'Nur API / Bezahlt'
+      : 'API / Paid only';
+  } else if (lab.weightsType === 'open') {
+    primaryText = lang === 'de' ? 'Open Weights (Lokal / API)' : 'Open Weights (Local / API)';
+  } else {
+    return null;
+  }
+
+  if (consumerPlans.length === 0 && lab.weightsType === 'open' && !primaryText.toLowerCase().includes('open')) {
+    secondaryText = hasFreeChat ? (lang === 'de' ? 'Open Weights + Webchat' : 'Open Weights + Web Chat') : undefined;
+  }
+
+  return {
+    accessFlags,
+    hasFreeAccess: hasFreeChat || hasConsumerFree || hasFreeApi,
+    hasFreeApi,
+    isPaidOnly: !hasFreeChat && !hasConsumerFree && !hasFreeApi && (hasPaidModel || consumerPlans.length > 0),
+    primaryText,
+    secondaryText,
+    consumerPlans,
+    subscriptionTiers: displayTiersText || undefined,
+    sheetModelPrices: rawSheetPrices,
+  };
+}
+
 export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   labs,
+  models,
+  allModels,
+  pricingPlans = DEFAULT_LAB_PLANS,
   onSelectLabForBenchmark,
   lang = 'de',
   activeGroup: controlledActiveGroup,
@@ -995,6 +1200,28 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
       a.creator.localeCompare(b.creator, undefined, { sensitivity: 'base', numeric: true })
     );
   }, [labs, activeGroup, weightsFilter, sizeFilter, selectedCountry, searchQuery]);
+
+  // Index benchmark models by normalized lab key so every card gets live pricing/availability metadata
+  const modelsByLabKey = useMemo(() => {
+    const sourceModels = allModels && allModels.length > 0 ? allModels : models || [];
+    const map = new Map<string, ModelRecord[]>();
+    for (const m of sourceModels) {
+      const keys = new Set<string>([
+        normalizePricingLabKey(m.companyName),
+        normalizePricingLabKey(m.creatorClean),
+      ]);
+      for (const key of keys) {
+        if (!key) continue;
+        const arr = map.get(key);
+        if (arr) {
+          arr.push(m);
+        } else {
+          map.set(key, [m]);
+        }
+      }
+    }
+    return map;
+  }, [allModels, models]);
 
   // Alphabetically sorted glossary terms according to active language (A-Z)
   const sortedGlossaryTerms = useMemo(() => {
@@ -1652,6 +1879,18 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               ? availableTiers.filter((tier) => targetTiers.includes(tier.key))
               : availableTiers;
 
+          const labModelKey =
+            normalizePricingLabKey(lab.creator) ||
+            normalizePricingLabKey(lab.id) ||
+            normalizePricingLabKey(lab.engineName);
+          const matchedLabModels = modelsByLabKey.get(labModelKey) || [];
+          const pricingSummary = resolveLabPricingSummary(
+            lab,
+            matchedLabModels,
+            pricingPlans,
+            lang
+          );
+
           return (
             <div
               key={lab.id}
@@ -1811,7 +2050,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
 
                 {/* Models */}
                 {displayTiers.length > 0 && (
-                  <div className={`space-y-1 ${isSimplifiedView ? 'mb-1' : 'mb-3'}`}>
+                  <div className={`space-y-1 ${isSimplifiedView ? 'mb-2' : 'mb-3'}`}>
                     <div className="flex flex-col gap-1">
                       {displayTiers.map((tier) => {
                         const modelVal = lab.parameterSizes[tier.key];
@@ -1887,6 +2126,71 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         );
                       })}
                     </div>
+                  </div>
+                )}
+
+                {/* Pricing Summary Row (directly visible on card face) */}
+                {pricingSummary && (
+                  <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-2 space-y-1">
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="font-semibold text-slate-500 dark:text-slate-400">
+                        {lang === 'de' ? 'Preise (DE)' : 'Pricing (US)'}
+                      </span>
+                      {pricingSummary.accessFlags.length > 0 && (
+                        <span
+                          className={`font-medium truncate ${
+                            pricingSummary.hasFreeAccess
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : pricingSummary.isPaidOnly
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-slate-500 dark:text-slate-400'
+                          }`}
+                        >
+                          {pricingSummary.accessFlags.join(' · ')}
+                        </span>
+                      )}
+                    </div>
+
+                    {pricingSummary.consumerPlans.length > 0 ? (
+                      <Tooltip
+                        title={`${lab.creator} · ${lang === 'de' ? 'Monatstarife (DE / US)' : 'Monthly Plans (DE / US)'}`}
+                        position="top"
+                        align="left"
+                        width="w-72"
+                        content={
+                          <div className="space-y-1 text-[11px]">
+                            {pricingSummary.consumerPlans.map((plan, idx) => (
+                              <div key={`${plan.planName}-${idx}`} className="flex items-baseline justify-between gap-2">
+                                <span className="font-semibold text-slate-200 truncate">
+                                  {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                </span>
+                                <span className="font-mono tabular-nums text-slate-100 shrink-0">
+                                  {plan.deMonthly} / {plan.usMonthly}
+                                </span>
+                              </div>
+                            ))}
+                            {pricingSummary.subscriptionTiers && (
+                              <div className="pt-1 mt-1 border-t border-slate-700/70 text-[10px] text-slate-400">
+                                {lang === 'de' ? 'Alle Stufen:' : 'All tiers:'} {pricingSummary.subscriptionTiers}
+                              </div>
+                            )}
+                          </div>
+                        }
+                      >
+                        <p className="font-mono tabular-nums text-[11px] font-medium text-slate-800 dark:text-slate-200 leading-snug cursor-help">
+                          {pricingSummary.primaryText}
+                        </p>
+                      </Tooltip>
+                    ) : (
+                      <p
+                        className={`font-mono tabular-nums text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-snug ${
+                          isSimplifiedView ? 'truncate' : ''
+                        }`}
+                        title={pricingSummary.primaryText}
+                      >
+                        {pricingSummary.primaryText}
+                      </p>
+                    )}
                   </div>
                 )}
 
