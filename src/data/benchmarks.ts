@@ -230,31 +230,39 @@ export function getBenchmarkCategoryLabel(
   if (!rawCsvOrKey && !compFallback) return '';
   const raw = (rawCsvOrKey || compFallback?.key || '').trim();
   const lower = raw.toLowerCase();
+  const isInternalOldKey = /^(iqold|nonhalluold|scienceknowledgeold|trickquestionsold)$/i.test(raw);
 
   if (lang === 'en') {
-    // English: return raw CSV string or English component name
-    if (lower.includes('trickquestionsold') || lower.includes('trick questions') || lower.includes('simplebench')) {
-      return 'SimpleBench';
-    }
-    if (raw && raw !== '-' && !raw.startsWith('Col ') && !raw.endsWith('Old')) {
-      return raw;
+    // English: return raw CSV Row-2 string verbatim whenever present
+    if (raw && raw !== '-' && !raw.startsWith('Col ') && !isInternalOldKey) {
+      return raw.replace(/_old\b/i, ' old');
     }
     return compFallback?.nameEn || raw;
   }
 
-  // German: if already translated via weekly AI sync of D2:K2, preserve directly
-  if (isPreTranslatedDe && raw && raw !== '-' && !raw.startsWith('Col ') && !raw.endsWith('Old')) {
+  // German: if already translated via weekly AI sync of Row 2, preserve directly
+  if (isPreTranslatedDe && raw && raw !== '-' && !raw.startsWith('Col ') && !isInternalOldKey) {
     return raw;
   }
 
-  // German: check retired components first if matching key
-  if (compFallback && (compFallback.id.endsWith('Old') || compFallback.key.endsWith('Old'))) {
-    return compFallback.nameDe;
+  // German fallback when Row-2 string matches retired/old keys or hints
+  if (lower.includes('iqold') || lower === 'iq_old' || lower === 'iq old' || lower.includes('iq (alt') || lower.includes('iq (old')) {
+    return 'IQ (alt)';
   }
-  if (lower.includes('iqold') || lower.includes('iq (alt') || lower.includes('iq (old')) return 'IQ';
-  if (lower.includes('nonhalluold') || lower.includes('faktentreue (alt') || lower.includes('non-hallu-rate (old')) return 'Faktentreue';
-  if (lower.includes('scienceknowledgeold') || lower.includes('faktenwissen (alt') || lower.includes('science knowledge (old')) return 'Faktenwissen';
-  if (lower.includes('trickquestionsold') || lower.includes('trickfragen') || lower.includes('simplebench')) return 'SimpleBench';
+  if (lower.includes('nonhalluold') || lower.includes('non-hallu-rate_old') || lower.includes('non-hallu-rate old') || lower.includes('faktentreue (alt') || lower.includes('non-hallu-rate (old')) {
+    return 'Faktentreue (alt)';
+  }
+  if (lower.includes('scienceknowledgeold') || lower.includes('science knowledge_old') || lower.includes('science knowledge old') || lower.includes('faktenwissen (alt') || lower.includes('science knowledge (old')) {
+    return 'Faktenwissen (alt)';
+  }
+  if (lower.includes('trickquestionsold') || lower.includes('trick questions_old') || lower.includes('trick questions old') || lower.includes('trickfragen') || lower.includes('simplebench')) {
+    return lower.includes('trick') ? 'Trickfragen (alt)' : 'SimpleBench';
+  }
+
+  if (compFallback && (compFallback.id.endsWith('Old') || compFallback.key.endsWith('Old'))) {
+    if (lower.includes('trick questions')) return 'Trickfragen (alt)';
+    return `${compFallback.nameDe} (alt)`;
+  }
 
   // German: translate standard score labels into German
   if (lower.includes('iq') || lower.includes('aa-ii')) return 'IQ';
@@ -273,3 +281,31 @@ export function getBenchmarkCategoryLabel(
   return raw;
 }
 
+/**
+ * Resolves a composite score label (slider indices 0=New, 1=Old, 2=WorstCase)
+ * synced from Google Sheet Row 2 (Cols M2, L2, N2).
+ */
+export function getCompositeScoreLabel(
+  _index: 0 | 1 | 2,
+  rawCsvName: string | undefined,
+  lang: 'de' | 'en',
+  fallbackLabel: string,
+  isPreTranslatedDe = false
+): string {
+  const raw = (rawCsvName || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return fallbackLabel;
+
+  if (lang === 'en') {
+    return raw;
+  }
+
+  if (isPreTranslatedDe) {
+    return raw;
+  }
+
+  const lower = raw.toLowerCase();
+  if (lower === 'new') return 'Neuer Score';
+  if (lower === 'old') return 'Alter Score';
+  if (lower.includes('worst')) return 'Worst-Case';
+  return raw;
+}

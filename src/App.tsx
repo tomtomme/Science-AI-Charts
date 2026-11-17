@@ -802,7 +802,7 @@ export default function App() {
   const [, setCountdown] = useState<number>(SYNC_INTERVAL);
 
   const refreshData = useCallback(
-    async (tokenOverride?: string | null, spreadsheetIdOverride?: string) => {
+    async (tokenOverride?: string | null, spreadsheetIdOverride?: string, forceRefresh = false) => {
       const effectiveToken = tokenOverride !== undefined ? tokenOverride : oauthAccessToken;
       const effectiveSpreadsheetId = spreadsheetIdOverride || activeSpreadsheetId;
       setIsSyncing(true);
@@ -815,6 +815,7 @@ export default function App() {
           fetchLiveLabEntries({
             accessToken: effectiveToken,
             spreadsheetId: effectiveSpreadsheetId,
+            forceRefresh,
           }),
         ]);
         if (result.authError) {
@@ -837,6 +838,14 @@ export default function App() {
                     Array.isArray(translated.categoryNamesDe) && translated.categoryNamesDe.length === 8
                       ? translated.categoryNamesDe
                       : prev.headerMeta.categoryNamesDe,
+                  compositeScoreNamesDe:
+                    Array.isArray(translated.compositeScoreNamesDe) && translated.compositeScoreNamesDe.length === 3
+                      ? translated.compositeScoreNamesDe
+                      : prev.headerMeta.compositeScoreNamesDe,
+                  retiredCategoryNamesDe:
+                    Array.isArray(translated.retiredCategoryNamesDe) && translated.retiredCategoryNamesDe.length === 4
+                      ? translated.retiredCategoryNamesDe
+                      : prev.headerMeta.retiredCategoryNamesDe,
                   translatedAt: tr.translatedAt ?? prev.headerMeta.translatedAt,
                   translationSource: 'gemini_weekly',
                 },
@@ -1365,7 +1374,7 @@ export default function App() {
                 }`}
               >
                 <Columns2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>{lang === 'de' ? 'Vergleichen' : 'Compare'}</span>
+                <span>{lang === 'de' ? 'Vergleich' : 'Compare'}</span>
               </button>
             </div>
 
@@ -1415,6 +1424,22 @@ export default function App() {
                   }
                   isPreTranslatedCategoryNames={Boolean(
                     lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+                  )}
+                  compositeScoreNames={
+                    lang === 'de'
+                      ? loadedData.headerMeta?.compositeScoreNamesDe || loadedData.headerMeta?.compositeScoreNames
+                      : loadedData.headerMeta?.compositeScoreNames
+                  }
+                  isPreTranslatedCompositeScoreNames={Boolean(
+                    lang === 'de' && loadedData.headerMeta?.compositeScoreNamesDe?.length === 3
+                  )}
+                  retiredCategoryNames={
+                    lang === 'de'
+                      ? loadedData.headerMeta?.retiredCategoryNamesDe || loadedData.headerMeta?.retiredCategoryNames
+                      : loadedData.headerMeta?.retiredCategoryNames
+                  }
+                  isPreTranslatedRetiredCategoryNames={Boolean(
+                    lang === 'de' && loadedData.headerMeta?.retiredCategoryNamesDe?.length === 4
                   )}
                   row33Meta={loadedData.headerMeta?.row33}
                   onHoverCategory={setCategoryInfoComp}
@@ -1606,7 +1631,7 @@ export default function App() {
             {/* Timeline View Header Controls: ScoreSlider, Scope toggle, Regression slider & badges, and Contextual param input */}
             {activeTab === 'benchmark' && benchmarkView === 'timeline' && (
               <div className="flex flex-wrap items-center gap-2">
-                {/* Score / Category Criteria Slider (Timeline includes retired benchmarks from Cols U-X) */}
+                {/* Score / Category Criteria Slider (Timeline includes retired benchmarks from Cols V-Y) */}
                 <ScoreSlider
                   scoreMode={timelineScoreMode}
                   onScoreModeChange={setTimelineScoreMode}
@@ -1628,6 +1653,22 @@ export default function App() {
                   }
                   isPreTranslatedCategoryNames={Boolean(
                     lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+                  )}
+                  compositeScoreNames={
+                    lang === 'de'
+                      ? loadedData.headerMeta?.compositeScoreNamesDe || loadedData.headerMeta?.compositeScoreNames
+                      : loadedData.headerMeta?.compositeScoreNames
+                  }
+                  isPreTranslatedCompositeScoreNames={Boolean(
+                    lang === 'de' && loadedData.headerMeta?.compositeScoreNamesDe?.length === 3
+                  )}
+                  retiredCategoryNames={
+                    lang === 'de'
+                      ? loadedData.headerMeta?.retiredCategoryNamesDe || loadedData.headerMeta?.retiredCategoryNames
+                      : loadedData.headerMeta?.retiredCategoryNames
+                  }
+                  isPreTranslatedRetiredCategoryNames={Boolean(
+                    lang === 'de' && loadedData.headerMeta?.retiredCategoryNamesDe?.length === 4
                   )}
                   row33Meta={loadedData.headerMeta?.row33}
                   onHoverCategory={setCategoryInfoComp}
@@ -2248,12 +2289,38 @@ export default function App() {
               selectedCategoryIndex={timelineCategoryIndex}
               onCategoryIndexChange={(idx) => {
                 setTimelineCategoryIndex(idx);
-                if (idx > 0) {
+                if (idx > 8) {
+                  setCategoryInfoComp(RETIRED_TIMELINE_BENCHMARKS[idx - 9]);
+                } else if (idx > 0) {
                   setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
                 } else {
                   setCategoryInfoComp(null);
                 }
               }}
+              categoryNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.categoryNamesDe || loadedData.headerMeta?.categoryNames
+                  : loadedData.headerMeta?.categoryNames
+              }
+              isPreTranslatedCategoryNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+              )}
+              compositeScoreNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.compositeScoreNamesDe || loadedData.headerMeta?.compositeScoreNames
+                  : loadedData.headerMeta?.compositeScoreNames
+              }
+              isPreTranslatedCompositeScoreNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.compositeScoreNamesDe?.length === 3
+              )}
+              retiredCategoryNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.retiredCategoryNamesDe || loadedData.headerMeta?.retiredCategoryNames
+                  : loadedData.headerMeta?.retiredCategoryNames
+              }
+              isPreTranslatedRetiredCategoryNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.retiredCategoryNamesDe?.length === 4
+              )}
               onScrollToParagraph={scrollToParagraph}
               onScrollToFinalScores={scrollToFinalScores}
               lang={lang}
@@ -2286,6 +2353,30 @@ export default function App() {
               onScrollToParagraph={scrollToParagraph}
               onScrollToFinalScores={scrollToFinalScores}
               lang={lang}
+              categoryNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.categoryNamesDe || loadedData.headerMeta?.categoryNames
+                  : loadedData.headerMeta?.categoryNames
+              }
+              isPreTranslatedCategoryNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+              )}
+              compositeScoreNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.compositeScoreNamesDe || loadedData.headerMeta?.compositeScoreNames
+                  : loadedData.headerMeta?.compositeScoreNames
+              }
+              isPreTranslatedCompositeScoreNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.compositeScoreNamesDe?.length === 3
+              )}
+              retiredCategoryNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.retiredCategoryNamesDe || loadedData.headerMeta?.retiredCategoryNames
+                  : loadedData.headerMeta?.retiredCategoryNames
+              }
+              isPreTranslatedRetiredCategoryNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.retiredCategoryNamesDe?.length === 4
+              )}
               scope={correlationsScope}
               onScopeChange={setCorrelationsScope}
               regressionIndex={correlationsRegressionIndex}
@@ -2313,6 +2404,7 @@ export default function App() {
                   ? loadedData.worstCaseModels
                   : loadedData.newModels
               }
+              labs={labs}
               scoreMode={scoreMode}
               scope={compareScope}
               lang={lang}
@@ -2323,6 +2415,22 @@ export default function App() {
               }
               isPreTranslatedCategoryNames={Boolean(
                 lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+              )}
+              compositeScoreNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.compositeScoreNamesDe || loadedData.headerMeta?.compositeScoreNames
+                  : loadedData.headerMeta?.compositeScoreNames
+              }
+              isPreTranslatedCompositeScoreNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.compositeScoreNamesDe?.length === 3
+              )}
+              retiredCategoryNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.retiredCategoryNamesDe || loadedData.headerMeta?.retiredCategoryNames
+                  : loadedData.headerMeta?.retiredCategoryNames
+              }
+              isPreTranslatedRetiredCategoryNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.retiredCategoryNamesDe?.length === 4
               )}
               row33Meta={loadedData.headerMeta?.row33}
               onScrollToParagraph={scrollToParagraph}
@@ -2517,7 +2625,7 @@ export default function App() {
             >
               <button
                 type="button"
-                onClick={() => refreshData()}
+                onClick={() => void refreshData(undefined, undefined, true)}
                 disabled={isSyncing}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer disabled:opacity-50"
                 aria-label={t.syncButtonTitle}

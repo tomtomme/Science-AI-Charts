@@ -1,6 +1,6 @@
 import { LabPlanInfo, MonitoredLab } from '../types/pricingMonitor';
 
-export const DEFAULT_PRICING_SNAPSHOT_DATE = '2026-11-16T08:00:00.000Z';
+export const DEFAULT_PRICING_SNAPSHOT_DATE = '2026-11-17T13:00:00.000Z';
 
 export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
   // OpenAI
@@ -84,8 +84,8 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     lab: 'Google',
     planName: 'Google AI Plus',
     tierKey: 'standard',
-    usMonthly: '$4.99',
-    deMonthly: '4.99-9.99€',
+    usMonthly: '$5',
+    deMonthly: '5-10€',
     billingNotes: '2x Hydrogen, 400 GB',
     sourceUrl: 'https://gemini.google/de/subscriptions/?hl=de',
   },
@@ -102,8 +102,8 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     lab: 'Google',
     planName: 'Google AI Ultra',
     tierKey: 'ultra',
-    usMonthly: '$100+',
-    deMonthly: '99€+',
+    usMonthly: '$100-200',
+    deMonthly: '100-220€',
     billingNotes: 'Gemini 4 Carbon, 20 TB',
     sourceUrl: 'https://gemini.google/de/subscriptions/?hl=de',
   },
@@ -122,7 +122,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     lab: 'Meta',
     planName: 'Meta One Core',
     tierKey: 'standard',
-    usMonthly: '$7.99',
+    usMonthly: '$8',
     deMonthly: '~8-9€',
     billingNotes: 'App perks (no Wonder)',
     sourceUrl: 'https://about.fb.com/news/2026/09/introducing-meta-one-subscription-service-more-features-ai/',
@@ -131,7 +131,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     lab: 'Meta',
     planName: 'Meta One Premium',
     tierKey: 'pro',
-    usMonthly: '$19.99',
+    usMonthly: '$20',
     deMonthly: '~20-23€',
     billingNotes: 'Media perks (no Wonder)',
     sourceUrl: 'https://about.fb.com/news/2026/09/introducing-meta-one-subscription-service-more-features-ai/',

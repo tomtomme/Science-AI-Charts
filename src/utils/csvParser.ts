@@ -87,6 +87,10 @@ export interface CsvHeaderMetadata {
   subtitleDe?: string;
   categoryNames?: string[];
   categoryNamesDe?: string[];
+  compositeScoreNames?: string[];
+  compositeScoreNamesDe?: string[];
+  retiredCategoryNames?: string[];
+  retiredCategoryNamesDe?: string[];
   translatedAt?: string;
   translationSource?: 'gemini_weekly' | 'local_fallback';
   row33?: Row33Metadata;
@@ -225,7 +229,13 @@ export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
       colTrickOld = c;
       continue;
     }
-    if (colReleaseDate === null && (h1 === 'release' || h01.includes('release'))) {
+    if (
+      colReleaseDate === null &&
+      (h1 === 'release' ||
+        h1 === 'release date' ||
+        h1 === 'veröffentlichung' ||
+        (!h1.includes('creator') && /\brelease\b/i.test(h1)))
+    ) {
       colReleaseDate = c;
       continue;
     }
@@ -418,6 +428,27 @@ export function extractHeaderMetadataFromRows(rows: string[][]): CsvHeaderMetada
     }
   }
 
+  const layout = detectSheetColumns(rows);
+  const cleanHeader = (colIdx: number, fallback: string) => {
+    const val = (row1[colIdx] || '').replace(/\s+/g, ' ').trim();
+    return val || fallback;
+  };
+
+  // Slider indices 0, 1, 2 map to Col M (NEW), Col L (OLD), Col N (Worst Case)
+  const compositeScoreNames = [
+    cleanHeader(12, 'NEW'),
+    cleanHeader(11, 'OLD'),
+    cleanHeader(13, 'Worst Case'),
+  ];
+
+  // Retired historical benchmarks (Cols V-Y in current sheet, or U-X in legacy layout)
+  const retiredCategoryNames = [
+    cleanHeader(layout.colIqOld, 'IQ old'),
+    cleanHeader(layout.colNonHalluOld, 'Non-Hallu-Rate old'),
+    cleanHeader(layout.colScienceOld, 'Science Knowledge old'),
+    cleanHeader(layout.colTrickOld, 'Trick Questions old'),
+  ];
+
   const { titleDe, subtitleDe } = translateHeaderToDe(combinedTitle, cellC1);
   const row33 = extractRow33Metadata(rows);
 
@@ -429,6 +460,8 @@ export function extractHeaderMetadataFromRows(rows: string[][]): CsvHeaderMetada
     titleDe,
     subtitleDe,
     categoryNames: categoryNames.length === 8 ? categoryNames : undefined,
+    compositeScoreNames,
+    retiredCategoryNames,
     translationSource: 'local_fallback',
     row33,
   };
@@ -932,10 +965,22 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
 
     const faviconUrl = getFaviconUrl(company.domain);
 
-    // Release date from dynamic release column (Col Y or Col Z) with robust fallback
+    // Release date from dynamic release column (Col Y or Col Z) with concrete-date tracking
     const rawReleaseDate = (row[layout.colReleaseDate] || '').trim();
-    let releaseDate = rawReleaseDate;
-    if (!releaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
+    let normalizedRawRelease = '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rawReleaseDate)) {
+      normalizedRawRelease = rawReleaseDate;
+    } else if (/^\d{4}[/-]\d{1,2}[/-]\d{1,2}$/.test(rawReleaseDate)) {
+      const parts = rawReleaseDate.split(/[/-]/);
+      normalizedRawRelease = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+    } else if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawReleaseDate)) {
+      const parts = rawReleaseDate.split('.');
+      normalizedRawRelease = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+
+    const hasConcreteReleaseDate = /^\d{4}-\d{2}-\d{2}$/.test(normalizedRawRelease);
+    let releaseDate = normalizedRawRelease;
+    if (!hasConcreteReleaseDate) {
       const combined = `${rawCreatorCell} ${rawNameCell}`;
       const m = combined.match(/(Jan|Feb|Mär|Mar|Apr|Mai|May|Jun|Jul|Aug|Sep|Sept|Okt|Oct|Nov|Dez|Dec)\s*(\d{2})/i);
       if (m) {
@@ -994,6 +1039,7 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
       creatorClean: cleanedCreator,
       companyName: company.name,
       releaseDate,
+      hasConcreteReleaseDate,
       releaseText: cleanedCreator,
       rawScores,
       hasAll8Benchmarks: hasAll8,

@@ -30,6 +30,7 @@ import {
   DEFAULT_PRICING_SNAPSHOT_DATE,
 } from '../data/pricingPlansFallback';
 import { Language } from '../utils/i18n';
+import { roundCurrencyString, roundCurrencyTokensInText } from '../utils/priceFormat';
 
 interface PricingMonitorModalProps {
   isOpen: boolean;
@@ -459,17 +460,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                                 </span>
                               )}
                               <span className="font-mono tabular-nums text-[11px] shrink-0 text-slate-700 dark:text-slate-200">
-                                <strong>{plan.deMonthly || '—'}</strong>
+                                <strong>{plan.deMonthly ? roundCurrencyString(plan.deMonthly) : '—'}</strong>
                                 <span className="text-slate-400 mx-1">/</span>
-                                <span>{plan.usMonthly || '—'}</span>
+                                <span>{plan.usMonthly ? roundCurrencyString(plan.usMonthly) : '—'}</span>
                               </span>
                             </div>
                             {plan.billingNotes && (
                               <p
                                 className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight truncate"
-                                title={plan.billingNotes}
+                                title={roundCurrencyTokensInText(plan.billingNotes)}
                               >
-                                {plan.billingNotes}
+                                {roundCurrencyTokensInText(plan.billingNotes)}
                               </p>
                             )}
                           </div>
@@ -607,7 +608,9 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                         ? 'Kein Preis-Diff:'
                         : 'No price diff:'}
                     </strong>{' '}
-                    {lang === 'de' ? effectiveDiffReport.summaryDe : effectiveDiffReport.summaryEn}
+                    {roundCurrencyTokensInText(
+                      lang === 'de' ? effectiveDiffReport.summaryDe : effectiveDiffReport.summaryEn
+                    )}
                   </span>
                 </div>
 
@@ -696,12 +699,12 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                                 <td className="py-2 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
                                   <div className="inline-flex items-center gap-1.5">
                                     {item.deStatus === 'unchanged' ? (
-                                      <span className="text-slate-700 dark:text-slate-200">{item.currentDe || '—'}</span>
+                                      <span className="text-slate-700 dark:text-slate-200">{item.currentDe ? roundCurrencyString(item.currentDe) : '—'}</span>
                                     ) : (
                                       <>
-                                        <span className="text-slate-400 line-through">{item.currentDe || '—'}</span>
+                                        <span className="text-slate-400 line-through">{item.currentDe ? roundCurrencyString(item.currentDe) : '—'}</span>
                                         <ArrowRight className="w-3 h-3 text-slate-400" />
-                                        <span className="font-bold text-slate-900 dark:text-white">{item.liveDe || '—'}</span>
+                                        <span className="font-bold text-slate-900 dark:text-white">{item.liveDe ? roundCurrencyString(item.liveDe) : '—'}</span>
                                         {renderStatusLabel(item.deStatus)}
                                       </>
                                     )}
@@ -710,12 +713,12 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                                 <td className="py-2 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
                                   <div className="inline-flex items-center gap-1.5">
                                     {item.usStatus === 'unchanged' ? (
-                                      <span className="text-slate-700 dark:text-slate-200">{item.currentUs || '—'}</span>
+                                      <span className="text-slate-700 dark:text-slate-200">{item.currentUs ? roundCurrencyString(item.currentUs) : '—'}</span>
                                     ) : (
                                       <>
-                                        <span className="text-slate-400 line-through">{item.currentUs || '—'}</span>
+                                        <span className="text-slate-400 line-through">{item.currentUs ? roundCurrencyString(item.currentUs) : '—'}</span>
                                         <ArrowRight className="w-3 h-3 text-slate-400" />
-                                        <span className="font-bold text-slate-900 dark:text-white">{item.liveUs || '—'}</span>
+                                        <span className="font-bold text-slate-900 dark:text-white">{item.liveUs ? roundCurrencyString(item.liveUs) : '—'}</span>
                                         {renderStatusLabel(item.usStatus)}
                                       </>
                                     )}
@@ -724,9 +727,9 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                                 <td className="py-2 px-3 align-middle max-w-[220px]">
                                   <span
                                     className="block truncate text-[11px] text-slate-500 dark:text-slate-400"
-                                    title={item.reason}
+                                    title={item.reason ? roundCurrencyTokensInText(item.reason) : ''}
                                   >
-                                    {item.reason || 'OK'}
+                                    {item.reason ? roundCurrencyTokensInText(item.reason) : 'OK'}
                                   </span>
                                 </td>
                               </tr>
@@ -822,10 +825,10 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                     </div>
                     <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
                       <div className="px-2 py-1 rounded bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 break-words">
-                        − {c.before}
+                        − {roundCurrencyString(c.before)}
                       </div>
                       <div className="px-2 py-1 rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 break-words">
-                        + {c.after}
+                        + {roundCurrencyString(c.after)}
                       </div>
                     </div>
                   </div>

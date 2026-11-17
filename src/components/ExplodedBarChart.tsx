@@ -7,6 +7,7 @@ import { createModelBreakdown } from '../utils/csvParser';
 import { translateStoryline } from '../utils/storylineHelper';
 import { ExternalLink } from 'lucide-react';
 import { Tooltip } from './Tooltip';
+import { roundCurrencyString, roundCurrencyTokensInText } from '../utils/priceFormat';
 
 interface ExplodedBarChartProps {
   models: ModelRecord[];
@@ -114,6 +115,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   // Index of hovered bar
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [hoveredSegment, setHoveredSegment] = useState<HoveredSegmentInfo | null>(null);
+  const [showAverageLine, setShowAverageLine] = useState<boolean>(false);
 
 
   // Persistent model & segment detail to keep showing the info even after the mouse leaves the bar
@@ -509,14 +511,14 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
   const getPriceColInfo = (raw: string | undefined, expectedRegion: 'de' | 'us' = lang === 'de' ? 'de' : 'us'): PriceColInfo => {
     if (!raw) return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
-    const clean = raw.trim();
+    const clean = roundCurrencyTokensInText(raw.trim());
     if (!clean || clean === '-' || clean.toLowerCase() === 'n/a' || clean.toLowerCase().includes('abokosten') || clean.toLowerCase().includes('monthly cost')) {
       return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
     }
 
     const isDe = lang === 'de';
     if (clean.includes('€')) {
-      const compactPrice = clean.replace(/\s*€/g, '€');
+      const compactPrice = roundCurrencyString(clean.replace(/\s*€/g, '€'));
       const amountOnly = compactPrice.replace(/€/g, '').trim();
       const isRange = /[-–—]/.test(amountOnly);
       const priceLine = isDe ? `${amountOnly} € / Monat` : `€${amountOnly} / month`;
@@ -527,7 +529,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         : '';
       return {
         type: 'price',
-        text: clean,
+        text: compactPrice,
         displayPrice: compactPrice,
         tooltipTitle: isDe ? 'Chatzugriff in DE' : 'Chat access in DE',
         tooltipText: `${priceLine}${rangeSuffix}`,
@@ -535,7 +537,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     }
 
     if (clean.includes('$')) {
-      const compactPrice = clean.replace(/\s*\$/g, '$').replace(/\$\s+/g, '$');
+      const compactPrice = roundCurrencyString(clean.replace(/\s*\$/g, '$').replace(/\$\s+/g, '$'));
       const amountOnly = compactPrice.replace(/\$/g, '').trim();
       const isRange = /[-–—]/.test(amountOnly);
       const priceLine = isDe ? `${amountOnly} $ / Monat` : `$${amountOnly} / month`;
@@ -546,7 +548,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         : '';
       return {
         type: 'price',
-        text: clean,
+        text: compactPrice,
         displayPrice: compactPrice,
         tooltipTitle: isDe ? 'Chatzugriff in US' : 'Chat access in US',
         tooltipText: `${priceLine}${rangeSuffix}`,
@@ -775,6 +777,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       return {
         model,
         index,
+        score,
         barX,
         barCenterX,
         exploded,
@@ -800,11 +803,21 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     });
   })();
 
+  const averageMetrics = (() => {
+    if (barLayouts.length === 0) return null;
+    const values = barLayouts.map((b) => (activeComp ? b.catRaw : b.score));
+    const sum = values.reduce((acc, v) => acc + v, 0);
+    const avg = sum / values.length;
+    const aboveCount = values.filter((v) => v >= avg).length;
+    const belowCount = values.length - aboveCount;
+    return { avg, aboveCount, belowCount };
+  })();
+
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 sm:p-3.5 shadow-xs transition-colors">
       {/* Sleek locked 2-row explainer & info bar above chart: locked 54px height for zero layout shift with complete readability */}
-      <div className="relative z-20 flex flex-col justify-center h-[54px] min-h-[54px] max-h-[54px] px-2.5 mb-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-visible">
-        <div className="w-full min-w-0 overflow-visible flex flex-col justify-center gap-0.5">
+      <div className="relative z-20 flex flex-row items-center justify-between gap-2.5 h-[54px] min-h-[54px] max-h-[54px] px-2.5 mb-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs overflow-visible">
+        <div className="flex-1 min-w-0 overflow-visible flex flex-col justify-center gap-0.5">
           {displayedModel ? (
             <>
               {/* Row 1: Model Name, Company, Release Date, Total Score & Rank */}
@@ -1179,6 +1192,45 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             </>
           )}
         </div>
+
+        {/* Global Average Trendline Toggle */}
+        {averageMetrics !== null && (
+          <Tooltip
+            align="right"
+            position="bottom"
+            width="w-64"
+            title={lang === 'de' ? 'Globaler Durchschnitt (Ø)' : 'Global Average Trendline'}
+            content={
+              lang === 'de'
+                ? `Mittelwert über alle ${barLayouts.length} angezeigten Modelle: ${averageMetrics.avg.toFixed(1)}${activeComp ? '%' : ' Pkt.'} (↑ ${averageMetrics.aboveCount} darüber · ↓ ${averageMetrics.belowCount} darunter).`
+                : `Mean across all ${barLayouts.length} visible models: ${averageMetrics.avg.toFixed(1)}${activeComp ? '%' : ' pts'} (↑ ${averageMetrics.aboveCount} above · ↓ ${averageMetrics.belowCount} below).`
+            }
+          >
+            <button
+              type="button"
+              onClick={() => setShowAverageLine((prev) => !prev)}
+              aria-pressed={showAverageLine}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-mono font-bold transition-all cursor-pointer tabular-nums ${
+                showAverageLine
+                  ? 'bg-amber-500 text-white border-amber-600 shadow-xs hover:bg-amber-600'
+                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-400'
+              }`}
+            >
+              <span
+                className={`w-3.5 h-0 border-t-2 border-dashed ${
+                  showAverageLine ? 'border-white' : 'border-amber-500'
+                }`}
+              />
+              <span>
+                {showAverageLine
+                  ? `Ø ${averageMetrics.avg.toFixed(1)}${activeComp ? '%' : ''}`
+                  : lang === 'de'
+                  ? 'Ø Schnitt'
+                  : 'Ø Avg'}
+              </span>
+            </button>
+          </Tooltip>
+        )}
       </div>
 
       {/* SVG Chart Container: Retains full readable bar scale and supports smooth mousewheel scrolling */}
@@ -2233,6 +2285,62 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </g>
             );
           })}
+
+          {/* Global Average Trendline Overlay */}
+          {showAverageLine && averageMetrics !== null && (() => {
+            const avgY = getYPosForVal(averageMetrics.avg);
+            const lineStartX = marginLeft - 4;
+            const lineEndX = Math.max(lineStartX + 40, chartWidth - marginRight + 8);
+            const badgeText = `Ø ${averageMetrics.avg.toFixed(1)}${activeComp ? '%' : ''}`;
+            const badgeW = badgeText.length * 7.2 + 16;
+            const badgeY = Math.max(12, avgY - 22);
+            return (
+              <g className="pointer-events-none select-none">
+                {/* Soft backdrop stroke so dashed amber line reads clearly over dark flags and light gaps */}
+                <line
+                  x1={lineStartX}
+                  y1={avgY}
+                  x2={lineEndX}
+                  y2={avgY}
+                  stroke="#FFFFFF"
+                  strokeOpacity="0.8"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1={lineStartX}
+                  y1={avgY}
+                  x2={lineEndX}
+                  y2={avgY}
+                  stroke="#D97706"
+                  strokeWidth="2.25"
+                  strokeDasharray="7,4"
+                  strokeLinecap="round"
+                />
+                <rect
+                  x={marginLeft + 4}
+                  y={badgeY}
+                  width={badgeW}
+                  height={19}
+                  rx={5}
+                  fill="#B45309"
+                  stroke="#FFFFFF"
+                  strokeWidth="1.25"
+                />
+                <text
+                  x={marginLeft + 4 + badgeW / 2}
+                  y={badgeY + 13}
+                  textAnchor="middle"
+                  fill="#FFFFFF"
+                  fontSize="11.5"
+                  fontWeight="700"
+                  className="font-mono tabular-nums"
+                >
+                  {badgeText}
+                </text>
+              </g>
+            );
+          })()}
           </svg>
         </div>
         )}

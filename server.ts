@@ -30,6 +30,7 @@ async function createAppServer() {
     try {
       const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true';
       const grid = await fetchLabsGridFromPublishedHtml(forceRefresh);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.json(grid);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch labs formatting grid.';
@@ -44,6 +45,8 @@ async function createAppServer() {
         a1: String(body.a1 || ''),
         c1: String(body.c1 || ''),
         categoryNames: Array.isArray(body.categoryNames) ? body.categoryNames.map(String) : [],
+        compositeScoreNames: Array.isArray(body.compositeScoreNames) ? body.compositeScoreNames.map(String) : [],
+        retiredCategoryNames: Array.isArray(body.retiredCategoryNames) ? body.retiredCategoryNames.map(String) : [],
         b34: String(body.b34 || ''),
         c34: String(body.c34 || ''),
         n34: String(body.n34 || ''),

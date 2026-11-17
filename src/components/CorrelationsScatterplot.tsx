@@ -10,6 +10,109 @@ import {
   CorrelationDimension,
   CorrelationPoint,
 } from '../utils/correlationUtils';
+import {
+  BENCHMARK_COMPONENTS,
+  RETIRED_TIMELINE_BENCHMARKS,
+  getBenchmarkCategoryLabel,
+  getCompositeScoreLabel,
+} from '../data/benchmarks';
+import { TRANSLATIONS } from '../utils/i18n';
+
+interface Row2LabelContext {
+  categoryNames?: string[];
+  isPreTranslatedCategoryNames?: boolean;
+  compositeScoreNames?: string[];
+  isPreTranslatedCompositeScoreNames?: boolean;
+  retiredCategoryNames?: string[];
+  isPreTranslatedRetiredCategoryNames?: boolean;
+}
+
+function getResolvedDimensionName(
+  dim: CorrelationDimension,
+  lang: 'de' | 'en',
+  row2: Row2LabelContext
+): string {
+  const t = TRANSLATIONS[lang];
+  if (dim.index === 0) {
+    return getCompositeScoreLabel(
+      0,
+      row2.compositeScoreNames?.[0],
+      lang,
+      t.scoreModeNew,
+      row2.isPreTranslatedCompositeScoreNames
+    );
+  }
+  if (dim.index === 1) {
+    return getCompositeScoreLabel(
+      1,
+      row2.compositeScoreNames?.[1],
+      lang,
+      t.scoreModeOld,
+      row2.isPreTranslatedCompositeScoreNames
+    );
+  }
+  if (dim.index === 2) {
+    return getCompositeScoreLabel(
+      2,
+      row2.compositeScoreNames?.[2],
+      lang,
+      t.scoreModeWorstCase,
+      row2.isPreTranslatedCompositeScoreNames
+    );
+  }
+  if (dim.index >= 3 && dim.index <= 10) {
+    const catIdx = dim.index - 3;
+    const comp = BENCHMARK_COMPONENTS[catIdx];
+    const label = getBenchmarkCategoryLabel(
+      row2.categoryNames?.[catIdx],
+      lang,
+      comp,
+      row2.isPreTranslatedCategoryNames
+    );
+    return `#${catIdx + 1} ${label}`;
+  }
+  if (dim.index >= 11 && dim.index <= 14) {
+    const retIdx = dim.index - 11;
+    const comp = RETIRED_TIMELINE_BENCHMARKS[retIdx];
+    const colTag = ['V', 'W', 'X', 'Y'][retIdx];
+    const label = getBenchmarkCategoryLabel(
+      row2.retiredCategoryNames?.[retIdx],
+      lang,
+      comp,
+      row2.isPreTranslatedRetiredCategoryNames
+    );
+    return `${label} (${colTag})`;
+  }
+  return lang === 'de' ? dim.nameDe : dim.nameEn;
+}
+
+function getResolvedDimensionShortLabel(
+  dim: CorrelationDimension,
+  lang: 'de' | 'en',
+  row2: Row2LabelContext
+): string {
+  if (dim.index <= 2) {
+    return getResolvedDimensionName(dim, lang, row2);
+  }
+  if (dim.index >= 3 && dim.index <= 10) {
+    const full = getResolvedDimensionName(dim, lang, row2);
+    return full.length > 15 ? `${full.slice(0, 14)}…` : full;
+  }
+  if (dim.index >= 11 && dim.index <= 14) {
+    const retIdx = dim.index - 11;
+    const comp = RETIRED_TIMELINE_BENCHMARKS[retIdx];
+    const colTag = ['V', 'W', 'X', 'Y'][retIdx];
+    const base = getBenchmarkCategoryLabel(
+      row2.retiredCategoryNames?.[retIdx],
+      lang,
+      comp,
+      row2.isPreTranslatedRetiredCategoryNames
+    );
+    const trimmed = base.length > 11 ? `${base.slice(0, 10)}…` : base;
+    return `${colTag}·${trimmed}`;
+  }
+  return lang === 'de' ? dim.shortDe : dim.shortEn;
+}
 
 export interface CorrelationsScatterplotProps {
   models: ModelRecord[];
@@ -17,6 +120,12 @@ export interface CorrelationsScatterplotProps {
   onScrollToParagraph?: (targetId: string) => void;
   onScrollToFinalScores?: () => void;
   lang: 'de' | 'en';
+  categoryNames?: string[];
+  isPreTranslatedCategoryNames?: boolean;
+  compositeScoreNames?: string[];
+  isPreTranslatedCompositeScoreNames?: boolean;
+  retiredCategoryNames?: string[];
+  isPreTranslatedRetiredCategoryNames?: boolean;
   // Controlled props when header controls are elevated
   scope?: 'all' | 'frontier';
   onScopeChange?: (scope: 'all' | 'frontier') => void;
@@ -175,6 +284,7 @@ interface AxisDimensionDropdownProps {
   onSelect: (index: number) => void;
   onClose: () => void;
   lang: 'de' | 'en';
+  row2Labels: Row2LabelContext;
   align?: 'left' | 'center' | 'right';
   direction?: 'up' | 'down';
   onScrollToParagraph?: (targetId: string) => void;
@@ -185,6 +295,7 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
   onSelect,
   onClose,
   lang,
+  row2Labels,
   align = 'left',
   direction = 'down',
   onScrollToParagraph,
@@ -198,7 +309,8 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
   }, [onClose]);
 
   const compositeDims = CORRELATION_DIMENSIONS.slice(0, 3);
-  const componentDims = CORRELATION_DIMENSIONS.slice(3);
+  const componentDims = CORRELATION_DIMENSIONS.slice(3, 11);
+  const retiredDims = CORRELATION_DIMENSIONS.slice(11);
 
   const alignClass =
     align === 'center'
@@ -258,7 +370,7 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
                       className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
                       style={{ backgroundColor: dim.color }}
                     />
-                    <span className="truncate">{lang === 'de' ? dim.nameDe : dim.nameEn}</span>
+                    <span className="truncate">{getResolvedDimensionName(dim, lang, row2Labels)}</span>
                   </div>
                   {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0 ml-1" />}
                 </button>
@@ -268,7 +380,7 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
         </div>
 
         {/* Section 2: Component Categories */}
-        <div>
+        <div className="mb-2">
           <div className="px-2 py-0.5 text-xs font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
             {lang === 'de' ? 'Einzel-Kategorien (8)' : 'Benchmark Categories (8)'}
           </div>
@@ -291,7 +403,7 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
                       className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
                       style={{ backgroundColor: dim.color }}
                     />
-                    <span className="truncate">{lang === 'de' ? dim.nameDe : dim.nameEn}</span>
+                    <span className="truncate">{getResolvedDimensionName(dim, lang, row2Labels)}</span>
                   </div>
                   {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0 ml-1" />}
                 </button>
@@ -299,6 +411,41 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
             })}
           </div>
         </div>
+
+        {/* Section 3: Retired Historical Benchmarks (Cols V-Y) */}
+        {retiredDims.length > 0 && (
+          <div>
+            <div className="px-2 py-0.5 text-xs font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
+              {lang === 'de' ? 'Historische Scores · Sp. V–Y (4)' : 'Historical Scores · Cols V–Y (4)'}
+            </div>
+            <div className="space-y-0.5 mt-0.5">
+              {retiredDims.map((dim) => {
+                const isSelected = dim.index === currentDimIndex;
+                return (
+                  <button
+                    key={dim.id}
+                    type="button"
+                    onClick={() => onSelect(dim.index)}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left text-xs font-mono transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 font-bold'
+                        : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
+                        style={{ backgroundColor: dim.color }}
+                      />
+                      <span className="truncate">{getResolvedDimensionName(dim, lang, row2Labels)}</span>
+                    </div>
+                    {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0 ml-1" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
@@ -318,6 +465,7 @@ interface SingleCorrelationPlotProps {
   onYAxisDimChange: (idx: number) => void;
   onSwapAxes: () => void;
   lang: 'de' | 'en';
+  row2Labels: Row2LabelContext;
   onScrollToParagraph?: (targetId: string) => void;
   headerToggle?: React.ReactNode;
 }
@@ -335,12 +483,17 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   onYAxisDimChange,
   onSwapAxes,
   lang,
+  row2Labels,
   onScrollToParagraph,
   headerToggle,
 }) => {
   const svgUid = useId().replace(/:/g, '');
   const xDim: CorrelationDimension = CORRELATION_DIMENSIONS[xAxisDimIndex] || CORRELATION_DIMENSIONS[0];
   const yDim: CorrelationDimension = CORRELATION_DIMENSIONS[yAxisDimIndex] || CORRELATION_DIMENSIONS[1];
+  const xDimLabel = getResolvedDimensionName(xDim, lang, row2Labels);
+  const yDimLabel = getResolvedDimensionName(yDim, lang, row2Labels);
+  const xDimShort = getResolvedDimensionShortLabel(xDim, lang, row2Labels);
+  const yDimShort = getResolvedDimensionShortLabel(yDim, lang, row2Labels);
 
   const [openAxisMenu, setOpenAxisMenu] = useState<'x' | 'y' | null>(null);
 
@@ -675,13 +828,13 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             style={{ backgroundColor: yDim.color }}
             title={
               lang === 'de'
-                ? `Y-Achse: ${yDim.nameDe} (Klicken zum Auswählen der Kategorie)`
-                : `Y-Axis: ${yDim.nameEn} (Click to choose category)`
+                ? `Y-Achse: ${yDimLabel} (Klicken zum Auswählen der Kategorie)`
+                : `Y-Axis: ${yDimLabel} (Click to choose category)`
             }
           >
             <span className="text-xs uppercase tracking-wide opacity-80">Y:</span>
             <span className="truncate max-w-[130px] sm:max-w-[180px]">
-              {lang === 'de' ? yDim.nameDe : yDim.nameEn}
+              {yDimLabel}
             </span>
             <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-80" />
           </button>
@@ -693,8 +846,8 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               className="p-1.5 rounded-md bg-white/95 dark:bg-slate-800/95 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-2xs border border-slate-200/80 dark:border-slate-700 cursor-pointer"
               title={
                 lang === 'de'
-                  ? `${yDim.nameDe}: Zur Erläuterung in „How to read this“ springen`
-                  : `${yDim.nameEn}: Jump to explanation in "How to read this"`
+                  ? `${yDimLabel}: Zur Erläuterung in „How to read this“ springen`
+                  : `${yDimLabel}: Jump to explanation in "How to read this"`
               }
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -711,6 +864,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               }}
               onClose={() => setOpenAxisMenu(null)}
               lang={lang}
+              row2Labels={row2Labels}
               align="left"
               direction="down"
               onScrollToParagraph={onScrollToParagraph}
@@ -903,13 +1057,13 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             style={{ backgroundColor: xDim.color }}
             title={
               lang === 'de'
-                ? `X-Achse: ${xDim.nameDe} (Klicken zum Auswählen der Kategorie)`
-                : `X-Axis: ${xDim.nameEn} (Click to choose category)`
+                ? `X-Achse: ${xDimLabel} (Klicken zum Auswählen der Kategorie)`
+                : `X-Axis: ${xDimLabel} (Click to choose category)`
             }
           >
             <span className="text-xs uppercase tracking-wide opacity-80">X:</span>
             <span className="truncate max-w-[150px] sm:max-w-[220px]">
-              {lang === 'de' ? xDim.nameDe : xDim.nameEn}
+              {xDimLabel}
             </span>
             <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-80" />
           </button>
@@ -921,8 +1075,8 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               className="p-1.5 rounded-md bg-white/95 dark:bg-slate-800/95 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-2xs border border-slate-200/80 dark:border-slate-700 cursor-pointer"
               title={
                 lang === 'de'
-                  ? `${xDim.nameDe}: Zur Erläuterung in „How to read this“ springen`
-                  : `${xDim.nameEn}: Jump to explanation in "How to read this"`
+                  ? `${xDimLabel}: Zur Erläuterung in „How to read this“ springen`
+                  : `${xDimLabel}: Jump to explanation in "How to read this"`
               }
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -939,6 +1093,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               }}
               onClose={() => setOpenAxisMenu(null)}
               lang={lang}
+              row2Labels={row2Labels}
               align="center"
               direction="up"
               onScrollToParagraph={onScrollToParagraph}
@@ -1007,9 +1162,9 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               <div className="bg-slate-800/80 px-1.5 py-1 rounded flex items-center justify-between gap-1">
                 <span
                   className="text-xs text-slate-400 font-mono truncate"
-                  title={lang === 'de' ? xDim.nameDe : xDim.nameEn}
+                  title={xDimLabel}
                 >
-                  X: {lang === 'de' ? xDim.shortDe : xDim.shortEn}
+                  X: {xDimShort}
                 </span>
                 <span
                   className="font-mono text-xs font-extrabold shrink-0"
@@ -1021,9 +1176,9 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               <div className="bg-slate-800/80 px-1.5 py-1 rounded flex items-center justify-between gap-1">
                 <span
                   className="text-xs text-slate-400 font-mono truncate"
-                  title={lang === 'de' ? yDim.nameDe : yDim.nameEn}
+                  title={yDimLabel}
                 >
-                  Y: {lang === 'de' ? yDim.shortDe : yDim.shortEn}
+                  Y: {yDimShort}
                 </span>
                 <span
                   className="font-mono text-xs font-extrabold shrink-0"
@@ -1040,33 +1195,12 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   );
 };
 
-function getHeatmapShortLabel(dim: CorrelationDimension, lang: 'de' | 'en'): string {
-  switch (dim.id) {
-    case 'new_score':
-      return lang === 'de' ? 'NEW Score' : 'NEW Score';
-    case 'old_score':
-      return lang === 'de' ? 'OLD Score' : 'OLD Score';
-    case 'worst_case':
-      return 'Worst Case';
-    case 'actCodeReason':
-      return '#1 IQ';
-    case 'nonHallucination':
-      return lang === 'de' ? '#2 Faktentr.' : '#2 Non-Hallu';
-    case 'scienceKnowledge':
-      return lang === 'de' ? '#3 Wissen' : '#3 Science';
-    case 'visionPlot':
-      return lang === 'de' ? '#4 Diagramm' : '#4 Plots';
-    case 'medReasoning':
-      return lang === 'de' ? '#5 Diagn.' : '#5 Diagn.';
-    case 'excelAgent':
-      return '#6 Excel';
-    case 'trickQuestions':
-      return '#7 Exp.&Eng.';
-    case 'econLegal':
-      return lang === 'de' ? '#8 Wirtsch.' : '#8 Econ/Leg.';
-    default:
-      return lang === 'de' ? dim.shortDe : dim.shortEn;
-  }
+function getHeatmapShortLabel(
+  dim: CorrelationDimension,
+  lang: 'de' | 'en',
+  row2Labels: Row2LabelContext
+): string {
+  return getResolvedDimensionShortLabel(dim, lang, row2Labels);
 }
 
 function getHeatmapCellColors(value: number | null): { bg: string; text: string } {
@@ -1117,6 +1251,7 @@ interface CorrelationHeatmapProps {
   onToggleMetric: () => void;
   onSelectPairForOtherPlot?: (xIdx: number, yIdx: number) => void;
   lang: 'de' | 'en';
+  row2Labels: Row2LabelContext;
   headerToggle?: React.ReactNode;
 }
 
@@ -1128,6 +1263,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
   onToggleMetric,
   onSelectPairForOtherPlot,
   lang,
+  row2Labels,
   headerToggle,
 }) => {
   const [hoveredCell, setHoveredCell] = useState<{
@@ -1251,23 +1387,23 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
       {/* Matrix Container */}
       <div className="relative p-3 pt-2 bg-white dark:bg-slate-900 rounded-b-2xl select-none flex-1 flex flex-col justify-between">
         <div className="w-full overflow-x-auto sm:overflow-visible flex-1 flex flex-col justify-center">
-          <div className="min-w-[440px] w-full pr-6">
+          <div className="min-w-[540px] w-full pr-6">
             {/* Rotated Column Headers */}
             <div
               className="grid items-end gap-[2px] mb-1"
               style={{
-                gridTemplateColumns: '94px repeat(3, minmax(0, 1fr)) 4px repeat(8, minmax(0, 1fr))',
+                gridTemplateColumns: '104px repeat(3, minmax(0, 1fr)) 4px repeat(8, minmax(0, 1fr)) 4px repeat(4, minmax(0, 1fr))',
               }}
             >
-              <div className="h-[68px]" />
+              <div className="h-[74px]" />
               {CORRELATION_DIMENSIONS.map((colDim, cIdx) => {
                 const isColHovered = hoveredCell?.colIdx === cIdx;
                 return (
                   <React.Fragment key={colDim.id}>
-                    {cIdx === 3 && <div />}
-                    <div className="relative h-[68px] flex items-end justify-center">
+                    {(cIdx === 3 || cIdx === 11) && <div />}
+                    <div className="relative h-[74px] flex items-end justify-center">
                       <div
-                        className={`absolute bottom-1 left-1/2 -rotate-45 origin-bottom-left whitespace-nowrap flex items-center gap-1 text-[10px] font-mono transition-colors ${
+                        className={`absolute bottom-1 left-1/2 -rotate-45 origin-bottom-left whitespace-nowrap flex items-center gap-1 text-[9.5px] font-mono transition-colors ${
                           isColHovered
                             ? 'text-slate-950 dark:text-white font-bold'
                             : 'text-slate-600 dark:text-slate-400 font-medium'
@@ -1277,7 +1413,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                           className="w-2 h-2 rounded-full shrink-0"
                           style={{ backgroundColor: colDim.color }}
                         />
-                        <span>{getHeatmapShortLabel(colDim, lang)}</span>
+                        <span>{getHeatmapShortLabel(colDim, lang, row2Labels)}</span>
                       </div>
                     </div>
                   </React.Fragment>
@@ -1285,31 +1421,32 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
               })}
             </div>
 
-            {/* 11 Matrix Rows */}
+            {/* 15 Matrix Rows */}
             <div className="space-y-[2px]">
               {CORRELATION_DIMENSIONS.map((rowDim, rIdx) => {
                 const isRowHovered = hoveredCell?.rowIdx === rIdx;
+                const rowDimFull = getResolvedDimensionName(rowDim, lang, row2Labels);
                 return (
                   <React.Fragment key={rowDim.id}>
-                    {rIdx === 3 && (
+                    {(rIdx === 3 || rIdx === 11) && (
                       <div className="h-[4px]" />
                     )}
                     <div
                       className="grid items-center gap-[2px]"
                       style={{
-                        gridTemplateColumns: '94px repeat(3, minmax(0, 1fr)) 4px repeat(8, minmax(0, 1fr))',
+                        gridTemplateColumns: '104px repeat(3, minmax(0, 1fr)) 4px repeat(8, minmax(0, 1fr)) 4px repeat(4, minmax(0, 1fr))',
                       }}
                     >
                       {/* Row Header Label */}
                       <div
-                        className={`pr-1.5 flex items-center justify-end gap-1 text-[10px] font-mono truncate transition-colors ${
+                        className={`pr-1.5 flex items-center justify-end gap-1 text-[9.5px] font-mono truncate transition-colors ${
                           isRowHovered
                             ? 'text-slate-950 dark:text-white font-bold'
                             : 'text-slate-600 dark:text-slate-400 font-medium'
                         }`}
-                        title={lang === 'de' ? rowDim.nameDe : rowDim.nameEn}
+                        title={rowDimFull}
                       >
-                        <span className="truncate">{getHeatmapShortLabel(rowDim, lang)}</span>
+                        <span className="truncate">{getHeatmapShortLabel(rowDim, lang, row2Labels)}</span>
                         <span
                           className="w-2 h-2 rounded-full shrink-0"
                           style={{ backgroundColor: rowDim.color }}
@@ -1326,7 +1463,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
 
                         return (
                           <React.Fragment key={`${rowDim.id}-${colDim.id}`}>
-                            {cIdx === 3 && <div />}
+                            {(cIdx === 3 || cIdx === 11) && <div />}
                             {isDiag ? (
                               <div className="aspect-square w-full" aria-hidden="true" />
                             ) : (
@@ -1348,7 +1485,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                                   backgroundColor: bg,
                                   color: text,
                                 }}
-                                className={`aspect-square w-full flex items-center justify-center rounded-[3px] border border-slate-200/90 dark:border-slate-700/70 cursor-pointer hover:scale-110 hover:z-20 text-[11px] sm:text-[13px] lg:text-[11.5px] xl:text-[13px] font-mono font-bold leading-none tabular-nums tracking-tighter transition-transform duration-100 ${
+                                className={`aspect-square w-full flex items-center justify-center rounded-[3px] border border-slate-200/90 dark:border-slate-700/70 cursor-pointer hover:scale-110 hover:z-20 text-[9.5px] sm:text-[10.5px] lg:text-[9.5px] xl:text-[10.5px] font-mono font-bold leading-none tabular-nums tracking-tighter transition-transform duration-100 ${
                                   isHovered ? 'ring-2 ring-slate-900 dark:ring-white z-20 scale-110' : ''
                                 }`}
                               >
@@ -1407,11 +1544,11 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                 <div className="space-y-1 pb-1.5 mb-1.5 border-b border-slate-800">
                   <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredRowDim.color }} />
-                    <span className="truncate">{lang === 'de' ? hoveredRowDim.nameDe : hoveredRowDim.nameEn}</span>
+                    <span className="truncate">{getResolvedDimensionName(hoveredRowDim, lang, row2Labels)}</span>
                   </div>
                   <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredColDim.color }} />
-                    <span className="truncate">{lang === 'de' ? hoveredColDim.nameDe : hoveredColDim.nameEn}</span>
+                    <span className="truncate">{getResolvedDimensionName(hoveredColDim, lang, row2Labels)}</span>
                   </div>
                 </div>
 
@@ -1459,8 +1596,13 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
 export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = ({
   allModels,
   onScrollToParagraph,
-  onScrollToFinalScores,
   lang,
+  categoryNames,
+  isPreTranslatedCategoryNames = false,
+  compositeScoreNames,
+  isPreTranslatedCompositeScoreNames = false,
+  retiredCategoryNames,
+  isPreTranslatedRetiredCategoryNames = false,
   scope: controlledScope,
   onScopeChange,
   regressionIndex: controlledRegressionIndex,
@@ -1471,6 +1613,14 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
   onLoessSpanChange,
   hideHeaderControls = false,
 }) => {
+  const row2Labels: Row2LabelContext = {
+    categoryNames,
+    isPreTranslatedCategoryNames,
+    compositeScoreNames,
+    isPreTranslatedCompositeScoreNames,
+    retiredCategoryNames,
+    isPreTranslatedRetiredCategoryNames,
+  };
   // Plot 1 Dimension selection (Default: X = #1 Coding & Math, Y = #2 Non-Hallucination)
   const [plot1XDimIndex, setPlot1XDimIndex] = useState<number>(3);
   const [plot1YDimIndex, setPlot1YDimIndex] = useState<number>(4);
@@ -1788,6 +1938,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   setPlot2Mode('scatter');
                 }}
                 lang={lang}
+                row2Labels={row2Labels}
                 headerToggle={heatmapToggleButton1}
               />
             );
@@ -1807,6 +1958,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
               onYAxisDimChange={setPlot1YDimIndex}
               onSwapAxes={handleSwapPlot1}
               lang={lang}
+              row2Labels={row2Labels}
               onScrollToParagraph={onScrollToParagraph}
               headerToggle={heatmapToggleButton1}
             />
@@ -1858,6 +2010,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   setPlot1Mode('scatter');
                 }}
                 lang={lang}
+                row2Labels={row2Labels}
                 headerToggle={heatmapToggleButton2}
               />
             );
@@ -1877,6 +2030,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
               onYAxisDimChange={setPlot2YDimIndex}
               onSwapAxes={handleSwapPlot2}
               lang={lang}
+              row2Labels={row2Labels}
               onScrollToParagraph={onScrollToParagraph}
               headerToggle={heatmapToggleButton2}
             />

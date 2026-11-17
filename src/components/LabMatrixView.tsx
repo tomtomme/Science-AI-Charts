@@ -4,6 +4,7 @@ import { LabPlanInfo } from '../types/pricingMonitor';
 import { DEFAULT_LAB_PLANS, matchMonitoredLabKey } from '../data/pricingPlansFallback';
 import { Search, ExternalLink, Cpu, Wrench, Terminal, Layers, HelpCircle, BookOpen, Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import { Tooltip } from './Tooltip';
+import { roundCurrencyString, roundCurrencyTokensInText } from '../utils/priceFormat';
 
 export type LabGroup = 'all' | 'top10' | 'contender' | 'tweakers' | 'small' | 'harness';
 
@@ -845,23 +846,241 @@ function normalizePricingLabKey(raw: string): string {
   return low.replace(/[^a-z0-9]/g, '');
 }
 
+function isZeroPriceString(raw: string | undefined | null): boolean {
+  if (!raw) return false;
+  const nums = String(raw).match(/\d+(?:[.,]\d+)?/g);
+  if (!nums || nums.length === 0) return false;
+  return Math.max(...nums.map((n) => parseFloat(n.replace(',', '.')) || 0)) <= 0;
+}
+
 function cleanSheetPriceValue(raw: string | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed || trimmed === '-' || trimmed.toLowerCase() === 'n/a') return null;
   const low = trimmed.toLowerCase();
   if (low.includes('abokosten') || low.includes('monthly cost')) return null;
-  return trimmed;
+  const rounded = roundCurrencyString(trimmed);
+  if (!rounded || isZeroPriceString(rounded)) return null;
+  return rounded;
 }
 
 function formatPlanShortLabel(plan: LabPlanInfo, lang: 'de' | 'en'): string {
-  const price = (lang === 'de' ? plan.deMonthly : plan.usMonthly) || (lang === 'de' ? plan.usMonthly : plan.deMonthly) || '';
+  const rawPrice =
+    (lang === 'de' ? plan.deMonthly : plan.usMonthly) ||
+    (lang === 'de' ? plan.usMonthly : plan.deMonthly) ||
+    '';
+  const rounded = rawPrice ? roundCurrencyString(rawPrice) : '';
+  const price = rounded && !isZeroPriceString(rounded) ? rounded : '';
   const name = plan.planName
     .replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')
     .replace(/^Meta AI\s+/i, 'meta.ai ')
     .replace(/^Meta One\s+/i, 'One ')
     .trim();
   return price ? `${name} ${price}` : name;
+}
+
+function extractTierModelTokens(modelVal: string): string[] {
+  const withoutParens = modelVal.replace(/[()]/g, ' ');
+  return withoutParens
+    .split(/[,/&+;]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length >= 2 && s !== '-' && s !== 'llm');
+}
+
+function extractPriceBounds(
+  raw: string
+): { min: number; max: number; hasPlus: boolean; currency: '€' | '$' | '' } | null {
+  const nums =
+    String(raw)
+      .match(/\d+/g)
+      ?.map((n) => parseInt(n, 10))
+      .filter((n) => Number.isFinite(n)) || [];
+  if (nums.length === 0) return null;
+  const currency = raw.includes('€') ? '€' : raw.includes('$') ? '$' : '';
+  return {
+    min: Math.min(...nums),
+    max: Math.max(...nums),
+    hasPlus: raw.includes('+'),
+    currency,
+  };
+}
+
+function formatPriceRange(firstRaw: string, secondRaw?: string): string {
+  const b1 = extractPriceBounds(firstRaw);
+  const b2 = secondRaw ? extractPriceBounds(secondRaw) : null;
+  if (!b1 && !b2) return secondRaw ? `${firstRaw}-${secondRaw}` : firstRaw;
+  const allNums = [...(b1 ? [b1.min, b1.max] : []), ...(b2 ? [b2.min, b2.max] : [])];
+  const min = Math.min(...allNums);
+  const max = Math.max(...allNums);
+  const currency = b1?.currency || b2?.currency || '';
+  const hasPlus = Boolean(b1?.hasPlus || b2?.hasPlus);
+  const plusSuffix = hasPlus ? '+' : '';
+  if (currency === '$') {
+    return min === max ? `$${min}${plusSuffix}` : `$${min}-${max}${plusSuffix}`;
+  }
+  if (currency === '€') {
+    return min === max ? `${min}€${plusSuffix}` : `${min}-${max}€${plusSuffix}`;
+  }
+  return min === max ? `${min}${plusSuffix}` : `${min}-${max}${plusSuffix}`;
+}
+
+function resolveTierRowPrice(
+  lab: LabEntry,
+  tierKey: keyof LabEntry['parameterSizes'],
+  modelVal: string,
+  matchedModels: ModelRecord[],
+  consumerPlans: LabPlanInfo[],
+  lang: 'de' | 'en'
+): string | null {
+  const monitoredLab = matchMonitoredLabKey(lab.creator) || matchMonitoredLabKey(lab.id);
+  const pickPrice = (plan?: LabPlanInfo): string => {
+    if (!plan) return '';
+    const raw =
+      (lang === 'de' ? plan.deMonthly : plan.usMonthly) ||
+      (lang === 'de' ? plan.usMonthly : plan.deMonthly) ||
+      '';
+    const rounded = roundCurrencyString(raw);
+    return isZeroPriceString(rounded) ? '' : rounded;
+  };
+  const zeroUnit = lang === 'de' ? '0€' : '$0';
+
+  if (monitoredLab && consumerPlans.length > 0) {
+    if (monitoredLab === 'OpenAI') {
+      const go = consumerPlans.find((p) => /go/i.test(p.planName));
+      const plus = consumerPlans.find((p) => /plus/i.test(p.planName));
+      const pros = consumerPlans.filter((p) => /pro/i.test(p.planName));
+      if (tierKey === 'small') return null;
+      if (tierKey === 'medium') {
+        const goPrice = pickPrice(go);
+        return goPrice ? `Go ${formatPriceRange(zeroUnit, goPrice)}` : null;
+      }
+      if (tierKey === 'large' || tierKey === 'massive' || tierKey === 'colossal' || tierKey === 'planetary') {
+        const plusPrice = pickPrice(plus);
+        if (plusPrice) return `Plus ${plusPrice}`;
+      }
+      if (tierKey === 'singularity' || tierKey === 'godTier') {
+        if (pros.length >= 2) {
+          const firstP = pickPrice(pros[0]);
+          const lastP = pickPrice(pros[pros.length - 1]);
+          if (firstP && lastP) return `Pro ${formatPriceRange(firstP, lastP)}`;
+        }
+        const singleP = pickPrice(pros[0]);
+        if (singleP) return `Pro ${singleP}`;
+      }
+    } else if (monitoredLab === 'Anthropic') {
+      const pro = consumerPlans.find((p) => /\bpro\b/i.test(p.planName));
+      const max = consumerPlans.find((p) => /\bmax\b/i.test(p.planName));
+      const ultra = consumerPlans.find((p) => /\bultra\b/i.test(p.planName));
+      if (tierKey === 'small' || tierKey === 'medium' || tierKey === 'large') {
+        return null;
+      }
+      if (tierKey === 'massive') {
+        const proPrice = pickPrice(pro);
+        return proPrice ? `Pro ${formatPriceRange(zeroUnit, proPrice)}` : null;
+      }
+      if (tierKey === 'colossal' || tierKey === 'planetary') {
+        const proPrice = pickPrice(pro);
+        if (proPrice) return `Pro ${proPrice}`;
+      }
+      if (tierKey === 'singularity' || tierKey === 'godTier') {
+        const maxPrice = pickPrice(max);
+        const ultraPrice = pickPrice(ultra);
+        if (maxPrice && ultraPrice) return `Max ${formatPriceRange(maxPrice, ultraPrice)}`;
+        if (maxPrice) return `Max ${maxPrice}`;
+      }
+    } else if (monitoredLab === 'Google') {
+      const plus = consumerPlans.find((p) => /\bplus\b/i.test(p.planName));
+      const pro = consumerPlans.find((p) => /\bpro\b/i.test(p.planName));
+      const ultras = consumerPlans.filter((p) => /\bultra\b/i.test(p.planName));
+      if (tierKey === 'small' || tierKey === 'medium' || tierKey === 'large' || tierKey === 'massive') {
+        return null;
+      }
+      if (tierKey === 'colossal') {
+        const plusPrice = pickPrice(plus);
+        return plusPrice ? `Plus ${formatPriceRange(zeroUnit, plusPrice)}` : null;
+      }
+      if (tierKey === 'planetary') {
+        const proPrice = pickPrice(pro);
+        if (proPrice) return `Pro ${proPrice}`;
+      }
+      if (tierKey === 'singularity' || tierKey === 'godTier') {
+        if (ultras.length >= 2) {
+          const firstU = pickPrice(ultras[0]);
+          const lastU = pickPrice(ultras[ultras.length - 1]);
+          if (firstU && lastU) return `Ultra ${formatPriceRange(firstU, lastU)}`;
+        }
+        const ultraPrice = pickPrice(ultras[0]);
+        if (ultraPrice) return `Ultra ${ultraPrice}`;
+      }
+    } else if (monitoredLab === 'Meta') {
+      // Meta Muse plans are US-only; omit US price badges on DE view
+      if (lang === 'de') {
+        return null;
+      }
+      const musePower = consumerPlans.find((p) => /muse power/i.test(p.planName));
+      const museMax = consumerPlans.find((p) => /muse maximum/i.test(p.planName));
+      const powerUs = roundCurrencyString(musePower?.usMonthly) || '$20';
+      const maxUs = roundCurrencyString(museMax?.usMonthly) || '$100';
+      if (tierKey === 'small' || tierKey === 'medium' || tierKey === 'large') {
+        return null;
+      }
+      if (tierKey === 'massive' || tierKey === 'colossal' || tierKey === 'planetary') {
+        if (!isZeroPriceString(powerUs)) {
+          return `Muse ${powerUs}`;
+        }
+        return null;
+      }
+      if (tierKey === 'singularity' || tierKey === 'godTier') {
+        if (!isZeroPriceString(maxUs)) {
+          return `Muse ${maxUs}`;
+        }
+        return null;
+      }
+    }
+  }
+
+  // Fallback for all other labs (and unmapped tiers): match benchmark rows with price > 0
+  const tokens = extractTierModelTokens(modelVal);
+  if (tokens.length === 0 || matchedModels.length === 0) return null;
+
+  const sortedTokens = [...tokens].sort((a, b) => b.length - a.length);
+  const priceHits: string[] = [];
+  const seen = new Set<string>();
+
+  const candidateModels = [...matchedModels].sort(
+    (a, b) => Number(b.isAvailable) - Number(a.isAvailable)
+  );
+
+  for (const m of candidateModels) {
+    const haystack = `${m.displayName} ${m.name}`.toLowerCase();
+    const matched = sortedTokens.some((tok) => {
+      if (tok.length <= 2) {
+        const escaped = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`\\b${escaped}\\b`, 'i').test(haystack);
+      }
+      return haystack.includes(tok);
+    });
+    if (!matched) continue;
+
+    const rawPrice = cleanSheetPriceValue(lang === 'de' ? m.priceDeMonthly : m.priceUsMonthly);
+    if (rawPrice && !isZeroPriceString(rawPrice)) {
+      const normKey = rawPrice.toLowerCase();
+      if (!seen.has(normKey)) {
+        seen.add(normKey);
+        priceHits.push(rawPrice);
+        if (priceHits.length >= 2) break;
+      }
+    }
+  }
+
+  if (priceHits.length === 0) return null;
+  if (priceHits.length === 1) return priceHits[0];
+  const b0 = extractPriceBounds(priceHits[0]);
+  const b1 = extractPriceBounds(priceHits[1]);
+  if (b0 && b1 && b0.currency && b0.currency === b1.currency) {
+    return formatPriceRange(priceHits[0], priceHits[1]);
+  }
+  return priceHits.join(' · ');
 }
 
 interface LabPricingSummary {
@@ -880,6 +1099,7 @@ function resolveLabPricingSummary(
   lab: LabEntry,
   matchedModels: ModelRecord[],
   allConsumerPlans: LabPlanInfo[],
+  hasTierRowPrices: boolean,
   lang: 'de' | 'en'
 ): LabPricingSummary | null {
   const monitoredLab = matchMonitoredLabKey(lab.creator) || matchMonitoredLabKey(lab.id);
@@ -904,10 +1124,11 @@ function resolveLabPricingSummary(
     }
   }
 
-  const rawTiers = (lab.subscriptionTiers || '').trim();
+  const rawTiers = roundCurrencyTokensInText((lab.subscriptionTiers || '').trim());
   const hasTiers = Boolean(rawTiers && rawTiers !== '-' && rawTiers.toLowerCase() !== 'n/a');
+  const isPayPerToken = /^per\s+token\s+price$/i.test(rawTiers);
   const displayTiersText = hasTiers
-    ? /^per\s+token\s+price$/i.test(rawTiers)
+    ? isPayPerToken
       ? lang === 'de'
         ? 'Pay-per-Token (API)'
         : 'Per-token API pricing'
@@ -919,7 +1140,7 @@ function resolveLabPricingSummary(
   if (hasFreeChat || hasConsumerFree) {
     accessFlags.push(lang === 'de' ? 'Gratis' : 'Free');
   }
-  if (consumerPlans.some((p) => p.tierKey !== 'free') || hasPaidModel || (hasTiers && !/per\s+token/i.test(rawTiers))) {
+  if (consumerPlans.some((p) => p.tierKey !== 'free') || hasPaidModel || (hasTiers && !isPayPerToken)) {
     accessFlags.push(lang === 'de' ? 'Abo' : 'Paid');
   }
   if (hasFreeApi) {
@@ -927,68 +1148,50 @@ function resolveLabPricingSummary(
   }
 
   let primaryText = '';
-  let secondaryText: string | undefined;
+  const secondaryText: string | undefined = undefined;
+  const subPrefix = lang === 'de' ? 'Abos:' : 'Plans:';
 
   if (consumerPlans.length > 0) {
-    if (monitoredLab === 'OpenAI') {
-      const go = consumerPlans.find((p) => /go/i.test(p.planName));
-      const plus = consumerPlans.find((p) => /plus/i.test(p.planName));
-      const pros = consumerPlans.filter((p) => /pro/i.test(p.planName));
-      const parts: string[] = [];
-      if (go) parts.push(formatPlanShortLabel(go, lang));
-      if (plus) parts.push(formatPlanShortLabel(plus, lang));
-      if (pros.length >= 2) {
-        const firstPrice = lang === 'de' ? pros[0].deMonthly : pros[0].usMonthly;
-        const lastPrice = lang === 'de' ? pros[pros.length - 1].deMonthly : pros[pros.length - 1].usMonthly;
-        parts.push(`Pro ${firstPrice}–${lastPrice}`);
-      } else if (pros.length === 1) {
-        parts.push(formatPlanShortLabel(pros[0], lang));
-      }
-      primaryText = parts.join(' · ');
-    } else if (monitoredLab === 'Meta') {
-      const metaFree = consumerPlans.find((p) => /meta ai free/i.test(p.planName));
-      const oneCore = consumerPlans.find((p) => /meta one core/i.test(p.planName));
-      const onePrem = consumerPlans.find((p) => /meta one premium/i.test(p.planName));
-      const musePower = consumerPlans.find((p) => /muse power/i.test(p.planName));
-      const museMax = consumerPlans.find((p) => /muse maximum/i.test(p.planName));
-      const parts: string[] = [];
-      if (metaFree) parts.push(formatPlanShortLabel(metaFree, lang));
-      if (oneCore && onePrem) {
-        const p1 = lang === 'de' ? oneCore.deMonthly : oneCore.usMonthly;
-        const p2 = lang === 'de' ? onePrem.deMonthly : onePrem.usMonthly;
-        parts.push(`One ${p1} / ${p2}`);
-      }
-      if (lang === 'de') {
-        parts.push('Muse US only');
-      } else if (musePower && museMax) {
-        parts.push(`Muse $0 / ${musePower.usMonthly} / ${museMax.usMonthly}`);
-      }
-      primaryText = parts.join(' · ');
+    if (monitoredLab === 'Meta') {
+      primaryText =
+        lang === 'de'
+          ? `${subPrefix} Meta One · Muse (US)`
+          : `${subPrefix} Meta One · Muse`;
+    } else if (displayTiersText) {
+      primaryText = isPayPerToken ? displayTiersText : `${subPrefix} ${displayTiersText}`;
     } else {
-      primaryText = consumerPlans.map((p) => formatPlanShortLabel(p, lang)).join(' · ');
+      const planNames = Array.from(
+        new Set(
+          consumerPlans.map((p) =>
+            p.planName
+              .replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')
+              .replace(/\s+\d+$/, '')
+              .trim()
+          )
+        )
+      );
+      primaryText = `${subPrefix} ${planNames.join(' · ')}`;
     }
-  } else if (rawSheetPrices.length > 0 && displayTiersText) {
-    primaryText = `${rawSheetPrices.join(', ')} · ${displayTiersText}`;
-  } else if (rawSheetPrices.length > 0) {
-    primaryText = rawSheetPrices.join(' · ');
   } else if (displayTiersText) {
-    primaryText = displayTiersText;
-  } else if (pool.length > 0) {
-    primaryText = hasFreeChat
-      ? lang === 'de'
-        ? 'Webchat kostenlos'
-        : 'Free web chat'
-      : lang === 'de'
-      ? 'Nur API / Bezahlt'
-      : 'API / Paid only';
-  } else if (lab.weightsType === 'open') {
-    primaryText = lang === 'de' ? 'Open Weights (Lokal / API)' : 'Open Weights (Local / API)';
-  } else {
-    return null;
+    const labeledTiers = isPayPerToken ? displayTiersText : `${subPrefix} ${displayTiersText}`;
+    primaryText =
+      !hasTierRowPrices && rawSheetPrices.length > 0
+        ? `${labeledTiers} · ${rawSheetPrices.join(' · ')}`
+        : labeledTiers;
+  } else if (!hasTierRowPrices && rawSheetPrices.length > 0) {
+    primaryText = rawSheetPrices.join(' · ');
+  } else if (accessFlags.length === 0) {
+    if (pool.length > 0) {
+      primaryText = lang === 'de' ? 'Nur API / Bezahlt' : 'API / Paid only';
+    } else if (lab.weightsType === 'open') {
+      primaryText = lang === 'de' ? 'Open Weights (Lokal / API)' : 'Open Weights (Local / API)';
+    } else {
+      return null;
+    }
   }
 
-  if (consumerPlans.length === 0 && lab.weightsType === 'open' && !primaryText.toLowerCase().includes('open')) {
-    secondaryText = hasFreeChat ? (lang === 'de' ? 'Open Weights + Webchat' : 'Open Weights + Web Chat') : undefined;
+  if (accessFlags.length === 0 && !primaryText) {
+    return null;
   }
 
   return {
@@ -996,7 +1199,7 @@ function resolveLabPricingSummary(
     hasFreeAccess: hasFreeChat || hasConsumerFree || hasFreeApi,
     hasFreeApi,
     isPaidOnly: !hasFreeChat && !hasConsumerFree && !hasFreeApi && (hasPaidModel || consumerPlans.length > 0),
-    primaryText,
+    primaryText: roundCurrencyTokensInText(primaryText),
     secondaryText,
     consumerPlans,
     subscriptionTiers: displayTiersText || undefined,
@@ -1884,10 +2087,33 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             normalizePricingLabKey(lab.id) ||
             normalizePricingLabKey(lab.engineName);
           const matchedLabModels = modelsByLabKey.get(labModelKey) || [];
+          const monitoredLab = matchMonitoredLabKey(lab.creator) || matchMonitoredLabKey(lab.id);
+          const labConsumerPlans = monitoredLab
+            ? pricingPlans.filter((p) => p.lab === monitoredLab)
+            : [];
+
+          const tierRowPrices = new Map<keyof LabEntry['parameterSizes'], string>();
+          for (const tier of displayTiers) {
+            const val = lab.parameterSizes[tier.key];
+            if (!val) continue;
+            const rowPrice = resolveTierRowPrice(
+              lab,
+              tier.key,
+              val,
+              matchedLabModels,
+              labConsumerPlans,
+              lang
+            );
+            if (rowPrice) {
+              tierRowPrices.set(tier.key, rowPrice);
+            }
+          }
+
           const pricingSummary = resolveLabPricingSummary(
             lab,
             matchedLabModels,
             pricingPlans,
+            tierRowPrices.size > 0,
             lang
           );
 
@@ -2067,6 +2293,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                           sizeFilter !== 'all' &&
                           getSizeFilterTiers(sizeFilter).includes(tier.key);
 
+                        const rowPrice = tierRowPrices.get(tier.key);
+
                         return (
                           <div
                             key={tier.key}
@@ -2110,6 +2338,20 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                               {modelVal}
                             </span>
 
+                            {/* Right: Concrete Unlock Price Badge (in model row) */}
+                            {rowPrice && (
+                              <span
+                                className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 shrink-0"
+                                title={
+                                  lang === 'de'
+                                    ? `Freischaltung / Preis (${rowPrice})`
+                                    : `Unlock / Price (${rowPrice})`
+                                }
+                              >
+                                {rowPrice}
+                              </span>
+                            )}
+
                             {/* Right: Open / Closed Badge (only shown for hybrid model families) */}
                             {!isSimplifiedView && lab.weightsType === 'hybrid' && isOpen !== undefined && (
                               <span
@@ -2129,12 +2371,12 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   </div>
                 )}
 
-                {/* Pricing Summary Row (directly visible on card face) */}
+                {/* General Pricing Summary Row (model-specific prices shown directly inside the rows above) */}
                 {pricingSummary && (
                   <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-2 space-y-1">
                     <div className="flex items-center justify-between gap-2 text-[11px]">
                       <span className="font-semibold text-slate-500 dark:text-slate-400">
-                        {lang === 'de' ? 'Preise (DE)' : 'Pricing (US)'}
+                        {lang === 'de' ? 'Zugang & Tarife' : 'Access & Plans'}
                       </span>
                       {pricingSummary.accessFlags.length > 0 && (
                         <span
@@ -2151,45 +2393,58 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       )}
                     </div>
 
-                    {pricingSummary.consumerPlans.length > 0 ? (
-                      <Tooltip
-                        title={`${lab.creator} · ${lang === 'de' ? 'Monatstarife (DE / US)' : 'Monthly Plans (DE / US)'}`}
-                        position="top"
-                        align="left"
-                        width="w-72"
-                        content={
-                          <div className="space-y-1 text-[11px]">
-                            {pricingSummary.consumerPlans.map((plan, idx) => (
-                              <div key={`${plan.planName}-${idx}`} className="flex items-baseline justify-between gap-2">
-                                <span className="font-semibold text-slate-200 truncate">
-                                  {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
-                                </span>
-                                <span className="font-mono tabular-nums text-slate-100 shrink-0">
-                                  {plan.deMonthly} / {plan.usMonthly}
-                                </span>
-                              </div>
-                            ))}
-                            {pricingSummary.subscriptionTiers && (
-                              <div className="pt-1 mt-1 border-t border-slate-700/70 text-[10px] text-slate-400">
-                                {lang === 'de' ? 'Alle Stufen:' : 'All tiers:'} {pricingSummary.subscriptionTiers}
-                              </div>
-                            )}
-                          </div>
-                        }
-                      >
-                        <p className="font-mono tabular-nums text-[11px] font-medium text-slate-800 dark:text-slate-200 leading-snug cursor-help">
+                    {pricingSummary.primaryText && (
+                      pricingSummary.consumerPlans.length > 0 ? (
+                        <Tooltip
+                          title={`${lab.creator} · ${lang === 'de' ? 'Monatstarife (DE)' : 'Monthly Plans (US)'}`}
+                          position="top"
+                          align="left"
+                          width="w-72"
+                          className="w-full max-w-full"
+                          content={
+                            <div className="space-y-1 text-[11px]">
+                              {pricingSummary.consumerPlans
+                                .filter((plan) => {
+                                  const raw = lang === 'de' ? plan.deMonthly : plan.usMonthly;
+                                  return Boolean(raw && !isZeroPriceString(raw));
+                                })
+                                .map((plan, idx) => {
+                                  const localizedPrice = roundCurrencyString(
+                                    lang === 'de' ? plan.deMonthly : plan.usMonthly
+                                  );
+                                  return (
+                                    <div key={`${plan.planName}-${idx}`} className="flex items-baseline justify-between gap-2">
+                                      <span className="font-semibold text-slate-200 truncate">
+                                        {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                      </span>
+                                      <span className="font-mono tabular-nums text-slate-100 shrink-0">
+                                        {localizedPrice}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              {pricingSummary.subscriptionTiers && (
+                                <div className="pt-1 mt-1 border-t border-slate-700/70 text-[10px] text-slate-400">
+                                  {lang === 'de' ? 'Alle Stufen:' : 'All tiers:'} {pricingSummary.subscriptionTiers}
+                                </div>
+                              )}
+                            </div>
+                          }
+                        >
+                          <p className="w-full font-mono tabular-nums text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-snug cursor-help truncate">
+                            {pricingSummary.primaryText}
+                          </p>
+                        </Tooltip>
+                      ) : (
+                        <p
+                          className={`font-mono tabular-nums text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-snug ${
+                            isSimplifiedView ? 'truncate' : ''
+                          }`}
+                          title={pricingSummary.primaryText}
+                        >
                           {pricingSummary.primaryText}
                         </p>
-                      </Tooltip>
-                    ) : (
-                      <p
-                        className={`font-mono tabular-nums text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-snug ${
-                          isSimplifiedView ? 'truncate' : ''
-                        }`}
-                        title={pricingSummary.primaryText}
-                      >
-                        {pricingSummary.primaryText}
-                      </p>
+                      )
                     )}
                   </div>
                 )}
@@ -2253,7 +2508,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                               {lang === 'de' ? 'Abo-Stufen:' : 'Subscription Tiers:'}
                             </span>
                             <span className="font-medium text-slate-700 dark:text-slate-300">
-                              {lab.subscriptionTiers}
+                              {roundCurrencyTokensInText(lab.subscriptionTiers)}
                             </span>
                           </div>
                         )}

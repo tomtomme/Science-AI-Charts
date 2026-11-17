@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface TooltipProps {
@@ -10,7 +10,7 @@ export interface TooltipProps {
   align?: 'left' | 'center' | 'right';
   width?: string;
   delay?: number; // open delay in ms (default: 80ms)
-  closeDelay?: number; // grace period in ms before closing (default: 280ms)
+  closeDelay?: number; // grace period in ms before closing (default: 300ms)
   disabled?: boolean;
   className?: string;
   popupClassName?: string;
@@ -19,10 +19,8 @@ export interface TooltipProps {
 /**
  * Unified accessible tooltip & popover component with:
  * 1. React Portal into document.body to ensure popups are NEVER clipped by parent overflow-hidden or overflow-x-auto.
- * 2. Collision-aware positioning: automatically flips above if space below viewport is limited.
- * 3. Ample vertical clearance (12px gap) ensuring the mouse cursor NEVER covers or obscures popup content.
- * 4. Safe closing grace period (280ms) so moving the pointer toward links never loses hover.
- * 5. High z-index (z-[9999]) and sleek dark glassmorphism styling unified across all 4 tabs.
+ * 2. Collision-aware positioning measured in useLayoutEffect so the popup never flickers or overlaps the cursor.
+ * 3. Exact 12px vertical clearance and hover bridge matching the gap without overlapping the trigger element.
  */
 export const Tooltip: React.FC<TooltipProps> = ({
   children,
@@ -33,7 +31,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   align = 'center',
   width = 'w-64',
   delay = 80,
-  closeDelay = 280,
+  closeDelay = 300,
   disabled = false,
   className = '',
   popupClassName = '',
@@ -43,6 +41,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const popupRef = useRef<HTMLDivElement>(null);
   const openTimerRef = useRef<number | null>(null);
   const closeTimerRef = useRef<number | null>(null);
+  const pointerOnTriggerRef = useRef(false);
+  const pointerOnPopupRef = useRef(false);
 
   const [coords, setCoords] = useState<{
     top: number;
@@ -53,24 +53,23 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const updatePosition = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    const spaceAbove = rect.top - 12;
 
-    // Estimate popup height (~170px for rich card) or measure if available
-    const measuredHeight = popupRef.current?.offsetHeight || 170;
+    const measuredHeight = popupRef.current?.offsetHeight || 200;
 
     let actualPosition: 'top' | 'bottom' = position;
-    if (position === 'bottom' && spaceBelow < measuredHeight + 15 && spaceAbove > spaceBelow) {
+    if (position === 'bottom' && spaceBelow < measuredHeight + 8 && spaceAbove > spaceBelow) {
       actualPosition = 'top';
-    } else if (position === 'top' && spaceAbove < measuredHeight + 15 && spaceBelow > spaceAbove) {
+    } else if (position === 'top' && spaceAbove < measuredHeight + 8 && spaceBelow > spaceAbove) {
       actualPosition = 'bottom';
     }
 
     let top = 0;
     if (actualPosition === 'bottom') {
-      top = rect.bottom + 12; // 12px vertical clearance: cursor never covers popup
+      top = rect.bottom + 12;
     } else {
-      top = rect.top - 12 - measuredHeight;
+      top = Math.max(8, rect.top - 12 - measuredHeight);
     }
 
     let left = rect.left + rect.width / 2;
@@ -80,23 +79,45 @@ export const Tooltip: React.FC<TooltipProps> = ({
       left = rect.right;
     }
 
-    // Keep horizontally within viewport bounds with padding
-    const measuredWidth = popupRef.current?.offsetWidth || (width.includes('w-96') ? 384 : width.includes('350') ? 350 : 320);
-    const halfWidth = measuredWidth / 2;
+    const measuredWidth =
+      popupRef.current?.offsetWidth ||
+      (width.includes('w-96') ? 384 : width.includes('350') ? 350 : 320);
+
     if (align === 'center') {
+      const halfWidth = measuredWidth / 2;
       if (left - halfWidth < 12) {
         left = halfWidth + 12;
       } else if (left + halfWidth > window.innerWidth - 12) {
         left = window.innerWidth - halfWidth - 12;
       }
+    } else if (align === 'left') {
+      if (left + measuredWidth > window.innerWidth - 12) {
+        left = Math.max(12, window.innerWidth - measuredWidth - 12);
+      }
+    } else if (align === 'right') {
+      if (left - measuredWidth < 12) {
+        left = Math.min(window.innerWidth - 12, measuredWidth + 12);
+      }
     }
 
-    setCoords({
-      top: Math.max(10, top),
-      left,
-      actualPosition,
+    setCoords((prev) => {
+      const nextTop = Math.round(top);
+      const nextLeft = Math.round(left);
+      if (
+        prev &&
+        prev.top === nextTop &&
+        prev.left === nextLeft &&
+        prev.actualPosition === actualPosition
+      ) {
+        return prev;
+      }
+      return {
+        top: nextTop,
+        left: nextLeft,
+        actualPosition,
+      };
     });
-  }, [position, align]);
+  }, [position, align, width]);
 
   const clearTimers = useCallback(() => {
     if (openTimerRef.current !== null) {
@@ -113,14 +134,16 @@ export const Tooltip: React.FC<TooltipProps> = ({
     return () => clearTimers();
   }, [clearTimers]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen) return;
     updatePosition();
+  }, [isOpen, updatePosition, content, title, badge]);
 
+  useEffect(() => {
+    if (!isOpen) return;
     const handleScrollOrResize = () => {
       updatePosition();
     };
-
     window.addEventListener('scroll', handleScrollOrResize, true);
     window.addEventListener('resize', handleScrollOrResize);
     return () => {
@@ -129,8 +152,21 @@ export const Tooltip: React.FC<TooltipProps> = ({
     };
   }, [isOpen, updatePosition]);
 
+  const scheduleClose = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      if (!pointerOnTriggerRef.current && !pointerOnPopupRef.current) {
+        setIsOpen(false);
+      }
+      closeTimerRef.current = null;
+    }, closeDelay);
+  }, [closeDelay]);
+
   const handleMouseEnter = () => {
     if (disabled) return;
+    pointerOnTriggerRef.current = true;
     if (closeTimerRef.current !== null) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
@@ -145,23 +181,25 @@ export const Tooltip: React.FC<TooltipProps> = ({
   };
 
   const handleMouseLeave = () => {
+    pointerOnTriggerRef.current = false;
     if (openTimerRef.current !== null) {
       clearTimeout(openTimerRef.current);
       openTimerRef.current = null;
     }
-    if (closeTimerRef.current === null) {
-      closeTimerRef.current = window.setTimeout(() => {
-        setIsOpen(false);
-        closeTimerRef.current = null;
-      }, closeDelay);
-    }
+    scheduleClose();
   };
 
   const handleTooltipMouseEnter = () => {
+    pointerOnPopupRef.current = true;
     if (closeTimerRef.current !== null) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
+  };
+
+  const handleTooltipMouseLeave = () => {
+    pointerOnPopupRef.current = false;
+    scheduleClose();
   };
 
   let alignClass = '-translate-x-1/2';
@@ -181,6 +219,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
       ref={triggerRef}
       className={`relative inline-flex items-center ${className}`}
       onMouseEnter={handleMouseEnter}
+      onMouseMove={() => {
+        if (!pointerOnTriggerRef.current) {
+          handleMouseEnter();
+        }
+      }}
       onMouseLeave={handleMouseLeave}
     >
       {children}
@@ -191,20 +234,20 @@ export const Tooltip: React.FC<TooltipProps> = ({
             ref={popupRef}
             role="tooltip"
             onMouseEnter={handleTooltipMouseEnter}
-            onMouseLeave={handleMouseLeave}
+            onMouseLeave={handleTooltipMouseLeave}
             style={{
               position: 'fixed',
               top: `${coords.top}px`,
               left: `${coords.left}px`,
               zIndex: 9999,
             }}
-            className={`fixed ${alignClass} ${width} max-w-[92vw] p-3 rounded-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 shadow-2xl backdrop-blur-md text-left text-xs whitespace-normal break-words pointer-events-auto transition-opacity animate-in fade-in-0 zoom-in-95 duration-150 ${popupClassName}`}
+            className={`fixed ${alignClass} ${width} max-w-[92vw] p-3 rounded-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 shadow-2xl backdrop-blur-md text-left text-xs whitespace-normal break-words pointer-events-auto transition-opacity duration-100 ${popupClassName}`}
           >
-            {/* Hover bridge spanning the gap between trigger and popover */}
+            {/* Hover bridge strictly matching the 12px gap between trigger and popover */}
             {actualPosition === 'bottom' ? (
-              <div className="absolute -top-3.5 left-0 right-0 h-3.5 bg-transparent pointer-events-auto" />
+              <div className="absolute -top-3 left-0 right-0 h-3 bg-transparent pointer-events-auto" />
             ) : (
-              <div className="absolute -bottom-3.5 left-0 right-0 h-3.5 bg-transparent pointer-events-auto" />
+              <div className="absolute -bottom-3 left-0 right-0 h-3 bg-transparent pointer-events-auto" />
             )}
 
             {/* Pointer indicator arrow */}

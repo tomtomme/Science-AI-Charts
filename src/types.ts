@@ -54,6 +54,7 @@ export interface ModelRecord {
   creatorClean: string;
   companyName: string;
   releaseDate: string;
+  hasConcreteReleaseDate?: boolean;
   releaseText: string;
   
   // Raw scores from sheet

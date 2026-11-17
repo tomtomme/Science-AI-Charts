@@ -1,7 +1,12 @@
 import React, { useMemo } from 'react';
 import { Minus, Plus, ExternalLink } from 'lucide-react';
 import { ScoreMode, BenchmarkComponent, Row33Metadata } from '../types';
-import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS, getBenchmarkCategoryLabel } from '../data/benchmarks';
+import {
+  BENCHMARK_COMPONENTS,
+  RETIRED_TIMELINE_BENCHMARKS,
+  getBenchmarkCategoryLabel,
+  getCompositeScoreLabel,
+} from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { Tooltip } from './Tooltip';
 
@@ -12,6 +17,10 @@ interface ScoreSliderProps {
   onSelectCategoryIndex: (index: number) => void;
   categoryNames?: string[];
   isPreTranslatedCategoryNames?: boolean;
+  compositeScoreNames?: string[];
+  isPreTranslatedCompositeScoreNames?: boolean;
+  retiredCategoryNames?: string[];
+  isPreTranslatedRetiredCategoryNames?: boolean;
   onHoverCategory?: (comp: BenchmarkComponent | null) => void;
   onScrollToParagraph?: (targetId: string) => void;
   lang: Language;
@@ -26,6 +35,10 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
   onSelectCategoryIndex,
   categoryNames,
   isPreTranslatedCategoryNames = false,
+  compositeScoreNames,
+  isPreTranslatedCompositeScoreNames = false,
+  retiredCategoryNames,
+  isPreTranslatedRetiredCategoryNames = false,
   onHoverCategory,
   onScrollToParagraph,
   lang,
@@ -40,7 +53,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
   // 1 = Old Score (scoreMode='old', category=0)
   // 2 = Worst Case (scoreMode='worstCase', category=0)
   // 3..10 = Categories 1..8
-  // 11..14 = Retired Categories 9..12 (Columns U..X)
+  // 11..14 = Retired Categories 9..12 (Columns V..Y)
   const unifiedSliderValue = useMemo(() => {
     if (selectedCategoryIndex === 0) {
       if (scoreMode === 'old') return 1;
@@ -90,13 +103,42 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
   }, [selectedCategoryIndex, allowRetiredScores]);
 
   const activeCategoryName = activeCategoryComp
-    ? getBenchmarkCategoryLabel(
-        categoryNames && selectedCategoryIndex > 0 ? categoryNames[selectedCategoryIndex - 1] : undefined,
-        lang,
-        activeCategoryComp,
-        isPreTranslatedCategoryNames
-      )
+    ? selectedCategoryIndex >= 9
+      ? getBenchmarkCategoryLabel(
+          retiredCategoryNames?.[selectedCategoryIndex - 9],
+          lang,
+          activeCategoryComp,
+          isPreTranslatedRetiredCategoryNames
+        )
+      : getBenchmarkCategoryLabel(
+          categoryNames?.[selectedCategoryIndex - 1],
+          lang,
+          activeCategoryComp,
+          isPreTranslatedCategoryNames
+        )
     : null;
+
+  const newScoreLabel = getCompositeScoreLabel(
+    0,
+    compositeScoreNames?.[0],
+    lang,
+    t.scoreModeNew,
+    isPreTranslatedCompositeScoreNames
+  );
+  const oldScoreLabel = getCompositeScoreLabel(
+    1,
+    compositeScoreNames?.[1],
+    lang,
+    t.scoreModeOld,
+    isPreTranslatedCompositeScoreNames
+  );
+  const worstCaseLabel = getCompositeScoreLabel(
+    2,
+    compositeScoreNames?.[2],
+    lang,
+    t.scoreModeWorstCase,
+    isPreTranslatedCompositeScoreNames
+  );
 
   // Scroll targets for all 3 composite scores + all 8 benchmark categories + retired benchmarks
   const scoreScrollTargets = useMemo(() => {
@@ -190,7 +232,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
     if (unifiedSliderValue === 0) {
       const item = row33Meta?.scoreNewColM;
       return {
-        title: t.scoreModeNew,
+        title: newScoreLabel,
         badge: renderSyncedBadge(
           item?.text || (lang === 'de' ? '8 Benchmarks' : '8 Benchmarks'),
           item?.sourceUrl || '#note-col-m'
@@ -204,7 +246,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
     if (unifiedSliderValue === 1) {
       const item = row33Meta?.scoreOldColL;
       return {
-        title: t.scoreModeOld,
+        title: oldScoreLabel,
         badge: renderSyncedBadge(
           item?.text || (lang === 'de' ? '5 Benchmarks' : '5 Benchmarks'),
           item?.sourceUrl || '#note-col-l'
@@ -218,7 +260,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
     if (unifiedSliderValue === 2) {
       const item = row33Meta?.scoreWorstCaseColN;
       return {
-        title: t.scoreModeWorstCase,
+        title: worstCaseLabel,
         badge: renderSyncedBadge(
           item?.text || (lang === 'de' ? 'Straf-Score' : 'Penalty Score'),
           item?.sourceUrl || '#note-col-n'
@@ -254,7 +296,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
       };
     }
     return null;
-  }, [unifiedSliderValue, activeCategoryComp, activeCategoryName, lang, t, row33Meta]);
+  }, [unifiedSliderValue, activeCategoryComp, activeCategoryName, lang, newScoreLabel, oldScoreLabel, worstCaseLabel, row33Meta]);
 
   const sliderControl = (
     <div className="relative flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0 max-w-full font-mono text-xs cursor-pointer">
@@ -308,7 +350,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
             className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-            <span className="truncate">{t.scoreModeNew}</span>
+            <span className="truncate">{newScoreLabel}</span>
           </button>
         )}
         {unifiedSliderValue === 1 && (
@@ -321,7 +363,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
             className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-            <span className="truncate">{t.scoreModeOld}</span>
+            <span className="truncate">{oldScoreLabel}</span>
           </button>
         )}
         {unifiedSliderValue === 2 && (
@@ -334,7 +376,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
             className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-            <span className="truncate">{t.scoreModeWorstCase}</span>
+            <span className="truncate">{worstCaseLabel}</span>
           </button>
         )}
         {unifiedSliderValue >= 3 && activeCategoryComp && (

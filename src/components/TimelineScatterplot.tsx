@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, Sparkles, Layers } from 'lucide-react';
 import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint, Row33Metadata } from '../types';
-import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS } from '../data/benchmarks';
+import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS, getBenchmarkCategoryLabel, getCompositeScoreLabel } from '../data/benchmarks';
 import { calculateMultiLevelRegression, calculateRegression, extractFrontierPoints, isMultiLevelSupported } from '../utils/mathRegression';
 import { DEFAULT_TIMELINE_LAB_LEVELS, TIMELINE_MAIN_LAB_LEVELS, TimelineLabLevel } from '../data/labLevels';
 import { calculatePearson, calculateSpearman } from '../utils/correlationUtils';
@@ -13,8 +13,14 @@ interface TimelineScatterplotProps {
   allModels: ModelRecord[];
   scoreMode: ScoreMode;
   onScoreModeChange: (mode: ScoreMode) => void;
-  selectedCategoryIndex: number; // 0 = All (Final Score), 1..8 = individual components
+  selectedCategoryIndex: number; // 0 = All (Final Score), 1..8 = active, 9..12 = retired
   onCategoryIndexChange: (index: number) => void;
+  categoryNames?: string[];
+  isPreTranslatedCategoryNames?: boolean;
+  retiredCategoryNames?: string[];
+  isPreTranslatedRetiredCategoryNames?: boolean;
+  compositeScoreNames?: string[];
+  isPreTranslatedCompositeScoreNames?: boolean;
   onScrollToParagraph?: (targetId: string) => void;
   onScrollToFinalScores?: () => void;
   lang: 'de' | 'en';
@@ -122,6 +128,12 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   onScoreModeChange,
   selectedCategoryIndex,
   onCategoryIndexChange,
+  categoryNames,
+  isPreTranslatedCategoryNames = false,
+  retiredCategoryNames,
+  isPreTranslatedRetiredCategoryNames = false,
+  compositeScoreNames,
+  isPreTranslatedCompositeScoreNames = false,
   onScrollToParagraph,
   onScrollToFinalScores,
   lang,
@@ -635,23 +647,55 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   };
 
   const activeCategoryName = activeComponent
-    ? lang === 'en'
-      ? activeComponent.nameEn
-      : activeComponent.nameDe
+    ? selectedCategoryIndex >= 9
+      ? getBenchmarkCategoryLabel(
+          retiredCategoryNames?.[selectedCategoryIndex - 9],
+          lang,
+          activeComponent,
+          isPreTranslatedRetiredCategoryNames
+        )
+      : getBenchmarkCategoryLabel(
+          categoryNames?.[selectedCategoryIndex - 1],
+          lang,
+          activeComponent,
+          isPreTranslatedCategoryNames
+        )
     : null;
+
+  const newScoreLabel = getCompositeScoreLabel(
+    0,
+    compositeScoreNames?.[0],
+    lang,
+    t.scoreModeNew,
+    isPreTranslatedCompositeScoreNames
+  );
+  const oldScoreLabel = getCompositeScoreLabel(
+    1,
+    compositeScoreNames?.[1],
+    lang,
+    t.scoreModeOld,
+    isPreTranslatedCompositeScoreNames
+  );
+  const worstCaseLabel = getCompositeScoreLabel(
+    2,
+    compositeScoreNames?.[2],
+    lang,
+    t.scoreModeWorstCase,
+    isPreTranslatedCompositeScoreNames
+  );
 
   // Bilingual Y-Axis label matching the score slider labels without superfluous points suffix
   const yAxisLabel = useMemo(() => {
     if (selectedCategoryIndex === 0) {
-      if (scoreMode === 'old') return t.scoreModeOld;
-      if (scoreMode === 'worstCase') return t.scoreModeWorstCase;
-      return t.scoreModeNew;
+      if (scoreMode === 'old') return oldScoreLabel;
+      if (scoreMode === 'worstCase') return worstCaseLabel;
+      return newScoreLabel;
     }
     if (activeCategoryName) {
       return activeCategoryName;
     }
     return t.score;
-  }, [selectedCategoryIndex, scoreMode, t, activeCategoryName]);
+  }, [selectedCategoryIndex, scoreMode, t.score, newScoreLabel, oldScoreLabel, worstCaseLabel, activeCategoryName]);
 
   // Scroll targets for all 3 composite scores + all 8 benchmark categories + retired benchmarks
   const scoreScrollTargets = useMemo(() => {
@@ -717,7 +761,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     if (unifiedSliderValue === 0) {
       const item = row33Meta?.scoreNewColM;
       return {
-        title: t.scoreModeNew,
+        title: newScoreLabel,
         badge: renderSyncedBadge(
           item?.text || (lang === 'de' ? '8 Benchmarks' : '8 Benchmarks'),
           item?.sourceUrl || '#note-col-m'
@@ -731,7 +775,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     if (unifiedSliderValue === 1) {
       const item = row33Meta?.scoreOldColL;
       return {
-        title: t.scoreModeOld,
+        title: oldScoreLabel,
         badge: renderSyncedBadge(
           item?.text || (lang === 'de' ? '5 Benchmarks' : '5 Benchmarks'),
           item?.sourceUrl || '#note-col-l'
@@ -745,7 +789,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     if (unifiedSliderValue === 2) {
       const item = row33Meta?.scoreWorstCaseColN;
       return {
-        title: t.scoreModeWorstCase,
+        title: worstCaseLabel,
         badge: renderSyncedBadge(
           item?.text || (lang === 'de' ? 'Straf-Score' : 'Penalty Score'),
           item?.sourceUrl || '#note-col-n'
@@ -781,7 +825,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       };
     }
     return null;
-  }, [unifiedSliderValue, activeComponent, activeCategoryName, lang, t, row33Meta]);
+  }, [unifiedSliderValue, activeComponent, activeCategoryName, lang, newScoreLabel, oldScoreLabel, worstCaseLabel, row33Meta]);
 
   return (
     <div className="w-full space-y-3.5">
@@ -869,7 +913,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                       className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-emerald-500 transition-colors"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                      <span className="truncate">{t.scoreModeNew}</span>
+                      <span className="truncate">{newScoreLabel}</span>
                     </button>
                   )}
                   {unifiedSliderValue === 1 && (
@@ -882,7 +926,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                       className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-amber-500 transition-colors"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                      <span className="truncate">{t.scoreModeOld}</span>
+                      <span className="truncate">{oldScoreLabel}</span>
                     </button>
                   )}
                   {unifiedSliderValue === 2 && (
@@ -895,7 +939,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                       className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 truncate w-full cursor-pointer hover:bg-rose-500 transition-colors"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                      <span className="truncate">{t.scoreModeWorstCase}</span>
+                      <span className="truncate">{worstCaseLabel}</span>
                     </button>
                   )}
                   {unifiedSliderValue >= 3 && activeComponent && (

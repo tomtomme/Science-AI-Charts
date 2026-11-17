@@ -3,13 +3,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
-const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-weekly-translations-v1.json');
+const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-weekly-translations-v2.json');
 const WEEKLY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export interface SheetTranslationPayload {
   a1: string;
   c1: string;
   categoryNames: string[];
+  compositeScoreNames?: string[];
+  retiredCategoryNames?: string[];
   b34: string;
   c34: string;
   n34: string;
@@ -20,6 +22,8 @@ export interface TranslatedSheetContent {
   titleDe: string;
   subtitleDe: string;
   categoryNamesDe: string[];
+  compositeScoreNamesDe?: string[];
+  retiredCategoryNamesDe?: string[];
   section1TitleDe: string;
   section1ContentDe: string;
   section2TitleDe: string;
@@ -123,7 +127,7 @@ export async function getOrRefreshWeeklyTranslation(
       const prompt = `Translate the following spreadsheet header, category labels, and explanatory notes for a scientific AI chatbot benchmark dashboard.
 
 RULES:
-1. Translate a1, c1, categoryNames (exact same array length: ${payload.categoryNames.length}), b34, c34, and n34 from English into clear, natural, concise German.
+1. Translate a1, c1, categoryNames (exact same array length: ${payload.categoryNames.length}), compositeScoreNames (exact same array length: ${(payload.compositeScoreNames || []).length}, concise German slider labels like "Neuer Score", "Alter Score", "Worst Case"), retiredCategoryNames (exact same array length: ${(payload.retiredCategoryNames || []).length}), b34, c34, and n34 from English into clear, natural, concise German.
 2. For o34: keep/ensure a natural German version in section2ContentDe (if o34 is already German, keep it verbatim without rewriting/shortening it), AND provide a natural English translation in section2ContentEn (if o34 is already English, keep it verbatim).
 3. CRITICAL STRUCTURE PRESERVATION for c34 and o34:
    - Keep ALL line breaks, dashed divider lines ("---" / "------------------"), and "- " bullet prefixes intact.
@@ -149,6 +153,14 @@ ${JSON.stringify(payload, null, 2)}`;
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
               },
+              compositeScoreNamesDe: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              retiredCategoryNamesDe: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
               section1TitleDe: { type: Type.STRING },
               section1ContentDe: { type: Type.STRING },
               section2TitleDe: { type: Type.STRING },
@@ -159,6 +171,8 @@ ${JSON.stringify(payload, null, 2)}`;
               'titleDe',
               'subtitleDe',
               'categoryNamesDe',
+              'compositeScoreNamesDe',
+              'retiredCategoryNamesDe',
               'section1TitleDe',
               'section1ContentDe',
               'section2TitleDe',

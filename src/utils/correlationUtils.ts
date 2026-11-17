@@ -1,9 +1,9 @@
 import { ModelRecord, BenchmarkComponent } from '../types';
-import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
+import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS } from '../data/benchmarks';
 
 export interface CorrelationDimension {
   id: string;
-  index: number; // 0..10
+  index: number; // 0..14
   nameDe: string;
   nameEn: string;
   shortDe: string;
@@ -36,7 +36,7 @@ export interface CorrelationMetricResult {
   color: string;
 }
 
-// 11 selectable dimensions: 3 composite scores + 8 component categories
+// 15 selectable dimensions: 3 composite scores + 8 active categories + 4 retired categories (Cols V-Y)
 export const CORRELATION_DIMENSIONS: CorrelationDimension[] = [
   {
     id: 'new_score',
@@ -95,6 +95,25 @@ export const CORRELATION_DIMENSIONS: CorrelationDimension[] = [
       color: comp.color,
       bgColor: comp.lightBg,
       targetId: colTargets[i] || 'final-scores-section',
+      getValue: (m: ModelRecord) => {
+        const raw = m.rawScores[comp.key];
+        if (typeof raw !== 'number' || isNaN(raw)) return null;
+        return comp.transform(raw);
+      },
+    };
+  }),
+  ...RETIRED_TIMELINE_BENCHMARKS.map((comp: BenchmarkComponent, i: number) => {
+    const retiredTargets = ['note-col-d', 'note-col-e', 'note-col-f', 'note-col-simplebench'];
+    return {
+      id: comp.id,
+      index: i + 11,
+      nameDe: `${comp.nameDe} (alt)`,
+      nameEn: `${comp.nameEn} (old)`,
+      shortDe: `${comp.nameDe.split(' ')[0]} (alt)`,
+      shortEn: `${comp.nameEn.split(' ')[0]} (old)`,
+      color: comp.color,
+      bgColor: comp.lightBg,
+      targetId: retiredTargets[i] || 'note-col-simplebench',
       getValue: (m: ModelRecord) => {
         const raw = m.rawScores[comp.key];
         if (typeof raw !== 'number' || isNaN(raw)) return null;

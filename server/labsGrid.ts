@@ -9,7 +9,7 @@ export interface LabsGridResponse {
 
 let cachedGrid: LabsGridResponse | null = null;
 let cachedAtMs = 0;
-const SHORT_CACHE_MS = 60 * 1000;
+const SHORT_CACHE_MS = 5 * 1000;
 
 function decodeHtmlEntities(input: string): string {
   return input
@@ -32,12 +32,18 @@ function isGreenColor(colorVal: string): boolean {
   let g = 255;
   let b = 255;
 
-  const hexMatch = c.match(/^#([0-9a-f]{6})$/i);
-  if (hexMatch) {
-    const hex = hexMatch[1];
+  const hexMatch6 = c.match(/^#([0-9a-f]{6})$/i);
+  const hexMatch3 = c.match(/^#([0-9a-f]{3})$/i);
+  if (hexMatch6) {
+    const hex = hexMatch6[1];
     r = parseInt(hex.slice(0, 2), 16);
     g = parseInt(hex.slice(2, 4), 16);
     b = parseInt(hex.slice(4, 6), 16);
+  } else if (hexMatch3) {
+    const hex = hexMatch3[1];
+    r = parseInt(hex[0] + hex[0], 16);
+    g = parseInt(hex[1] + hex[1], 16);
+    b = parseInt(hex[2] + hex[2], 16);
   } else {
     const rgbMatch = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
     if (!rgbMatch) return false;
@@ -144,9 +150,11 @@ export async function fetchLabsGridFromPublishedHtml(forceRefresh = false): Prom
   }
 
   const response = await fetch(`${PUBHTML_LABS_URL}&_t=${Date.now()}`, {
+    cache: 'no-store',
     headers: {
       Accept: 'text/html, */*',
       'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
     },
   });
 

@@ -5,6 +5,8 @@ export interface WeeklyTranslationRequest {
   a1: string;
   c1: string;
   categoryNames: string[];
+  compositeScoreNames?: string[];
+  retiredCategoryNames?: string[];
   b34: string;
   c34: string;
   n34: string;
@@ -15,6 +17,8 @@ export interface WeeklyTranslationResult {
   titleDe: string;
   subtitleDe: string;
   categoryNamesDe: string[];
+  compositeScoreNamesDe?: string[];
+  retiredCategoryNamesDe?: string[];
   section1TitleDe: string;
   section1ContentDe: string;
   section2TitleDe: string;
@@ -45,6 +49,8 @@ export async function fetchWeeklySheetTranslations(
         a1: headerMeta.cellA1 || '',
         c1: headerMeta.cellC1 || '',
         categoryNames,
+        compositeScoreNames: headerMeta.compositeScoreNames || [],
+        retiredCategoryNames: headerMeta.retiredCategoryNames || [],
         b34: notesMeta.section1Title || '',
         c34: notesMeta.section1Content || '',
         n34: notesMeta.section2Title || '',

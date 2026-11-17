@@ -440,6 +440,7 @@ export function parseLabCsv(csvText: string): LabEntry[] {
 export async function fetchLiveLabEntries(options?: {
   accessToken?: string | null;
   spreadsheetId?: string;
+  forceRefresh?: boolean;
 }): Promise<{
   entries: LabEntry[];
   isLive: boolean;
@@ -447,6 +448,7 @@ export async function fetchLiveLabEntries(options?: {
 }> {
   const accessToken = options?.accessToken;
   const spreadsheetId = options?.spreadsheetId || DEFAULT_SPREADSHEET_ID;
+  const forceRefresh = options?.forceRefresh ?? false;
 
   // 1. Authenticated Google Sheets API v4 with includeGridData=true (reads live values + cell green formatting)
   if (accessToken) {
@@ -467,7 +469,10 @@ export async function fetchLiveLabEntries(options?: {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 7000);
-    const gridRes = await fetch('/api/labs-grid', { signal: controller.signal });
+    const gridRes = await fetch(`/api/labs-grid${forceRefresh ? '?refresh=1' : ''}`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    });
     clearTimeout(timeoutId);
 
     if (gridRes.ok && (gridRes.headers.get('content-type') || '').includes('application/json')) {

@@ -11,8 +11,12 @@ import type {
   PricingDiffItem,
   PricingMonitorStatusResponse,
 } from '../src/types/pricingMonitor.ts';
+import {
+  roundCurrencyString,
+  roundCurrencyTokensInText,
+} from '../src/utils/priceFormat.ts';
 
-const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-pricing-monitor-cache.json');
+const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-pricing-monitor-cache-v3.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const QUOTA_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
@@ -121,7 +125,7 @@ function normalizeLab(raw: string): MonitoredLab | null {
 
 function normalizePriceForComparison(val: string | undefined | null): string {
   if (!val) return '';
-  return val
+  return roundCurrencyString(val)
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '')
@@ -302,7 +306,7 @@ export async function runPricingCheck(options?: {
           // dev.meta.ai/models/muse-wonder is fetched solely to detect if Muse Wonder Full expands beyond CLI.
           {
             lab: 'Meta',
-            title: 'Meta Newsroom: Meta One Consumer Bundles ($7.99 / $19.99)',
+            title: 'Meta Newsroom: Meta One Consumer Bundles ($8 / $20)',
             url: 'https://about.fb.com/news/2026/09/introducing-meta-one-subscription-service-more-features-ai/',
           },
           {
@@ -400,11 +404,11 @@ Analyze the live fetched pricing & model pages below (combined with verified cur
 You MUST include ALL relevant CONSUMER browser/app plans across all 4 AI labs in "labs" (excluding CLI-only tools like Muse Code):
 - OpenAI: ChatGPT Go ($8 / ~8€; expanded free-tier features, no Pro/Plus-exclusive models), ChatGPT Plus ($20 / 23€), ChatGPT Pro 100 ($100 / 103€), ChatGPT Pro 200 ($200 / 200€), ChatGPT Pro 500 ($500 / 500€)
 - Anthropic: Claude Pro ($17-20 / 15-18€; includes Opus 5.5), Claude Max ($100 / 90€; includes Fable 5.2), Claude Ultra ($200 / 180€)
-- Google: Google AI Plus ($4.99 / 4.99-9.99€; 2x Hydrogen, 400 GB), Google AI Pro ($17-20 / 14-22€; Gemini 4 Argon, 5 TB), Google AI Ultra ($100+ / 99€+; Gemini 4 Carbon, 20 TB)
+- Google: Google AI Plus ($5 / 5-10€; 2x Hydrogen, 400 GB), Google AI Pro ($17-20 / 14-22€; Gemini 4 Argon, 5 TB), Google AI Ultra ($100-200 / 100-220€; Gemini 4 Carbon, 20 TB)
 - Meta (Consumer Browser / App Plans ONLY — do NOT list Muse Code CLI plans in "labs"!):
   * Meta AI Free ($0 / 0€ — meta.ai chat, Muse Spark 1.1)
-  * Meta One Core ($7.99 / ~8-9€ — app perks + extra media gen; NO Muse Wonder)
-  * Meta One Premium ($19.99 / ~20-23€ — max Meta AI media gen; NO Muse Wonder)
+  * Meta One Core ($8 / ~8-9€ — app perks + extra media gen; NO Muse Wonder)
+  * Meta One Premium ($20 / ~20-23€ — max Meta AI media gen; NO Muse Wonder)
   * Muse Free ($0 / US only — muse.ai browser agent, baseline weekly quota)
   * Muse Power ($20 / US only — muse.ai browser agent, 500M tok/wk)
   * Muse Maximum ($100 / US only — muse.ai browser agent, 3B tok/wk; quota only)
@@ -413,16 +417,17 @@ CRITICAL VERIFICATION & MODEL-TO-TIER RULES:
 1. NEVER blindly trust or copy the Google Sheet's current "de" / "us" values! Verify EVERY model strictly against the fetched sources below first.
 2. Always match each paid model to the CHEAPEST / LOWEST CONSUMER BROWSER subscription tier that grants access to that model — NEVER assign a consumer baseline to a CLI coding plan ("Muse Code" $5/$15/$50/$200) or to a higher-quota tier just to match the sheet:
    - Meta (Consumer browser / non-coder baseline):
-     * Casual meta.ai browser chat is FREE ($0 / 0€) and Meta One ($7.99 / $19.99) only increases media/app perks — Meta One does NOT unlock Muse Spark 1.3, Muse Wonder, or Muse Wonder Full.
+     * Casual meta.ai browser chat is FREE ($0 / 0€) and Meta One ($8 / $20) only increases media/app perks — Meta One does NOT unlock Muse Spark 1.3, Muse Wonder, or Muse Wonder Full.
      * "Muse Spark 1.3": Consumer browser access is via muse.ai ("Meta Muse" web/app, US only — not in meta.ai chat). Paid consumer browser tier is "Muse Power" ($20 / US only) — NEVER assign "Muse Code Everyday ($5)" CLI or "Muse Maximum ($100)"!
      * "Muse Wonder": Rolling out to muse.ai consumer subscribers — consumer browser baseline is "Muse Power" ($20 / US only), NOT "Muse Code Everyday ($5)" CLI!
      * "Muse Wonder Full": Currently has NO consumer browser chat plan on meta.ai or muse.ai (only available via developer CLI "Muse Code Power" at $50 / US only). Unless the fetched sources show Muse Wonder Full launching in muse.ai/meta.ai browser chat, match it as "Muse Code Power (CLI only)" with liveDe="US only". For liveUs: if the sheet's current "us" already mentions "no chat", "CLI", or "coder" alongside "$50" (e.g. "no chat / $50 for coders"), KEEP that exact sheet string unchanged as liveUs so the user's note is preserved; otherwise set liveUs="$50". State "CLI only (kein Browser-Chat)" in "reason".
    - OpenAI: GPT-6.1 Sol / Terra unlock at ChatGPT Plus ($20 / 23€); GPT-6 Astra unlocks at ChatGPT Pro 100 ($100 / 103€).
    - Anthropic: Claude Opus 5.5 unlocks at Claude Pro ($17-20 / 15-18€); Claude Fable 5.2 unlocks at Claude Max ($100 / 90€).
-   - Google: Gemini 4 Argon unlocks at Google AI Pro ($17-20 / 14-22€); Gemini 4 Carbon unlocks at Google AI Ultra ($100 / 99€).
+   - Google: Gemini 4 Argon unlocks at Google AI Pro ($17-20 / 14-22€); Gemini 4 Carbon unlocks at Google AI Ultra ($100-200 / 100-220€; entry tier $100 / 100€).
 3. Sheet formatting rules (Columns T & U, "if paid for 1 year vs. if paid monthly"):
-   - Annual discount < monthly -> compact range like "$17-20", "15-18€", "14-22€".
-   - Monthly-only / flat -> "$20", "23€", "$100", "99€", "103€", "$50", "$7.99", "$19.99".
+   - ALWAYS round ALL dollar and euro prices to WHOLE integers (no decimals/cents like .99 or .50) AND round psychological "-1" prices ending in 9 (e.g. 99€ -> 100€, $99 -> $100, 199€ -> 200€, $199 -> $200, 219€ -> 220€) up to the clean figure: use "$5", "5-10€", "$8", "$20", "15-18€", "23€", "$100", "100€", "100-220€", "$100-200", "103€", "$50".
+   - Annual discount < monthly or tiered plan range -> compact hyphenated range like "$17-20", "15-18€", "14-22€", "5-10€", "100-220€", "$100-200".
+   - Monthly-only / flat -> "$20", "23€", "$100", "100€", "103€", "$50", "$8", "$5".
    - Paid plan unavailable in Germany -> DE price = "US only".
    - ONLY keep an identical sheet string for minor currency/VAT/annual rounding when the model is matched to the RIGHT consumer tier (do NOT suppress real tier changes!).
 
@@ -537,9 +542,9 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
             lab,
             planName: String(rec.planName || `${lab} Plan`).trim(),
             tierKey,
-            usMonthly: String(rec.usMonthly || '').trim(),
-            deMonthly: String(rec.deMonthly || '').trim(),
-            billingNotes: String(rec.billingNotes || '').trim(),
+            usMonthly: roundCurrencyString(String(rec.usMonthly || '').trim()),
+            deMonthly: roundCurrencyString(String(rec.deMonthly || '').trim()),
+            billingNotes: roundCurrencyTokensInText(String(rec.billingNotes || '').trim()),
             sourceUrl: typeof rec.sourceUrl === 'string' && rec.sourceUrl.startsWith('http') ? rec.sourceUrl : undefined,
           };
         })
@@ -557,10 +562,10 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
       const diffs: PricingDiffItem[] = monitoredModels.map((m) => {
         const lab = normalizeLab(m.companyName) as MonitoredLab;
         const comp = compById.get(m.id);
-        const currentDe = (m.priceDeMonthly || '').trim();
-        const currentUs = (m.priceUsMonthly || '').trim();
-        const liveDe = comp ? String(comp.liveDe ?? currentDe).trim() : currentDe;
-        const liveUs = comp ? String(comp.liveUs ?? currentUs).trim() : currentUs;
+        const currentDe = roundCurrencyString((m.priceDeMonthly || '').trim());
+        const currentUs = roundCurrencyString((m.priceUsMonthly || '').trim());
+        const liveDe = comp ? roundCurrencyString(String(comp.liveDe ?? currentDe).trim()) : currentDe;
+        const liveUs = comp ? roundCurrencyString(String(comp.liveUs ?? currentUs).trim()) : currentUs;
 
         const deStatus = determineCellStatus(currentDe, liveDe, m.isPaid);
         const usStatus = determineCellStatus(currentUs, liveUs, m.isPaid);
@@ -578,7 +583,7 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
           currentUs,
           liveUs,
           usStatus,
-          reason: comp ? String(comp.reason || '').trim() : 'No comparison returned.',
+          reason: comp ? roundCurrencyTokensInText(String(comp.reason || '').trim()) : 'No comparison returned.',
           sourceUrl:
             comp && typeof comp.sourceUrl === 'string' && comp.sourceUrl.startsWith('http')
               ? comp.sourceUrl
