@@ -2707,26 +2707,11 @@ export const CompareView: React.FC<CompareViewProps> = ({
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden"
       >
         {/* Header Bar */}
-        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
-          <span className="uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">
-            {lang === 'de'
-              ? 'Alle 8 Benchmarks im Direktvergleich (je 12,5%)'
-              : 'All 8 Benchmarks Side-by-Side (12.5% each)'}
-          </span>
-          <div className="flex flex-wrap items-center gap-3">
-            {benchmarkChartMode === 'bars' && (
-              <div className="flex flex-wrap items-center gap-3">
-                {activeSlots.map(({ slot, model }) => (
-                  <span key={slot} className={`font-bold ${SLOT_THEME[slot].text}`}>
-                    {slot} · {model.displayName}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Chart Type Switcher: Balken vs Spinnennetz */}
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+          <div className="flex flex-wrap items-center gap-3 min-h-[28px]">
+            {/* Chart Type Switcher: Fixed Top-Left (Balken vs Spinnennetz) */}
             <div
-              className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 font-sans"
+              className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 font-sans shrink-0"
               role="group"
               aria-label={
                 lang === 'de'
@@ -2761,7 +2746,23 @@ export const CompareView: React.FC<CompareViewProps> = ({
                 <span>{lang === 'de' ? 'Spinnennetz' : 'Radar'}</span>
               </button>
             </div>
+
+            <span className="uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">
+              {lang === 'de'
+                ? 'Alle 8 Benchmarks im Direktvergleich (je 12,5%)'
+                : 'All 8 Benchmarks Side-by-Side (12.5% each)'}
+            </span>
           </div>
+
+          {benchmarkChartMode === 'bars' && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-h-[28px]">
+              {activeSlots.map(({ slot, model }) => (
+                <span key={slot} className={`font-bold ${SLOT_THEME[slot].text}`}>
+                  {slot} · {model.displayName}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Benchmark Rows or Radar Chart */}

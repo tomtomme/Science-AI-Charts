@@ -101,18 +101,45 @@ export interface CsvHeaderMetadata {
  */
 export function translateHeaderToDe(titleEn: string, subtitleEn: string): { titleDe: string; subtitleDe: string } {
   let titleDe = titleEn;
-  titleDe = titleDe.replace(/Science[\s-]+IQ\s+of\s+Chat[bB]ots/i, 'Wissenschafts-IQ von Chatbots');
-  titleDe = titleDe.replace(/Science[\s-]+IQ\s+von\s+Chat[bB]ots/i, 'Wissenschafts-IQ von Chatbots');
-  titleDe = titleDe.replace(/Science[\s-]+IQ/i, 'Wissenschafts-IQ');
-  titleDe = titleDe.replace(/update to AA-Index version 5 in progress/i, 'Umstellung auf AA-Index Version 5 in Arbeit');
-  titleDe = titleDe.replace(/update to AA-Index v5 in progress/i, 'Umstellung auf AA-Index v5 in Arbeit');
-  titleDe = titleDe.replace(/\bupdate to\b/i, 'Umstellung auf');
-  titleDe = titleDe.replace(/\bin progress\b/i, 'in Arbeit');
+  titleDe = titleDe.replace(/Science[\s-]+IQ\s+of\s+Chat[bB]ots/gi, 'Wissenschafts-IQ von Chatbots');
+  titleDe = titleDe.replace(/Science[\s-]+IQ\s+von\s+Chat[bB]ots/gi, 'Wissenschafts-IQ von Chatbots');
+  titleDe = titleDe.replace(/Science[\s-]+IQ/gi, 'Wissenschafts-IQ');
+  titleDe = titleDe.replace(/Ranking\s+of\s+chatbots(?:'|\s+)?\s*science\s+capabilities/gi, 'Ranking der wissenschaftlichen Fähigkeiten von Chatbots');
+  titleDe = titleDe.replace(/with\s+scores\s+from\s+three\s+different\s+sources\s+for\s+robustness/gi, 'mit Scores aus drei verschiedenen Quellen für höhere Robustheit');
+  titleDe = titleDe.replace(/An\s+Interactive\s+Info[\s-]*Graph/gi, 'Eine interaktive Infografik');
+  titleDe = titleDe.replace(/Interactive\s+Info[\s-]*Graph/gi, 'Interaktive Infografik');
+  titleDe = titleDe.replace(/An\s+Interactive\s+Dashboard/gi, 'Ein interaktives Dashboard');
+  titleDe = titleDe.replace(/Interactive\s+Dashboard/gi, 'Interaktives Dashboard');
+  titleDe = titleDe.replace(/An\s+Interactive\s+Chart/gi, 'Ein interaktives Diagramm');
+  titleDe = titleDe.replace(/Interactive\s+Chart/gi, 'Interaktives Diagramm');
+  titleDe = titleDe.replace(/An\s+Interactive\s+Graph/gi, 'Ein interaktiver Graph');
+  titleDe = titleDe.replace(/Interactive\s+Graph/gi, 'Interaktiver Graph');
+  titleDe = titleDe.replace(/An\s+Interactive\s+Comparison/gi, 'Ein interaktiver Vergleich');
+  titleDe = titleDe.replace(/Interactive\s+Comparison/gi, 'Interaktiver Vergleich');
+  titleDe = titleDe.replace(/An\s+Interactive\s+Ranking/gi, 'Ein interaktives Ranking');
+  titleDe = titleDe.replace(/Interactive\s+Ranking/gi, 'Interaktives Ranking');
+  titleDe = titleDe.replace(/An\s+Interactive\s+Overview/gi, 'Eine interaktive Übersicht');
+  titleDe = titleDe.replace(/Interactive\s+Overview/gi, 'Interaktive Übersicht');
+  titleDe = titleDe.replace(/update to AA-Index version 5 in progress/gi, 'Umstellung auf AA-Index Version 5 in Arbeit');
+  titleDe = titleDe.replace(/update to AA-Index v5 in progress/gi, 'Umstellung auf AA-Index v5 in Arbeit');
+  titleDe = titleDe.replace(/\bupdate to\b/gi, 'Umstellung auf');
+  titleDe = titleDe.replace(/\bin progress\b/gi, 'in Arbeit');
+  titleDe = titleDe.replace(/\bScience\s+Capabilities\b/gi, 'Wissenschaftliche Fähigkeiten');
+  titleDe = titleDe.replace(/\bfor\s+Science\b/gi, 'für die Wissenschaft');
+  titleDe = titleDe.replace(/\band\s+Research\b/gi, 'und Forschung');
+  titleDe = titleDe.replace(/\band\s+Analytics\b/gi, 'und Datenanalyse');
+  titleDe = titleDe.replace(/\bUpdated\s+Weekly\b/gi, 'Wöchentlich aktualisiert');
+  titleDe = titleDe.replace(/\bUpdated\s+Hourly\b/gi, 'Stündlich aktualisiert');
 
   let subtitleDe = subtitleEn;
   if (subtitleEn) {
     let s = subtitleEn;
-    // Full replacement for the new long subtitle
+    // Full replacement for the current live Sheet C1 subtitle
+    s = s.replace(
+      /Unlike many tests that measure coding skills and pure language the composite scores here focus on capabilities important for science like factual accuracy \(non-hallucination\), data analysis, plot-reading, and automated multi-step workflows like diagnostics?\.\s*To counter potential dependencies of test-suite developers on AI companies,\s*benchmarks from different providers are included\.\s*The final composite scores \(old, new, worst case\) are averages,\s*with some sub-scores adjusted for guessing probability\.\s*More details below\./i,
+      'Im Gegensatz zu vielen Tests, die Programmierfähigkeiten und reine Sprachleistung messen, konzentrieren sich die Gesamt-Scores hier auf wissenschaftlich relevante Fähigkeiten wie faktische Genauigkeit (Non-Hallucination), Datenanalyse, Diagrammverständnis und automatisierte mehrstufige Workflows wie Diagnostik. Um möglichen Abhängigkeiten von Testsuite-Entwicklern zu KI-Unternehmen entgegenzuwirken, werden Benchmarks verschiedener Anbieter einbezogen. Die finalen Gesamt-Scores (Alt, Neu, Worst Case) sind Durchschnitte, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden. Weitere Details unten.'
+    );
+    // Full replacement for the earlier long subtitle
     s = s.replace(
       /Unlike conventional tests that primarily measure text-based coding tasks or pure language skills,\s*this composite scoring focusses on capabilities important for science like factual accuracy \(non-hallucination\),\s*data analysis,\s*plot-reading,\s*and automated multi-step workflows like diagnostic\.\s*To counter potential dependencies of test-suite developers on major AI companies,\s*benchmarks from at least 3 different providers are included\.\s*The 3 final composite scores \(old, new, worst case\) are simple averages,\s*with some sub-scores adjusted for guessing probability\.\s*More details below\./i,
       'Im Gegensatz zu herkömmlichen Tests, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen, konzentriert sich dieser Gesamt-Score auf wissenschaftlich relevante Fähigkeiten wie faktische Genauigkeit (Non-Hallucination), Datenanalyse, Diagrammverständnis und automatisierte mehrstufige Workflows wie Diagnostik. Um möglichen Abhängigkeiten von Testsuite-Entwicklern zu großen KI-Unternehmen entgegenzuwirken, werden Benchmarks von mindestens 3 verschiedenen Anbietern einbezogen. Die 3 finalen Gesamt-Scores (Alt, Neu, Worst-Case) sind einfache Durchschnitte, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden. Weitere Details unten.'
@@ -121,12 +148,16 @@ export function translateHeaderToDe(titleEn: string, subtitleEn: string): { titl
     s = s.replace(/The scoring focusses on factual accuracy \(non-hallucination\), scientific expertise, and data analysis skills instead of coding\./i, 'Die Bewertung konzentriert sich auf faktische Genauigkeit (Non-Hallucination), wissenschaftliche Expertise und Datenanalysefähigkeiten statt Coding.');
     s = s.replace(/The bots completed tests from ArtificialAnalysis\.ai, Simple-Bench\.com, and Vals\.ai\./i, 'Die Bots absolvierten Tests von ArtificialAnalysis.ai, Simple-Bench.com und Vals.ai.');
     // Component phrases for robustness
+    s = s.replace(/Unlike many tests that measure coding skills and pure language the composite scores here focus on capabilities important for science/i, 'Im Gegensatz zu vielen Tests, die Programmierfähigkeiten und reine Sprachleistung messen, konzentrieren sich die Gesamt-Scores hier auf wissenschaftlich relevante Fähigkeiten');
     s = s.replace(/Unlike conventional tests that primarily measure text-based coding tasks or pure language skills/i, 'Im Gegensatz zu herkömmlichen Tests, die primär textbasierte Programmieraufgaben oder reine Sprachfähigkeiten messen');
     s = s.replace(/this composite scoring focusses on capabilities important for science/i, 'konzentriert sich dieser Gesamt-Score auf wissenschaftlich relevante Fähigkeiten');
-    s = s.replace(/like factual accuracy \(non-hallucination\), data analysis, plot-reading, and automated multi-step workflows like diagnostic/i, 'wie faktische Genauigkeit (Non-Hallucination), Datenanalyse, Diagrammverständnis und automatisierte mehrstufige Workflows wie Diagnostik');
+    s = s.replace(/like factual accuracy \(non-hallucination\), data analysis, plot-reading, and automated multi-step workflows like diagnostics?/i, 'wie faktische Genauigkeit (Non-Hallucination), Datenanalyse, Diagrammverständnis und automatisierte mehrstufige Workflows wie Diagnostik');
     s = s.replace(/To counter potential dependencies of test-suite developers on major AI companies/i, 'Um möglichen Abhängigkeiten von Testsuite-Entwicklern zu großen KI-Unternehmen entgegenzuwirken');
+    s = s.replace(/To counter potential dependencies of test-suite developers on AI companies/i, 'Um möglichen Abhängigkeiten von Testsuite-Entwicklern zu KI-Unternehmen entgegenzuwirken');
     s = s.replace(/benchmarks from at least 3 different providers are included/i, 'werden Benchmarks von mindestens 3 verschiedenen Anbietern einbezogen');
+    s = s.replace(/benchmarks from different providers are included/i, 'werden Benchmarks verschiedener Anbieter einbezogen');
     s = s.replace(/The 3 final composite scores \(old, new, worst case\) are simple averages/i, 'Die 3 finalen Gesamt-Scores (Alt, Neu, Worst-Case) sind einfache Durchschnitte');
+    s = s.replace(/The final composite scores \(old, new, worst case\) are averages/i, 'Die finalen Gesamt-Scores (Alt, Neu, Worst Case) sind Durchschnitte');
     s = s.replace(/3 different benchmark providers/i, '3 verschiedenen Benchmark-Anbietern');
     s = s.replace(/from 3 different benchmark providers/i, 'von 3 verschiedenen Benchmark-Anbietern');
     s = s.replace(/Final scores are averages, with some sub-scores adjusted for guessing probability/i, 'Final Scores sind Durchschnitte, wobei einige Teilwerte an die Ratewahrscheinlichkeit angepasst wurden');
