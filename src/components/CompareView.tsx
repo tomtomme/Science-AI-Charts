@@ -16,6 +16,12 @@ import {
   Building2,
   Ruler,
   RotateCw,
+  Minus,
+  Plus,
+  BarChart3,
+  Radar,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import {
   LabEntry,
@@ -46,7 +52,9 @@ const BENCHMARK_ANCHOR_MAP: Record<string, string> = {
   econLegal: 'note-col-k',
 };
 
-type CompareSlot = 'A' | 'B' | 'C';
+const COMPARE_SLOTS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
+type CompareSlot = (typeof COMPARE_SLOTS)[number];
+const MAX_COMPARE_MODELS = 8;
 type PresetKind = 'newest' | 'same_price' | 'same_family' | 'same_size';
 
 const SLOT_THEME: Record<
@@ -59,6 +67,7 @@ const SLOT_THEME: Record<
     ring: string;
     rowSelected: string;
     borderTop: string;
+    hex: string;
   }
 > = {
   A: {
@@ -69,6 +78,7 @@ const SLOT_THEME: Record<
     ring: 'hover:border-blue-400 dark:hover:border-blue-500 focus-visible:ring-blue-500',
     rowSelected: 'bg-blue-50/90 dark:bg-blue-950/40',
     borderTop: 'border-t-blue-500',
+    hex: '#2563eb',
   },
   B: {
     badgeBg: 'bg-rose-600 text-white',
@@ -78,6 +88,7 @@ const SLOT_THEME: Record<
     ring: 'hover:border-rose-400 dark:hover:border-rose-500 focus-visible:ring-rose-500',
     rowSelected: 'bg-rose-50/90 dark:bg-rose-950/40',
     borderTop: 'border-t-rose-500',
+    hex: '#e11d48',
   },
   C: {
     badgeBg: 'bg-violet-600 text-white',
@@ -87,6 +98,57 @@ const SLOT_THEME: Record<
     ring: 'hover:border-violet-400 dark:hover:border-violet-500 focus-visible:ring-violet-500',
     rowSelected: 'bg-violet-50/90 dark:bg-violet-950/40',
     borderTop: 'border-t-violet-500',
+    hex: '#7c3aed',
+  },
+  D: {
+    badgeBg: 'bg-emerald-600 text-white',
+    text: 'text-emerald-600 dark:text-emerald-400',
+    barActive: 'bg-emerald-600 dark:bg-emerald-500',
+    barDim: 'bg-emerald-400/65 dark:bg-emerald-500/45',
+    ring: 'hover:border-emerald-400 dark:hover:border-emerald-500 focus-visible:ring-emerald-500',
+    rowSelected: 'bg-emerald-50/90 dark:bg-emerald-950/40',
+    borderTop: 'border-t-emerald-500',
+    hex: '#059669',
+  },
+  E: {
+    badgeBg: 'bg-amber-600 text-white',
+    text: 'text-amber-600 dark:text-amber-400',
+    barActive: 'bg-amber-600 dark:bg-amber-500',
+    barDim: 'bg-amber-400/65 dark:bg-amber-500/45',
+    ring: 'hover:border-amber-400 dark:hover:border-amber-500 focus-visible:ring-amber-500',
+    rowSelected: 'bg-amber-50/90 dark:bg-amber-950/40',
+    borderTop: 'border-t-amber-500',
+    hex: '#d97706',
+  },
+  F: {
+    badgeBg: 'bg-cyan-600 text-white',
+    text: 'text-cyan-600 dark:text-cyan-400',
+    barActive: 'bg-cyan-600 dark:bg-cyan-500',
+    barDim: 'bg-cyan-400/65 dark:bg-cyan-500/45',
+    ring: 'hover:border-cyan-400 dark:hover:border-cyan-500 focus-visible:ring-cyan-500',
+    rowSelected: 'bg-cyan-50/90 dark:bg-cyan-950/40',
+    borderTop: 'border-t-cyan-500',
+    hex: '#0891b2',
+  },
+  G: {
+    badgeBg: 'bg-fuchsia-600 text-white',
+    text: 'text-fuchsia-600 dark:text-fuchsia-400',
+    barActive: 'bg-fuchsia-600 dark:bg-fuchsia-500',
+    barDim: 'bg-fuchsia-400/65 dark:bg-fuchsia-500/45',
+    ring: 'hover:border-fuchsia-400 dark:hover:border-fuchsia-500 focus-visible:ring-fuchsia-500',
+    rowSelected: 'bg-fuchsia-50/90 dark:bg-fuchsia-950/40',
+    borderTop: 'border-t-fuchsia-500',
+    hex: '#c026d3',
+  },
+  H: {
+    badgeBg: 'bg-lime-600 text-white',
+    text: 'text-lime-600 dark:text-lime-400',
+    barActive: 'bg-lime-600 dark:bg-lime-500',
+    barDim: 'bg-lime-400/65 dark:bg-lime-500/45',
+    ring: 'hover:border-lime-400 dark:hover:border-lime-500 focus-visible:ring-lime-500',
+    rowSelected: 'bg-lime-50/90 dark:bg-lime-950/40',
+    borderTop: 'border-t-lime-500',
+    hex: '#65a30d',
   },
 };
 
@@ -194,40 +256,13 @@ function getRow33Source(
   return { text: item?.text, url: item?.sourceUrl };
 }
 
-function pickDefaultCompareTrio(
+function pickDefaultCompareIds(
   pool: ModelRecord[],
+  count: number,
   mode: ScoreMode
-): { aId: string; bId: string; cId: string } {
-  if (pool.length === 0) return { aId: '', bId: '', cId: '' };
-  if (pool.length === 1) return { aId: pool[0].id, bId: pool[0].id, cId: pool[0].id };
-
-  const sorted = [...pool].sort((x, y) => {
-    const sx = getScoreForMode(x, mode) ?? -9999;
-    const sy = getScoreForMode(y, mode) ?? -9999;
-    if (sy !== sx) return sy - sx;
-    return (y.scoreNewCalculated ?? 0) - (x.scoreNewCalculated ?? 0);
-  });
-
-  const first = sorted[0];
-  const usedCompanies = new Set<string>([first.companyName.trim().toLowerCase()]);
-
-  const second =
-    sorted.find(
-      (m) => m.id !== first.id && !usedCompanies.has(m.companyName.trim().toLowerCase())
-    ) || sorted[1];
-  usedCompanies.add(second.companyName.trim().toLowerCase());
-
-  const third =
-    sorted.find(
-      (m) =>
-        m.id !== first.id &&
-        m.id !== second.id &&
-        !usedCompanies.has(m.companyName.trim().toLowerCase())
-    ) ||
-    sorted.find((m) => m.id !== first.id && m.id !== second.id) ||
-    second;
-
-  return { aId: first.id, bId: second.id, cId: third.id };
+): string[] {
+  if (pool.length === 0) return [];
+  return pickTopDiverseModels(pool, Math.min(count, pool.length), mode).map((m) => m.id);
 }
 
 function pickTopDiverseModels(pool: ModelRecord[], count: number, mode: ScoreMode): ModelRecord[] {
@@ -260,30 +295,96 @@ function pickTopDiverseModels(pool: ModelRecord[], count: number, mode: ScoreMod
   return chosen;
 }
 
-type SizeClassKey = 'small' | 'massive' | 'colossal' | 'planetary' | 'singularity';
+type SizeClassKey = 'small' | 'large' | 'massive' | 'colossal' | 'planetary' | 'singularity';
 
 const SIZE_CLASS_LABELS: Record<SizeClassKey, { de: string; en: string }> = {
-  small: { de: 'Small / Medium', en: 'Small / Medium' },
-  massive: { de: 'Massive', en: 'Massive' },
-  colossal: { de: 'Colossal', en: 'Colossal' },
-  planetary: { de: 'Planetary', en: 'Planetary' },
-  singularity: { de: 'Singularity', en: 'Singularity' },
+  small: { de: 'Small / Medium (< 128B)', en: 'Small / Medium (< 128B)' },
+  large: { de: 'Large (< 256B)', en: 'Large (< 256B)' },
+  massive: { de: 'Massive (< 512B)', en: 'Massive (< 512B)' },
+  colossal: { de: 'Colossal (< 1,5T)', en: 'Colossal (< 1.5T)' },
+  planetary: { de: 'Planetary (< 5T)', en: 'Planetary (< 5T)' },
+  singularity: { de: 'Singularity (< 15T)', en: 'Singularity (< 15T)' },
 };
+
+function normLabKey(s: string): string {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+const LAB_COMPANY_ALIASES: Record<string, string[]> = {
+  spacexai: ['spacexsi', 'xai'],
+  spacexsi: ['spacexai', 'xai'],
+  xai: ['spacexsi', 'spacexai'],
+  zai: ['zhipu'],
+  zhipu: ['zai'],
+  kimi: ['moonshot'],
+  moonshot: ['kimi'],
+  mistral: ['mistralai'],
+  mistralai: ['mistral'],
+  thinking: ['thinkingmachines'],
+  thinkingmachines: ['thinking'],
+  ssi: ['ssiinc'],
+  ssiinc: ['ssi'],
+  inclusionai: ['antgroup'],
+  antgroup: ['inclusionai'],
+  longcat: ['meituan'],
+  meituan: ['longcat'],
+  hy: ['tencent'],
+};
+
+function findMatchingLabForModel(model: ModelRecord, labs: LabEntry[]): LabEntry | undefined {
+  const companyNorms = [normLabKey(model.companyName), normLabKey(model.creatorClean)].filter(Boolean);
+  const expandedNorms = new Set<string>(companyNorms);
+  for (const c of companyNorms) {
+    for (const alias of LAB_COMPANY_ALIASES[c] || []) {
+      expandedNorms.add(alias);
+    }
+  }
+
+  // Pass 1: exact normalized creator match
+  for (const l of labs) {
+    const lc = normLabKey(l.creator);
+    if (lc && expandedNorms.has(lc)) return l;
+  }
+
+  // Pass 2: substring normalized creator match (min length 4 to avoid spurious short hits)
+  for (const l of labs) {
+    const lc = normLabKey(l.creator);
+    if (lc.length < 4) continue;
+    for (const c of expandedNorms) {
+      if (c.length >= 4 && (c.includes(lc) || lc.includes(c))) return l;
+    }
+  }
+
+  // Pass 3: word-bounded engineName fallback (skip 1-2 char / punctuation names like "M", "N", "-")
+  const haystack = `${model.displayName} ${model.name}`.toLowerCase();
+  for (const l of labs) {
+    const le = (l.engineName || '').trim().toLowerCase();
+    if (normLabKey(le).length < 3) continue;
+    const esc = le.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`\\b${esc}\\b`, 'i').test(haystack)) return l;
+  }
+
+  return undefined;
+}
+
+function inferModelSizeClassFromParamCount(modelHaystack: string): SizeClassKey | null {
+  const match = modelHaystack.match(/\b(\d+(?:\.\d+)?)\s*([bt])\b/i);
+  if (!match) return null;
+  const val = parseFloat(match[1]);
+  const unit = match[2].toLowerCase();
+  if (!Number.isFinite(val) || val <= 0) return null;
+  const billions = unit === 't' ? val * 1000 : val;
+  if (billions < 128) return 'small';
+  if (billions < 256) return 'large';
+  if (billions < 512) return 'massive';
+  if (billions < 1500) return 'colossal';
+  if (billions < 5000) return 'planetary';
+  return 'singularity';
+}
 
 function inferModelSizeClass(model: ModelRecord, labs: LabEntry[]): SizeClassKey | null {
   const modelHaystack = `${model.displayName} ${model.name}`.toLowerCase();
-  const companyLow = `${model.companyName} ${model.creatorClean}`.toLowerCase();
-
-  // Match against Labs sheet parameterSizes first (longest token wins)
-  const matchingLab = labs.find((l) => {
-    const lc = l.creator.toLowerCase();
-    const le = (l.engineName || '').toLowerCase();
-    return (
-      companyLow.includes(lc) ||
-      lc.includes(companyLow) ||
-      (le && modelHaystack.includes(le))
-    );
-  });
+  const matchingLab = findMatchingLabForModel(model, labs);
 
   const tierMap: Array<{
     cls: SizeClassKey;
@@ -291,13 +392,27 @@ function inferModelSizeClass(model: ModelRecord, labs: LabEntry[]): SizeClassKey
   }> = [
     { cls: 'singularity', keys: ['singularity', 'godTier'] },
     { cls: 'planetary', keys: ['planetary'] },
-    { cls: 'colossal', keys: ['colossal', 'large'] },
+    { cls: 'colossal', keys: ['colossal'] },
     { cls: 'massive', keys: ['massive'] },
-    { cls: 'small', keys: ['small', 'medium'] },
+    { cls: 'large', keys: ['large'] },
+    { cls: 'small', keys: ['micro', 'mini', 'tiny', 'small', 'medium'] },
   ];
 
   if (matchingLab) {
+    const engineTokens = new Set(
+      (matchingLab.engineName || '')
+        .toLowerCase()
+        .split(/[\s/,&+;()]+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 2)
+    );
+    const creatorNorm = normLabKey(matchingLab.creator);
+
     let bestCls: SizeClassKey | null = null;
+    // Specificity: 2 = explicit tier keyword (e.g. Max, Plus, Sonnet, Haiku),
+    //              1 = versioned tier token (e.g. v4 -> Grok 4.7, v3 -> M3),
+    //              0 = bare family/engine name reused as a tier (e.g. "Qwen", "GLM", "Inkling")
+    let bestSpecificity = -1;
     let bestLen = 0;
 
     for (const entry of tierMap) {
@@ -308,28 +423,59 @@ function inferModelSizeClass(model: ModelRecord, labs: LabEntry[]): SizeClassKey
           .replace(/[()]/g, ' ')
           .split(/[,/&+;]+/)
           .map((t) => t.trim().toLowerCase())
-          .filter((t) => t.length >= 2 && t !== 'llm');
+          .filter((t) => t.length >= 1 && t !== 'llm' && t !== '-');
+
         for (const tok of tokens) {
-          const hit =
-            tok.length <= 2
-              ? new RegExp(`\\b${tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(modelHaystack)
-              : modelHaystack.includes(tok);
-          if (hit && tok.length > bestLen) {
-            bestLen = tok.length;
-            bestCls = entry.cls;
+          if (tok.length < 2 && !/^[a-z]$/i.test(tok)) continue;
+          const isGenericFamily = engineTokens.has(tok) || normLabKey(tok) === creatorNorm;
+          const vMatch = tok.match(/^v(\d+(?:\.\d+)?)$/);
+
+          let hit = false;
+          let specificity = isGenericFamily ? 0 : 2;
+
+          if (vMatch) {
+            const escVer = vMatch[1].replace('.', '\\.');
+            hit = new RegExp(`(?:\\b|[a-z])${escVer}(?:\\.\\d+)?\\b`, 'i').test(modelHaystack);
+            specificity = 1;
+          } else {
+            const escTok = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const wordHit = new RegExp(`\\b${escTok}\\b`, 'i').test(modelHaystack);
+            hit = wordHit || (tok.length >= 5 && modelHaystack.includes(tok));
+          }
+
+          if (hit) {
+            if (
+              specificity > bestSpecificity ||
+              (specificity === bestSpecificity && tok.length > bestLen)
+            ) {
+              bestSpecificity = specificity;
+              bestLen = tok.length;
+              bestCls = entry.cls;
+            }
           }
         }
       }
     }
+
+    // Explicit parameter size in model name (e.g. "Qwen3.8 27B", "Qwen3.5 397B")
+    // overrides a generic bare-family match (specificity <= 0).
+    if (bestSpecificity <= 0) {
+      const byParam = inferModelSizeClassFromParamCount(modelHaystack);
+      if (byParam) return byParam;
+    }
+
     if (bestCls) return bestCls;
   }
 
+  const byParam = inferModelSizeClassFromParamCount(modelHaystack);
+  if (byParam) return byParam;
+
   // Fallback heuristics for common frontier & small model families
   if (/\b(fable|mythos|carbon|astra|wonder full|5\.4 pro|5\.2 pro)\b/i.test(modelHaystack)) return 'singularity';
-  if (/\b(opus|argon|sol|wonder|grok 4|grok-4|qwen max|deepseek pro)\b/i.test(modelHaystack)) return 'planetary';
-  if (/\b(hydrogen|gemini pro|2\.5 pro|3\.0 pro|3 pro|grok 3|grok-3)\b/i.test(modelHaystack)) return 'colossal';
-  if (/\b(sonnet|flash(?!-lite)|terra|spark|qwen plus|deepseek v3|r1)\b/i.test(modelHaystack)) return 'massive';
-  if (/\b(haiku|gemma|flash-lite|luna|glimmer|ember|mini|nano|lite|8b|7b|9b|4b|14b|32b)\b/i.test(modelHaystack)) return 'small';
+  if (/\b(opus|argon|sol|wonder|grok[- ]4(?:\.\d+)?|qwen[- ]?(?:\d+(?:\.\d+)?[- ]+)?max|deepseek[- ]?(?:\d+(?:\.\d+)?[- ]+)?pro)\b/i.test(modelHaystack)) return 'planetary';
+  if (/\b(hydrogen|gemini pro|2\.5 pro|3\.0 pro|3 pro|grok[- ]3(?:\.\d+)?)\b/i.test(modelHaystack)) return 'colossal';
+  if (/\b(sonnet|flash(?!-lite)|terra|spark|qwen[- ]?(?:\d+(?:\.\d+)?[- ]+)?plus|deepseek v3|r1)\b/i.test(modelHaystack)) return 'massive';
+  if (/\b(haiku|gemma|flash-lite|luna|glimmer|ember|mini|nano|lite|8b|7b|9b|4b|14b|27b|32b)\b/i.test(modelHaystack)) return 'small';
   return null;
 }
 
@@ -341,6 +487,7 @@ interface ModelSelectorProps {
   rankMap: Map<string, number>;
   scoreMode: ScoreMode;
   lang: Language;
+  alignRight?: boolean;
   onSelect: (modelId: string) => void;
 }
 
@@ -352,6 +499,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   rankMap,
   scoreMode,
   lang,
+  alignRight = false,
   onSelect,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -463,7 +611,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       {isOpen && (
         <div
           role="listbox"
-          className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden"
+          className={`absolute ${alignRight ? 'right-0' : 'left-0'} w-full min-w-[min(320px,88vw)] top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden`}
         >
           <div className="p-2 border-b border-slate-200 dark:border-slate-800 space-y-2 bg-slate-50/70 dark:bg-slate-950/60">
             <div className="relative flex items-center">
@@ -615,6 +763,886 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   );
 };
 
+interface CategoryComparisonEntry {
+  slot: CompareSlot;
+  model: ModelRecord;
+  raw: number | null | undefined;
+  val: number | null;
+  contrib: number | null;
+}
+
+interface CategoryComparisonRow {
+  comp: (typeof BENCHMARK_COMPONENTS)[number];
+  label: string;
+  sourceName: string;
+  sourceUrl?: string;
+  entries: CategoryComparisonEntry[];
+  winners: CompareSlot[];
+  margin: number;
+  isTie: boolean;
+  isRescaled: boolean;
+}
+
+function wrapRadarLabel(label: string, maxChars = 17): string[] {
+  const clean = label.trim();
+  if (clean.length <= maxChars) return [clean];
+
+  const words = clean.split(/\s+/);
+  if (words.length === 1) return [clean];
+
+  let bestSplit = 1;
+  let bestDiff = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const line1 = words.slice(0, i).join(' ');
+    const line2 = words.slice(i).join(' ');
+    const maxLen = Math.max(line1.length, line2.length);
+    const diff = Math.abs(line1.length - line2.length) + (maxLen > maxChars ? 15 : 0);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestSplit = i;
+    }
+  }
+
+  return [words.slice(0, bestSplit).join(' '), words.slice(bestSplit).join(' ')];
+}
+
+interface BenchmarkRadarChartProps {
+  categoryComparisons: CategoryComparisonRow[];
+  activeSlots: { slot: CompareSlot; model: ModelRecord }[];
+  primaryScores: { slot: CompareSlot; model: ModelRecord; score: number | null }[];
+  rankMap: Map<string, number>;
+  lang: Language;
+  expandedCategoryId: string | null;
+  onToggleExpandCategory: (categoryId: string) => void;
+  onScrollToParagraph?: (targetId: string) => void;
+  sourceLinkLabel: string;
+}
+
+const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
+  categoryComparisons,
+  activeSlots,
+  primaryScores,
+  rankMap,
+  lang,
+  expandedCategoryId,
+  onToggleExpandCategory,
+  onScrollToParagraph,
+  sourceLinkLabel,
+}) => {
+  const [hoveredSlot, setHoveredSlot] = useState<CompareSlot | null>(null);
+  const [pinnedSlot, setPinnedSlot] = useState<CompareSlot | null>(null);
+  const [hiddenSlots, setHiddenSlots] = useState<Set<CompareSlot>>(() => new Set());
+  const [hoveredAxisIdx, setHoveredAxisIdx] = useState<number | null>(null);
+  const [selectedAxisIdx, setSelectedAxisIdx] = useState<number>(0);
+  const [scaleMode, setScaleMode] = useState<'full' | 'zoom'>('full');
+
+  const activeSlotSet = useMemo(
+    () => new Set(activeSlots.map((s) => s.slot)),
+    [activeSlots]
+  );
+
+  const visibleSlots = useMemo(
+    () => activeSlots.filter((s) => !hiddenSlots.has(s.slot)),
+    [activeSlots, hiddenSlots]
+  );
+
+  const effectivePinnedSlot =
+    pinnedSlot && activeSlotSet.has(pinnedSlot) && !hiddenSlots.has(pinnedSlot)
+      ? pinnedSlot
+      : null;
+  const effectiveHoveredSlot =
+    hoveredSlot && activeSlotSet.has(hoveredSlot) && !hiddenSlots.has(hoveredSlot)
+      ? hoveredSlot
+      : null;
+  const focusedSlot = effectiveHoveredSlot ?? effectivePinnedSlot;
+
+  const inspectedAxisIdx = hoveredAxisIdx ?? selectedAxisIdx;
+  const inspectedRow = categoryComparisons[inspectedAxisIdx] ?? categoryComparisons[0];
+
+  // Compute zoom floor if user enables zoomed scale
+  const minFloor = useMemo(() => {
+    if (scaleMode === 'full') return 0;
+    const vals: number[] = [];
+    for (const row of categoryComparisons) {
+      for (const entry of row.entries) {
+        if (!hiddenSlots.has(entry.slot) && entry.val !== null) {
+          vals.push(entry.val);
+        }
+      }
+    }
+    if (vals.length === 0) return 0;
+    const minVal = Math.min(...vals);
+    const floor = Math.max(0, Math.min(70, Math.floor((minVal - 8) / 10) * 10));
+    return floor >= 20 ? floor : 0;
+  }, [categoryComparisons, hiddenSlots, scaleMode]);
+
+  const canZoom = useMemo(() => {
+    const vals: number[] = [];
+    for (const row of categoryComparisons) {
+      for (const entry of row.entries) {
+        if (!hiddenSlots.has(entry.slot) && entry.val !== null) {
+          vals.push(entry.val);
+        }
+      }
+    }
+    if (vals.length === 0) return false;
+    return Math.floor((Math.min(...vals) - 8) / 10) * 10 >= 20;
+  }, [categoryComparisons, hiddenSlots]);
+
+  const ratioForVal = (val: number) => {
+    const span = 100 - minFloor;
+    if (span <= 0) return 0;
+    return Math.max(0, Math.min(1, (val - minFloor) / span));
+  };
+
+  const cx = 400;
+  const cy = 270;
+  const R = 160;
+  const axisCount = categoryComparisons.length || 8;
+  const ringValues = useMemo(() => {
+    const steps = 5;
+    const arr: number[] = [];
+    for (let i = 1; i <= steps; i++) {
+      arr.push(Math.round(minFloor + ((100 - minFloor) * i) / steps));
+    }
+    return arr;
+  }, [minFloor]);
+
+  const getAxisAngle = (idx: number) => -Math.PI / 2 + (idx * 2 * Math.PI) / axisCount;
+
+  const getPoint = (idx: number, radius: number) => {
+    const angle = getAxisAngle(idx);
+    return {
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle),
+    };
+  };
+
+  // Order visible slots so focused slot renders last (on top)
+  const orderedSlotsForRender = useMemo(() => {
+    if (!focusedSlot) return visibleSlots;
+    return [
+      ...visibleSlots.filter((s) => s.slot !== focusedSlot),
+      ...visibleSlots.filter((s) => s.slot === focusedSlot),
+    ];
+  }, [visibleSlots, focusedSlot]);
+
+  const defaultFillOpacity =
+    visibleSlots.length <= 2
+      ? 0.16
+      : visibleSlots.length <= 4
+      ? 0.11
+      : visibleSlots.length <= 6
+      ? 0.08
+      : 0.06;
+
+  const toggleSlotVisibility = (slot: CompareSlot) => {
+    setHiddenSlots((prev) => {
+      const next = new Set(prev);
+      if (next.has(slot)) {
+        next.delete(slot);
+      } else {
+        // Keep at least 1 model visible
+        const remainingVisible = activeSlots.filter((s) => s.slot !== slot && !next.has(s.slot));
+        if (remainingVisible.length === 0) return prev;
+        next.add(slot);
+      }
+      return next;
+    });
+  };
+
+  const expandedRow = expandedCategoryId
+    ? categoryComparisons.find((r) => r.comp.id === expandedCategoryId) ?? null
+    : null;
+
+  return (
+    <div className="p-3 sm:p-4 space-y-3">
+      {/* Toolbar: Scale toggle + hint */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+          <span>
+            {lang === 'de'
+              ? 'Modell anklicken zum Hervorheben · Achse überfahren oder klicken für Details'
+              : 'Click a model to highlight · Hover or click an axis for details'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {canZoom && (
+            <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 p-0.5 text-[11px] font-mono">
+              <button
+                type="button"
+                onClick={() => setScaleMode('full')}
+                className={`px-2 py-0.5 rounded-md font-semibold transition-colors cursor-pointer ${
+                  scaleMode === 'full'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                0–100%
+              </button>
+              <button
+                type="button"
+                onClick={() => setScaleMode('zoom')}
+                className={`px-2 py-0.5 rounded-md font-semibold transition-colors cursor-pointer ${
+                  scaleMode === 'zoom'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+                title={
+                  lang === 'de'
+                    ? 'Skala näher an den niedrigsten Wert heranzoomen'
+                    : 'Zoom scale closer to the lowest score'
+                }
+              >
+                Zoom
+              </button>
+            </div>
+          )}
+          {hiddenSlots.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setHiddenSlots(new Set())}
+              className="px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              {lang === 'de' ? 'Alle einblenden' : 'Show all'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Responsive Grid: Radar SVG + Interactive Inspector */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,1fr)] gap-4 items-start">
+        {/* Left: SVG Spider / Radar Chart */}
+        <div className="relative rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 p-2 sm:p-3">
+          <svg
+            viewBox="0 0 800 540"
+            className="w-full h-auto max-h-[540px] select-none overflow-visible"
+            role="img"
+            aria-label={
+              lang === 'de'
+                ? 'Spinnennetzdiagramm über alle 8 Benchmarks'
+                : 'Radar chart across all 8 benchmarks'
+            }
+          >
+            {/* Concentric Octagonal Grid Rings */}
+            {ringValues.map((tickVal, rIdx) => {
+              const ringR = ratioForVal(tickVal) * R;
+              const ringPts = Array.from({ length: axisCount }, (_, i) => {
+                const p = getPoint(i, ringR);
+                return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+              }).join(' ');
+              const isOuter = rIdx === ringValues.length - 1;
+              return (
+                <g key={tickVal}>
+                  <polygon
+                    points={ringPts}
+                    fill={rIdx % 2 === 0 ? 'rgba(148, 163, 184, 0.04)' : 'none'}
+                    className={
+                      isOuter
+                        ? 'stroke-slate-300 dark:stroke-slate-600'
+                        : 'stroke-slate-200 dark:stroke-slate-800'
+                    }
+                    strokeWidth={isOuter ? 1.25 : 1}
+                  />
+                  {/* Scale tick label slightly right of top spoke */}
+                  <text
+                    x={cx + 5}
+                    y={cy - ringR + 3}
+                    fontSize="10"
+                    className="fill-slate-400 dark:fill-slate-500 font-mono"
+                  >
+                    {tickVal}%
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Min-floor origin label if zoomed */}
+            {minFloor > 0 && (
+              <text
+                x={cx}
+                y={cy + 4}
+                textAnchor="middle"
+                fontSize="10"
+                className="fill-slate-400 dark:fill-slate-500 font-mono font-semibold"
+              >
+                {minFloor}%
+              </text>
+            )}
+
+            {/* Radial Axis Spokes + Hover Highlight */}
+            {categoryComparisons.map((row, idx) => {
+              const end = getPoint(idx, R);
+              const isAxisActive = inspectedAxisIdx === idx;
+              return (
+                <line
+                  key={row.comp.id}
+                  x1={cx}
+                  y1={cy}
+                  x2={end.x}
+                  y2={end.y}
+                  className={
+                    isAxisActive
+                      ? 'stroke-slate-400 dark:stroke-slate-500'
+                      : 'stroke-slate-200 dark:stroke-slate-800'
+                  }
+                  strokeWidth={isAxisActive ? 1.8 : 1}
+                />
+              );
+            })}
+
+            {/* Model Polygons (2 to 8 models, gaps dashed cleanly for null values) */}
+            {orderedSlotsForRender.map(({ slot }) => {
+              const theme = SLOT_THEME[slot];
+              const isFocused = focusedSlot === slot;
+              const isDimmed = focusedSlot !== null && !isFocused;
+
+              const axisPts = categoryComparisons.map((row, idx) => {
+                const entry = row.entries.find((e) => e.slot === slot);
+                const val = entry?.val ?? null;
+                if (val === null) return { idx, val: null as number | null, x: 0, y: 0 };
+                const pt = getPoint(idx, ratioForVal(val) * R);
+                return { idx, val, x: pt.x, y: pt.y };
+              });
+
+              const validPts = axisPts.filter((p) => p.val !== null);
+              if (validPts.length === 0) return null;
+
+              const polygonPoints = validPts
+                .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+                .join(' ');
+
+              const strokeWidth = isFocused ? 2.8 : isDimmed ? 1.3 : 2.0;
+              const strokeOpacity = isFocused ? 1 : isDimmed ? 0.22 : 0.9;
+              const fillOpacity = isFocused ? 0.22 : isDimmed ? 0.025 : defaultFillOpacity;
+
+              // Build individual segments so missing axes show as dashed bridges
+              const segments: {
+                x1: number;
+                y1: number;
+                x2: number;
+                y2: number;
+                isGap: boolean;
+                key: string;
+              }[] = [];
+
+              if (validPts.length >= 2) {
+                const segLimit = validPts.length === 2 ? 1 : validPts.length;
+                for (let k = 0; k < segLimit; k++) {
+                  const a = validPts[k];
+                  const b = validPts[(k + 1) % validPts.length];
+                  const step = (b.idx - a.idx + axisCount) % axisCount;
+                  segments.push({
+                    x1: a.x,
+                    y1: a.y,
+                    x2: b.x,
+                    y2: b.y,
+                    isGap: step !== 1 && !(validPts.length === 2 && (a.idx - b.idx + axisCount) % axisCount === 1),
+                    key: `${slot}-${a.idx}-${b.idx}`,
+                  });
+                }
+              }
+
+              return (
+                <g
+                  key={slot}
+                  className="transition-opacity duration-150"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {validPts.length >= 3 && (
+                    <polygon
+                      points={polygonPoints}
+                      fill={theme.hex}
+                      fillOpacity={fillOpacity}
+                      stroke="none"
+                    />
+                  )}
+                  {segments.map((seg) => (
+                    <line
+                      key={seg.key}
+                      x1={seg.x1}
+                      y1={seg.y1}
+                      x2={seg.x2}
+                      y2={seg.y2}
+                      stroke={theme.hex}
+                      strokeWidth={strokeWidth}
+                      strokeOpacity={strokeOpacity}
+                      strokeDasharray={seg.isGap ? '4 4' : undefined}
+                      strokeLinecap="round"
+                    />
+                  ))}
+                  {validPts.map((pt) => {
+                    const isAxisHovered = inspectedAxisIdx === pt.idx;
+                    const dotR = isFocused
+                      ? isAxisHovered
+                        ? 5.4
+                        : 4.2
+                      : isAxisHovered
+                      ? 4.6
+                      : isDimmed
+                      ? 2.2
+                      : 3.4;
+                    return (
+                      <circle
+                        key={`${slot}-pt-${pt.idx}`}
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={dotR}
+                        fill={theme.hex}
+                        fillOpacity={isDimmed ? 0.3 : 1}
+                        stroke="white"
+                        strokeWidth={isDimmed ? 0.6 : 1.3}
+                      />
+                    );
+                  })}
+                </g>
+              );
+            })}
+
+            {/* Interactive Axis Hit Targets + Labels */}
+            {categoryComparisons.map((row, idx) => {
+              const angle = getAxisAngle(idx);
+              const cos = Math.cos(angle);
+              const sin = Math.sin(angle);
+              const labelDist = R + 22;
+              const lx = cx + labelDist * cos;
+              const ly = cy + labelDist * sin;
+
+              const isTop = idx === 0;
+              const isBottom = idx === 4;
+              const isRight = cos > 0.15;
+              const textAnchor: 'middle' | 'start' | 'end' =
+                isTop || isBottom ? 'middle' : isRight ? 'start' : 'end';
+
+              const lines = wrapRadarLabel(row.label, 17);
+              const isAxisActive = inspectedAxisIdx === idx;
+              const isExpanded = expandedCategoryId === row.comp.id;
+
+              // Determine vertical baseline offset cleanly
+              let baseDy = 0;
+              if (isTop) {
+                baseDy = lines.length > 1 ? -22 : -10;
+              } else if (isBottom) {
+                baseDy = 14;
+              } else if (sin < -0.25) {
+                baseDy = lines.length > 1 ? -10 : -2;
+              } else if (sin > 0.25) {
+                baseDy = 8;
+              } else {
+                baseDy = lines.length > 1 ? -4 : 3;
+              }
+
+              // Winner badge on visible models for this axis
+              const visibleEntries = row.entries.filter(
+                (e) => !hiddenSlots.has(e.slot) && e.val !== null
+              );
+              let axisLeaderText = '';
+              let axisLeaderColor = '#64748b';
+              if (visibleEntries.length >= 2) {
+                const sorted = [...visibleEntries].sort(
+                  (a, b) => (b.val as number) - (a.val as number)
+                );
+                const topV = sorted[0].val as number;
+                const ties = sorted.filter((e) => topV - (e.val as number) < 0.05);
+                if (ties.length === visibleEntries.length) {
+                  axisLeaderText = lang === 'de' ? 'Patt' : 'Tie';
+                } else {
+                  axisLeaderText = `${ties.map((t) => t.slot).join('/')} ${formatNumber(topV, 1)}%`;
+                  axisLeaderColor = SLOT_THEME[ties[0].slot].hex;
+                }
+              } else if (visibleEntries.length === 1) {
+                axisLeaderText = `${visibleEntries[0].slot} ${formatNumber(visibleEntries[0].val, 1)}%`;
+                axisLeaderColor = SLOT_THEME[visibleEntries[0].slot].hex;
+              }
+
+              // Invisible spoke wedge hit-zone + clickable label group
+              const spokeMid = getPoint(idx, R * 0.55);
+
+              return (
+                <g
+                  key={`axis-label-${row.comp.id}`}
+                  className="cursor-pointer"
+                  onMouseEnter={() => setHoveredAxisIdx(idx)}
+                  onMouseLeave={() => setHoveredAxisIdx(null)}
+                  onClick={() => {
+                    setSelectedAxisIdx(idx);
+                    onToggleExpandCategory(row.comp.id);
+                  }}
+                >
+                  {/* Generous invisible hit circle along spoke for smooth hovering */}
+                  <circle cx={spokeMid.x} cy={spokeMid.y} r={34} fill="transparent" />
+                  <circle
+                    cx={getPoint(idx, R).x}
+                    cy={getPoint(idx, R).y}
+                    r={22}
+                    fill="transparent"
+                  />
+
+                  {/* Category color dot at outer vertex */}
+                  <circle
+                    cx={getPoint(idx, R).x}
+                    cy={getPoint(idx, R).y}
+                    r={isAxisActive ? 4.5 : 3}
+                    fill={row.comp.color}
+                    className="transition-all duration-150"
+                  />
+
+                  {/* Axis Title */}
+                  <text
+                    x={lx}
+                    y={ly + baseDy}
+                    textAnchor={textAnchor}
+                    fontSize="12"
+                    fontWeight={isAxisActive || isExpanded ? 700 : 600}
+                    className={
+                      isAxisActive || isExpanded
+                        ? 'fill-blue-600 dark:fill-blue-400'
+                        : 'fill-slate-700 dark:fill-slate-200'
+                    }
+                  >
+                    {lines.map((line, lineIdx) => (
+                      <tspan key={lineIdx} x={lx} dy={lineIdx === 0 ? 0 : 14}>
+                        {line}
+                      </tspan>
+                    ))}
+                  </text>
+
+                  {/* Sub-label showing axis leader */}
+                  {axisLeaderText && (
+                    <text
+                      x={lx}
+                      y={ly + baseDy + lines.length * 14}
+                      textAnchor={textAnchor}
+                      fontSize="10.5"
+                      fontWeight={700}
+                      fill={axisLeaderColor}
+                      className="font-mono"
+                    >
+                      {axisLeaderText}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        {/* Right: Interactive Legend & Axis Inspector */}
+        <div className="space-y-3 min-w-0">
+          {/* Active Models Legend / Highlight & Visibility Controls */}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 overflow-hidden">
+            <div className="px-3 py-2 bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+              <span>
+                {lang === 'de'
+                  ? `Modelle im Netz (${visibleSlots.length}/${activeSlots.length})`
+                  : `Models on Radar (${visibleSlots.length}/${activeSlots.length})`}
+              </span>
+              {effectivePinnedSlot && (
+                <button
+                  type="button"
+                  onClick={() => setPinnedSlot(null)}
+                  className="text-[10px] normal-case font-sans font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  {lang === 'de' ? 'Fokus lösen' : 'Clear focus'}
+                </button>
+              )}
+            </div>
+
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+              {primaryScores.map(({ slot, model, score }) => {
+                const theme = SLOT_THEME[slot];
+                const isHidden = hiddenSlots.has(slot);
+                const isPinned = effectivePinnedSlot === slot;
+                const isFocused = focusedSlot === slot;
+                const rank = rankMap.get(model.id);
+
+                return (
+                  <div
+                    key={slot}
+                    onMouseEnter={() => {
+                      if (!isHidden) setHoveredSlot(slot);
+                    }}
+                    onMouseLeave={() => setHoveredSlot(null)}
+                    className={`px-3 py-1.5 flex items-center justify-between gap-2 transition-colors ${
+                      isFocused
+                        ? theme.rowSelected
+                        : isHidden
+                        ? 'opacity-45 bg-slate-50/40 dark:bg-slate-950/30'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isHidden) {
+                          toggleSlotVisibility(slot);
+                          setPinnedSlot(slot);
+                        } else {
+                          setPinnedSlot((prev) => (prev === slot ? null : slot));
+                        }
+                      }}
+                      className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer focus:outline-hidden"
+                      title={
+                        lang === 'de'
+                          ? isPinned
+                            ? 'Hervorhebung aufheben'
+                            : 'Modell im Netz hervorheben'
+                          : isPinned
+                          ? 'Unpin highlight'
+                          : 'Highlight model on radar'
+                      }
+                    >
+                      <span
+                        className={`w-4 h-4 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
+                      >
+                        {slot}
+                      </span>
+                      <span
+                        className={`text-xs font-semibold truncate ${
+                          isFocused
+                            ? theme.text
+                            : 'text-slate-800 dark:text-slate-200'
+                        }`}
+                      >
+                        {model.displayName}
+                      </span>
+                      {rank !== undefined && (
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 shrink-0">
+                          #{rank}
+                        </span>
+                      )}
+                    </button>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`font-mono tabular-nums text-xs font-bold ${theme.text}`}>
+                        {score !== null ? formatNumber(score, 1) : '—'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleSlotVisibility(slot)}
+                        className="p-1 rounded hover:bg-slate-200/70 dark:hover:bg-slate-700/70 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                        aria-label={
+                          isHidden
+                            ? lang === 'de'
+                              ? `${model.displayName} einblenden`
+                              : `Show ${model.displayName}`
+                            : lang === 'de'
+                            ? `${model.displayName} ausblenden`
+                            : `Hide ${model.displayName}`
+                        }
+                        title={
+                          isHidden
+                            ? lang === 'de'
+                              ? 'Im Diagramm einblenden'
+                              : 'Show on radar'
+                            : lang === 'de'
+                            ? 'Im Diagramm ausblenden'
+                            : 'Hide on radar'
+                        }
+                      >
+                        {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Selected / Hovered Axis Ranking Inspector */}
+          {inspectedRow && (
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 overflow-hidden">
+              <div className="px-3 py-2 bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: inspectedRow.comp.color }}
+                  />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                    {inspectedRow.label}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
+                  {inspectedRow.sourceName} · {inspectedRow.comp.weightPct}%
+                </span>
+              </div>
+
+              {/* Axis Quick Switcher Pills */}
+              <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center gap-1">
+                {categoryComparisons.map((r, idx) => {
+                  const isCurr = idx === inspectedAxisIdx;
+                  return (
+                    <button
+                      key={r.comp.id}
+                      type="button"
+                      onClick={() => setSelectedAxisIdx(idx)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                        isCurr
+                          ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                      title={r.label}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => onToggleExpandCategory(inspectedRow.comp.id)}
+                  className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  <Info className="w-3 h-3" />
+                  <span>
+                    {expandedCategoryId === inspectedRow.comp.id
+                      ? lang === 'de'
+                        ? 'Details zu'
+                        : 'Hide info'
+                      : lang === 'de'
+                      ? 'Methodik'
+                      : 'Details'}
+                  </span>
+                </button>
+              </div>
+
+              {/* Sorted Values on Inspected Axis */}
+              <div className="p-2.5 space-y-1.5">
+                {[...inspectedRow.entries]
+                  .sort((a, b) => {
+                    if (a.val === null && b.val === null) return 0;
+                    if (a.val === null) return 1;
+                    if (b.val === null) return -1;
+                    return b.val - a.val;
+                  })
+                  .map((entry) => {
+                    const theme = SLOT_THEME[entry.slot];
+                    const isHidden = hiddenSlots.has(entry.slot);
+                    const isWinner =
+                      inspectedRow.winners.includes(entry.slot) &&
+                      !inspectedRow.isTie &&
+                      inspectedRow.winners.length > 0;
+                    const widthPct =
+                      entry.val !== null ? Math.max(0, Math.min(100, entry.val)) : 0;
+
+                    return (
+                      <div
+                        key={entry.slot}
+                        onMouseEnter={() => {
+                          if (!isHidden) setHoveredSlot(entry.slot);
+                        }}
+                        onMouseLeave={() => setHoveredSlot(null)}
+                        className={`flex items-center gap-2 text-xs ${
+                          isHidden ? 'opacity-40' : ''
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
+                        >
+                          {entry.slot}
+                        </span>
+                        <span className="w-28 sm:w-32 truncate font-medium text-slate-700 dark:text-slate-300">
+                          {entry.model.displayName}
+                        </span>
+                        <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded overflow-hidden">
+                          {entry.val !== null && (
+                            <div
+                              className={`h-full rounded-r-xs ${
+                                isWinner || inspectedRow.isTie ? theme.barActive : theme.barDim
+                              }`}
+                              style={{ width: `${widthPct}%` }}
+                            />
+                          )}
+                        </div>
+                        <span
+                          className={`w-14 text-right font-mono tabular-nums font-bold shrink-0 ${
+                            entry.val === null
+                              ? 'text-slate-400 dark:text-slate-500'
+                              : isWinner
+                              ? theme.text
+                              : 'text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {entry.val !== null ? `${formatNumber(entry.val, 1)}%` : '—'}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Expandable Methodology & Source Drawer for Clicked Axis */}
+      {expandedRow && (
+        <div className="px-4 py-2.5 rounded-xl bg-slate-50/90 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1 max-w-3xl">
+            <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100">
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: expandedRow.comp.color }}
+              />
+              <span>{expandedRow.label}</span>
+              <button
+                type="button"
+                onClick={() => onToggleExpandCategory(expandedRow.comp.id)}
+                className="ml-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                aria-label={lang === 'de' ? 'Schließen' : 'Close'}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <p className="leading-relaxed">
+              {lang === 'de' ? expandedRow.comp.descriptionDe : expandedRow.comp.descriptionEn}
+            </p>
+            <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+              {lang === 'de' ? 'Berechnung:' : 'Formula:'}{' '}
+              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                {expandedRow.comp.formulaDesc}
+              </span>
+              {expandedRow.isRescaled && (
+                <span>
+                  {' · '}
+                  {lang === 'de'
+                    ? 'Skaliert von 29% Rate-Basis auf 0–100%'
+                    : 'Rescaled from 29% guessing floor to 0–100%'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {expandedRow.sourceUrl && (
+              <a
+                href={expandedRow.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
+              >
+                <span>{sourceLinkLabel}</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+            {onScrollToParagraph && (
+              <button
+                type="button"
+                onClick={() =>
+                  onScrollToParagraph(BENCHMARK_ANCHOR_MAP[expandedRow.comp.id] || 'note-col-d')
+                }
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-blue-600 dark:text-blue-400 transition-colors cursor-pointer"
+              >
+                <BookOpen className="w-3 h-3" />
+                <span>{lang === 'de' ? 'Methodik unten' : 'Notes below'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const CompareView: React.FC<CompareViewProps> = ({
   allModels,
   rankedModels,
@@ -658,18 +1686,16 @@ export const CompareView: React.FC<CompareViewProps> = ({
     return map;
   }, [rankedModels]);
 
-  const [useThirdModel, setUseThirdModel] = useState<boolean>(true);
-  const [modelAId, setModelAId] = useState<string>(() => {
+  const maxCompareCount = Math.max(
+    2,
+    Math.min(MAX_COMPARE_MODELS, pickerModels.length || allModels.length)
+  );
+  const [modelCount, setModelCount] = useState<number>(3);
+  const effectiveCount = Math.max(2, Math.min(modelCount, maxCompareCount));
+
+  const [slotIds, setSlotIds] = useState<string[]>(() => {
     const pool = rankedModels.length >= 2 ? rankedModels : allModels;
-    return pickDefaultCompareTrio(pool, scoreMode).aId;
-  });
-  const [modelBId, setModelBId] = useState<string>(() => {
-    const pool = rankedModels.length >= 2 ? rankedModels : allModels;
-    return pickDefaultCompareTrio(pool, scoreMode).bId;
-  });
-  const [modelCId, setModelCId] = useState<string>(() => {
-    const pool = rankedModels.length >= 3 ? rankedModels : allModels;
-    return pickDefaultCompareTrio(pool, scoreMode).cId;
+    return pickDefaultCompareIds(pool, MAX_COMPARE_MODELS, scoreMode);
   });
 
   const [activePreset, setActivePreset] = useState<PresetKind | null>(null);
@@ -679,63 +1705,58 @@ export const CompareView: React.FC<CompareViewProps> = ({
   const [sizeClassIndex, setSizeClassIndex] = useState<number>(0);
 
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
+  const [benchmarkChartMode, setBenchmarkChartMode] = useState<'bars' | 'radar'>('bars');
   const [showHistoricalBenchmarks, setShowHistoricalBenchmarks] = useState<boolean>(false);
 
-  // Keep selections valid whenever live Sheet updates reload models
+  // Keep selections valid & mutually distinct across all 7 slots whenever live Sheet updates reload models
   useEffect(() => {
     const byId = new Map(allModels.map((m) => [m.id, m]));
-    const pool = pickerModels.length >= 3 ? pickerModels : allModels;
-    const defaults = pickDefaultCompareTrio(pool, scoreMode);
+    const pool = pickerModels.length >= 2 ? pickerModels : allModels;
+    if (pool.length === 0) return;
 
-    if (!byId.has(modelAId)) setModelAId(defaults.aId);
-    if (!byId.has(modelBId) || (allModels.length >= 2 && modelBId === modelAId)) {
-      const nextB =
-        defaults.bId !== modelAId
-          ? defaults.bId
-          : pool.find((m) => m.id !== modelAId)?.id || defaults.bId;
-      setModelBId(nextB);
-    }
-    if (!byId.has(modelCId) || (allModels.length >= 3 && (modelCId === modelAId || modelCId === modelBId))) {
-      const nextC =
-        defaults.cId !== modelAId && defaults.cId !== modelBId
-          ? defaults.cId
-          : pool.find((m) => m.id !== modelAId && m.id !== modelBId)?.id || defaults.cId;
-      setModelCId(nextC);
-    }
-  }, [allModels, pickerModels, modelAId, modelBId, modelCId, scoreMode]);
-
-  const modelA = useMemo(
-    () => allModels.find((m) => m.id === modelAId) || pickerModels[0] || null,
-    [allModels, pickerModels, modelAId]
-  );
-  const modelB = useMemo(
-    () =>
-      allModels.find((m) => m.id === modelBId) ||
-      pickerModels.find((m) => m.id !== modelA?.id) ||
-      pickerModels[1] ||
-      pickerModels[0] ||
-      null,
-    [allModels, pickerModels, modelBId, modelA?.id]
-  );
-  const modelC = useMemo(
-    () =>
-      allModels.find((m) => m.id === modelCId) ||
-      pickerModels.find((m) => m.id !== modelA?.id && m.id !== modelB?.id) ||
-      pickerModels[2] ||
-      pickerModels[0] ||
-      null,
-    [allModels, pickerModels, modelCId, modelA?.id, modelB?.id]
-  );
-
-  const isThreeMode = useThirdModel && Boolean(modelC && modelC.id !== modelA?.id && modelC.id !== modelB?.id);
+    const defaults = pickDefaultCompareIds(pool, MAX_COMPARE_MODELS, scoreMode);
+    setSlotIds((prev) => {
+      const next: string[] = [];
+      const used = new Set<string>();
+      for (let i = 0; i < Math.min(MAX_COMPARE_MODELS, pool.length); i++) {
+        const cur = prev[i];
+        if (cur && byId.has(cur) && !used.has(cur)) {
+          next.push(cur);
+          used.add(cur);
+        } else {
+          const fallback =
+            defaults.find((id) => !used.has(id)) ||
+            pool.find((m) => !used.has(m.id))?.id ||
+            pool[0].id;
+          next.push(fallback);
+          used.add(fallback);
+        }
+      }
+      if (next.length === prev.length && next.every((id, idx) => id === prev[idx])) {
+        return prev;
+      }
+      return next;
+    });
+  }, [allModels, pickerModels, scoreMode]);
 
   const activeSlots = useMemo(() => {
+    const byId = new Map(allModels.map((m) => [m.id, m]));
     const list: Array<{ slot: CompareSlot; model: ModelRecord }> = [];
-    if (modelA) list.push({ slot: 'A', model: modelA });
-    if (modelB) list.push({ slot: 'B', model: modelB });
-    if (isThreeMode && modelC) list.push({ slot: 'C', model: modelC });
+    const used = new Set<string>();
+    for (let i = 0; i < effectiveCount; i++) {
+      const slot = COMPARE_SLOTS[i];
+      const candidateId = slotIds[i];
+      let model = candidateId ? byId.get(candidateId) : undefined;
+      if (!model || used.has(model.id)) {
+        model = pickerModels.find((m) => !used.has(m.id)) || allModels.find((m) => !used.has(m.id));
+      }
+      if (model) {
+        used.add(model.id);
+        list.push({ slot, model });
+      }
+    }
     return list;
-  }, [modelA, modelB, modelC, isThreeMode]);
+  }, [allModels, pickerModels, slotIds, effectiveCount]);
 
   // Preset option groups
   const priceGroups = useMemo(() => {
@@ -766,19 +1787,19 @@ export const CompareView: React.FC<CompareViewProps> = ({
       }
     }
     const groups = Array.from(byFamily.values()).filter((g) => g.models.length >= 2);
-    // Prioritize families with >=3 models first, then highest top score
+    // Prioritize families with enough models for current count first, then highest top score
     return groups.sort((a, b) => {
-      const a3 = a.models.length >= 3 ? 1 : 0;
-      const b3 = b.models.length >= 3 ? 1 : 0;
-      if (b3 !== a3) return b3 - a3;
+      const aFit = a.models.length >= effectiveCount ? 1 : 0;
+      const bFit = b.models.length >= effectiveCount ? 1 : 0;
+      if (bFit !== aFit) return bFit - aFit;
       const sa = getScoreForMode(a.models[0], scoreMode) ?? -9999;
       const sb = getScoreForMode(b.models[0], scoreMode) ?? -9999;
       return sb - sa;
     });
-  }, [pickerModels, scoreMode]);
+  }, [pickerModels, scoreMode, effectiveCount]);
 
   const sizeGroups = useMemo(() => {
-    const order: SizeClassKey[] = ['planetary', 'massive', 'singularity', 'colossal', 'small'];
+    const order: SizeClassKey[] = ['planetary', 'massive', 'singularity', 'colossal', 'large', 'small'];
     const map = new Map<SizeClassKey, ModelRecord[]>();
     for (const k of order) map.set(k, []);
     for (const m of pickerModels) {
@@ -790,23 +1811,30 @@ export const CompareView: React.FC<CompareViewProps> = ({
     return order
       .map((k) => ({ key: k, label: SIZE_CLASS_LABELS[k], models: map.get(k)! }))
       .filter((g) => g.models.length >= 2)
-      .sort((a, b) => Number(b.models.length >= 3) - Number(a.models.length >= 3));
-  }, [pickerModels, labs]);
+      .sort((a, b) => Number(b.models.length >= effectiveCount) - Number(a.models.length >= effectiveCount));
+  }, [pickerModels, labs, effectiveCount]);
 
-  const applyTrioSelection = (chosen: ModelRecord[]) => {
+  const applySlotSelection = (chosen: ModelRecord[]) => {
     if (chosen.length === 0) return;
-    setModelAId(chosen[0].id);
-    if (chosen[1]) setModelBId(chosen[1].id);
-    if (chosen[2]) {
-      setModelCId(chosen[2].id);
-      setUseThirdModel(true);
-    } else if (chosen.length === 2) {
-      setUseThirdModel(false);
+    const chosenIds = chosen.slice(0, MAX_COMPARE_MODELS).map((m) => m.id);
+    const chosenSet = new Set(chosenIds);
+    const fillPool = pickDefaultCompareIds(pickerModels.length >= 2 ? pickerModels : allModels, MAX_COMPARE_MODELS, scoreMode);
+    const merged = [...chosenIds];
+    for (const id of [...slotIds, ...fillPool]) {
+      if (merged.length >= MAX_COMPARE_MODELS) break;
+      if (!chosenSet.has(id)) {
+        chosenSet.add(id);
+        merged.push(id);
+      }
+    }
+    setSlotIds(merged);
+    if (chosen.length < effectiveCount) {
+      setModelCount(Math.max(2, chosen.length));
     }
   };
 
-  const handleApplyPreset = (preset: PresetKind) => {
-    const targetCount = 3;
+  const applyPresetForCount = (preset: PresetKind, count: number, idxOverride?: number) => {
+    const targetCount = Math.max(2, Math.min(count, maxCompareCount));
     if (preset === 'newest') {
       const datedPool = pickerModels.filter(
         (m) => Boolean(m.hasConcreteReleaseDate) && /^\d{4}-\d{2}-\d{2}$/.test(m.releaseDate || '')
@@ -819,17 +1847,22 @@ export const CompareView: React.FC<CompareViewProps> = ({
         return (getScoreForMode(b, scoreMode) ?? -9999) - (getScoreForMode(a, scoreMode) ?? -9999);
       });
       const chosen = newestSorted.slice(0, targetCount);
-      applyTrioSelection(chosen);
+      applySlotSelection(chosen);
       setActivePreset('newest');
       setPresetSubLabel(lang === 'de' ? 'Aktuellste Releases' : 'Latest releases');
       return;
     }
 
     if (preset === 'same_price' && priceGroups.length > 0) {
-      const nextIdx = activePreset === 'same_price' ? (priceBucketIndex + 1) % priceGroups.length : 0;
+      const nextIdx =
+        idxOverride !== undefined
+          ? idxOverride % priceGroups.length
+          : activePreset === 'same_price'
+          ? (priceBucketIndex + 1) % priceGroups.length
+          : 0;
       const group = priceGroups[nextIdx];
       const chosen = pickTopDiverseModels(group.models, targetCount, scoreMode);
-      applyTrioSelection(chosen);
+      applySlotSelection(chosen);
       setPriceBucketIndex(nextIdx);
       setActivePreset('same_price');
       setPresetSubLabel(lang === 'de' ? group.labelDe : group.labelEn);
@@ -837,12 +1870,17 @@ export const CompareView: React.FC<CompareViewProps> = ({
     }
 
     if (preset === 'same_family' && familyGroups.length > 0) {
-      const nextIdx = activePreset === 'same_family' ? (familyGroupIndex + 1) % familyGroups.length : 0;
+      const nextIdx =
+        idxOverride !== undefined
+          ? idxOverride % familyGroups.length
+          : activePreset === 'same_family'
+          ? (familyGroupIndex + 1) % familyGroups.length
+          : 0;
       const group = familyGroups[nextIdx];
       const sorted = [...group.models].sort(
         (a, b) => (getScoreForMode(b, scoreMode) ?? -9999) - (getScoreForMode(a, scoreMode) ?? -9999)
       );
-      applyTrioSelection(sorted.slice(0, targetCount));
+      applySlotSelection(sorted.slice(0, targetCount));
       setFamilyGroupIndex(nextIdx);
       setActivePreset('same_family');
       setPresetSubLabel(group.name);
@@ -850,47 +1888,84 @@ export const CompareView: React.FC<CompareViewProps> = ({
     }
 
     if (preset === 'same_size' && sizeGroups.length > 0) {
-      const nextIdx = activePreset === 'same_size' ? (sizeClassIndex + 1) % sizeGroups.length : 0;
+      const nextIdx =
+        idxOverride !== undefined
+          ? idxOverride % sizeGroups.length
+          : activePreset === 'same_size'
+          ? (sizeClassIndex + 1) % sizeGroups.length
+          : 0;
       const group = sizeGroups[nextIdx];
       const chosen = pickTopDiverseModels(group.models, targetCount, scoreMode);
-      applyTrioSelection(chosen);
+      applySlotSelection(chosen);
       setSizeClassIndex(nextIdx);
       setActivePreset('same_size');
       setPresetSubLabel(lang === 'de' ? group.label.de : group.label.en);
     }
   };
 
-  const handleSelectSlot = (slot: CompareSlot, newId: string) => {
-    setActivePreset(null);
-    setPresetSubLabel('');
-    if (slot === 'A') {
-      if (modelB && newId === modelB.id) setModelBId(modelA?.id || modelB.id);
-      else if (modelC && newId === modelC.id) setModelCId(modelA?.id || modelC.id);
-      setModelAId(newId);
-    } else if (slot === 'B') {
-      if (modelA && newId === modelA.id) setModelAId(modelB?.id || modelA.id);
-      else if (modelC && newId === modelC.id) setModelCId(modelB?.id || modelC.id);
-      setModelBId(newId);
-    } else {
-      if (modelA && newId === modelA.id) setModelAId(modelC?.id || modelA.id);
-      else if (modelB && newId === modelB.id) setModelBId(modelC?.id || modelB.id);
-      setModelCId(newId);
+  const handleApplyPreset = (preset: PresetKind) => {
+    applyPresetForCount(preset, effectiveCount);
+  };
+
+  const handleModelCountChange = (rawCount: number) => {
+    const nextCount = Math.max(2, Math.min(rawCount, maxCompareCount));
+    setModelCount(nextCount);
+    if (!activePreset) return;
+
+    if (activePreset === 'newest') {
+      applyPresetForCount('newest', nextCount);
+    } else if (activePreset === 'same_price' && priceGroups[priceBucketIndex]) {
+      if (priceGroups[priceBucketIndex].models.length >= nextCount) {
+        applyPresetForCount('same_price', nextCount, priceBucketIndex);
+      } else {
+        setActivePreset(null);
+        setPresetSubLabel('');
+      }
+    } else if (activePreset === 'same_family' && familyGroups[familyGroupIndex]) {
+      if (familyGroups[familyGroupIndex].models.length >= nextCount) {
+        applyPresetForCount('same_family', nextCount, familyGroupIndex);
+      } else {
+        setActivePreset(null);
+        setPresetSubLabel('');
+      }
+    } else if (activePreset === 'same_size' && sizeGroups[sizeClassIndex]) {
+      if (sizeGroups[sizeClassIndex].models.length >= nextCount) {
+        applyPresetForCount('same_size', nextCount, sizeClassIndex);
+      } else {
+        setActivePreset(null);
+        setPresetSubLabel('');
+      }
     }
   };
 
-  const handleSwapOrRotate = () => {
-    if (!modelA || !modelB) return;
+  const handleSelectSlot = (slotIndex: number, newId: string) => {
     setActivePreset(null);
     setPresetSubLabel('');
-    if (isThreeMode && modelC) {
-      // Rotate A -> B -> C -> A
-      setModelAId(modelB.id);
-      setModelBId(modelC.id);
-      setModelCId(modelA.id);
-    } else {
-      setModelAId(modelB.id);
-      setModelBId(modelA.id);
-    }
+    setSlotIds((prev) => {
+      const next = [...prev];
+      const oldId = next[slotIndex];
+      const existingIdx = next.findIndex((id, idx) => idx !== slotIndex && id === newId);
+      if (existingIdx !== -1 && oldId) {
+        next[existingIdx] = oldId;
+      }
+      next[slotIndex] = newId;
+      return next;
+    });
+  };
+
+  const handleSwapOrRotate = () => {
+    if (activeSlots.length < 2) return;
+    setActivePreset(null);
+    setPresetSubLabel('');
+    setSlotIds((prev) => {
+      const next = [...prev];
+      const count = activeSlots.length;
+      const rotated = activeSlots.map((_, i) => activeSlots[(i + 1) % count].model.id);
+      for (let i = 0; i < count; i++) {
+        next[i] = rotated[i];
+      }
+      return next;
+    });
   };
 
   // Row-2 synced composite score labels: index 0=NEW (M2), 1=OLD (L2), 2=WorstCase (N2)
@@ -1000,13 +2075,18 @@ export const CompareView: React.FC<CompareViewProps> = ({
     c.entries.some((e) => e.val !== null)
   );
 
-  // Aggregate summary metrics across 2 or 3 models
+  // Aggregate summary metrics across 2 to 8 active models
   const summaryStats = useMemo(() => {
-    const wins: Record<CompareSlot, number> = { A: 0, B: 0, C: 0 };
+    const wins: Record<CompareSlot, number> = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0, H: 0 };
     const bestEdge: Record<CompareSlot, { label: string; margin: number; color: string } | null> = {
       A: null,
       B: null,
       C: null,
+      D: null,
+      E: null,
+      F: null,
+      G: null,
+      H: null,
     };
     let ties = 0;
     let comparableCount = 0;
@@ -1049,7 +2129,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
       ? validPrimaries.filter((p) => topPrimaryScore - (p.score as number) < 0.05)
       : [];
 
-  if (!modelA || !modelB) {
+  if (activeSlots.length < 2) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-10 text-center text-sm text-slate-500 dark:text-slate-400">
         {lang === 'de'
@@ -1081,12 +2161,14 @@ export const CompareView: React.FC<CompareViewProps> = ({
             }`}
             title={
               lang === 'de'
-                ? 'Die 3 aktuellsten erschienenen Modelle vergleichen'
-                : 'Compare the 3 most recently released models'
+                ? `Die ${effectiveCount} aktuellsten erschienenen Modelle vergleichen`
+                : `Compare the ${effectiveCount} most recently released models`
             }
           >
             <Sparkles className="w-3 h-3 shrink-0" />
-            <span>{lang === 'de' ? 'Neueste 3' : 'Newest 3'}</span>
+            <span>
+              {lang === 'de' ? `Neueste ${effectiveCount}` : `Newest ${effectiveCount}`}
+            </span>
           </button>
 
           <button
@@ -1159,51 +2241,29 @@ export const CompareView: React.FC<CompareViewProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 text-[11px] font-mono font-semibold">
-            <button
-              type="button"
-              onClick={() => setUseThirdModel(false)}
-              className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                !isThreeMode
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              {lang === 'de' ? '2 Modelle' : '2 Models'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setUseThirdModel(true)}
-              disabled={pickerModels.length < 3}
-              className={`px-2 py-0.5 rounded transition-colors cursor-pointer disabled:opacity-40 ${
-                isThreeMode
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              {lang === 'de' ? '3 Modelle' : '3 Models'}
-            </button>
-          </div>
-
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleSwapOrRotate}
             title={
-              isThreeMode
+              effectiveCount > 2
                 ? lang === 'de'
-                  ? 'Positionen rotieren (A → B → C)'
-                  : 'Rotate slots (A → B → C)'
+                  ? `Positionen rotieren (A → B → … → ${COMPARE_SLOTS[effectiveCount - 1]})`
+                  : `Rotate slots (A → B → … → ${COMPARE_SLOTS[effectiveCount - 1]})`
                 : lang === 'de'
                 ? 'Chatbots A und B tauschen'
                 : 'Swap Chatbots A and B'
             }
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-mono font-semibold transition-colors cursor-pointer"
           >
-            {isThreeMode ? (
+            {effectiveCount > 2 ? (
               <>
                 <RotateCw className="w-3 h-3 text-slate-500 dark:text-slate-400" />
-                <span>A→B→C</span>
+                <span>
+                  {effectiveCount === 3
+                    ? 'A→B→C'
+                    : `A→…→${COMPARE_SLOTS[effectiveCount - 1]}`}
+                </span>
               </>
             ) : (
               <>
@@ -1212,17 +2272,69 @@ export const CompareView: React.FC<CompareViewProps> = ({
               </>
             )}
           </button>
+
+          {/* Model Count Slider (2 to 8 models) */}
+          <div
+            className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1"
+            title={
+              lang === 'de'
+                ? 'Anzahl gleichzeitig verglichener Modelle (2 bis 8)'
+                : 'Number of models compared side-by-side (2 to 8)'
+            }
+          >
+            <button
+              type="button"
+              onClick={() => handleModelCountChange(effectiveCount - 1)}
+              disabled={effectiveCount <= 2}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+              aria-label={lang === 'de' ? 'Ein Modell weniger' : 'One fewer model'}
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <input
+              type="range"
+              min={2}
+              max={maxCompareCount}
+              step={1}
+              value={effectiveCount}
+              onChange={(e) => handleModelCountChange(Number(e.target.value))}
+              aria-label={lang === 'de' ? 'Anzahl verglichener Modelle' : 'Number of compared models'}
+              className="w-20 sm:w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
+            />
+            <button
+              type="button"
+              onClick={() => handleModelCountChange(effectiveCount + 1)}
+              disabled={effectiveCount >= maxCompareCount}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
+              aria-label={lang === 'de' ? 'Ein Modell mehr' : 'One more model'}
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+            <span className="text-[11px] font-mono font-bold tabular-nums text-slate-800 dark:text-slate-100 pl-0.5 min-w-[66px] text-center">
+              {effectiveCount} {lang === 'de' ? 'Modelle' : 'Models'}
+            </span>
+          </div>
         </div>
       </section>
 
-      {/* Split Overview Cards (2 or 3 Columns) */}
+      {/* Split Overview Cards (2 to 8 Responsive Cards) */}
       <section
         aria-label={lang === 'de' ? 'Modellauswahl und Übersicht' : 'Model Selection and Overview'}
-        className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs grid grid-cols-1 ${
-          isThreeMode ? 'lg:grid-cols-3' : 'lg:grid-cols-2'
-        } divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-800 overflow-visible`}
+        className={`grid gap-2.5 overflow-visible ${
+          effectiveCount === 2
+            ? 'grid-cols-1 md:grid-cols-2'
+            : effectiveCount === 3
+            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            : effectiveCount === 4
+            ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'
+            : effectiveCount === 5
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
+            : effectiveCount === 6
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+        }`}
       >
-        {activeSlots.map(({ slot, model }) => {
+        {activeSlots.map(({ slot, model }, idx) => {
           const theme = SLOT_THEME[slot];
           const primaryScore = getScoreForMode(model, scoreMode);
           const rank = rankMap.get(model.id);
@@ -1254,10 +2366,20 @@ export const CompareView: React.FC<CompareViewProps> = ({
             if (s.slot !== slot) otherMap.set(s.model.id, s.slot);
           }
 
+          const isRightEdge =
+            effectiveCount >= 2 &&
+            ((effectiveCount === 2 && idx === 1) ||
+              (effectiveCount === 3 && idx === 2) ||
+              (effectiveCount === 4 && idx === 3) ||
+              (effectiveCount === 5 && idx === 4) ||
+              (effectiveCount === 6 && (idx === 2 || idx === 5)) ||
+              (effectiveCount === 7 && (idx === 3 || idx === 6)) ||
+              (effectiveCount === 8 && (idx === 3 || idx === 7)));
+
           return (
             <div
               key={slot}
-              className={`p-3.5 sm:p-4 flex flex-col gap-2.5 min-w-0 border-t-2 ${theme.borderTop} first:rounded-t-xl lg:first:rounded-tl-xl lg:first:rounded-tr-none lg:last:rounded-tr-xl`}
+              className={`p-3.5 flex flex-col gap-2.5 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs border-t-2 ${theme.borderTop}`}
             >
               {/* Selector + Compact Direct Links */}
               <div className="flex items-center gap-1.5">
@@ -1270,7 +2392,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
                     rankMap={rankMap}
                     scoreMode={scoreMode}
                     lang={lang}
-                    onSelect={(newId) => handleSelectSlot(slot, newId)}
+                    alignRight={isRightEdge}
+                    onSelect={(newId) => handleSelectSlot(idx, newId)}
                   />
                 </div>
                 {chatUrl && (
@@ -1469,16 +2592,15 @@ export const CompareView: React.FC<CompareViewProps> = ({
           <div className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {lang === 'de' ? 'Kategorie-Siege (D–K)' : 'Category Wins (D–K)'}
           </div>
-          <div className="flex flex-wrap items-baseline gap-2 font-mono tabular-nums text-xs sm:text-sm font-bold">
-            <span className="text-blue-600 dark:text-blue-400">A: {summaryStats.wins.A}</span>
-            <span className="text-slate-300 dark:text-slate-700">·</span>
-            <span className="text-rose-600 dark:text-rose-400">B: {summaryStats.wins.B}</span>
-            {isThreeMode && (
-              <>
-                <span className="text-slate-300 dark:text-slate-700">·</span>
-                <span className="text-violet-600 dark:text-violet-400">C: {summaryStats.wins.C}</span>
-              </>
-            )}
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono tabular-nums text-xs sm:text-sm font-bold">
+            {activeSlots.map(({ slot }, i) => (
+              <React.Fragment key={slot}>
+                {i > 0 && <span className="text-slate-300 dark:text-slate-700">·</span>}
+                <span className={SLOT_THEME[slot].text}>
+                  {slot}: {summaryStats.wins[slot]}
+                </span>
+              </React.Fragment>
+            ))}
             <span className="text-slate-300 dark:text-slate-700">·</span>
             <span className="text-slate-500 dark:text-slate-400">
               {lang === 'de' ? 'Patt' : 'Tie'}: {summaryStats.ties}
@@ -1486,23 +2608,14 @@ export const CompareView: React.FC<CompareViewProps> = ({
           </div>
           {summaryStats.comparableCount > 0 && (
             <div className="h-1.5 w-full rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex">
-              {summaryStats.wins.A > 0 && (
-                <div
-                  className="bg-blue-600 dark:bg-blue-500 h-full"
-                  style={{ width: `${(summaryStats.wins.A / summaryStats.comparableCount) * 100}%` }}
-                />
-              )}
-              {summaryStats.wins.B > 0 && (
-                <div
-                  className="bg-rose-600 dark:bg-rose-500 h-full"
-                  style={{ width: `${(summaryStats.wins.B / summaryStats.comparableCount) * 100}%` }}
-                />
-              )}
-              {isThreeMode && summaryStats.wins.C > 0 && (
-                <div
-                  className="bg-violet-600 dark:bg-violet-500 h-full"
-                  style={{ width: `${(summaryStats.wins.C / summaryStats.comparableCount) * 100}%` }}
-                />
+              {activeSlots.map(({ slot }) =>
+                summaryStats.wins[slot] > 0 ? (
+                  <div
+                    key={slot}
+                    className={`${SLOT_THEME[slot].barActive} h-full`}
+                    style={{ width: `${(summaryStats.wins[slot] / summaryStats.comparableCount) * 100}%` }}
+                  />
+                ) : null
               )}
               {summaryStats.ties > 0 && (
                 <div
@@ -1548,7 +2661,13 @@ export const CompareView: React.FC<CompareViewProps> = ({
           <div className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {lang === 'de' ? 'Größte Einzelstärke' : 'Biggest Category Edge'}
           </div>
-          <div className="space-y-0.5 text-xs">
+          <div
+            className={
+              activeSlots.length > 4
+                ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 text-xs'
+                : 'space-y-0.5 text-xs'
+            }
+          >
             {activeSlots.map(({ slot }) => {
               const edge = summaryStats.bestEdge[slot];
               const theme = SLOT_THEME[slot];
@@ -1588,192 +2707,250 @@ export const CompareView: React.FC<CompareViewProps> = ({
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden"
       >
         {/* Header Bar */}
-        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
           <span className="uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">
             {lang === 'de'
               ? 'Alle 8 Benchmarks im Direktvergleich (je 12,5%)'
               : 'All 8 Benchmarks Side-by-Side (12.5% each)'}
           </span>
           <div className="flex flex-wrap items-center gap-3">
-            {activeSlots.map(({ slot, model }) => (
-              <span key={slot} className={`font-bold ${SLOT_THEME[slot].text}`}>
-                {slot} · {model.displayName}
-              </span>
-            ))}
+            {benchmarkChartMode === 'bars' && (
+              <div className="flex flex-wrap items-center gap-3">
+                {activeSlots.map(({ slot, model }) => (
+                  <span key={slot} className={`font-bold ${SLOT_THEME[slot].text}`}>
+                    {slot} · {model.displayName}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Chart Type Switcher: Balken vs Spinnennetz */}
+            <div
+              className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 font-sans"
+              role="group"
+              aria-label={
+                lang === 'de'
+                  ? 'Darstellungsform der 8 Benchmarks'
+                  : 'Benchmark chart view'
+              }
+            >
+              <button
+                type="button"
+                onClick={() => setBenchmarkChartMode('bars')}
+                aria-pressed={benchmarkChartMode === 'bars'}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                  benchmarkChartMode === 'bars'
+                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>{lang === 'de' ? 'Balken' : 'Bars'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setBenchmarkChartMode('radar')}
+                aria-pressed={benchmarkChartMode === 'radar'}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                  benchmarkChartMode === 'radar'
+                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <Radar className="w-3.5 h-3.5" />
+                <span>{lang === 'de' ? 'Spinnennetz' : 'Radar'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Benchmark Rows */}
-        <div className="divide-y divide-slate-200 dark:divide-slate-800">
-          {categoryComparisons.map((row) => {
-            const isExpanded = expandedCategoryId === row.comp.id;
-            const anchorId = BENCHMARK_ANCHOR_MAP[row.comp.id] || 'note-col-d';
+        {/* Benchmark Rows or Radar Chart */}
+        {benchmarkChartMode === 'radar' ? (
+          <BenchmarkRadarChart
+            categoryComparisons={categoryComparisons}
+            activeSlots={activeSlots}
+            primaryScores={primaryScores}
+            rankMap={rankMap}
+            lang={lang}
+            expandedCategoryId={expandedCategoryId}
+            onToggleExpandCategory={(categoryId) =>
+              setExpandedCategoryId((prev) => (prev === categoryId ? null : categoryId))
+            }
+            onScrollToParagraph={onScrollToParagraph}
+            sourceLinkLabel={t.sourceLink}
+          />
+        ) : (
+          <div className="divide-y divide-slate-200 dark:divide-slate-800">
+            {categoryComparisons.map((row) => {
+              const isExpanded = expandedCategoryId === row.comp.id;
+              const anchorId = BENCHMARK_ANCHOR_MAP[row.comp.id] || 'note-col-d';
 
-            return (
-              <div
-                key={row.comp.id}
-                className="transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
-              >
-                <div className="px-4 py-2.5 grid grid-cols-1 md:grid-cols-[270px_minmax(0,1fr)] lg:grid-cols-[310px_minmax(0,1fr)] items-center gap-2.5 md:gap-4">
-                  {/* Left: Category Label + Source + Leader Pill */}
-                  <div className="flex items-start justify-between gap-2 min-w-0">
-                    <div className="min-w-0">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExpandedCategoryId((prev) => (prev === row.comp.id ? null : row.comp.id))
-                        }
-                        className="group inline-flex items-center gap-1.5 max-w-full cursor-pointer focus:outline-hidden text-left"
-                        title={
-                          lang === 'de'
-                            ? 'Methodik & Benchmark-Details anzeigen'
-                            : 'Show methodology & benchmark details'
-                        }
-                      >
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: row.comp.color }}
-                        />
-                        <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate transition-colors">
-                          {row.label}
-                        </span>
-                        {isExpanded ? (
-                          <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        ) : (
-                          <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 shrink-0" />
-                        )}
-                      </button>
-
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 pl-4">
-                        <span className="truncate">{row.sourceName}</span>
-                        <span>·</span>
-                        <span className="font-mono tabular-nums shrink-0">{row.comp.weightPct}%</span>
-                      </div>
-                    </div>
-
-                    <div className="font-mono tabular-nums text-[11px] font-bold shrink-0 pt-0.5">
-                      {row.winners.length === 0 ? (
-                        <span className="text-slate-400 dark:text-slate-500">—</span>
-                      ) : row.isTie ? (
-                        <span className="text-slate-500 dark:text-slate-400">
-                          {lang === 'de' ? 'Patt' : 'Tie'}
-                        </span>
-                      ) : (
-                        <span className={SLOT_THEME[row.winners[0]].text}>
-                          🏆 {row.winners.join('/')}
-                          {row.margin > 0 ? ` +${row.margin.toFixed(1)}` : ''}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right: Compact Stacked Bars for A, B, (C) */}
-                  <div className="space-y-1.5 min-w-0">
-                    {row.entries.map((entry) => {
-                      const theme = SLOT_THEME[entry.slot];
-                      const isWinner = row.winners.includes(entry.slot) && !row.isTie && row.winners.length > 0;
-                      const widthPct = entry.val !== null ? Math.max(0, Math.min(100, entry.val)) : 0;
-
-                      return (
-                        <div key={entry.slot} className="flex items-center gap-2 min-w-0">
-                          <span
-                            className={`w-4 h-4 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
-                          >
-                            {entry.slot}
-                          </span>
-
-                          <div className="relative flex-1 h-4 bg-slate-100 dark:bg-slate-800/90 rounded overflow-hidden border border-slate-200/80 dark:border-slate-700/70">
-                            <div className="absolute inset-y-0 left-1/4 w-px bg-slate-200/80 dark:bg-slate-700/60 pointer-events-none" />
-                            <div className="absolute inset-y-0 left-1/2 w-px bg-slate-200/80 dark:bg-slate-700/60 pointer-events-none" />
-                            <div className="absolute inset-y-0 left-3/4 w-px bg-slate-200/80 dark:bg-slate-700/60 pointer-events-none" />
-                            {entry.val !== null && (
-                              <div
-                                className={`h-full rounded-r-xs transition-all duration-300 ${
-                                  isWinner || row.isTie ? theme.barActive : theme.barDim
-                                }`}
-                                style={{ width: `${widthPct}%` }}
-                              />
-                            )}
-                          </div>
-
-                          <div className="w-28 sm:w-36 text-right font-mono tabular-nums text-xs shrink-0 flex items-baseline justify-end gap-1.5">
-                            <span
-                              className={
-                                entry.val === null
-                                  ? 'text-slate-400 dark:text-slate-500 font-semibold'
-                                  : isWinner
-                                  ? `font-extrabold ${theme.text}`
-                                  : 'font-semibold text-slate-700 dark:text-slate-300'
-                              }
-                            >
-                              {entry.val !== null ? `${formatNumber(entry.val, 1)}%` : '—'}
-                            </span>
-                            {entry.contrib !== null && (
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:inline">
-                                {row.isRescaled && entry.raw !== null
-                                  ? `(${formatNumber(entry.raw, 0)}%)`
-                                  : `+${entry.contrib.toFixed(1)}`}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Expandable Category Details Drawer */}
-                {isExpanded && (
-                  <div className="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1 max-w-3xl">
-                      <p className="leading-relaxed">
-                        {lang === 'de' ? row.comp.descriptionDe : row.comp.descriptionEn}
-                      </p>
-                      <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                        {lang === 'de' ? 'Berechnung:' : 'Formula:'}{' '}
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
-                          {row.comp.formulaDesc}
-                        </span>
-                        {row.isRescaled && (
-                          <span>
-                            {' · '}
-                            {lang === 'de'
-                              ? 'Skaliert von 29% Rate-Basis auf 0–100%'
-                              : 'Rescaled from 29% guessing floor to 0–100%'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {row.sourceUrl && (
-                        <a
-                          href={row.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
-                        >
-                          <span>{t.sourceLink}</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                      {onScrollToParagraph && (
+              return (
+                <div
+                  key={row.comp.id}
+                  className="transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
+                >
+                  <div className="px-4 py-2.5 grid grid-cols-1 md:grid-cols-[270px_minmax(0,1fr)] lg:grid-cols-[310px_minmax(0,1fr)] items-center gap-2.5 md:gap-4">
+                    {/* Left: Category Label + Source + Leader Pill */}
+                    <div className="flex items-start justify-between gap-2 min-w-0">
+                      <div className="min-w-0">
                         <button
                           type="button"
-                          onClick={() => onScrollToParagraph(anchorId)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-blue-600 dark:text-blue-400 transition-colors cursor-pointer"
+                          onClick={() =>
+                            setExpandedCategoryId((prev) => (prev === row.comp.id ? null : row.comp.id))
+                          }
+                          className="group inline-flex items-center gap-1.5 max-w-full cursor-pointer focus:outline-hidden text-left"
+                          title={
+                            lang === 'de'
+                              ? 'Methodik & Benchmark-Details anzeigen'
+                              : 'Show methodology & benchmark details'
+                          }
                         >
-                          <BookOpen className="w-3 h-3" />
-                          <span>{lang === 'de' ? 'Methodik unten' : 'Notes below'}</span>
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: row.comp.color }}
+                          />
+                          <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate transition-colors">
+                            {row.label}
+                          </span>
+                          {isExpanded ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          ) : (
+                            <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                          )}
                         </button>
-                      )}
+
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 pl-4">
+                          <span className="truncate">{row.sourceName}</span>
+                          <span>·</span>
+                          <span className="font-mono tabular-nums shrink-0">{row.comp.weightPct}%</span>
+                        </div>
+                      </div>
+
+                      <div className="font-mono tabular-nums text-[11px] font-bold shrink-0 pt-0.5">
+                        {row.winners.length === 0 ? (
+                          <span className="text-slate-400 dark:text-slate-500">—</span>
+                        ) : row.isTie ? (
+                          <span className="text-slate-500 dark:text-slate-400">
+                            {lang === 'de' ? 'Patt' : 'Tie'}
+                          </span>
+                        ) : (
+                          <span className={SLOT_THEME[row.winners[0]].text}>
+                            🏆 {row.winners.join('/')}
+                            {row.margin > 0 ? ` +${row.margin.toFixed(1)}` : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: Compact Stacked Bars for A, B, (C..H) */}
+                    <div className="space-y-1.5 min-w-0">
+                      {row.entries.map((entry) => {
+                        const theme = SLOT_THEME[entry.slot];
+                        const isWinner = row.winners.includes(entry.slot) && !row.isTie && row.winners.length > 0;
+                        const widthPct = entry.val !== null ? Math.max(0, Math.min(100, entry.val)) : 0;
+
+                        return (
+                          <div key={entry.slot} className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`w-4 h-4 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
+                            >
+                              {entry.slot}
+                            </span>
+
+                            <div className="relative flex-1 h-4 bg-slate-100 dark:bg-slate-800/90 rounded overflow-hidden border border-slate-200/80 dark:border-slate-700/70">
+                              <div className="absolute inset-y-0 left-1/4 w-px bg-slate-200/80 dark:bg-slate-700/60 pointer-events-none" />
+                              <div className="absolute inset-y-0 left-1/2 w-px bg-slate-200/80 dark:bg-slate-700/60 pointer-events-none" />
+                              <div className="absolute inset-y-0 left-3/4 w-px bg-slate-200/80 dark:bg-slate-700/60 pointer-events-none" />
+                              {entry.val !== null && (
+                                <div
+                                  className={`h-full rounded-r-xs transition-all duration-300 ${
+                                    isWinner || row.isTie ? theme.barActive : theme.barDim
+                                  }`}
+                                  style={{ width: `${widthPct}%` }}
+                                />
+                              )}
+                            </div>
+
+                            <div className="w-28 sm:w-36 text-right font-mono tabular-nums text-xs shrink-0 flex items-baseline justify-end gap-1.5">
+                              <span
+                                className={
+                                  entry.val === null
+                                    ? 'text-slate-400 dark:text-slate-500 font-semibold'
+                                    : isWinner
+                                    ? `font-extrabold ${theme.text}`
+                                    : 'font-semibold text-slate-700 dark:text-slate-300'
+                                }
+                              >
+                                {entry.val !== null ? `${formatNumber(entry.val, 1)}%` : '—'}
+                              </span>
+                              {entry.contrib !== null && (
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:inline">
+                                  {row.isRescaled && entry.raw !== null
+                                    ? `(${formatNumber(entry.raw, 0)}%)`
+                                    : `+${entry.contrib.toFixed(1)}`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+
+                  {/* Expandable Category Details Drawer */}
+                  {isExpanded && (
+                    <div className="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1 max-w-3xl">
+                        <p className="leading-relaxed">
+                          {lang === 'de' ? row.comp.descriptionDe : row.comp.descriptionEn}
+                        </p>
+                        <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                          {lang === 'de' ? 'Berechnung:' : 'Formula:'}{' '}
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {row.comp.formulaDesc}
+                          </span>
+                          {row.isRescaled && (
+                            <span>
+                              {' · '}
+                              {lang === 'de'
+                                ? 'Skaliert von 29% Rate-Basis auf 0–100%'
+                                : 'Rescaled from 29% guessing floor to 0–100%'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {row.sourceUrl && (
+                          <a
+                            href={row.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
+                          >
+                            <span>{t.sourceLink}</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                        {onScrollToParagraph && (
+                          <button
+                            type="button"
+                            onClick={() => onScrollToParagraph(anchorId)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-blue-600 dark:text-blue-400 transition-colors cursor-pointer"
+                          >
+                            <BookOpen className="w-3 h-3" />
+                            <span>{lang === 'de' ? 'Methodik unten' : 'Notes below'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Totals Footer Row */}
         <div className="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-950/70 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
@@ -1846,7 +3023,11 @@ export const CompareView: React.FC<CompareViewProps> = ({
                   </div>
                   <div
                     className={`grid ${
-                      isThreeMode ? 'grid-cols-3' : 'grid-cols-2'
+                      effectiveCount === 2
+                        ? 'grid-cols-2'
+                        : effectiveCount === 3
+                        ? 'grid-cols-3'
+                        : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
                     } gap-2 font-mono tabular-nums`}
                   >
                     {row.entries.map((entry) => {

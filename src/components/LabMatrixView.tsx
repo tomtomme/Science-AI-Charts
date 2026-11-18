@@ -5,6 +5,7 @@ import { DEFAULT_LAB_PLANS, matchMonitoredLabKey } from '../data/pricingPlansFal
 import { Search, ExternalLink, Cpu, Wrench, Terminal, Layers, HelpCircle, BookOpen, Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { roundCurrencyString, roundCurrencyTokensInText } from '../utils/priceFormat';
+import { getSubscriptionBookingUrl, resolveLabTierChatUrl } from '../data/subscriptionLinks';
 
 export type LabGroup = 'all' | 'top10' | 'contender' | 'tweakers' | 'small' | 'harness';
 
@@ -137,7 +138,7 @@ export const GLOSSARY_TERMS: GlossaryTermDef[] = [
     shortEn: 'A massive mathematical association network of billions of learned knobs (weights) trained to produce probable text continuations.',
     shortDe: 'Ein mathematisches Assoziationsnetz aus Milliarden gelernten Stellschrauben (Gewichten), das Texteingaben in passende Fortsetzungen übersetzt.',
     detailEn: 'Analogy: Like an immensely well-read smartphone predictive text engine that digested libraries of books, research papers, and code. It possesses no consciousness or personal intent; rather, it computes statistical word associations. Without an execution scaffold (harness), it remains a passive text-generation tool.',
-    detailDe: 'Metapher: Wie ein extrem belesener Text-Vervollständiger auf dem Smartphone, der Millionen Fachbücher, Webseiten und Programmcode gelesen hat. Es „denkt“ nicht mit Bewusstsein wie ein Mensch, sondern berechnet nach statistischer Mustererkennung, welches nächste Wort (Token) am besten an die bisherigen Wörter anschließt. Ohne Steuerung (Harness) bleibt es ein stummes Textausgabe-Werkzeug.',
+    detailDe: 'Metapher: Wie ein extrem belesener Text-Vervollständiger auf dem Smartphone, der Millionen Fachbücher, Webseiten und Programmcode gelesen hat. Es „denkt“ nicht mit Bewusstsein wie ein Mensch, sondern berechnet nach statistischer Mustererkennung, welches nächste Wort (Token) am besten an die bisherigen Wörter anschließt. Ohne Agentensteuerung bleibt es ein stummes Textausgabe-Werkzeug.',
     category: 'architecture',
   },
 
@@ -263,7 +264,7 @@ export const GLOSSARY_TERMS: GlossaryTermDef[] = [
     shortEn: 'Large Language Model. A neural network trained on vast text corpora to predict probabilistic sequences of word tokens.',
     shortDe: 'Großes Sprachmodell. Ein gigantischer Textgenerator, der Wortbausteine auf Basis statistischer Wahrscheinlichkeiten aneinanderreiht.',
     detailEn: 'Analogy: A vast associative memory network. An LLM possesses neither consciousness nor intent; having digested terabytes of text, it knows with uncanny precision which words associate with which contexts, similar to human word association. Without an operational harness, it cannot take independent actions.',
-    detailDe: 'Metapher: Ein Assoziationsgedächtnis gigantischen Ausmaßes. Ein LLM hat keine Gefühle, keine Absichten und kein Weltwissen wie ein Mensch. Es hat Millionen von Texten analysiert und weiß verblüffend genau, welche Wörter in einem bestimmten Kontext zueinander passen – genau wie Menschen beim freien Assoziieren („Nacht“ → „Dunkelheit“). Ohne Steuerungsgerüst (Harness) agiert es nicht selbstständig.',
+    detailDe: 'Metapher: Ein Assoziationsgedächtnis gigantischen Ausmaßes. Ein LLM hat keine Gefühle, keine Absichten und kein Weltwissen wie ein Mensch. Es hat Millionen von Texten analysiert und weiß verblüffend genau, welche Wörter in einem bestimmten Kontext zueinander passen – genau wie Menschen beim freien Assoziieren („Nacht“ → „Dunkelheit“). Ohne Agentensteuerung agiert es nicht selbstständig.',
     category: 'architecture',
   },
   {
@@ -315,17 +316,17 @@ export const GLOSSARY_TERMS: GlossaryTermDef[] = [
     category: 'architecture',
   },
 
-  // 5. Agenten, Steuerung & Praxis
+  // 5. Agentensteuerung & Praxis
   {
     id: 'term-harness',
     termEn: 'Harness (Agent Scaffolding & Runtime)',
-    termDe: 'Harness (Zaumzeug & Ablaufsteuerung)',
+    termDe: 'Agentensteuerung',
     badgeEn: 'Agent Scaffolding',
-    badgeDe: 'Ablaufsteuerung',
+    badgeDe: 'Agentensteuerung',
     shortEn: 'The harness for the model: the software scaffolding connecting the raw model to tools and keeping it in an active execution loop.',
-    shortDe: 'Das Zaumzeug für das Modell: Die Software-Umgebung, die ein Sprachmodell mit Werkzeugen verbindet und in einer Arbeitsschleife hält.',
+    shortDe: 'Die Software-Umgebung, die ein Sprachmodell mit Werkzeugen verbindet und selbstständig in einer Arbeitsschleife steuert.',
     detailEn: 'Analogy: A brain in a jar cannot act alone—it can only whisper thoughts. The harness provides the body and toolbelt: it accepts a complex prompt, breaks it into actionable sub-tasks, edits files, executes commands, intercepts errors, and sustains an autonomous loop until the work is verified.',
-    detailDe: 'Metapher: Ein Gehirn im Glas kann allein nichts bewirken – es kann nur Gedanken flüstern. Das Harness ist der Körper und die Werkzeugkiste: Es nimmt eine Aufgabe an, zerlegt sie in Teilschritte, öffnet Dateien, startet das Terminal, fängt Fehlermeldungen ab und lässt das Modell in einer Schleife arbeiten, bis die Aufgabe tatsächlich gelöst ist.',
+    detailDe: 'Metapher: Ein Gehirn im Glas kann allein nichts bewirken – es kann nur Gedanken flüstern. Die Agentensteuerung ist der Körper und die Werkzeugkiste: Sie nimmt eine Aufgabe an, zerlegt sie in Teilschritte, öffnet Dateien, startet das Terminal, fängt Fehlermeldungen ab und lässt das Modell in einer Schleife arbeiten, bis die Aufgabe tatsächlich gelöst ist.',
     category: 'agentic',
   },
   {
@@ -828,7 +829,7 @@ function normalizePricingLabKey(raw: string): string {
   if (low.includes('thinking')) return 'thinkingmachines';
   if (low.includes('xiaomi') || low.includes('mimo')) return 'xiaomi';
   if (low.includes('minimax')) return 'minimax';
-  if (low.includes('inclusion')) return 'inclusion';
+  if (low.includes('inclusion') || low.includes('ant group') || low === 'ling') return 'inclusion';
   if (low.includes('stepfun')) return 'stepfun';
   if (low.includes('sapiens') || low.includes('agnes')) return 'sapiens';
   if (low.includes('tencent')) return 'tencent';
@@ -924,6 +925,11 @@ function formatPriceRange(firstRaw: string, secondRaw?: string): string {
   return min === max ? `${min}${plusSuffix}` : `${min}-${max}${plusSuffix}`;
 }
 
+interface TierRowPriceInfo {
+  price: string;
+  planLabel?: string;
+}
+
 function resolveTierRowPrice(
   lab: LabEntry,
   tierKey: keyof LabEntry['parameterSizes'],
@@ -931,7 +937,7 @@ function resolveTierRowPrice(
   matchedModels: ModelRecord[],
   consumerPlans: LabPlanInfo[],
   lang: 'de' | 'en'
-): string | null {
+): TierRowPriceInfo | null {
   const monitoredLab = matchMonitoredLabKey(lab.creator) || matchMonitoredLabKey(lab.id);
   const pickPrice = (plan?: LabPlanInfo): string => {
     if (!plan) return '';
@@ -952,20 +958,20 @@ function resolveTierRowPrice(
       if (tierKey === 'small') return null;
       if (tierKey === 'medium') {
         const goPrice = pickPrice(go);
-        return goPrice ? `Go ${formatPriceRange(zeroUnit, goPrice)}` : null;
+        return goPrice ? { price: formatPriceRange(zeroUnit, goPrice), planLabel: 'Go' } : null;
       }
       if (tierKey === 'large' || tierKey === 'massive' || tierKey === 'colossal' || tierKey === 'planetary') {
         const plusPrice = pickPrice(plus);
-        if (plusPrice) return `Plus ${plusPrice}`;
+        if (plusPrice) return { price: plusPrice, planLabel: 'Plus' };
       }
       if (tierKey === 'singularity' || tierKey === 'godTier') {
         if (pros.length >= 2) {
           const firstP = pickPrice(pros[0]);
           const lastP = pickPrice(pros[pros.length - 1]);
-          if (firstP && lastP) return `Pro ${formatPriceRange(firstP, lastP)}`;
+          if (firstP && lastP) return { price: formatPriceRange(firstP, lastP), planLabel: 'Pro' };
         }
         const singleP = pickPrice(pros[0]);
-        if (singleP) return `Pro ${singleP}`;
+        if (singleP) return { price: singleP, planLabel: 'Pro' };
       }
     } else if (monitoredLab === 'Anthropic') {
       const pro = consumerPlans.find((p) => /\bpro\b/i.test(p.planName));
@@ -976,17 +982,19 @@ function resolveTierRowPrice(
       }
       if (tierKey === 'massive') {
         const proPrice = pickPrice(pro);
-        return proPrice ? `Pro ${formatPriceRange(zeroUnit, proPrice)}` : null;
+        return proPrice ? { price: formatPriceRange(zeroUnit, proPrice), planLabel: 'Pro' } : null;
       }
       if (tierKey === 'colossal' || tierKey === 'planetary') {
         const proPrice = pickPrice(pro);
-        if (proPrice) return `Pro ${proPrice}`;
+        if (proPrice) return { price: proPrice, planLabel: 'Pro' };
       }
       if (tierKey === 'singularity' || tierKey === 'godTier') {
         const maxPrice = pickPrice(max);
         const ultraPrice = pickPrice(ultra);
-        if (maxPrice && ultraPrice) return `Max ${formatPriceRange(maxPrice, ultraPrice)}`;
-        if (maxPrice) return `Max ${maxPrice}`;
+        if (maxPrice && ultraPrice) {
+          return { price: formatPriceRange(maxPrice, ultraPrice), planLabel: 'Max / Ultra' };
+        }
+        if (maxPrice) return { price: maxPrice, planLabel: 'Max' };
       }
     } else if (monitoredLab === 'Google') {
       const plus = consumerPlans.find((p) => /\bplus\b/i.test(p.planName));
@@ -997,20 +1005,20 @@ function resolveTierRowPrice(
       }
       if (tierKey === 'colossal') {
         const plusPrice = pickPrice(plus);
-        return plusPrice ? `Plus ${formatPriceRange(zeroUnit, plusPrice)}` : null;
+        return plusPrice ? { price: formatPriceRange(zeroUnit, plusPrice), planLabel: 'Plus' } : null;
       }
       if (tierKey === 'planetary') {
         const proPrice = pickPrice(pro);
-        if (proPrice) return `Pro ${proPrice}`;
+        if (proPrice) return { price: proPrice, planLabel: 'Pro' };
       }
       if (tierKey === 'singularity' || tierKey === 'godTier') {
         if (ultras.length >= 2) {
           const firstU = pickPrice(ultras[0]);
           const lastU = pickPrice(ultras[ultras.length - 1]);
-          if (firstU && lastU) return `Ultra ${formatPriceRange(firstU, lastU)}`;
+          if (firstU && lastU) return { price: formatPriceRange(firstU, lastU), planLabel: 'Ultra' };
         }
         const ultraPrice = pickPrice(ultras[0]);
-        if (ultraPrice) return `Ultra ${ultraPrice}`;
+        if (ultraPrice) return { price: ultraPrice, planLabel: 'Ultra' };
       }
     } else if (monitoredLab === 'Meta') {
       // Meta Muse plans are US-only; omit US price badges on DE view
@@ -1026,13 +1034,13 @@ function resolveTierRowPrice(
       }
       if (tierKey === 'massive' || tierKey === 'colossal' || tierKey === 'planetary') {
         if (!isZeroPriceString(powerUs)) {
-          return `Muse ${powerUs}`;
+          return { price: powerUs, planLabel: 'Muse Power' };
         }
         return null;
       }
       if (tierKey === 'singularity' || tierKey === 'godTier') {
         if (!isZeroPriceString(maxUs)) {
-          return `Muse ${maxUs}`;
+          return { price: maxUs, planLabel: 'Muse Maximum' };
         }
         return null;
       }
@@ -1074,13 +1082,13 @@ function resolveTierRowPrice(
   }
 
   if (priceHits.length === 0) return null;
-  if (priceHits.length === 1) return priceHits[0];
+  if (priceHits.length === 1) return { price: priceHits[0] };
   const b0 = extractPriceBounds(priceHits[0]);
   const b1 = extractPriceBounds(priceHits[1]);
   if (b0 && b1 && b0.currency && b0.currency === b1.currency) {
-    return formatPriceRange(priceHits[0], priceHits[1]);
+    return { price: formatPriceRange(priceHits[0], priceHits[1]) };
   }
-  return priceHits.join(' · ');
+  return { price: priceHits.join(' · ') };
 }
 
 interface LabPricingSummary {
@@ -1554,7 +1562,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             {lang === 'de' ? `Labore kleiner Modelle (${smallCount})` : `Small Model Labs (${smallCount})`}
           </button>
           <Tooltip
-            title={lang === 'de' ? 'Agenten- & Steuergerüste (Harness)' : 'Agent Scaffolding & Harness'}
+            title={lang === 'de' ? 'Agentensteuerung' : 'Agent Scaffolding & Harness'}
             badge={lang === 'de' ? 'Glossar' : 'Glossary'}
             align="center"
             width="w-72"
@@ -1562,7 +1570,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               <div>
                 <p className="text-slate-300 leading-snug mb-2">
                   {lang === 'de'
-                    ? 'Entwickler von Software-Umgebungen wie Aider, OpenHands oder Cursor. Sie bauen das Steuerungsgerüst („Zaumzeug“ / Harness): Sie statten LLMs mit Werkzeugen (Terminal, Dateizugriff) aus, zerlegen komplexe Aufgaben in Teilschritte und halten das Modell in einer autonomen Ausführungsschleife (ReAct-Loop), bis die Arbeit vollständig erledigt ist.'
+                    ? 'Entwickler von Software-Umgebungen wie Aider, OpenHands oder Cursor. Sie bauen die Agentensteuerung: Sie statten LLMs mit Werkzeugen (Terminal, Dateizugriff) aus, zerlegen komplexe Aufgaben in Teilschritte und halten das Modell in einer autonomen Ausführungsschleife (ReAct-Loop), bis die Arbeit vollständig erledigt ist.'
                     : 'Developers of agentic runtime environments like Aider, OpenHands, or Cursor. Instead of training raw models, they build the execution scaffolding ("harness"): equipping LLMs with tools (terminal, file system), decomposing tasks into sub-steps, and running them in autonomous loops until finished.'}
                 </p>
                 <button
@@ -1573,7 +1581,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   }}
                   className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline pt-1 border-t border-slate-800/80 w-full cursor-pointer font-semibold"
                 >
-                  <span>{lang === 'de' ? 'Harness im Glossar nachschlagen ↓' : 'View Harness in Glossary ↓'}</span>
+                  <span>{lang === 'de' ? 'Agentensteuerung im Glossar nachschlagen ↓' : 'View Harness in Glossary ↓'}</span>
                 </button>
               </div>
             }
@@ -1587,7 +1595,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              {lang === 'de' ? `Agenten- & Steuergerüste (${harnessCount})` : `Agent Scaffolding (${harnessCount})`}
+              {lang === 'de' ? `Agentensteuerung (${harnessCount})` : `Agent Scaffolding (${harnessCount})`}
             </button>
           </Tooltip>
         </div>
@@ -1600,7 +1608,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             width="w-64"
             content={
               lang === 'de'
-                ? 'Zu den Definitionen springen (Neuronales Netz, Modell, Chatbot, Generative KI, Harness etc.)'
+                ? 'Zu den Definitionen springen (Neuronales Netz, Modell, Chatbot, Generative KI, Agentensteuerung etc.)'
                 : 'Jump to definitions (Neural Network, Model, Chatbot, Generative AI, Harness etc.)'
             }
           >
@@ -2092,11 +2100,11 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             ? pricingPlans.filter((p) => p.lab === monitoredLab)
             : [];
 
-          const tierRowPrices = new Map<keyof LabEntry['parameterSizes'], string>();
+          const tierRowPrices = new Map<keyof LabEntry['parameterSizes'], TierRowPriceInfo>();
           for (const tier of displayTiers) {
             const val = lab.parameterSizes[tier.key];
             if (!val) continue;
-            const rowPrice = resolveTierRowPrice(
+            const rowPriceInfo = resolveTierRowPrice(
               lab,
               tier.key,
               val,
@@ -2104,8 +2112,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               labConsumerPlans,
               lang
             );
-            if (rowPrice) {
-              tierRowPrices.set(tier.key, rowPrice);
+            if (rowPriceInfo) {
+              tierRowPrices.set(tier.key, rowPriceInfo);
             }
           }
 
@@ -2187,7 +2195,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     {lab.group === 'harness' ? (
                       <>
                         <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
-                          {lang === 'de' ? 'Agenten- & Steuergerüst (Harness)' : 'Agent Scaffolding & Execution Harness'}
+                          {lang === 'de' ? 'Agentensteuerung' : 'Agent Scaffolding & Execution Harness'}
                         </div>
                         <div className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate">
                           {lab.harness || lab.engineName}
@@ -2293,7 +2301,25 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                           sizeFilter !== 'all' &&
                           getSizeFilterTiers(sizeFilter).includes(tier.key);
 
-                        const rowPrice = tierRowPrices.get(tier.key);
+                        const rowPriceInfo = tierRowPrices.get(tier.key);
+                        const rowPrice = rowPriceInfo?.price;
+                        const rowPlanLabel = rowPriceInfo?.planLabel;
+                        const modelChatUrl = resolveLabTierChatUrl({
+                          lab,
+                          tierKey: tier.key,
+                          modelVal,
+                          matchedModels: matchedLabModels,
+                        });
+                        const priceBookingUrl = rowPrice
+                          ? getSubscriptionBookingUrl({
+                              labOrCompany: lab.creator,
+                              modelName: modelVal,
+                              planText: rowPlanLabel || rowPrice,
+                              priceText: rowPrice,
+                              lang,
+                              consumerPlans: labConsumerPlans,
+                            })
+                          : undefined;
 
                         return (
                           <div
@@ -2326,31 +2352,64 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                               </div>
                             </div>
 
-                            {/* Center: Model Name(s) */}
-                            <span
-                              className={`font-mono text-xs text-right truncate flex-1 ${
-                                isSimplifiedView
-                                  ? 'font-bold text-slate-900 dark:text-slate-100'
-                                  : 'font-semibold text-slate-800 dark:text-slate-200'
-                              }`}
-                              title={modelVal}
-                            >
-                              {modelVal}
-                            </span>
-
-                            {/* Right: Concrete Unlock Price Badge (in model row) */}
-                            {rowPrice && (
-                              <span
-                                className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 shrink-0"
-                                title={
-                                  lang === 'de'
-                                    ? `Freischaltung / Preis (${rowPrice})`
-                                    : `Unlock / Price (${rowPrice})`
-                                }
+                            {/* Center: Model Name(s) — clickable link to chat (prioritizes Col P) */}
+                            {modelChatUrl ? (
+                              <a
+                                href={modelChatUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`font-mono text-xs text-right truncate flex-1 hover:text-blue-600 dark:hover:text-blue-400 hover:underline decoration-blue-400/70 underline-offset-2 transition-colors ${
+                                  isSimplifiedView
+                                    ? 'font-bold text-slate-900 dark:text-slate-100'
+                                    : 'font-semibold text-slate-800 dark:text-slate-200'
+                                }`}
+                                title={`${modelVal} — ${lang === 'de' ? 'Chat öffnen' : 'Open chat'}`}
                               >
-                                {rowPrice}
+                                {modelVal}
+                              </a>
+                            ) : (
+                              <span
+                                className={`font-mono text-xs text-right truncate flex-1 ${
+                                  isSimplifiedView
+                                    ? 'font-bold text-slate-900 dark:text-slate-100'
+                                    : 'font-semibold text-slate-800 dark:text-slate-200'
+                                }`}
+                                title={modelVal}
+                              >
+                                {modelVal}
                               </span>
                             )}
+
+                            {/* Right: Concrete Unlock Price Badge (price only; plan tier shown below + in tooltip) */}
+                            {rowPrice && (() => {
+                              const combinedLabel = rowPlanLabel ? `${rowPlanLabel}: ${rowPrice}` : rowPrice;
+                              return priceBookingUrl ? (
+                                <a
+                                  href={priceBookingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 hover:border-emerald-400 dark:hover:border-emerald-600 hover:underline shrink-0 transition-colors cursor-pointer"
+                                  title={
+                                    lang === 'de'
+                                      ? `${combinedLabel} — Abo buchen / Tarifseite öffnen`
+                                      : `${combinedLabel} — Book plan / open pricing page`
+                                  }
+                                >
+                                  {rowPrice}
+                                </a>
+                              ) : (
+                                <span
+                                  className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 shrink-0"
+                                  title={
+                                    lang === 'de'
+                                      ? `Freischaltung / Preis (${combinedLabel})`
+                                      : `Unlock / Price (${combinedLabel})`
+                                  }
+                                >
+                                  {rowPrice}
+                                </span>
+                              );
+                            })()}
 
                             {/* Right: Open / Closed Badge (only shown for hybrid model families) */}
                             {!isSimplifiedView && lab.weightsType === 'hybrid' && isOpen !== undefined && (
@@ -2412,6 +2471,32 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                                   const localizedPrice = roundCurrencyString(
                                     lang === 'de' ? plan.deMonthly : plan.usMonthly
                                   );
+                                  const planHref =
+                                    getSubscriptionBookingUrl({
+                                      labOrCompany: lab.creator,
+                                      planText: plan.planName,
+                                      priceText: localizedPrice,
+                                      lang,
+                                      consumerPlans: pricingSummary.consumerPlans,
+                                    }) || plan.sourceUrl;
+                                  if (planHref) {
+                                    return (
+                                      <a
+                                        key={`${plan.planName}-${idx}`}
+                                        href={planHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-baseline justify-between gap-2 rounded px-1 -mx-1 py-0.5 hover:bg-slate-800/80 transition-colors cursor-pointer"
+                                      >
+                                        <span className="font-semibold text-slate-200 truncate">
+                                          {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                        </span>
+                                        <span className="font-mono tabular-nums text-emerald-300 underline decoration-emerald-400/50 shrink-0">
+                                          {localizedPrice}
+                                        </span>
+                                      </a>
+                                    );
+                                  }
                                   return (
                                     <div key={`${plan.planName}-${idx}`} className="flex items-baseline justify-between gap-2">
                                       <span className="font-semibold text-slate-200 truncate">
@@ -2495,7 +2580,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         {lab.harnessSdk && (
                           <div className="flex items-start gap-1.5 pt-0.5">
                             <span className="text-slate-400 text-xs shrink-0 font-medium">
-                              Harness / SDK:
+                              {lang === 'de' ? 'Agentensteuerung / SDK:' : 'Harness / SDK:'}
                             </span>
                             <span className="font-medium text-slate-700 dark:text-slate-300">
                               {lab.harnessSdk}
@@ -2688,7 +2773,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               { key: 'foundations', labelDe: 'Wissenschaftstheorie', labelEn: 'Science & Foundations' },
               { key: 'statistics', labelDe: 'Statistische Modelle & Regression', labelEn: 'Statistical Models' },
               { key: 'architecture', labelDe: 'Sprachmodelle & KI', labelEn: 'LLMs & AI Architecture' },
-              { key: 'agentic', labelDe: 'Agenten & Steuerung', labelEn: 'Agents & Scaffolding' },
+              { key: 'agentic', labelDe: 'Agentensteuerung', labelEn: 'Agents & Scaffolding' },
               { key: 'evaluation', labelDe: 'Tests & Benchmarks', labelEn: 'Tests & Benchmarks' },
               { key: 'infrastructure', labelDe: 'Infrastruktur & APIs', labelEn: 'Infrastructure' },
             ].map((cat) => {

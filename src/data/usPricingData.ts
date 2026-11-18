@@ -6,12 +6,12 @@ export const US_PRICE_HEADER_ROW2 = 'if paid for 1 year vs. if paid monthly';
  * ("if paid for 1 year vs. if paid monthly").
  */
 export const RESEARCHED_US_PRICES: Record<string, string> = {
-  'claude fable 5.2': '$100',
-  'gemini 4 carbon': '$100',
+  'claude fable 5.2': '$100-200',
+  'gemini 4 carbon': '$100-200',
   'claude opus 5.5': '$17-20',
   'gemini 4 argon': '$17-20',
-  'gpt-6 astra': '$100',
-  'chatgpt-6 astra': '$100',
+  'gpt-6 astra': '$100-500',
+  'chatgpt-6 astra': '$100-500',
   'gpt-6.1 sol': '$20',
   'chatgpt-6.1 sol': '$20',
   'gpt-6.1 terra': '$20',

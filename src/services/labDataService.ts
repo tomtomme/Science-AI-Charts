@@ -135,31 +135,107 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
     return -1;
   };
 
+  type TierKey = keyof LabEntry['parameterSizes'];
+  const TIER_ROW_SPECS: Array<{ key: TierKey; keywords: string[] }> = [
+    { key: 'micro', keywords: ['micro <', 'micro'] },
+    { key: 'mini', keywords: ['mini <', 'mini'] },
+    { key: 'tiny', keywords: ['tiny <', 'tiny'] },
+    { key: 'small', keywords: ['small <', 'small'] },
+    { key: 'medium', keywords: ['medium <', 'medium'] },
+    { key: 'large', keywords: ['large <', 'large'] },
+    { key: 'massive', keywords: ['massive <', 'massive'] },
+    { key: 'colossal', keywords: ['colossal <', 'colossal'] },
+    { key: 'planetary', keywords: ['planetary <', 'planetary'] },
+    { key: 'singularity', keywords: ['singularity <', 'singularity'] },
+    { key: 'godTier', keywords: ['god tier', 'godtier'] },
+  ];
+
+  const resolveTierRowIndices = (
+    startRow: number,
+    endRow: number,
+    defaults?: Partial<Record<TierKey, number>>
+  ): Partial<Record<TierKey, number>> => {
+    const map: Partial<Record<TierKey, number>> = {};
+    for (let i = Math.max(0, startRow); i <= Math.min(endRow, rows.length - 1); i++) {
+      const col0 = (rows[i]?.[0] || '').toLowerCase().trim();
+      if (!col0) continue;
+      // Ignore notes/metadata/footer lines that happen to include a tier word (e.g. "**Local AI...", "Small Model Labs")
+      if (col0.includes('notes') || col0.includes('model lab') || col0.includes('local ai') || col0.includes('based on')) {
+        continue;
+      }
+      for (const spec of TIER_ROW_SPECS) {
+        if (map[spec.key] !== undefined) continue;
+        if (spec.keywords.some((kw) => col0.startsWith(kw) || col0.includes(`${kw} `))) {
+          map[spec.key] = i;
+          break;
+        }
+      }
+    }
+    if (defaults) {
+      for (const [k, rowIdx] of Object.entries(defaults)) {
+        const key = k as TierKey;
+        if (map[key] === undefined && rowIdx !== undefined) {
+          map[key] = rowIdx;
+        }
+      }
+    }
+    return map;
+  };
+
+  const buildTierValuesAndGrid = (
+    tierRowIndices: Partial<Record<TierKey, number>>,
+    colIdx: number
+  ) => {
+    const parameterSizes: LabEntry['parameterSizes'] = {};
+    const tierRowsForGrid: Array<{ key: TierKey; rowIdx: number; value: string }> = [];
+    for (const spec of TIER_ROW_SPECS) {
+      const rowIdx = tierRowIndices[spec.key];
+      if (rowIdx === undefined) continue;
+      const val = getCell(rowIdx, colIdx);
+      parameterSizes[spec.key] = val;
+      tierRowsForGrid.push({ key: spec.key, rowIdx, value: val });
+    }
+    return { parameterSizes, tierRowsForGrid };
+  };
+
   const fallbackMap = new Map<string, LabEntry>(FALLBACK_LAB_ENTRIES.map((l) => [l.id, l]));
   const fallbackByCreator = new Map<string, LabEntry>(
     FALLBACK_LAB_ENTRIES.map((l) => [l.creator.toLowerCase().trim(), l])
   );
 
-  // 1. Top LLM Labs (dynamic columns + live merged country headers + live cell green backgrounds)
-  const rTop10 = findRow('top') !== -1 ? findRow('top') : 1;
-  const rContenders = findRow('contender') !== -1 ? findRow('contender') : 18;
+  // Locate section header rows dynamically so row insertions never shift parsing
+  const rTop10 =
+    findRow('top llm') !== -1 ? findRow('top llm') : findRow('top') !== -1 ? findRow('top') : 2;
+  const rContenders = findRow('contender') !== -1 ? findRow('contender') : 19;
+  const rTweakers = findRow('tweaker') !== -1 ? findRow('tweaker') : 31;
+  const rSmall = findRow('small model') !== -1 ? findRow('small model') : 42;
+  const rHarness =
+    findRow('harness labs') !== -1
+      ? findRow('harness labs')
+      : findRow('harness only') !== -1
+      ? findRow('harness only')
+      : 54;
 
+  // 1. Top LLM Labs
+  const topBoundEnd = Math.max(rTop10 + 16, rContenders - 1);
   const findTopRow = (keywords: string[], defaultOffset: number) => {
-    const found = findRowInRange(rTop10 + 1, Math.max(rTop10 + 16, rContenders - 1), keywords);
+    const found = findRowInRange(rTop10 + 1, topBoundEnd, keywords);
     return found !== -1 ? found : rTop10 + defaultOffset;
   };
 
   const rTopCreator = findTopRow(['creator'], 1);
   const rTopFamous = findTopRow(['famous for'], 2);
   const rTopEngine = findTopRow(['chatbot family', 'engine'], 3);
-  const rTopSmall = findTopRow(['small <'], 4);
-  const rTopMedium = findTopRow(['medium <'], 5);
-  const rTopLarge = findTopRow(['large <'], 6);
-  const rTopMassive = findTopRow(['massive <'], 7);
-  const rTopColossal = findTopRow(['colossal <'], 8);
-  const rTopPlanetary = findTopRow(['planetary <'], 9);
-  const rTopSingularity = findTopRow(['singularity <'], 10);
-  const rTopGodTier = findTopRow(['god tier'], 11);
+  const topTierRows = resolveTierRowIndices(rTop10 + 1, topBoundEnd, {
+    small: rTop10 + 4,
+    medium: rTop10 + 5,
+    large: rTop10 + 6,
+    massive: rTop10 + 7,
+    colossal: rTop10 + 8,
+    planetary: rTop10 + 9,
+    singularity: rTop10 + 10,
+    godTier: rTop10 + 11,
+  });
   const rTopSubs = findTopRow(['subscription tier'], 12);
   const rTopHarness = findTopRow(['the harness'], 13);
   const rTopDaily = findTopRow(['daily agent'], 14);
@@ -180,28 +256,9 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
       fallbackMap.get(slugifyLabId(creator, c));
     const { country, flag } = normalizeCountry(curCountryTop10);
 
-    const parameterSizes = {
-      small: getCell(rTopSmall, c),
-      medium: getCell(rTopMedium, c),
-      large: getCell(rTopLarge, c),
-      massive: getCell(rTopMassive, c),
-      colossal: getCell(rTopColossal, c),
-      planetary: getCell(rTopPlanetary, c),
-      singularity: getCell(rTopSingularity, c),
-      godTier: getCell(rTopGodTier, c),
-    };
-
+    const { parameterSizes, tierRowsForGrid } = buildTierValuesAndGrid(topTierRows, c);
     const { weightsType, openWeights } = resolveWeightsFromGrid(
-      [
-        { key: 'small', rowIdx: rTopSmall, value: parameterSizes.small },
-        { key: 'medium', rowIdx: rTopMedium, value: parameterSizes.medium },
-        { key: 'large', rowIdx: rTopLarge, value: parameterSizes.large },
-        { key: 'massive', rowIdx: rTopMassive, value: parameterSizes.massive },
-        { key: 'colossal', rowIdx: rTopColossal, value: parameterSizes.colossal },
-        { key: 'planetary', rowIdx: rTopPlanetary, value: parameterSizes.planetary },
-        { key: 'singularity', rowIdx: rTopSingularity, value: parameterSizes.singularity },
-        { key: 'godTier', rowIdx: rTopGodTier, value: parameterSizes.godTier },
-      ],
+      tierRowsForGrid,
       c,
       greenMask,
       fb,
@@ -226,42 +283,42 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
     });
   }
 
-  // 2. Contenders
-  const rTweakers = findRow('tweaker') !== -1 ? findRow('tweaker') : 29;
-  const rContenderNotes = findRowInRange(rContenders, rTweakers, ['note', 'famous']);
-  const notesRowContender = rContenderNotes !== -1 ? rContenderNotes : rContenders + 9;
+  // 2. Contenders (dynamic rows incl. Tiny < 8B & Planetary < 5T)
+  const contenderBoundEnd = Math.max(rContenders + 10, rTweakers - 1);
+  const findContenderRow = (keywords: string[], defaultOffset: number) => {
+    const found = findRowInRange(rContenders + 1, contenderBoundEnd, keywords);
+    return found !== -1 ? found : rContenders + defaultOffset;
+  };
+  const rContenderCreator = findContenderRow(['creator'], 1);
+  const rContenderEngine = findContenderRow(['chatbot family', 'engine'], 2);
+  const rContenderNotes = findRowInRange(rContenders + 1, contenderBoundEnd, ['note', 'famous']);
+  const notesRowContender = rContenderNotes !== -1 ? rContenderNotes : rContenders + 10;
   const contenderNotesLabel = rContenderNotes !== -1 ? getCell(rContenderNotes, 0) : 'Notes';
+  const contenderTierRows = resolveTierRowIndices(rContenders + 1, contenderBoundEnd, {
+    tiny: rContenders + 3,
+    small: rContenders + 4,
+    medium: rContenders + 5,
+    large: rContenders + 6,
+    massive: rContenders + 7,
+    colossal: rContenders + 8,
+    planetary: rContenders + 9,
+  });
 
   let curCountryContender = 'America (US)';
   const contenders: LabEntry[] = [];
-  const contendersMaxCols = rows[rContenders + 1]?.length || 35;
+  const contendersMaxCols = rows[rContenderCreator]?.length || 35;
   for (let c = 1; c < contendersMaxCols; c++) {
     const countryHeader = getCell(rContenders, c);
     if (countryHeader) curCountryContender = countryHeader;
-    const creator = getCell(rContenders + 1, c);
+    const creator = getCell(rContenderCreator, c);
     if (!creator) continue;
 
     const fb = fallbackMap.get(`contender-${c}`) || fallbackByCreator.get(creator.toLowerCase());
     const { country, flag } = normalizeCountry(curCountryContender);
 
-    const parameterSizes = {
-      small: getCell(rContenders + 3, c),
-      medium: getCell(rContenders + 4, c),
-      large: getCell(rContenders + 5, c),
-      massive: getCell(rContenders + 6, c),
-      colossal: getCell(rContenders + 7, c),
-      planetary: getCell(rContenders + 8, c),
-    };
-
+    const { parameterSizes, tierRowsForGrid } = buildTierValuesAndGrid(contenderTierRows, c);
     const { weightsType, openWeights } = resolveWeightsFromGrid(
-      [
-        { key: 'small', rowIdx: rContenders + 3, value: parameterSizes.small },
-        { key: 'medium', rowIdx: rContenders + 4, value: parameterSizes.medium },
-        { key: 'large', rowIdx: rContenders + 5, value: parameterSizes.large },
-        { key: 'massive', rowIdx: rContenders + 6, value: parameterSizes.massive },
-        { key: 'colossal', rowIdx: rContenders + 7, value: parameterSizes.colossal },
-        { key: 'planetary', rowIdx: rContenders + 8, value: parameterSizes.planetary },
-      ],
+      tierRowsForGrid,
       c,
       greenMask,
       fb,
@@ -274,7 +331,7 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
       country,
       countryFlag: flag,
       creator,
-      engineName: getCell(rContenders + 2, c),
+      engineName: getCell(rContenderEngine, c),
       famousFor: getCell(notesRowContender, c),
       notesLabel: contenderNotesLabel,
       weightsType,
@@ -285,102 +342,98 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
   }
 
   // 3. Model Tweakers
+  const tweakerBoundEnd = Math.max(rTweakers + 9, rSmall - 1);
+  const findTweakerRow = (keywords: string[], defaultOffset: number) => {
+    const found = findRowInRange(rTweakers + 1, tweakerBoundEnd, keywords);
+    return found !== -1 ? found : rTweakers + defaultOffset;
+  };
+  const rTweakerCreator = findTweakerRow(['players building', 'creator'], 1);
+  const rTweakerEngine = findTweakerRow(['chatbot family', 'engine'], 2);
+  const rTweakerBasedOn = findTweakerRow(['based on'], 3);
+  const tweakerTierRows = resolveTierRowIndices(rTweakers + 1, tweakerBoundEnd, {
+    small: rTweakers + 4,
+    medium: rTweakers + 5,
+    large: rTweakers + 6,
+    massive: rTweakers + 7,
+    colossal: rTweakers + 8,
+    planetary: rTweakers + 9,
+  });
+
   const tweakers: LabEntry[] = [];
   let curCountryTweaker = 'America (US)';
-  const tweakersMaxCols = rows[rTweakers + 1]?.length || 30;
+  const tweakersMaxCols = rows[rTweakerCreator]?.length || 30;
   for (let c = 1; c < tweakersMaxCols; c++) {
     const countryHeader = getCell(rTweakers, c);
     if (countryHeader) curCountryTweaker = countryHeader;
-    const creator = getCell(rTweakers + 1, c);
+    const creator = getCell(rTweakerCreator, c);
     if (!creator) continue;
 
     const fb = fallbackMap.get(`tweaker-${c}`) || fallbackByCreator.get(creator.toLowerCase());
     const { country, flag } = normalizeCountry(curCountryTweaker);
 
-    const parameterSizes = {
-      small: getCell(rTweakers + 4, c),
-      medium: getCell(rTweakers + 5, c),
-      large: getCell(rTweakers + 6, c),
-      massive: getCell(rTweakers + 7, c),
-      colossal: getCell(rTweakers + 8, c),
-      planetary: getCell(rTweakers + 9, c),
-    };
-
+    const { parameterSizes, tierRowsForGrid } = buildTierValuesAndGrid(tweakerTierRows, c);
     const { weightsType, openWeights } = resolveWeightsFromGrid(
-      [
-        { key: 'small', rowIdx: rTweakers + 4, value: parameterSizes.small },
-        { key: 'medium', rowIdx: rTweakers + 5, value: parameterSizes.medium },
-        { key: 'large', rowIdx: rTweakers + 6, value: parameterSizes.large },
-        { key: 'massive', rowIdx: rTweakers + 7, value: parameterSizes.massive },
-        { key: 'colossal', rowIdx: rTweakers + 8, value: parameterSizes.colossal },
-        { key: 'planetary', rowIdx: rTweakers + 9, value: parameterSizes.planetary },
-      ],
+      tierRowsForGrid,
       c,
       greenMask,
       fb,
       'open'
     );
 
+    const basedOnVal = getCell(rTweakerBasedOn, c);
     tweakers.push({
       id: `tweaker-${c}`,
       group: 'tweakers',
       country,
       countryFlag: flag,
       creator,
-      engineName: getCell(rTweakers + 2, c),
-      basedOn: getCell(rTweakers + 3, c),
-      famousFor: getCell(rTweakers + 3, c) ? `Based on ${getCell(rTweakers + 3, c)}` : '',
+      engineName: getCell(rTweakerEngine, c),
+      basedOn: basedOnVal,
+      famousFor: basedOnVal ? `Based on ${basedOnVal}` : '',
       weightsType,
       openWeights,
       parameterSizes,
-      specialties: getCell(rTweakers + 3, c) ? `Based on ${getCell(rTweakers + 3, c)}` : '',
+      specialties: basedOnVal ? `Based on ${basedOnVal}` : '',
     });
   }
 
   // 4. Small Model Labs (live columns, no hardcoded Samsung merge)
-  const rSmall = findRow('small model') !== -1 ? findRow('small model') : 40;
-  const rHarness =
-    findRow('harness labs') !== -1
-      ? findRow('harness labs')
-      : findRow('harness only') !== -1
-      ? findRow('harness only')
-      : 52;
-  const rSmallNotes = findRowInRange(rSmall, rHarness, ['note', 'famous']);
+  const smallBoundEnd = Math.max(rSmall + 9, rHarness - 1);
+  const findSmallRow = (keywords: string[], defaultOffset: number) => {
+    const found = findRowInRange(rSmall + 1, smallBoundEnd, keywords);
+    return found !== -1 ? found : rSmall + defaultOffset;
+  };
+  const rSmallCreator = findSmallRow(['creator'], 1);
+  const rSmallEngine = findSmallRow(['chatbot family', 'engine'], 2);
+  const rSmallNotes = findRowInRange(rSmall + 1, smallBoundEnd, ['note', 'famous']);
   const notesRowSmall = rSmallNotes !== -1 ? rSmallNotes : rSmall + 9;
   const smallNotesLabel = rSmallNotes !== -1 ? getCell(rSmallNotes, 0) : 'Notes';
+  const smallTierRows = resolveTierRowIndices(rSmall + 1, smallBoundEnd, {
+    micro: rSmall + 3,
+    mini: rSmall + 4,
+    tiny: rSmall + 5,
+    small: rSmall + 6,
+    medium: rSmall + 7,
+    large: rSmall + 8,
+  });
 
   const smallLabs: LabEntry[] = [];
   let curCountrySmall = 'America (US)';
-  const smallMaxCols = rows[rSmall + 1]?.length || 30;
+  const smallMaxCols = rows[rSmallCreator]?.length || 30;
   for (let c = 1; c < smallMaxCols; c++) {
     const countryHeader = getCell(rSmall, c);
     if (countryHeader && !countryHeader.toLowerCase().includes('small llm') && !countryHeader.toLowerCase().includes('small model')) {
       curCountrySmall = countryHeader.trim();
     }
-    const creator = getCell(rSmall + 1, c);
+    const creator = getCell(rSmallCreator, c);
     if (!creator) continue;
 
     const fb = fallbackMap.get(`small-${c}`) || fallbackByCreator.get(creator.toLowerCase());
     const { country, flag } = normalizeCountry(curCountrySmall);
 
-    const parameterSizes = {
-      micro: getCell(rSmall + 3, c),
-      mini: getCell(rSmall + 4, c),
-      tiny: getCell(rSmall + 5, c),
-      small: getCell(rSmall + 6, c),
-      medium: getCell(rSmall + 7, c),
-      large: getCell(rSmall + 8, c),
-    };
-
+    const { parameterSizes, tierRowsForGrid } = buildTierValuesAndGrid(smallTierRows, c);
     const { weightsType, openWeights } = resolveWeightsFromGrid(
-      [
-        { key: 'micro', rowIdx: rSmall + 3, value: parameterSizes.micro },
-        { key: 'mini', rowIdx: rSmall + 4, value: parameterSizes.mini },
-        { key: 'tiny', rowIdx: rSmall + 5, value: parameterSizes.tiny },
-        { key: 'small', rowIdx: rSmall + 6, value: parameterSizes.small },
-        { key: 'medium', rowIdx: rSmall + 7, value: parameterSizes.medium },
-        { key: 'large', rowIdx: rSmall + 8, value: parameterSizes.large },
-      ],
+      tierRowsForGrid,
       c,
       greenMask,
       fb,
@@ -393,7 +446,7 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
       country,
       countryFlag: flag,
       creator,
-      engineName: getCell(rSmall + 2, c),
+      engineName: getCell(rSmallEngine, c),
       famousFor: getCell(notesRowSmall, c),
       notesLabel: smallNotesLabel,
       weightsType,
@@ -404,13 +457,23 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
   }
 
   // 5. Harness Only Labs
+  const harnessBoundEnd = Math.min(rows.length - 1, rHarness + 8);
+  const findHarnessRow = (keywords: string[], defaultOffset: number) => {
+    const found = findRowInRange(rHarness + 1, harnessBoundEnd, keywords);
+    return found !== -1 ? found : rHarness + defaultOffset;
+  };
+  const rHarnessCreator = findHarnessRow(['creator'], 1);
+  const rHarnessName = findHarnessRow(['harness'], 2);
+  const rHarnessForm = findHarnessRow(['form'], 3);
+  const rHarnessNote = findHarnessRow(['note'], 4);
+
   const harnessLabs: LabEntry[] = [];
   let curCountryHarness = 'America (US)';
-  const harnessMaxCols = rows[rHarness + 1]?.length || 30;
+  const harnessMaxCols = rows[rHarnessCreator]?.length || 30;
   for (let c = 1; c < harnessMaxCols; c++) {
     const countryHeader = getCell(rHarness, c);
     if (countryHeader) curCountryHarness = countryHeader.trim();
-    const creator = getCell(rHarness + 1, c);
+    const creator = getCell(rHarnessCreator, c);
     if (!creator) continue;
     const { country, flag } = normalizeCountry(curCountryHarness);
     harnessLabs.push({
@@ -420,10 +483,10 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
       countryFlag: flag,
       creator,
       famousFor: '',
-      engineName: getCell(rHarness + 2, c),
-      harness: getCell(rHarness + 2, c),
-      form: getCell(rHarness + 3, c),
-      note: getCell(rHarness + 4, c),
+      engineName: getCell(rHarnessName, c),
+      harness: getCell(rHarnessName, c),
+      form: getCell(rHarnessForm, c),
+      note: getCell(rHarnessNote, c),
       specialties: '',
       parameterSizes: {},
     });

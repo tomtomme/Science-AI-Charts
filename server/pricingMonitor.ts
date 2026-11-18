@@ -16,7 +16,7 @@ import {
   roundCurrencyTokensInText,
 } from '../src/utils/priceFormat.ts';
 
-const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-pricing-monitor-cache-v3.json');
+const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-pricing-monitor-cache-v4.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const QUOTA_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
@@ -402,7 +402,7 @@ Analyze the live fetched pricing & model pages below (combined with verified cur
 2. Germany (EUR, "€", incl. VAT — or "US only" if a paid consumer plan/model is currently unavailable in Germany)
 
 You MUST include ALL relevant CONSUMER browser/app plans across all 4 AI labs in "labs" (excluding CLI-only tools like Muse Code):
-- OpenAI: ChatGPT Go ($8 / ~8€; expanded free-tier features, no Pro/Plus-exclusive models), ChatGPT Plus ($20 / 23€), ChatGPT Pro 100 ($100 / 103€), ChatGPT Pro 200 ($200 / 200€), ChatGPT Pro 500 ($500 / 500€)
+- OpenAI: ChatGPT Go ($8 / ~8€; expanded free-tier features, no Pro/Plus-exclusive models), ChatGPT Plus ($20 / 23€), ChatGPT Pro 100 ($100 / 103€), ChatGPT Pro 200 ($200 / 200€), ChatGPT Pro 500 ($500 / 510€)
 - Anthropic: Claude Pro ($17-20 / 15-18€; includes Opus 5.5), Claude Max ($100 / 90€; includes Fable 5.2), Claude Ultra ($200 / 180€)
 - Google: Google AI Plus ($5 / 5-10€; 2x Hydrogen, 400 GB), Google AI Pro ($17-20 / 14-22€; Gemini 4 Argon, 5 TB), Google AI Ultra ($100-200 / 100-220€; Gemini 4 Carbon, 20 TB)
 - Meta (Consumer Browser / App Plans ONLY — do NOT list Muse Code CLI plans in "labs"!):
@@ -415,18 +415,25 @@ You MUST include ALL relevant CONSUMER browser/app plans across all 4 AI labs in
 
 CRITICAL VERIFICATION & MODEL-TO-TIER RULES:
 1. NEVER blindly trust or copy the Google Sheet's current "de" / "us" values! Verify EVERY model strictly against the fetched sources below first.
-2. Always match each paid model to the CHEAPEST / LOWEST CONSUMER BROWSER subscription tier that grants access to that model — NEVER assign a consumer baseline to a CLI coding plan ("Muse Code" $5/$15/$50/$200) or to a higher-quota tier just to match the sheet:
+2. Always match each paid model to the CHEAPEST / LOWEST CONSUMER BROWSER subscription tier that grants access to that model — EXCEPT for the flagship multi-step Pro/Max/Ultra tiers below, which span multiple expensive capacity/quota levels (no annual discount, instead multiple plan steps like Pro 100 -> Pro 500 or Max -> Ultra):
+   - NEVER assign a consumer baseline to a CLI coding plan ("Muse Code" $5/$15/$50/$200)!
    - Meta (Consumer browser / non-coder baseline):
      * Casual meta.ai browser chat is FREE ($0 / 0€) and Meta One ($8 / $20) only increases media/app perks — Meta One does NOT unlock Muse Spark 1.3, Muse Wonder, or Muse Wonder Full.
      * "Muse Spark 1.3": Consumer browser access is via muse.ai ("Meta Muse" web/app, US only — not in meta.ai chat). Paid consumer browser tier is "Muse Power" ($20 / US only) — NEVER assign "Muse Code Everyday ($5)" CLI or "Muse Maximum ($100)"!
      * "Muse Wonder": Rolling out to muse.ai consumer subscribers — consumer browser baseline is "Muse Power" ($20 / US only), NOT "Muse Code Everyday ($5)" CLI!
      * "Muse Wonder Full": Currently has NO consumer browser chat plan on meta.ai or muse.ai (only available via developer CLI "Muse Code Power" at $50 / US only). Unless the fetched sources show Muse Wonder Full launching in muse.ai/meta.ai browser chat, match it as "Muse Code Power (CLI only)" with liveDe="US only". For liveUs: if the sheet's current "us" already mentions "no chat", "CLI", or "coder" alongside "$50" (e.g. "no chat / $50 for coders"), KEEP that exact sheet string unchanged as liveUs so the user's note is preserved; otherwise set liveUs="$50". State "CLI only (kein Browser-Chat)" in "reason".
-   - OpenAI: GPT-6.1 Sol / Terra unlock at ChatGPT Plus ($20 / 23€); GPT-6 Astra unlocks at ChatGPT Pro 100 ($100 / 103€).
-   - Anthropic: Claude Opus 5.5 unlocks at Claude Pro ($17-20 / 15-18€); Claude Fable 5.2 unlocks at Claude Max ($100 / 90€).
-   - Google: Gemini 4 Argon unlocks at Google AI Pro ($17-20 / 14-22€); Gemini 4 Carbon unlocks at Google AI Ultra ($100-200 / 100-220€; entry tier $100 / 100€).
-3. Sheet formatting rules (Columns T & U, "if paid for 1 year vs. if paid monthly"):
-   - ALWAYS round ALL dollar and euro prices to WHOLE integers (no decimals/cents like .99 or .50) AND round psychological "-1" prices ending in 9 (e.g. 99€ -> 100€, $99 -> $100, 199€ -> 200€, $199 -> $200, 219€ -> 220€) up to the clean figure: use "$5", "5-10€", "$8", "$20", "15-18€", "23€", "$100", "100€", "100-220€", "$100-200", "103€", "$50".
-   - Annual discount < monthly or tiered plan range -> compact hyphenated range like "$17-20", "15-18€", "14-22€", "5-10€", "100-220€", "$100-200".
+   - OpenAI:
+     * GPT-6.1 Sol / Terra unlock at ChatGPT Plus ($20 / 23€).
+     * GPT-6 Astra / ChatGPT-6 Astra spans the multi-step ChatGPT Pro tiers from Pro 100 ($100 / 103€) up to Pro 500 ($500 / 510€) -> output the full multi-tier range liveUs="$100-500", liveDe="103-510€" (and update either bound if OpenAI changes Pro 100 or Pro 500 pricing).
+   - Anthropic:
+     * Claude Opus 5.5 unlocks at Claude Pro ($17-20 / 15-18€).
+     * Claude Fable 5.2 spans the multi-step Max/Ultra tiers from Claude Max ($100 / 90€) up to Claude Ultra ($200 / 180€) -> output the full multi-tier range liveUs="$100-200", liveDe="90-180€" (and update either bound if Anthropic changes Max or Ultra pricing).
+   - Google:
+     * Gemini 4 Argon unlocks at Google AI Pro ($17-20 / 14-22€).
+     * Gemini 4 Carbon spans the multi-step Google AI Ultra tiers from Ultra 5x ($100 / 100€) up to Ultra 20x ($200 / 220€) -> output the full multi-tier range liveUs="$100-200", liveDe="100-220€" (and update either bound if Google changes Ultra tier pricing).
+3. Sheet formatting rules (Columns T & U):
+   - ALWAYS round ALL dollar and euro prices to WHOLE integers (no decimals/cents like .99 or .50) AND round psychological "-1" prices ending in 9 (e.g. 99€ -> 100€, $99 -> $100, 199€ -> 200€, $199 -> $200, 219€ -> 220€) up to the clean figure: use "$5", "5-10€", "$8", "$20", "15-18€", "23€", "90-180€", "100-220€", "$100-200", "103-510€", "$100-500", "$50".
+   - Annual discount < monthly OR multi-step flagship capacity tiers -> compact hyphenated range like "$17-20", "15-18€", "14-22€", "5-10€", "90-180€", "100-220€", "$100-200", "103-510€", "$100-500".
    - Monthly-only / flat -> "$20", "23€", "$100", "100€", "103€", "$50", "$8", "$5".
    - Paid plan unavailable in Germany -> DE price = "US only".
    - ONLY keep an identical sheet string for minor currency/VAT/annual rounding when the model is matched to the RIGHT consumer tier (do NOT suppress real tier changes!).

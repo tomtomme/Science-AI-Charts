@@ -11,7 +11,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$8',
     deMonthly: '~8€',
     billingNotes: 'Expanded free limits',
-    sourceUrl: 'https://openai.com/index/introducing-chatgpt-go/',
+    sourceUrl: 'https://chatgpt.com/pricing',
   },
   {
     lab: 'OpenAI',
@@ -20,7 +20,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$20',
     deMonthly: '23€',
     billingNotes: 'Unlocks Sol & Terra',
-    sourceUrl: 'https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus',
+    sourceUrl: 'https://chatgpt.com/pricing',
   },
   {
     lab: 'OpenAI',
@@ -29,7 +29,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$100',
     deMonthly: '103€',
     billingNotes: 'Unlocks GPT-6 Astra',
-    sourceUrl: 'https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers',
+    sourceUrl: 'https://chatgpt.com/pricing',
   },
   {
     lab: 'OpenAI',
@@ -38,16 +38,16 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$200',
     deMonthly: '200€',
     billingNotes: 'Higher Pro limits',
-    sourceUrl: 'https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers',
+    sourceUrl: 'https://chatgpt.com/pricing',
   },
   {
     lab: 'OpenAI',
     planName: 'ChatGPT Pro 500',
     tierKey: 'ultra',
     usMonthly: '$500',
-    deMonthly: '500€',
+    deMonthly: '510€',
     billingNotes: 'Maximum compute tier',
-    sourceUrl: 'https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers',
+    sourceUrl: 'https://chatgpt.com/pricing',
   },
 
   // Anthropic
@@ -58,7 +58,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$17-20',
     deMonthly: '15-18€',
     billingNotes: 'Unlocks Opus 5.5',
-    sourceUrl: 'https://support.claude.com/en/articles/8325606-what-is-the-pro-plan',
+    sourceUrl: 'https://claude.com/pricing',
   },
   {
     lab: 'Anthropic',
@@ -67,7 +67,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$100',
     deMonthly: '90€',
     billingNotes: '5x Pro; Fable 5.2',
-    sourceUrl: 'https://support.claude.com/en/articles/11049741-what-is-the-max-plan',
+    sourceUrl: 'https://claude.com/pricing',
   },
   {
     lab: 'Anthropic',
@@ -125,7 +125,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$8',
     deMonthly: '~8-9€',
     billingNotes: 'App perks (no Wonder)',
-    sourceUrl: 'https://about.fb.com/news/2026/09/introducing-meta-one-subscription-service-more-features-ai/',
+    sourceUrl: 'https://www.meta.ai/',
   },
   {
     lab: 'Meta',
@@ -134,7 +134,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$20',
     deMonthly: '~20-23€',
     billingNotes: 'Media perks (no Wonder)',
-    sourceUrl: 'https://about.fb.com/news/2026/09/introducing-meta-one-subscription-service-more-features-ai/',
+    sourceUrl: 'https://www.meta.ai/',
   },
   {
     lab: 'Meta',
@@ -143,7 +143,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$0',
     deMonthly: 'US only',
     billingNotes: 'muse.ai browser baseline',
-    sourceUrl: 'https://about.fb.com/news/2026/09/introducing-muse/',
+    sourceUrl: 'https://muse.ai/',
   },
   {
     lab: 'Meta',
@@ -152,7 +152,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$20',
     deMonthly: 'US only',
     billingNotes: 'muse.ai, 500M tok/wk',
-    sourceUrl: 'https://about.fb.com/news/2026/10/introducing-muse-wonder-models/',
+    sourceUrl: 'https://muse.ai/',
   },
   {
     lab: 'Meta',
@@ -161,7 +161,7 @@ export const DEFAULT_LAB_PLANS: LabPlanInfo[] = [
     usMonthly: '$100',
     deMonthly: 'US only',
     billingNotes: 'muse.ai, 3B tok/wk',
-    sourceUrl: 'https://about.fb.com/news/2026/10/introducing-muse-wonder-models/',
+    sourceUrl: 'https://muse.ai/',
   },
 ];
 

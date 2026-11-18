@@ -8,6 +8,7 @@ import { translateStoryline } from '../utils/storylineHelper';
 import { ExternalLink } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { roundCurrencyString, roundCurrencyTokensInText } from '../utils/priceFormat';
+import { getSubscriptionBookingUrl } from '../data/subscriptionLinks';
 
 interface ExplodedBarChartProps {
   models: ModelRecord[];
@@ -517,16 +518,31 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     }
 
     const isDe = lang === 'de';
+    const buildRangeSuffix = (amountOnly: string): string => {
+      if (!/[-–—]/.test(amountOnly)) return '';
+      const nums =
+        amountOnly
+          .match(/\d+/g)
+          ?.map((n) => parseInt(n, 10))
+          .filter((n) => Number.isFinite(n)) || [];
+      const minVal = nums.length > 0 ? Math.min(...nums) : 0;
+      const maxVal = nums.length > 0 ? Math.max(...nums) : 0;
+      // High-tier flagship plans (>= 80) vary by capacity/usage tier rather than 1-year discount
+      if (minVal >= 80 || maxVal >= 90) {
+        return isDe
+          ? '\nje nach Abo-Stufe / Nutzungslimit'
+          : '\ndepending on plan tier / usage limit';
+      }
+      return isDe
+        ? '\nbei Zahlung für 1 Jahr vs. monatlicher Zahlung'
+        : '\nif paid for 1 year vs. if paid monthly';
+    };
+
     if (clean.includes('€')) {
       const compactPrice = roundCurrencyString(clean.replace(/\s*€/g, '€'));
       const amountOnly = compactPrice.replace(/€/g, '').trim();
-      const isRange = /[-–—]/.test(amountOnly);
       const priceLine = isDe ? `${amountOnly} € / Monat` : `€${amountOnly} / month`;
-      const rangeSuffix = isRange
-        ? (isDe
-            ? '\nbei Zahlung für 1 Jahr vs. monatlicher Zahlung'
-            : '\nif paid for 1 year vs. if paid monthly')
-        : '';
+      const rangeSuffix = buildRangeSuffix(amountOnly);
       return {
         type: 'price',
         text: compactPrice,
@@ -539,13 +555,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     if (clean.includes('$')) {
       const compactPrice = roundCurrencyString(clean.replace(/\s*\$/g, '$').replace(/\$\s+/g, '$'));
       const amountOnly = compactPrice.replace(/\$/g, '').trim();
-      const isRange = /[-–—]/.test(amountOnly);
       const priceLine = isDe ? `${amountOnly} $ / Monat` : `$${amountOnly} / month`;
-      const rangeSuffix = isRange
-        ? (isDe
-            ? '\nbei Zahlung für 1 Jahr vs. monatlicher Zahlung'
-            : '\nif paid for 1 year vs. if paid monthly')
-        : '';
+      const rangeSuffix = buildRangeSuffix(amountOnly);
       return {
         type: 'price',
         text: compactPrice,
@@ -1976,27 +1987,23 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 {/* Euro-Price from Col T & Free API globe rendered above bar / logo */}
                 {priceInfo.type === 'price' && (() => {
                   const displayPrice = priceInfo.displayPrice || '';
-                  return (
-                  <g>
-                    {isStaggeredUp && (
-                      <line
-                        x1={barCenterX}
-                        y1={priceY + 3}
-                        x2={barCenterX}
-                        y2={basePriceY - 2}
-                        stroke="#10B981"
-                        strokeOpacity={0.4}
-                        strokeWidth={1}
-                        strokeDasharray="2,2"
-                        pointerEvents="none"
-                      />
-                    )}
+                  const bookingHref = getSubscriptionBookingUrl({
+                    labOrCompany: model.companyName || model.creatorClean,
+                    modelName: model.displayName,
+                    priceText: displayPrice,
+                    lang: lang === 'de' ? 'de' : 'en',
+                  });
+                  const tooltipFullText = bookingHref
+                    ? `${priceInfo.tooltipText}\n${lang === 'de' ? 'Klick für Abo-Buchung' : 'Click to view / book plan'}`
+                    : priceInfo.tooltipText;
+
+                  const priceBadgeInner = (
                     <g
-                      className="cursor-help"
+                      className={`${bookingHref ? 'cursor-pointer group/price' : 'cursor-help'}`}
                       onMouseEnter={(e) => {
                         setPriceTooltip({
                           title: priceInfo.tooltipTitle,
-                          text: priceInfo.tooltipText,
+                          text: tooltipFullText,
                           x: e.clientX,
                           y: e.clientY,
                         });
@@ -2017,7 +2024,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         x={priceX}
                         y={priceY}
                         textAnchor="middle"
-                        className="font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none"
+                        className={`font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none transition-colors ${
+                          bookingHref
+                            ? 'group-hover/price:fill-emerald-500 dark:group-hover/price:fill-emerald-300 group-hover/price:underline'
+                            : ''
+                        }`}
                         fontSize={priceFontSize}
                         style={{
                           letterSpacing: isLongPrice ? '-0.03em' : undefined,
@@ -2027,6 +2038,36 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         {displayPrice}
                       </text>
                     </g>
+                  );
+
+                  return (
+                  <g>
+                    {isStaggeredUp && (
+                      <line
+                        x1={barCenterX}
+                        y1={priceY + 3}
+                        x2={barCenterX}
+                        y2={basePriceY - 2}
+                        stroke="#10B981"
+                        strokeOpacity={0.4}
+                        strokeWidth={1}
+                        strokeDasharray="2,2"
+                        pointerEvents="none"
+                      />
+                    )}
+                    {bookingHref ? (
+                      <a
+                        href={bookingHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="cursor-pointer group/price"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {priceBadgeInner}
+                      </a>
+                    ) : (
+                      priceBadgeInner
+                    )}
                     {model.isFreeApi && (() => {
                       const apiHref = model.apiLink || model.modelUrl;
                       const tooltipText = lang === 'de'

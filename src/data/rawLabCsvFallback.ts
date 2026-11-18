@@ -331,14 +331,15 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "massive": false
     },
     "parameterSizes": {
-      "small": "Micro; Lite; Sonic",
-      "medium": "Omni; Pro",
-      "large": "",
+      "tiny": "",
+      "small": "Lite",
+      "medium": "Pro",
+      "large": "Pro 2",
       "massive": "Premier",
       "colossal": "",
       "planetary": ""
     },
-    "specialties": "Alexa, Kiro on AWS"
+    "specialties": "known for Alexa"
   },
   {
     "id": "contender-2",
@@ -351,14 +352,17 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "weightsType": "closed",
     "openWeights": {
       "medium": false,
-      "large": false
+      "large": false,
+      "massive": false,
+      "colossal": false
     },
     "parameterSizes": {
+      "tiny": "",
       "small": "",
       "medium": "v1",
       "large": "v2",
-      "massive": "",
-      "colossal": "",
+      "massive": "v2.5",
+      "colossal": "v3",
       "planetary": ""
     },
     "specialties": ""
@@ -370,22 +374,24 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "countryFlag": "🇺🇸",
     "creator": "Microsoft",
     "engineName": "Phi & MAI",
-    "famousFor": "Copilot",
+    "famousFor": "known for Windows, Copilot, Autopilot Agent",
     "weightsType": "hybrid",
     "openWeights": {
-      "small": true,
-      "large": false,
-      "colossal": false
+      "tiny": true,
+      "massive": false,
+      "colossal": false,
+      "planetary": false
     },
     "parameterSizes": {
-      "small": "Phi",
+      "tiny": "Phi",
+      "small": "",
       "medium": "",
-      "large": "Flash",
-      "massive": "",
-      "colossal": "Thinking",
-      "planetary": ""
+      "large": "",
+      "massive": "MAI Flash Series",
+      "colossal": "MAI Thinking",
+      "planetary": "MAI Code"
     },
-    "specialties": "Copilot"
+    "specialties": "known for Windows, Copilot, Autopilot Agent"
   },
   {
     "id": "contender-4",
@@ -394,12 +400,13 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
     "countryFlag": "🇺🇸",
     "creator": "Reflection",
     "engineName": "Beam",
-    "famousFor": "https://reflection.ai/blog/introducing-beam",
+    "famousFor": "",
     "weightsType": "open",
     "openWeights": {
       "massive": true
     },
     "parameterSizes": {
+      "tiny": "",
       "small": "",
       "medium": "",
       "large": "",
@@ -407,7 +414,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "colossal": "",
       "planetary": ""
     },
-    "specialties": "https://reflection.ai/blog/introducing-beam"
+    "specialties": ""
   },
   {
     "id": "contender-5",
@@ -423,6 +430,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "colossal": true
     },
     "parameterSizes": {
+      "tiny": "",
       "small": "",
       "medium": "",
       "large": "",

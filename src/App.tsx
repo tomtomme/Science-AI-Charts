@@ -2251,7 +2251,7 @@ export default function App() {
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
-                    {lang === 'de' ? `Scaffolding (${labCounts.harness})` : `Scaffolding (${labCounts.harness})`}
+                    {lang === 'de' ? `Agentensteuerung (${labCounts.harness})` : `Scaffolding (${labCounts.harness})`}
                   </button>
                 </div>
 
