@@ -32,8 +32,8 @@ export const WEIGHTS_CONCEPTS = {
     titleDe: 'Open Weights',
     tagEn: 'Open',
     tagDe: 'Offen',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800',
-    dotClass: 'bg-emerald-500',
+    badgeClass: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800',
+    dotClass: 'bg-cyan-500',
     tooltipEn: 'Parameters are downloadable. Users run, inspect, or modify the model on their own hardware.',
     tooltipDe: 'Parameter sind downloadbar. Ausführung, Inspektion und Anpassung auf eigener Hardware.',
     bulletsEn: [
@@ -1091,8 +1091,14 @@ function resolveTierRowPrice(
   return { price: priceHits.join(' · ') };
 }
 
+interface LabAccessBadge {
+  label: string;
+  kind: 'freeOnly' | 'paidOnly' | 'freeApi';
+  title?: string;
+}
+
 interface LabPricingSummary {
-  accessFlags: string[];
+  accessBadges: LabAccessBadge[];
   hasFreeAccess: boolean;
   hasFreeApi: boolean;
   isPaidOnly: boolean;
@@ -1101,6 +1107,17 @@ interface LabPricingSummary {
   consumerPlans: LabPlanInfo[];
   subscriptionTiers?: string;
   sheetModelPrices: string[];
+}
+
+function isDeveloperPlaygroundOrRouterUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  const low = url.toLowerCase();
+  return (
+    low.includes('build.nvidia.com') ||
+    low.includes('tinker.thinkingmachines.ai') ||
+    low.includes('openrouter.ai') ||
+    low.includes('console.mistral.ai')
+  );
 }
 
 function resolveLabPricingSummary(
@@ -1118,7 +1135,13 @@ function resolveLabPricingSummary(
   const available = matchedModels.filter((m) => m.isAvailable);
   const pool = available.length > 0 ? available : matchedModels;
 
-  const hasFreeChat = pool.some((m) => !m.isPaid);
+  // Distinguish actual free consumer chat from developer API/playground links (e.g. build.nvidia.com)
+  const dailyAgentVal = (lab.dailyAgent || '').trim();
+  const hasExplicitNoConsumerChat = dailyAgentVal === '–' || dailyAgentVal === '-';
+  const hasConsumerFreeChatModel = pool.some(
+    (m) => !m.isPaid && !isDeveloperPlaygroundOrRouterUrl(m.chatLink)
+  );
+  const hasAnyFreeModel = pool.some((m) => !m.isPaid);
   const hasPaidModel = pool.some((m) => m.isPaid);
   const hasFreeApi = pool.some((m) => m.isFreeApi);
 
@@ -1133,7 +1156,7 @@ function resolveLabPricingSummary(
   }
 
   const rawTiers = roundCurrencyTokensInText((lab.subscriptionTiers || '').trim());
-  const hasTiers = Boolean(rawTiers && rawTiers !== '-' && rawTiers.toLowerCase() !== 'n/a');
+  const hasTiers = Boolean(rawTiers && rawTiers !== '-' && rawTiers !== '–' && rawTiers.toLowerCase() !== 'n/a');
   const isPayPerToken = /^per\s+token\s+price$/i.test(rawTiers);
   const displayTiersText = hasTiers
     ? isPayPerToken
@@ -1143,16 +1166,53 @@ function resolveLabPricingSummary(
       : rawTiers
     : '';
 
-  const accessFlags: string[] = [];
   const hasConsumerFree = consumerPlans.some((p) => p.tierKey === 'free');
-  if (hasFreeChat || hasConsumerFree) {
-    accessFlags.push(lang === 'de' ? 'Gratis' : 'Free');
+  const hasConsumerPaid = consumerPlans.some((p) => p.tierKey !== 'free');
+
+  const hasFreeChat =
+    hasConsumerFree ||
+    hasConsumerFreeChatModel ||
+    (!hasExplicitNoConsumerChat && hasAnyFreeModel && !pool.every((m) => isDeveloperPlaygroundOrRouterUrl(m.chatLink)));
+  const hasPaid = hasConsumerPaid || hasPaidModel || (hasTiers && !isPayPerToken);
+
+  // Top Contenders / Tweakers / Small sheets do not track a Subscription Tiers row,
+  // so missing subscription data there must not be mislabeled as "nur gratis".
+  const hasReliableSubscriptionCoverage =
+    lab.group === 'top10' || hasTiers || consumerPlans.length > 0;
+
+  const accessBadges: LabAccessBadge[] = [];
+  if (hasPaid && !hasFreeChat) {
+    accessBadges.push({
+      label: lang === 'de' ? 'nur als Abo' : 'Paid only',
+      kind: 'paidOnly',
+      title:
+        lang === 'de'
+          ? 'Kein kostenloser Chat-Tarif – Nutzung nur im bezahlten Abo'
+          : 'No free chat tier – paid subscription required',
+    });
+  } else if (hasFreeChat && !hasPaid && hasReliableSubscriptionCoverage) {
+    accessBadges.push({
+      label: lang === 'de' ? 'nur gratis' : 'Free only',
+      kind: 'freeOnly',
+      title: isPayPerToken
+        ? lang === 'de'
+          ? 'Chat kostenlos ohne Monatsabo (API: Pay-per-Token)'
+          : 'Free web chat without monthly plan (API: pay-per-token)'
+        : lang === 'de'
+        ? 'Kostenloser Chat ohne bezahltes Abo'
+        : 'Free chat without paid subscription tiers',
+    });
   }
-  if (consumerPlans.some((p) => p.tierKey !== 'free') || hasPaidModel || (hasTiers && !isPayPerToken)) {
-    accessFlags.push(lang === 'de' ? 'Abo' : 'Paid');
-  }
+
   if (hasFreeApi) {
-    accessFlags.push('🌐 Free API');
+    accessBadges.push({
+      label: '🌐 Free API',
+      kind: 'freeApi',
+      title:
+        lang === 'de'
+          ? 'Kostenloser API-Zugang verfügbar (z. B. für JASP oder Agenten)'
+          : 'Free API access available (e.g. for JASP or agents)',
+    });
   }
 
   let primaryText = '';
@@ -1188,25 +1248,27 @@ function resolveLabPricingSummary(
         : labeledTiers;
   } else if (!hasTierRowPrices && rawSheetPrices.length > 0) {
     primaryText = rawSheetPrices.join(' · ');
-  } else if (accessFlags.length === 0) {
-    if (pool.length > 0) {
+  } else if (accessBadges.length === 0) {
+    if (pool.length > 0 && hasPaidModel) {
       primaryText = lang === 'de' ? 'Nur API / Bezahlt' : 'API / Paid only';
     } else if (lab.weightsType === 'open') {
       primaryText = lang === 'de' ? 'Open Weights (Lokal / API)' : 'Open Weights (Local / API)';
+    } else if (pool.length > 0) {
+      primaryText = lang === 'de' ? 'Playground / API' : 'Playground / API';
     } else {
       return null;
     }
   }
 
-  if (accessFlags.length === 0 && !primaryText) {
+  if (accessBadges.length === 0 && !primaryText) {
     return null;
   }
 
   return {
-    accessFlags,
-    hasFreeAccess: hasFreeChat || hasConsumerFree || hasFreeApi,
+    accessBadges,
+    hasFreeAccess: hasFreeChat || hasFreeApi,
     hasFreeApi,
-    isPaidOnly: !hasFreeChat && !hasConsumerFree && !hasFreeApi && (hasPaidModel || consumerPlans.length > 0),
+    isPaidOnly: hasPaid && !hasFreeChat && !hasFreeApi,
     primaryText: roundCurrencyTokensInText(primaryText),
     secondaryText,
     consumerPlans,
@@ -1748,8 +1810,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               {/* Open Button with Tooltip */}
               <Tooltip
                 title={
-                  <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="flex items-center gap-1.5 text-cyan-400 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500" />
                     <span>{lang === 'de' ? WEIGHTS_CONCEPTS.open.titleDe : WEIGHTS_CONCEPTS.open.titleEn}</span>
                   </span>
                 }
@@ -1779,8 +1841,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   onClick={() => setWeightsFilter('open')}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                     weightsFilter === 'open'
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                      ? 'bg-cyan-600 text-white shadow-2xs'
+                      : 'text-cyan-700 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-950/40'
                   }`}
                 >
                   {lang === 'de' ? 'Offen' : 'Open'}
@@ -2167,7 +2229,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       onClick={() => scrollToWeightsExplainer(`weights-${lab.weightsType}`)}
                       className={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 cursor-pointer transition-transform hover:scale-105 ${
                         lab.weightsType === 'open'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                          ? 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800'
                           : lab.weightsType === 'hybrid'
                           ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800'
                           : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
@@ -2411,16 +2473,12 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                               );
                             })()}
 
-                            {/* Right: Open / Closed Badge (only shown for hybrid model families) */}
-                            {!isSimplifiedView && lab.weightsType === 'hybrid' && isOpen !== undefined && (
+                            {/* Right: Open Badge (for hybrid labs, highlight only open-weights models and omit Closed tags) */}
+                            {!isSimplifiedView && lab.weightsType === 'hybrid' && isOpen && (
                               <span
-                                className={`text-xs font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${
-                                  isOpen
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800'
-                                    : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
-                                }`}
+                                className="text-xs font-semibold px-1.5 py-0.5 rounded-full border shrink-0 bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/80 dark:text-cyan-300 dark:border-cyan-800"
                               >
-                                {isOpen ? (lang === 'de' ? 'Offen' : 'Open') : (lang === 'de' ? 'Geschlossen' : 'Closed')}
+                                {lang === 'de' ? 'Offen' : 'Open'}
                               </span>
                             )}
                           </div>
@@ -2434,21 +2492,27 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 {pricingSummary && (
                   <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-2 space-y-1">
                     <div className="flex items-center justify-between gap-2 text-[11px]">
-                      <span className="font-semibold text-slate-500 dark:text-slate-400">
+                      <span className="font-semibold text-slate-500 dark:text-slate-400 shrink-0">
                         {lang === 'de' ? 'Zugang & Tarife' : 'Access & Plans'}
                       </span>
-                      {pricingSummary.accessFlags.length > 0 && (
-                        <span
-                          className={`font-medium truncate ${
-                            pricingSummary.hasFreeAccess
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : pricingSummary.isPaidOnly
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-slate-500 dark:text-slate-400'
-                          }`}
-                        >
-                          {pricingSummary.accessFlags.join(' · ')}
-                        </span>
+                      {pricingSummary.accessBadges.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-end gap-1">
+                          {pricingSummary.accessBadges.map((badge) => (
+                            <span
+                              key={badge.kind}
+                              title={badge.title}
+                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${
+                                badge.kind === 'freeOnly'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                                  : badge.kind === 'paidOnly'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                                  : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+                              }`}
+                            >
+                              {badge.label}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
 
@@ -2653,26 +2717,26 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
           {/* Open Weights Card */}
           <div
             id="weights-open"
-            className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 transition-all scroll-mt-20"
+            className="p-4 rounded-xl border border-cyan-200 dark:border-cyan-900/60 bg-cyan-50/40 dark:bg-cyan-950/20 transition-all scroll-mt-20"
           >
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-sm font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+              <span className="text-sm font-bold text-cyan-800 dark:text-cyan-300 flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 shrink-0" />
                 <span>{lang === 'de' ? WEIGHTS_CONCEPTS.open.titleDe : WEIGHTS_CONCEPTS.open.titleEn}</span>
               </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full border bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800">
                 {lang === 'de' ? 'Offen' : 'Open'}
               </span>
             </div>
             <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 mb-3">
               {(lang === 'de' ? WEIGHTS_CONCEPTS.open.bulletsDe : WEIGHTS_CONCEPTS.open.bulletsEn).map((bullet, i) => (
                 <li key={i} className="flex items-start gap-1.5 leading-snug">
-                  <span className="text-emerald-500 shrink-0 font-bold">•</span>
+                  <span className="text-cyan-500 shrink-0 font-bold">•</span>
                   <span>{bullet}</span>
                 </li>
               ))}
             </ul>
-            <div className="pt-2 border-t border-emerald-100 dark:border-emerald-900/40 text-xs text-slate-500 dark:text-slate-400">
+            <div className="pt-2 border-t border-cyan-100 dark:border-cyan-900/40 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-semibold text-slate-700 dark:text-slate-300">
                 {lang === 'de' ? 'Beispiele: ' : 'Examples: '}
               </span>
