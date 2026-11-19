@@ -1335,6 +1335,21 @@ export default function App() {
               <button
                 onClick={() => {
                   setActiveTab('benchmark');
+                  setBenchmarkView('compare');
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  activeTab === 'benchmark' && benchmarkView === 'compare'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <Columns2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{lang === 'de' ? 'Vergleich' : 'Compare'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('benchmark');
                   setBenchmarkView('timeline');
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
@@ -1360,21 +1375,6 @@ export default function App() {
               >
                 <GitCompare className="w-3.5 h-3.5 text-indigo-500" />
                 <span>{lang === 'de' ? 'Analyse' : 'Analysis'}</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setActiveTab('benchmark');
-                  setBenchmarkView('compare');
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                  activeTab === 'benchmark' && benchmarkView === 'compare'
-                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-              >
-                <Columns2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>{lang === 'de' ? 'Vergleich' : 'Compare'}</span>
               </button>
             </div>
 

@@ -1690,7 +1690,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
     2,
     Math.min(MAX_COMPARE_MODELS, pickerModels.length || allModels.length)
   );
-  const [modelCount, setModelCount] = useState<number>(3);
+  const [modelCount, setModelCount] = useState<number>(2);
   const effectiveCount = Math.max(2, Math.min(modelCount, maxCompareCount));
 
   const [slotIds, setSlotIds] = useState<string[]>(() => {

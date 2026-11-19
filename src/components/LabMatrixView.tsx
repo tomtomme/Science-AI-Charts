@@ -1093,8 +1093,9 @@ function resolveTierRowPrice(
 
 interface LabAccessBadge {
   label: string;
-  kind: 'freeOnly' | 'paidOnly' | 'freeApi';
+  kind: 'paidOnly' | 'freeApi';
   title?: string;
+  href?: string;
 }
 
 interface LabPricingSummary {
@@ -1175,10 +1176,9 @@ function resolveLabPricingSummary(
     (!hasExplicitNoConsumerChat && hasAnyFreeModel && !pool.every((m) => isDeveloperPlaygroundOrRouterUrl(m.chatLink)));
   const hasPaid = hasConsumerPaid || hasPaidModel || (hasTiers && !isPayPerToken);
 
-  // Top Contenders / Tweakers / Small sheets do not track a Subscription Tiers row,
-  // so missing subscription data there must not be mislabeled as "nur gratis".
-  const hasReliableSubscriptionCoverage =
-    lab.group === 'top10' || hasTiers || consumerPlans.length > 0;
+  const freeApiUrl =
+    pool.find((m) => m.isFreeApi && m.apiLink?.startsWith('http'))?.apiLink ||
+    matchedModels.find((m) => m.isFreeApi && m.apiLink?.startsWith('http'))?.apiLink;
 
   const accessBadges: LabAccessBadge[] = [];
   if (hasPaid && !hasFreeChat) {
@@ -1190,28 +1190,20 @@ function resolveLabPricingSummary(
           ? 'Kein kostenloser Chat-Tarif – Nutzung nur im bezahlten Abo'
           : 'No free chat tier – paid subscription required',
     });
-  } else if (hasFreeChat && !hasPaid && hasReliableSubscriptionCoverage) {
-    accessBadges.push({
-      label: lang === 'de' ? 'nur gratis' : 'Free only',
-      kind: 'freeOnly',
-      title: isPayPerToken
-        ? lang === 'de'
-          ? 'Chat kostenlos ohne Monatsabo (API: Pay-per-Token)'
-          : 'Free web chat without monthly plan (API: pay-per-token)'
-        : lang === 'de'
-        ? 'Kostenloser Chat ohne bezahltes Abo'
-        : 'Free chat without paid subscription tiers',
-    });
   }
 
   if (hasFreeApi) {
     accessBadges.push({
-      label: '🌐 Free API',
+      label: lang === 'de' ? '🌐 Gratis API' : '🌐 Free API',
       kind: 'freeApi',
-      title:
-        lang === 'de'
-          ? 'Kostenloser API-Zugang verfügbar (z. B. für JASP oder Agenten)'
-          : 'Free API access available (e.g. for JASP or agents)',
+      href: freeApiUrl,
+      title: freeApiUrl
+        ? lang === 'de'
+          ? 'Kostenloser API-Zugang verfügbar (z. B. für JASP oder Agenten) — API-Seite öffnen'
+          : 'Free API access available (e.g. for JASP or agents) — Open API page'
+        : lang === 'de'
+        ? 'Kostenloser API-Zugang verfügbar (z. B. für JASP oder Agenten)'
+        : 'Free API access available (e.g. for JASP or agents)',
     });
   }
 
@@ -2406,81 +2398,85 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                               >
                                 {lang === 'de' ? tier.nameDe : tier.nameEn}
                               </span>
-
-                              {/* Tooltip on hover showing parameter count */}
-                              <div className="absolute left-2 -top-8 hidden group-hover:flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-lg text-xs font-mono pointer-events-none z-30 whitespace-nowrap">
-                                <span className="font-bold">{lang === 'de' ? tier.nameDe : tier.nameEn}:</span>
-                                <span>{lang === 'de' ? tier.paramCountDe : tier.paramCountEn}</span>
-                              </div>
                             </div>
 
-                            {/* Center: Model Name(s) — clickable link to chat (prioritizes Col P) */}
-                            {modelChatUrl ? (
-                              <a
-                                href={modelChatUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`font-mono text-xs text-right truncate flex-1 hover:text-blue-600 dark:hover:text-blue-400 hover:underline decoration-blue-400/70 underline-offset-2 transition-colors ${
-                                  isSimplifiedView
-                                    ? 'font-bold text-slate-900 dark:text-slate-100'
-                                    : 'font-semibold text-slate-800 dark:text-slate-200'
-                                }`}
-                                title={`${modelVal} — ${lang === 'de' ? 'Chat öffnen' : 'Open chat'}`}
-                              >
-                                {modelVal}
-                              </a>
-                            ) : (
-                              <span
-                                className={`font-mono text-xs text-right truncate flex-1 ${
-                                  isSimplifiedView
-                                    ? 'font-bold text-slate-900 dark:text-slate-100'
-                                    : 'font-semibold text-slate-800 dark:text-slate-200'
-                                }`}
-                                title={modelVal}
-                              >
-                                {modelVal}
-                              </span>
-                            )}
+                            {/* Hover Tooltip: Parameter count + Open/Closed weights status */}
+                            <div className="absolute left-2 bottom-full mb-1.5 hidden group-hover:flex flex-wrap items-center gap-1.5 w-max max-w-[320px] px-2.5 py-1.5 rounded-md bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-lg text-xs font-mono pointer-events-none z-30">
+                              <span className="font-bold">{lang === 'de' ? tier.nameDe : tier.nameEn}:</span>
+                              <span>{lang === 'de' ? tier.paramCountDe : tier.paramCountEn}</span>
+                              {!isSimplifiedView && (
+                                <span
+                                  className={`text-[11px] font-sans font-semibold px-1.5 py-0.5 rounded-full border ${
+                                    isOpen
+                                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40 dark:bg-cyan-100 dark:text-cyan-800 dark:border-cyan-300'
+                                      : 'bg-slate-700/80 text-slate-300 border-slate-500/60 dark:bg-slate-200 dark:text-slate-700 dark:border-slate-300'
+                                  }`}
+                                >
+                                  {isOpen
+                                    ? (lang === 'de' ? 'Offen' : 'Open')
+                                    : (lang === 'de' ? 'Geschlossen' : 'Closed')}
+                                </span>
+                              )}
+                            </div>
 
-                            {/* Right: Concrete Unlock Price Badge (price only; plan tier shown below + in tooltip) */}
-                            {rowPrice && (() => {
-                              const combinedLabel = rowPlanLabel ? `${rowPlanLabel}: ${rowPrice}` : rowPrice;
-                              return priceBookingUrl ? (
+                            {/* Right: Price directly left of the flush-right Model Name */}
+                            <div className="flex-1 flex items-center justify-end gap-1.5 min-w-0">
+                              {rowPrice && (() => {
+                                const combinedLabel = rowPlanLabel ? `${rowPlanLabel}: ${rowPrice}` : rowPrice;
+                                return priceBookingUrl ? (
+                                  <a
+                                    href={priceBookingUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 hover:border-emerald-400 dark:hover:border-emerald-600 hover:underline shrink-0 transition-colors cursor-pointer"
+                                    title={
+                                      lang === 'de'
+                                        ? `${combinedLabel} — Abo buchen / Tarifseite öffnen`
+                                        : `${combinedLabel} — Book plan / open pricing page`
+                                    }
+                                  >
+                                    {rowPrice}
+                                  </a>
+                                ) : (
+                                  <span
+                                    className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 shrink-0"
+                                    title={
+                                      lang === 'de'
+                                        ? `Freischaltung / Preis (${combinedLabel})`
+                                        : `Unlock / Price (${combinedLabel})`
+                                    }
+                                  >
+                                    {rowPrice}
+                                  </span>
+                                );
+                              })()}
+
+                              {modelChatUrl ? (
                                 <a
-                                  href={priceBookingUrl}
+                                  href={modelChatUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 hover:border-emerald-400 dark:hover:border-emerald-600 hover:underline shrink-0 transition-colors cursor-pointer"
-                                  title={
-                                    lang === 'de'
-                                      ? `${combinedLabel} — Abo buchen / Tarifseite öffnen`
-                                      : `${combinedLabel} — Book plan / open pricing page`
-                                  }
+                                  aria-label={`${modelVal} — ${lang === 'de' ? 'Chat öffnen' : 'Open chat'}`}
+                                  className={`font-mono text-xs text-right truncate min-w-0 hover:text-blue-600 dark:hover:text-blue-400 hover:underline decoration-blue-400/70 underline-offset-2 transition-colors ${
+                                    isSimplifiedView
+                                      ? 'font-bold text-slate-900 dark:text-slate-100'
+                                      : 'font-semibold text-slate-800 dark:text-slate-200'
+                                  }`}
                                 >
-                                  {rowPrice}
+                                  {modelVal}
                                 </a>
                               ) : (
                                 <span
-                                  className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 shrink-0"
-                                  title={
-                                    lang === 'de'
-                                      ? `Freischaltung / Preis (${combinedLabel})`
-                                      : `Unlock / Price (${combinedLabel})`
-                                  }
+                                  className={`font-mono text-xs text-right truncate min-w-0 ${
+                                    isSimplifiedView
+                                      ? 'font-bold text-slate-900 dark:text-slate-100'
+                                      : 'font-semibold text-slate-800 dark:text-slate-200'
+                                  }`}
                                 >
-                                  {rowPrice}
+                                  {modelVal}
                                 </span>
-                              );
-                            })()}
-
-                            {/* Right: Open Badge (for hybrid labs, highlight only open-weights models and omit Closed tags) */}
-                            {!isSimplifiedView && lab.weightsType === 'hybrid' && isOpen && (
-                              <span
-                                className="text-xs font-semibold px-1.5 py-0.5 rounded-full border shrink-0 bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/80 dark:text-cyan-300 dark:border-cyan-800"
-                              >
-                                {lang === 'de' ? 'Offen' : 'Open'}
-                              </span>
-                            )}
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -2497,21 +2493,35 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       </span>
                       {pricingSummary.accessBadges.length > 0 && (
                         <div className="flex flex-wrap items-center justify-end gap-1">
-                          {pricingSummary.accessBadges.map((badge) => (
-                            <span
-                              key={badge.kind}
-                              title={badge.title}
-                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${
-                                badge.kind === 'freeOnly'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                                  : badge.kind === 'paidOnly'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
-                                  : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
-                              }`}
-                            >
-                              {badge.label}
-                            </span>
-                          ))}
+                          {pricingSummary.accessBadges.map((badge) => {
+                            const badgeClasses = `text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${
+                              badge.kind === 'paidOnly'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                                : badge.href
+                                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/70 hover:border-blue-400 dark:hover:border-blue-600 hover:underline transition-colors cursor-pointer'
+                                : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+                            }`;
+                            return badge.href ? (
+                              <a
+                                key={badge.kind}
+                                href={badge.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={badge.title}
+                                className={badgeClasses}
+                              >
+                                {badge.label}
+                              </a>
+                            ) : (
+                              <span
+                                key={badge.kind}
+                                title={badge.title}
+                                className={badgeClasses}
+                              >
+                                {badge.label}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
