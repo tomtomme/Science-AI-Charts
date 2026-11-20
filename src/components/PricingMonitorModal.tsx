@@ -11,6 +11,8 @@ import {
   ArrowRight,
   Save,
   LogOut,
+  Trophy,
+  Scale,
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { LoadedDatasets } from '../services/dataService';
@@ -26,6 +28,21 @@ import {
   PricingDiffItem,
 } from '../types/pricingMonitor';
 import {
+  GdpxCheckReport,
+  GdpxDiffItem,
+  GdpxDiffStatus,
+} from '../types/gdpxMonitor';
+import {
+  IntegrityCheckReport,
+  IntegrityDiffItem,
+  IntegrityDiffStatus,
+  ManualRowMapping,
+} from '../types/integrityMonitor';
+import {
+  INTEGRITY_COL_INDEX,
+  parseIntegrityCellNumber,
+} from '../services/integrityMonitorService';
+import {
   DEFAULT_LAB_PLANS,
   DEFAULT_PRICING_SNAPSHOT_DATE,
 } from '../data/pricingPlansFallback';
@@ -36,13 +53,36 @@ interface PricingMonitorModalProps {
   isOpen: boolean;
   onClose: () => void;
   lang: Language;
+  // Pricing monitor state
   report: PricingCheckReport | null;
   isDiffValid?: boolean;
   isChecking: boolean;
   checkError: string | null;
+  onRunCheck: () => Promise<void>;
+  // GDPx monitor state (unified)
+  gdpxReport: GdpxCheckReport | null;
+  isGdpxDiffValid?: boolean;
+  isCheckingGdpx: boolean;
+  gdpxCheckError: string | null;
+  onRunGdpxCheck: () => Promise<void>;
+  // Integrity-Bench monitor state (unified)
+  integrityReport: IntegrityCheckReport | null;
+  isIntegrityDiffValid?: boolean;
+  isCheckingIntegrity: boolean;
+  integrityCheckError: string | null;
+  onRunIntegrityCheck: () => Promise<void>;
+  // Persistent ignore & manual row mapping callbacks
+  onIgnoreGdpxModel?: (gdpxId: string) => Promise<void>;
+  onRestoreGdpxModel?: (gdpxId: string) => Promise<void>;
+  onIgnoreIntegrityModel?: (integrityId: string) => Promise<void>;
+  onRestoreIntegrityModel?: (integrityId: string) => Promise<void>;
+  onSaveManualMappings?: (mappings: {
+    gdpx?: Record<string, ManualRowMapping>;
+    integrity?: Record<string, ManualRowMapping>;
+  }) => Promise<void>;
+  // Shared auto-24h & Google Sheets state
   dailyAutoEnabled: boolean;
   onToggleDailyAuto: (enabled: boolean) => void;
-  onRunCheck: () => Promise<void>;
   loadedData: LoadedDatasets;
   accessToken: string | null;
   authUser: User | null;
@@ -72,13 +112,24 @@ const LAB_BADGE: Record<MonitoredLab, string> = {
   Meta: 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300',
 };
 
+const GDPX_COL_INDEX = 9; // Column J (SemiAnalysis GDPx v1)
+const GDPX_COL_LETTER = columnIndexToA1(GDPX_COL_INDEX); // "J"
+const INTEGRITY_COL_LETTER = columnIndexToA1(INTEGRITY_COL_INDEX); // "AN"
+const IGNORE_OPTION_VALUE = '__IGNORE__';
+
 interface PendingSheetCellChange {
   cellRef: string;
   label: string;
   before: string;
   after: string;
   range: string;
-  value: string;
+  value: string | number;
+  kind: 'price' | 'gdpx' | 'integrity';
+  sourceId?: string;
+  sheetRowNumber?: number;
+  matchedModelId?: string;
+  matchedDisplayName?: string;
+  isManualAssignment?: boolean;
 }
 
 export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
@@ -89,9 +140,24 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   isDiffValid = true,
   isChecking,
   checkError,
+  onRunCheck,
+  gdpxReport,
+  isGdpxDiffValid = true,
+  isCheckingGdpx,
+  gdpxCheckError,
+  onRunGdpxCheck,
+  integrityReport,
+  isIntegrityDiffValid = true,
+  isCheckingIntegrity,
+  integrityCheckError,
+  onRunIntegrityCheck,
+  onIgnoreGdpxModel,
+  onRestoreGdpxModel,
+  onIgnoreIntegrityModel,
+  onRestoreIntegrityModel,
+  onSaveManualMappings,
   dailyAutoEnabled,
   onToggleDailyAuto,
-  onRunCheck,
   loadedData,
   accessToken,
   authUser,
@@ -104,7 +170,13 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   apiAvailable = true,
   onRetryConnection,
 }) => {
-  const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
+  const [selectedPriceIds, setSelectedPriceIds] = useState<Record<string, boolean>>({});
+  const [selectedGdpxIds, setSelectedGdpxIds] = useState<Record<string, boolean>>({});
+  const [manualGdpxRowOverrides, setManualGdpxRowOverrides] = useState<Record<string, number>>({});
+  const [selectedIntegrityIds, setSelectedIntegrityIds] = useState<Record<string, boolean>>({});
+  const [manualIntegrityRowOverrides, setManualIntegrityRowOverrides] = useState<Record<string, number>>({});
+  const [showIgnoredGdpx, setShowIgnoredGdpx] = useState(false);
+  const [showIgnoredIntegrity, setShowIgnoredIntegrity] = useState(false);
   const [pendingWrite, setPendingWrite] = useState<PendingSheetCellChange[] | null>(null);
   const [isWriting, setIsWriting] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -113,10 +185,52 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   const effectiveDiffReport =
     apiAvailable && isSheetsConnected && isDiffValid && report ? report : null;
 
-  // Pre-select any rows with changed prices whenever live Sheet diff report updates
+  const effectiveGdpxDiffReport =
+    apiAvailable && isSheetsConnected && isGdpxDiffValid && gdpxReport && gdpxReport.diffs.length > 0
+      ? gdpxReport
+      : null;
+
+  const effectiveIntegrityDiffReport =
+    apiAvailable &&
+    isSheetsConnected &&
+    isIntegrityDiffValid &&
+    integrityReport &&
+    integrityReport.diffs.length > 0
+      ? integrityReport
+      : null;
+
+  const sheetRowsForPicker = useMemo(() => {
+    return loadedData.allModels
+      .filter((m) => typeof m.sheetRowNumber === 'number' && m.sheetRowNumber >= 36)
+      .sort((a, b) => (a.sheetRowNumber ?? 9999) - (b.sheetRowNumber ?? 9999));
+  }, [loadedData.allModels]);
+
+  const sheetRowByNumber = useMemo(() => {
+    const map = new Map<number, (typeof sheetRowsForPicker)[number]>();
+    for (const m of sheetRowsForPicker) {
+      if (typeof m.sheetRowNumber === 'number') {
+        map.set(m.sheetRowNumber, m);
+      }
+    }
+    return map;
+  }, [sheetRowsForPicker]);
+
+  const integrityColByRow = useMemo(() => {
+    const map = new Map<number, number | null>();
+    const rawRows = loadedData.rawRows;
+    for (const m of sheetRowsForPicker) {
+      if (typeof m.sheetRowNumber === 'number') {
+        const rawCell = rawRows?.[m.sheetRowNumber - 1]?.[INTEGRITY_COL_INDEX];
+        map.set(m.sheetRowNumber, parseIntegrityCellNumber(rawCell));
+      }
+    }
+    return map;
+  }, [sheetRowsForPicker, loadedData.rawRows]);
+
+  // Pre-select changed prices
   useEffect(() => {
     if (!effectiveDiffReport) {
-      setSelectedIds({});
+      setSelectedPriceIds({});
       return;
     }
     const next: Record<string, boolean> = {};
@@ -127,14 +241,56 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         next[item.modelId] = hasChange;
       }
     }
-    setSelectedIds(next);
+    setSelectedPriceIds(next);
   }, [effectiveDiffReport]);
+
+  // Pre-select actionable GDPx rows (missing, overwrite_estimate, changed)
+  useEffect(() => {
+    if (!effectiveGdpxDiffReport) {
+      setSelectedGdpxIds({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const item of effectiveGdpxDiffReport.diffs) {
+      if (
+        item.status === 'missing' ||
+        item.status === 'overwrite_estimate' ||
+        item.status === 'changed'
+      ) {
+        next[item.gdpxId] = true;
+      }
+    }
+    setSelectedGdpxIds(next);
+  }, [effectiveGdpxDiffReport]);
+
+  // Pre-select actionable Integrity-Bench rows (missing, overwrite_estimate, changed)
+  useEffect(() => {
+    if (!effectiveIntegrityDiffReport) {
+      setSelectedIntegrityIds({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const item of effectiveIntegrityDiffReport.diffs) {
+      if (
+        item.status === 'missing' ||
+        item.status === 'overwrite_estimate' ||
+        item.status === 'changed'
+      ) {
+        next[item.integrityId] = true;
+      }
+    }
+    setSelectedIntegrityIds(next);
+  }, [effectiveIntegrityDiffReport]);
 
   useEffect(() => {
     if (isOpen) {
       setWriteError(null);
       setWriteSuccess(null);
       setPendingWrite(null);
+      setManualGdpxRowOverrides({});
+      setManualIntegrityRowOverrides({});
+      setShowIgnoredGdpx(false);
+      setShowIgnoredIntegrity(false);
     }
   }, [isOpen]);
 
@@ -145,16 +301,109 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   const colUsLetter = colUsIdx !== null ? columnIndexToA1(colUsIdx) : null;
   const sheetTitle = loadedData.activeSheetTitle || 'Sheet1';
 
-  const actionableDiffs = useMemo(() => {
+  const actionablePriceDiffs = useMemo(() => {
     if (!effectiveDiffReport) return [];
     return effectiveDiffReport.diffs.filter(
       (d) => d.deStatus !== 'unchanged' || d.usStatus !== 'unchanged'
     );
   }, [effectiveDiffReport]);
 
-  const selectedCount = useMemo(() => {
-    return actionableDiffs.filter((d) => selectedIds[d.modelId]).length;
-  }, [actionableDiffs, selectedIds]);
+  // Strictly only show changing/actionable rows in GDPx section (never full leaderboard or ignored)
+  const actionableGdpxDiffs = useMemo(() => {
+    if (!effectiveGdpxDiffReport) return [];
+    return effectiveGdpxDiffReport.diffs.filter(
+      (d) => d.status !== 'unchanged' && d.status !== 'ignored'
+    );
+  }, [effectiveGdpxDiffReport]);
+
+  const ignoredGdpxDiffs = useMemo(() => {
+    if (!effectiveGdpxDiffReport) return [];
+    return effectiveGdpxDiffReport.diffs.filter((d) => d.status === 'ignored');
+  }, [effectiveGdpxDiffReport]);
+
+  // Strictly only show changing/actionable rows in Integrity section (never full 43-row table or ignored)
+  const actionableIntegrityDiffs = useMemo(() => {
+    if (!effectiveIntegrityDiffReport) return [];
+    return effectiveIntegrityDiffReport.diffs.filter(
+      (d) => d.status !== 'unchanged' && d.status !== 'ignored'
+    );
+  }, [effectiveIntegrityDiffReport]);
+
+  const ignoredIntegrityDiffs = useMemo(() => {
+    if (!effectiveIntegrityDiffReport) return [];
+    return effectiveIntegrityDiffReport.diffs.filter((d) => d.status === 'ignored');
+  }, [effectiveIntegrityDiffReport]);
+
+  const resolveEffectiveGdpxTarget = (item: GdpxDiffItem) => {
+    const overrideRow = manualGdpxRowOverrides[item.gdpxId];
+    if (typeof overrideRow === 'number' && overrideRow >= 36) {
+      const sheetModel = sheetRowByNumber.get(overrideRow);
+      return {
+        sheetRowNumber: overrideRow,
+        matchedDisplayName: sheetModel?.displayName || `Row ${overrideRow}`,
+        currentColJ:
+          sheetModel && typeof sheetModel.rawScores.trickQuestions === 'number'
+            ? sheetModel.rawScores.trickQuestions
+            : null,
+      };
+    }
+    return {
+      sheetRowNumber: item.sheetRowNumber,
+      matchedDisplayName: item.matchedDisplayName,
+      currentColJ: item.currentColJ,
+    };
+  };
+
+  const resolveEffectiveIntegrityTarget = (item: IntegrityDiffItem) => {
+    const overrideRow = manualIntegrityRowOverrides[item.integrityId];
+    if (typeof overrideRow === 'number' && overrideRow >= 36) {
+      const sheetModel = sheetRowByNumber.get(overrideRow);
+      return {
+        sheetRowNumber: overrideRow,
+        matchedDisplayName: sheetModel?.displayName || `Row ${overrideRow}`,
+        currentColAN: integrityColByRow.get(overrideRow) ?? null,
+      };
+    }
+    return {
+      sheetRowNumber: item.sheetRowNumber,
+      matchedDisplayName: item.matchedDisplayName,
+      currentColAN: item.currentColAN,
+    };
+  };
+
+  const selectedPriceCount = useMemo(() => {
+    return actionablePriceDiffs.filter((d) => selectedPriceIds[d.modelId]).length;
+  }, [actionablePriceDiffs, selectedPriceIds]);
+
+  const selectedGdpxItems = useMemo(() => {
+    return actionableGdpxDiffs.filter((item) => {
+      if (!selectedGdpxIds[item.gdpxId]) return false;
+      const target = resolveEffectiveGdpxTarget(item);
+      return typeof target.sheetRowNumber === 'number' && target.sheetRowNumber >= 36;
+    });
+  }, [actionableGdpxDiffs, selectedGdpxIds, manualGdpxRowOverrides, sheetRowByNumber]);
+
+  const selectedIntegrityItems = useMemo(() => {
+    return actionableIntegrityDiffs.filter((item) => {
+      if (!selectedIntegrityIds[item.integrityId]) return false;
+      const target = resolveEffectiveIntegrityTarget(item);
+      return typeof target.sheetRowNumber === 'number' && target.sheetRowNumber >= 36;
+    });
+  }, [
+    actionableIntegrityDiffs,
+    selectedIntegrityIds,
+    manualIntegrityRowOverrides,
+    sheetRowByNumber,
+    integrityColByRow,
+  ]);
+
+  const totalSelectedCount =
+    selectedPriceCount + selectedGdpxItems.length + selectedIntegrityItems.length;
+  const hasAnyActionable =
+    actionablePriceDiffs.length > 0 ||
+    actionableGdpxDiffs.length > 0 ||
+    actionableIntegrityDiffs.length > 0;
+  const isAnyChecking = isChecking || isCheckingGdpx || isCheckingIntegrity;
 
   const displayedLabs = useMemo(() => {
     return report?.labs && report.labs.length > 0 ? report.labs : DEFAULT_LAB_PLANS;
@@ -166,10 +415,10 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
 
   if (!isOpen) return null;
 
-  const formatTimestamp = (iso?: string) => {
+  const formatTimestamp = (iso?: string | null) => {
     if (!iso) return '—';
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return '—';
+    if (isNaN(d.getTime())) return String(iso);
     return d.toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', {
       day: '2-digit',
       month: '2-digit',
@@ -179,45 +428,244 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     });
   };
 
-  const handleToggleItem = (modelId: string) => {
-    setSelectedIds((prev) => ({ ...prev, [modelId]: !prev[modelId] }));
+  const formatGdpxScore = (val: number | null | undefined) => {
+    if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
+    const rounded = Math.round(val * 100) / 100;
+    return lang === 'de' ? String(rounded).replace('.', ',') : String(rounded);
+  };
+
+  const formatIntegrityScore = (val: number | null | undefined) => {
+    if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
+    const rounded = Math.round(val * 10) / 10;
+    const formatted = rounded.toFixed(1);
+    return lang === 'de' ? formatted.replace('.', ',') : formatted;
+  };
+
+  const handleRunAllChecks = async () => {
+    await Promise.allSettled([
+      isSheetsConnected ? onRunCheck() : Promise.resolve(),
+      onRunGdpxCheck(),
+      onRunIntegrityCheck(),
+    ]);
+  };
+
+  const handleTogglePriceItem = (modelId: string) => {
+    setSelectedPriceIds((prev) => ({ ...prev, [modelId]: !prev[modelId] }));
+  };
+
+  const handleToggleGdpxItem = (gdpxId: string) => {
+    setSelectedGdpxIds((prev) => ({ ...prev, [gdpxId]: !prev[gdpxId] }));
+  };
+
+  const handleToggleIntegrityItem = (integrityId: string) => {
+    setSelectedIntegrityIds((prev) => ({ ...prev, [integrityId]: !prev[integrityId] }));
+  };
+
+  const handleToggleAllIntegrity = (checked: boolean) => {
+    if (!checked) {
+      setSelectedIntegrityIds({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const item of actionableIntegrityDiffs) {
+      const target = resolveEffectiveIntegrityTarget(item);
+      if (target.sheetRowNumber && target.sheetRowNumber >= 36) {
+        next[item.integrityId] = true;
+      }
+    }
+    setSelectedIntegrityIds(next);
+  };
+
+  const handleAssignManualGdpxRow = (gdpxId: string, rowNumStr: string) => {
+    if (rowNumStr === IGNORE_OPTION_VALUE) {
+      setManualGdpxRowOverrides((prev) => {
+        const next = { ...prev };
+        delete next[gdpxId];
+        return next;
+      });
+      setSelectedGdpxIds((prev) => ({ ...prev, [gdpxId]: false }));
+      void onIgnoreGdpxModel?.(gdpxId);
+      return;
+    }
+
+    const rowNum = Number(rowNumStr);
+    if (!Number.isFinite(rowNum) || rowNum < 36) {
+      setManualGdpxRowOverrides((prev) => {
+        const next = { ...prev };
+        delete next[gdpxId];
+        return next;
+      });
+      setSelectedGdpxIds((prev) => ({ ...prev, [gdpxId]: false }));
+      return;
+    }
+    setManualGdpxRowOverrides((prev) => ({ ...prev, [gdpxId]: rowNum }));
+    setSelectedGdpxIds((prev) => ({ ...prev, [gdpxId]: true }));
+  };
+
+  const handleAssignManualIntegrityRow = (integrityId: string, rowNumStr: string) => {
+    if (rowNumStr === IGNORE_OPTION_VALUE) {
+      setManualIntegrityRowOverrides((prev) => {
+        const next = { ...prev };
+        delete next[integrityId];
+        return next;
+      });
+      setSelectedIntegrityIds((prev) => ({ ...prev, [integrityId]: false }));
+      void onIgnoreIntegrityModel?.(integrityId);
+      return;
+    }
+
+    const rowNum = Number(rowNumStr);
+    if (!Number.isFinite(rowNum) || rowNum < 36) {
+      setManualIntegrityRowOverrides((prev) => {
+        const next = { ...prev };
+        delete next[integrityId];
+        return next;
+      });
+      setSelectedIntegrityIds((prev) => ({ ...prev, [integrityId]: false }));
+      return;
+    }
+    setManualIntegrityRowOverrides((prev) => ({ ...prev, [integrityId]: rowNum }));
+    setSelectedIntegrityIds((prev) => ({ ...prev, [integrityId]: true }));
+  };
+
+  const sortedPickerOptionsFor = (lab: string) => {
+    const labLow = (lab || '').toLowerCase();
+    return [...sheetRowsForPicker].sort((a, b) => {
+      const aEmpty = a.rawScores.trickQuestions === null ? 0 : 1;
+      const bEmpty = b.rawScores.trickQuestions === null ? 0 : 1;
+      const aCo =
+        (a.companyName || '').toLowerCase().includes(labLow) ||
+        labLow.includes((a.companyName || '').toLowerCase())
+          ? 0
+          : 1;
+      const bCo =
+        (b.companyName || '').toLowerCase().includes(labLow) ||
+        labLow.includes((b.companyName || '').toLowerCase())
+          ? 0
+          : 1;
+      if (aCo !== bCo) return aCo - bCo;
+      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
+      return (a.sheetRowNumber ?? 0) - (b.sheetRowNumber ?? 0);
+    });
+  };
+
+  const sortedIntegrityPickerOptionsFor = (modelName: string) => {
+    const firstWord = (modelName || '').toLowerCase().split(/[\s-]+/)[0] || '';
+    return [...sheetRowsForPicker].sort((a, b) => {
+      const aRow = a.sheetRowNumber ?? 0;
+      const bRow = b.sheetRowNumber ?? 0;
+      const aAn = integrityColByRow.get(aRow) ?? null;
+      const bAn = integrityColByRow.get(bRow) ?? null;
+      const aMatch = firstWord && a.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
+      const bMatch = firstWord && b.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
+      if (aMatch !== bMatch) return aMatch - bMatch;
+      const aEmpty = aAn === null ? 0 : 1;
+      const bEmpty = bAn === null ? 0 : 1;
+      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
+      return aRow - bRow;
+    });
   };
 
   const handlePrepareSheetUpdates = () => {
-    if (!effectiveDiffReport) return;
     setWriteError(null);
     setWriteSuccess(null);
 
     const changes: PendingSheetCellChange[] = [];
-    for (const item of actionableDiffs) {
-      if (!selectedIds[item.modelId]) continue;
-      // Strict guard: never write to Rows 1-35 (Top-30 VSTACK lives in Rows 3-32)
-      if (item.sheetRowNumber < 36) continue;
 
-      if ((item.deStatus === 'changed' || item.deStatus === 'missing') && item.liveDe) {
+    if (effectiveDiffReport) {
+      for (const item of actionablePriceDiffs) {
+        if (!selectedPriceIds[item.modelId]) continue;
+        // Strict guard: never write to Rows 1-35
+        if (item.sheetRowNumber < 36) continue;
+
+        if ((item.deStatus === 'changed' || item.deStatus === 'missing') && item.liveDe) {
+          changes.push({
+            cellRef: `${colDeLetter}${item.sheetRowNumber}`,
+            label: `${item.displayName} (${item.lab} · DE)`,
+            before: item.currentDe || (lang === 'de' ? '(leer)' : '(empty)'),
+            after: item.liveDe,
+            range: `${quoteSheetTitle(sheetTitle)}!${colDeLetter}${item.sheetRowNumber}`,
+            value: item.liveDe,
+            kind: 'price',
+          });
+        }
+
+        if (
+          colUsIdx !== null &&
+          colUsLetter &&
+          (item.usStatus === 'changed' || item.usStatus === 'missing') &&
+          item.liveUs
+        ) {
+          changes.push({
+            cellRef: `${colUsLetter}${item.sheetRowNumber}`,
+            label: `${item.displayName} (${item.lab} · US)`,
+            before: item.currentUs || (lang === 'de' ? '(leer)' : '(empty)'),
+            after: item.liveUs,
+            range: `${quoteSheetTitle(sheetTitle)}!${colUsLetter}${item.sheetRowNumber}`,
+            value: item.liveUs,
+            kind: 'price',
+          });
+        }
+      }
+    }
+
+    if (effectiveGdpxDiffReport) {
+      for (const item of selectedGdpxItems) {
+        const target = resolveEffectiveGdpxTarget(item);
+        if (!target.sheetRowNumber || target.sheetRowNumber < 36) continue;
+        const sheetModel = sheetRowByNumber.get(target.sheetRowNumber);
+        const isManualAssignment = typeof manualGdpxRowOverrides[item.gdpxId] === 'number';
+
+        const numericScore = Math.round(item.liveScore * 10) / 10;
         changes.push({
-          cellRef: `${colDeLetter}${item.sheetRowNumber}`,
-          label: `${item.displayName} (${item.lab} · DE)`,
-          before: item.currentDe || '(empty)',
-          after: item.liveDe,
-          range: `${quoteSheetTitle(sheetTitle)}!${colDeLetter}${item.sheetRowNumber}`,
-          value: item.liveDe,
+          cellRef: `${GDPX_COL_LETTER}${target.sheetRowNumber}`,
+          label: `GDPx: ${item.gdpxName} → ${target.matchedDisplayName || `Zeile ${target.sheetRowNumber}`}`,
+          before:
+            target.currentColJ !== null
+              ? formatGdpxScore(target.currentColJ)
+              : lang === 'de'
+              ? '(leer)'
+              : '(empty)',
+          after: formatGdpxScore(numericScore),
+          range: `${quoteSheetTitle(sheetTitle)}!${GDPX_COL_LETTER}${target.sheetRowNumber}`,
+          value: numericScore,
+          kind: 'gdpx',
+          sourceId: item.gdpxId,
+          sheetRowNumber: target.sheetRowNumber,
+          matchedModelId: sheetModel?.id ?? item.matchedModelId ?? undefined,
+          matchedDisplayName: sheetModel?.displayName ?? target.matchedDisplayName ?? undefined,
+          isManualAssignment,
         });
       }
+    }
 
-      if (
-        colUsIdx !== null &&
-        colUsLetter &&
-        (item.usStatus === 'changed' || item.usStatus === 'missing') &&
-        item.liveUs
-      ) {
+    if (effectiveIntegrityDiffReport) {
+      for (const item of selectedIntegrityItems) {
+        const target = resolveEffectiveIntegrityTarget(item);
+        if (!target.sheetRowNumber || target.sheetRowNumber < 36) continue;
+        const sheetModel = sheetRowByNumber.get(target.sheetRowNumber);
+        const isManualAssignment =
+          typeof manualIntegrityRowOverrides[item.integrityId] === 'number';
+
+        const numericScore = Math.round(item.liveScore * 10) / 10;
         changes.push({
-          cellRef: `${colUsLetter}${item.sheetRowNumber}`,
-          label: `${item.displayName} (${item.lab} · US)`,
-          before: item.currentUs || '(empty)',
-          after: item.liveUs,
-          range: `${quoteSheetTitle(sheetTitle)}!${colUsLetter}${item.sheetRowNumber}`,
-          value: item.liveUs,
+          cellRef: `${INTEGRITY_COL_LETTER}${target.sheetRowNumber}`,
+          label: `Integrity: ${item.integrityName} → ${target.matchedDisplayName || `Zeile ${target.sheetRowNumber}`}`,
+          before:
+            target.currentColAN !== null
+              ? formatIntegrityScore(target.currentColAN)
+              : lang === 'de'
+              ? '(leer)'
+              : '(empty)',
+          after: formatIntegrityScore(numericScore),
+          range: `${quoteSheetTitle(sheetTitle)}!${INTEGRITY_COL_LETTER}${target.sheetRowNumber}`,
+          value: numericScore,
+          kind: 'integrity',
+          sourceId: item.integrityId,
+          sheetRowNumber: target.sheetRowNumber,
+          matchedModelId: sheetModel?.id ?? item.matchedModelId ?? undefined,
+          matchedDisplayName: sheetModel?.displayName ?? target.matchedDisplayName ?? undefined,
+          isManualAssignment,
         });
       }
     }
@@ -225,8 +673,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     if (changes.length === 0) {
       setWriteError(
         lang === 'de'
-          ? 'Keine ausgewählten Preisänderungen für Google Sheets (Spalten T/U) gefunden.'
-          : 'No selected price updates found to write to Google Sheets (Cols T/U).'
+          ? 'Keine gültigen Änderungen ausgewählt. Bei neuen LLMs bitte zuerst eine Sheet-Zeile zuordnen.'
+          : 'No valid updates selected. For unmatched LLMs, please assign a Sheet row first.'
       );
       return;
     }
@@ -246,12 +694,41 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         value: c.value,
       }));
       const res = await batchUpdateSheetCells(activeSpreadsheetId, updates, accessToken);
+
+      const gdpxMappings: Record<string, ManualRowMapping> = {};
+      const integrityMappings: Record<string, ManualRowMapping> = {};
+      for (const c of pendingWrite) {
+        if (!c.isManualAssignment || !c.sourceId || !c.sheetRowNumber) continue;
+        const mapping: ManualRowMapping = {
+          sheetRowNumber: c.sheetRowNumber,
+          ...(c.matchedModelId ? { matchedModelId: c.matchedModelId } : {}),
+          ...(c.matchedDisplayName ? { matchedDisplayName: c.matchedDisplayName } : {}),
+        };
+        if (c.kind === 'gdpx') {
+          gdpxMappings[c.sourceId] = mapping;
+        } else if (c.kind === 'integrity') {
+          integrityMappings[c.sourceId] = mapping;
+        }
+      }
+
+      if (
+        onSaveManualMappings &&
+        (Object.keys(gdpxMappings).length > 0 || Object.keys(integrityMappings).length > 0)
+      ) {
+        await onSaveManualMappings({
+          gdpx: Object.keys(gdpxMappings).length > 0 ? gdpxMappings : undefined,
+          integrity: Object.keys(integrityMappings).length > 0 ? integrityMappings : undefined,
+        });
+      }
+
       setWriteSuccess(
         lang === 'de'
-          ? `${res.totalUpdatedCells} Preiszelle(n) ab Zeile 36 erfolgreich im Google Sheet aktualisiert.`
-          : `Successfully updated ${res.totalUpdatedCells} pricing cell(s) (Row 36+) in Google Sheets.`
+          ? `${res.totalUpdatedCells} Zelle(n) ab Zeile 36 erfolgreich im Google Sheet aktualisiert.`
+          : `Successfully updated ${res.totalUpdatedCells} cell(s) (Row 36+) in Google Sheets.`
       );
       setPendingWrite(null);
+      setManualGdpxRowOverrides({});
+      setManualIntegrityRowOverrides({});
       await onRefreshFromSheets(activeSpreadsheetId);
     } catch (err) {
       setWriteError(err instanceof Error ? err.message : 'Failed to update Google Sheet.');
@@ -261,7 +738,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     }
   };
 
-  const renderStatusLabel = (status: PricingDiffItem['deStatus']) => {
+  const renderPriceStatusLabel = (status: PricingDiffItem['deStatus']) => {
     if (status === 'changed') {
       return (
         <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
@@ -279,6 +756,73 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     return null;
   };
 
+  const renderGdpxStatusBadge = (status: GdpxDiffStatus) => {
+    switch (status) {
+      case 'new_unmatched':
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300">
+            {lang === 'de' ? 'Neues LLM' : 'New LLM'}
+          </span>
+        );
+      case 'missing':
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300">
+            {lang === 'de' ? 'Fehlt in J' : 'Missing J'}
+          </span>
+        );
+      case 'overwrite_estimate':
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+            {lang === 'de' ? 'Schätzwert → Offiziell' : 'Estimate → Official'}
+          </span>
+        );
+      case 'changed':
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+            {lang === 'de' ? 'Geändert' : 'Changed'}
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderIntegrityStatusBadge = (status: IntegrityDiffStatus) => {
+    switch (status) {
+      case 'new_unmatched':
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300">
+            {lang === 'de' ? 'Ohne Zeile' : 'Unmatched'}
+          </span>
+        );
+      case 'missing':
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300">
+            {lang === 'de' ? `Fehlt in ${INTEGRITY_COL_LETTER}` : `Missing ${INTEGRITY_COL_LETTER}`}
+          </span>
+        );
+      case 'overwrite_estimate':
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+            {lang === 'de' ? 'Schätzwert → Offiziell' : 'Estimate → Official'}
+          </span>
+        );
+      case 'changed':
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+            {lang === 'de' ? 'Geändert' : 'Changed'}
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const totalBadgeAlerts =
+    (effectiveDiffReport?.changedCount ?? 0) +
+    (effectiveGdpxDiffReport?.actionableCount ?? 0) +
+    (effectiveIntegrityDiffReport?.actionableCount ?? 0);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 backdrop-blur-xs p-3 sm:p-5">
       <div className="relative w-full max-w-4xl max-h-[90vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
@@ -287,7 +831,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
           <div className="flex items-center gap-2.5 min-w-0">
             <div
               className={`p-1.5 rounded-lg shrink-0 ${
-                effectiveDiffReport && effectiveDiffReport.changedCount > 0
+                totalBadgeAlerts > 0
                   ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
                   : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
               }`}
@@ -296,14 +840,22 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                {lang === 'de' ? 'Tarife & Preischecker' : 'Plans & Price Checker'}
+                {lang === 'de'
+                  ? 'Tarife, Preis-, GDPx- & Integrity-Prüfer'
+                  : 'Plans, Price, GDPx & Integrity Checker'}
               </h2>
-              <p className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
+              <p className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <Clock className="w-3 h-3 shrink-0" />
                 <span>
                   {isUsingLiveReport
-                    ? `${lang === 'de' ? 'Live-Stand' : 'Live'}: ${formatTimestamp(displayedTimestamp)}`
-                    : `${lang === 'de' ? 'Stand' : 'Snapshot'}: ${formatTimestamp(displayedTimestamp)}`}
+                    ? `${lang === 'de' ? 'Preise' : 'Plans'}: ${formatTimestamp(displayedTimestamp)}`
+                    : `${lang === 'de' ? 'Tarife' : 'Snapshot'}: ${formatTimestamp(displayedTimestamp)}`}
+                  {gdpxReport
+                    ? ` · GDPx: ${gdpxReport.totalSourceModels}`
+                    : ''}
+                  {integrityReport
+                    ? ` · Integrity: ${integrityReport.totalSourceModels}`
+                    : ''}
                 </span>
               </p>
             </div>
@@ -322,25 +874,23 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                   <span>Auto (24h)</span>
                 </label>
 
-                {isSheetsConnected && (
-                  <button
-                    type="button"
-                    onClick={() => void onRunCheck()}
-                    disabled={isChecking}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
-                    <span>
-                      {isChecking
-                        ? lang === 'de'
-                          ? 'Prüfe…'
-                          : 'Checking…'
-                        : lang === 'de'
-                        ? 'Live prüfen'
-                        : 'Check Live'}
-                    </span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => void handleRunAllChecks()}
+                  disabled={isAnyChecking}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isAnyChecking ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isAnyChecking
+                      ? lang === 'de'
+                        ? 'Prüfe…'
+                        : 'Checking…'
+                      : lang === 'de'
+                      ? 'Live prüfen'
+                      : 'Check Live'}
+                  </span>
+                </button>
               </>
             )}
 
@@ -376,6 +926,20 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
           )}
 
+          {gdpxCheckError && (
+            <div className="flex items-start gap-2.5 p-3 rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{gdpxCheckError}</span>
+            </div>
+          )}
+
+          {integrityCheckError && (
+            <div className="flex items-start gap-2.5 p-3 rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{integrityCheckError}</span>
+            </div>
+          )}
+
           {writeError && (
             <div className="flex items-start gap-2.5 p-3 rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 text-xs">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -390,7 +954,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
           )}
 
-          {/* Top Section: Current Consumer Plans (DE / US) — Always visible for all users including static GitHub Pages */}
+          {/* Top Section: Current Consumer Plans (DE / US) */}
           <div className="space-y-2">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">
@@ -483,13 +1047,13 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
           </div>
 
-          {/* Diff Section (Full-Stack Server Only): Only renders diff controls & detected diffs when applicable */}
+          {/* Static preview banner */}
           {!apiAvailable && (
             <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
               <span>
                 {lang === 'de'
-                  ? 'Statische Vorschau ohne Server-Backend: Live-Webprüfung & Google-Sheet-Diff stehen nur mit dem Full-Stack-Server zur Verfügung.'
-                  : 'Static preview without backend server: live web re-checks and Google Sheet diff require the full-stack server.'}
+                  ? 'Statische Vorschau ohne Server-Backend: Live-Prüfungen & Google-Sheet-Diffs stehen nur mit dem Full-Stack-Server zur Verfügung.'
+                  : 'Static preview without backend server: live checks and Google Sheet diffs require the full-stack server.'}
               </span>
               {onRetryConnection && (
                 <button
@@ -504,14 +1068,15 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
           )}
 
+          {/* Single Unified Google Sign-In Bar */}
           {apiAvailable && !isSheetsConnected && (
             <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 min-w-0">
                 <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                 <span>
                   {lang === 'de'
-                    ? 'Für einen Live-Preis-Diff gegen Ihr Google Sheet (und direkte Übernahme ab Zeile 36) mit Google anmelden.'
-                    : 'Sign in with Google to run a live pricing diff against your Google Sheet and apply updates.'}
+                    ? `Einmal mit Google anmelden für Live-Diffs & direkte Übernahme (Preise T/U, GDPx ${GDPX_COL_LETTER} & Integrity ${INTEGRITY_COL_LETTER}, ab Zeile 36).`
+                    : `Sign in once with Google to diff prices (T/U), GDPx (${GDPX_COL_LETTER}) & Integrity (${INTEGRITY_COL_LETTER}) and apply updates (Row 36+).`}
                 </span>
               </div>
               <button
@@ -540,50 +1105,25 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
           )}
 
+          {/* Connected: Pricing Diff Section */}
           {apiAvailable && isSheetsConnected && isChecking && !effectiveDiffReport && (
-            <div className="px-3.5 py-3 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/70 dark:bg-blue-950/30 flex items-center gap-3 text-xs">
-              <RefreshCw className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
-              <div className="min-w-0">
-                <p className="font-semibold text-slate-800 dark:text-slate-200">
-                  {lang === 'de'
-                    ? 'Prüfe Live-Preise gegen Ihr Google Sheet…'
-                    : 'Checking live pricing against your Google Sheet…'}
-                </p>
-                <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                  {lang === 'de'
-                    ? `Spalten ${colDeLetter} / ${colUsLetter || 'US'} ab Zeile 36`
-                    : `Columns ${colDeLetter} / ${colUsLetter || 'US'}, Row 36+`}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {apiAvailable && isSheetsConnected && !isChecking && !effectiveDiffReport && (
-            <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs text-slate-600 dark:text-slate-300">
+            <div className="px-3.5 py-2.5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/70 dark:bg-blue-950/30 flex items-center gap-2.5 text-xs">
+              <RefreshCw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
+              <span className="font-medium text-slate-800 dark:text-slate-200">
                 {lang === 'de'
-                  ? 'Google Sheet verbunden. Live-Check ausführen, um etwaige Preis-Diffs zu erkennen.'
-                  : 'Google Sheet connected. Run a live check to detect any pricing diffs.'}
+                  ? `Prüfe Live-Preise gegen Spalten ${colDeLetter} / ${colUsLetter || 'US'}…`
+                  : `Checking live pricing against Columns ${colDeLetter} / ${colUsLetter || 'US'}…`}
               </span>
-              <button
-                type="button"
-                onClick={() => void onRunCheck()}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>{lang === 'de' ? 'Diff jetzt prüfen' : 'Check Diff Now'}</span>
-              </button>
             </div>
           )}
 
           {effectiveDiffReport && (
-            <>
-              {/* Compact Diff Status Strip */}
+            <div className="space-y-2">
               <div
-                className={`px-3.5 py-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
+                className={`px-3.5 py-2 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
                   effectiveDiffReport.changedCount > 0
                     ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
-                    : actionableDiffs.length > 0
+                    : actionablePriceDiffs.length > 0
                     ? 'border-blue-300 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/25'
                     : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/25'
                 }`}
@@ -598,15 +1138,15 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                     <strong className="font-bold text-slate-900 dark:text-white">
                       {effectiveDiffReport.changedCount > 0
                         ? lang === 'de'
-                          ? `${effectiveDiffReport.changedCount} Diff(s) erkannt:`
-                          : `${effectiveDiffReport.changedCount} Diff(s) detected:`
-                        : actionableDiffs.length > 0
+                          ? `Preise: ${effectiveDiffReport.changedCount} Diff(s):`
+                          : `Plans: ${effectiveDiffReport.changedCount} Diff(s):`
+                        : actionablePriceDiffs.length > 0
                         ? lang === 'de'
-                          ? `${actionableDiffs.length} fehlende Preiszelle(n):`
-                          : `${actionableDiffs.length} missing price cell(s):`
+                          ? `Preise: ${actionablePriceDiffs.length} fehlend:`
+                          : `Plans: ${actionablePriceDiffs.length} missing:`
                         : lang === 'de'
-                        ? 'Kein Preis-Diff:'
-                        : 'No price diff:'}
+                        ? 'Preise OK:'
+                        : 'Plans OK:'}
                     </strong>{' '}
                     {roundCurrencyTokensInText(
                       lang === 'de' ? effectiveDiffReport.summaryDe : effectiveDiffReport.summaryEn
@@ -631,167 +1171,707 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 </div>
               </div>
 
-              {/* Diff-Only Table: Only rendered when actual changes or missing cells exist */}
-              {actionableDiffs.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      {lang === 'de'
-                        ? `Abweichungen zum Sheet (${colDeLetter} / ${colUsLetter || 'US'} · ab Z. 36)`
-                        : `Detected Price Diffs (${colDeLetter} / ${colUsLetter || 'US'} · Row 36+)`}
-                    </h3>
-                    <span className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                      {actionableDiffs.length} {lang === 'de' ? 'Einträge' : 'items'}
-                    </span>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                            <th className="py-1.5 px-2.5 w-7"></th>
-                            <th className="py-1.5 px-3">{lang === 'de' ? 'Modell' : 'Model'}</th>
-                            <th className="py-1.5 px-3">{lang === 'de' ? 'Lab · Tarif' : 'Lab · Plan'}</th>
-                            <th className="py-1.5 px-3">DE ({colDeLetter})</th>
-                            <th className="py-1.5 px-3">US ({colUsLetter || 'EN'})</th>
-                            <th className="py-1.5 px-3">{lang === 'de' ? 'Notiz' : 'Note'}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80">
-                          {actionableDiffs.map((item) => {
-                            const isChanged = item.deStatus === 'changed' || item.usStatus === 'changed';
-                            return (
-                              <tr
-                                key={item.modelId}
-                                className={
-                                  isChanged
-                                    ? 'bg-amber-50/45 dark:bg-amber-950/15'
-                                    : 'bg-white dark:bg-slate-900'
-                                }
-                              >
-                                <td className="py-2 px-2.5 align-middle">
-                                  <input
-                                    type="checkbox"
-                                    checked={Boolean(selectedIds[item.modelId])}
-                                    onChange={() => handleToggleItem(item.modelId)}
-                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                  />
-                                </td>
-                                <td className="py-2 px-3 align-middle whitespace-nowrap">
-                                  <span className="font-semibold text-slate-900 dark:text-white">
-                                    {item.displayName}
+              {actionablePriceDiffs.length > 0 && (
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                          <th className="py-1.5 px-2.5 w-7"></th>
+                          <th className="py-1.5 px-3">{lang === 'de' ? 'Modell' : 'Model'}</th>
+                          <th className="py-1.5 px-3">{lang === 'de' ? 'Lab · Tarif' : 'Lab · Plan'}</th>
+                          <th className="py-1.5 px-3">DE ({colDeLetter})</th>
+                          <th className="py-1.5 px-3">US ({colUsLetter || 'EN'})</th>
+                          <th className="py-1.5 px-3">{lang === 'de' ? 'Notiz' : 'Note'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+                        {actionablePriceDiffs.map((item) => {
+                          const isChanged = item.deStatus === 'changed' || item.usStatus === 'changed';
+                          return (
+                            <tr
+                              key={item.modelId}
+                              className={
+                                isChanged
+                                  ? 'bg-amber-50/45 dark:bg-amber-950/15'
+                                  : 'bg-white dark:bg-slate-900'
+                              }
+                            >
+                              <td className="py-1.5 px-2.5 align-middle">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(selectedPriceIds[item.modelId])}
+                                  onChange={() => handleTogglePriceItem(item.modelId)}
+                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                              </td>
+                              <td className="py-1.5 px-3 align-middle whitespace-nowrap">
+                                <span className="font-semibold text-slate-900 dark:text-white">
+                                  {item.displayName}
+                                </span>
+                                <span className="ml-1.5 text-[10px] font-mono tabular-nums text-slate-400">
+                                  #{item.sheetRowNumber}
+                                </span>
+                              </td>
+                              <td className="py-1.5 px-3 align-middle whitespace-nowrap">
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${LAB_BADGE[item.lab]}`}>
+                                  {item.lab}
+                                </span>
+                                {item.matchedPlanName && (
+                                  <span className="ml-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+                                    {item.matchedPlanName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
                                   </span>
-                                  <span className="ml-1.5 text-[10px] font-mono tabular-nums text-slate-400">
-                                    #{item.sheetRowNumber}
-                                  </span>
-                                </td>
-                                <td className="py-2 px-3 align-middle whitespace-nowrap">
-                                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${LAB_BADGE[item.lab]}`}>
-                                    {item.lab}
-                                  </span>
-                                  {item.matchedPlanName && (
-                                    <span className="ml-1.5 text-[11px] text-slate-600 dark:text-slate-300">
-                                      {item.matchedPlanName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
-                                    </span>
+                                )}
+                              </td>
+                              <td className="py-1.5 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
+                                <div className="inline-flex items-center gap-1.5">
+                                  {item.deStatus === 'unchanged' ? (
+                                    <span className="text-slate-700 dark:text-slate-200">{item.currentDe ? roundCurrencyString(item.currentDe) : '—'}</span>
+                                  ) : (
+                                    <>
+                                      <span className="text-slate-400 line-through">{item.currentDe ? roundCurrencyString(item.currentDe) : '—'}</span>
+                                      <ArrowRight className="w-3 h-3 text-slate-400" />
+                                      <span className="font-bold text-slate-900 dark:text-white">{item.liveDe ? roundCurrencyString(item.liveDe) : '—'}</span>
+                                      {renderPriceStatusLabel(item.deStatus)}
+                                    </>
                                   )}
-                                </td>
-                                <td className="py-2 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
-                                  <div className="inline-flex items-center gap-1.5">
-                                    {item.deStatus === 'unchanged' ? (
-                                      <span className="text-slate-700 dark:text-slate-200">{item.currentDe ? roundCurrencyString(item.currentDe) : '—'}</span>
-                                    ) : (
-                                      <>
-                                        <span className="text-slate-400 line-through">{item.currentDe ? roundCurrencyString(item.currentDe) : '—'}</span>
-                                        <ArrowRight className="w-3 h-3 text-slate-400" />
-                                        <span className="font-bold text-slate-900 dark:text-white">{item.liveDe ? roundCurrencyString(item.liveDe) : '—'}</span>
-                                        {renderStatusLabel(item.deStatus)}
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="py-2 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
-                                  <div className="inline-flex items-center gap-1.5">
-                                    {item.usStatus === 'unchanged' ? (
-                                      <span className="text-slate-700 dark:text-slate-200">{item.currentUs ? roundCurrencyString(item.currentUs) : '—'}</span>
-                                    ) : (
-                                      <>
-                                        <span className="text-slate-400 line-through">{item.currentUs ? roundCurrencyString(item.currentUs) : '—'}</span>
-                                        <ArrowRight className="w-3 h-3 text-slate-400" />
-                                        <span className="font-bold text-slate-900 dark:text-white">{item.liveUs ? roundCurrencyString(item.liveUs) : '—'}</span>
-                                        {renderStatusLabel(item.usStatus)}
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="py-2 px-3 align-middle max-w-[220px]">
-                                  <span
-                                    className="block truncate text-[11px] text-slate-500 dark:text-slate-400"
-                                    title={item.reason ? roundCurrencyTokensInText(item.reason) : ''}
-                                  >
-                                    {item.reason ? roundCurrencyTokensInText(item.reason) : 'OK'}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Sheet Update Action Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {lang === 'de'
-                        ? 'Schreibt ausschließlich in Spalten T/U ab Zeile 36 (Top-30 VSTACK in Zeilen 3–32 bleibt unberührt).'
-                        : 'Writes strictly to Columns T/U from Row 36+ (Rows 3–32 Top-30 VSTACK stays untouched).'}
-                    </span>
-
-                    {accessToken ? (
-                      <button
-                        type="button"
-                        disabled={selectedCount === 0}
-                        onClick={handlePrepareSheetUpdates}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>
-                          {lang === 'de'
-                            ? `${selectedCount} ausgewählte Zeile(n) prüfen & ins Sheet schreiben`
-                            : `Review & Write ${selectedCount} Selected Row(s) to Sheet`}
-                        </span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void onSignIn()}
-                        disabled={isSigningIn}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        <span>
-                          {isSigningIn
-                            ? lang === 'de'
-                              ? 'Verbinde…'
-                              : 'Connecting…'
-                            : authUser
-                            ? lang === 'de'
-                              ? 'Google Sheets neu verbinden um zu schreiben'
-                              : 'Reconnect Google Sheets to Apply'
-                            : lang === 'de'
-                            ? 'Mit Google anmelden um Änderungen ins Sheet zu übernehmen'
-                            : 'Sign in with Google to Apply Changes'}
-                        </span>
-                      </button>
-                    )}
+                                </div>
+                              </td>
+                              <td className="py-1.5 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
+                                <div className="inline-flex items-center gap-1.5">
+                                  {item.usStatus === 'unchanged' ? (
+                                    <span className="text-slate-700 dark:text-slate-200">{item.currentUs ? roundCurrencyString(item.currentUs) : '—'}</span>
+                                  ) : (
+                                    <>
+                                      <span className="text-slate-400 line-through">{item.currentUs ? roundCurrencyString(item.currentUs) : '—'}</span>
+                                      <ArrowRight className="w-3 h-3 text-slate-400" />
+                                      <span className="font-bold text-slate-900 dark:text-white">{item.liveUs ? roundCurrencyString(item.liveUs) : '—'}</span>
+                                      {renderPriceStatusLabel(item.usStatus)}
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-1.5 px-3 align-middle max-w-[200px]">
+                                <span
+                                  className="block truncate text-[11px] text-slate-500 dark:text-slate-400"
+                                  title={item.reason ? roundCurrencyTokensInText(item.reason) : ''}
+                                >
+                                  {item.reason ? roundCurrencyTokensInText(item.reason) : 'OK'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
-            </>
+            </div>
+          )}
+
+          {/* Compact GDPx Section: Strictly Diff-Only (No full 21-row leaderboard!) */}
+          {apiAvailable && (
+            <div className="space-y-2 pt-1 border-t border-slate-200/80 dark:border-slate-800/80">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {lang === 'de'
+                      ? `GDPx-Prüfer (Spalte ${GDPX_COL_LETTER} · ab Z. 36)`
+                      : `GDPx Checker (Column ${GDPX_COL_LETTER} · Row 36+)`}
+                  </h3>
+                  <a
+                    href="https://gdpx.semianalysis.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] font-mono text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    <span>gdpx.semianalysis.com</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+                {gdpxReport && (
+                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                    {gdpxReport.totalSourceModels} LLMs
+                    {gdpxReport.sourceUpdatedAt ? ` · ${gdpxReport.sourceUpdatedAt}` : ''}
+                  </span>
+                )}
+              </div>
+
+              {isCheckingGdpx && !effectiveGdpxDiffReport && (
+                <div className="px-3.5 py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 flex items-center gap-2.5 text-xs">
+                  <RefreshCw className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 animate-spin shrink-0" />
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                    {lang === 'de'
+                      ? `Prüfe gdpx.semianalysis.com auf Neuzugänge für Spalte ${GDPX_COL_LETTER}…`
+                      : `Checking gdpx.semianalysis.com for new entries in Column ${GDPX_COL_LETTER}…`}
+                  </span>
+                </div>
+              )}
+
+              {!isSheetsConnected && gdpxReport && (
+                <div className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between gap-2">
+                  <span>{lang === 'de' ? gdpxReport.summaryDe : gdpxReport.summaryEn}</span>
+                  <span className="font-mono text-[11px] text-slate-400 shrink-0">
+                    {gdpxReport.totalSourceModels} LLMs
+                  </span>
+                </div>
+              )}
+
+              {effectiveGdpxDiffReport && (
+                <>
+                  <div
+                    className={`px-3.5 py-2 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
+                      effectiveGdpxDiffReport.actionableCount > 0
+                        ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
+                        : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/25'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {effectiveGdpxDiffReport.actionableCount > 0 ? (
+                        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      ) : (
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      )}
+                      <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug">
+                        <strong className="font-bold text-slate-900 dark:text-white">
+                          {effectiveGdpxDiffReport.actionableCount > 0
+                            ? lang === 'de'
+                              ? `GDPx: ${effectiveGdpxDiffReport.actionableCount} Änderung(en):`
+                              : `GDPx: ${effectiveGdpxDiffReport.actionableCount} update(s):`
+                            : lang === 'de'
+                            ? 'GDPx OK:'
+                            : 'GDPx OK:'}
+                        </strong>{' '}
+                        {lang === 'de'
+                          ? effectiveGdpxDiffReport.summaryDe
+                          : effectiveGdpxDiffReport.summaryEn}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 font-mono tabular-nums text-[11px] shrink-0">
+                      {effectiveGdpxDiffReport.unmatchedCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-bold">
+                          {effectiveGdpxDiffReport.unmatchedCount} {lang === 'de' ? 'Neu' : 'New'}
+                        </span>
+                      )}
+                      {effectiveGdpxDiffReport.missingCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
+                          {effectiveGdpxDiffReport.missingCount} {lang === 'de' ? 'Fehlt' : 'Missing'}
+                        </span>
+                      )}
+                      {(effectiveGdpxDiffReport.overwriteEstimateCount ?? 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                          {effectiveGdpxDiffReport.overwriteEstimateCount}{' '}
+                          {lang === 'de' ? 'Schätzwert' : 'Estimate'}
+                        </span>
+                      )}
+                      {effectiveGdpxDiffReport.changedCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                          {effectiveGdpxDiffReport.changedCount}{' '}
+                          {lang === 'de' ? 'Geändert' : 'Changed'}
+                        </span>
+                      )}
+                      {ignoredGdpxDiffs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowIgnoredGdpx((prev) => !prev)}
+                          className="px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-300/80 dark:hover:bg-slate-700 cursor-pointer"
+                          title={
+                            lang === 'de'
+                              ? 'Ignorierte Modelle anzeigen / wiederherstellen'
+                              : 'Show / restore ignored models'
+                          }
+                        >
+                          {ignoredGdpxDiffs.length} {lang === 'de' ? 'ignoriert' : 'ignored'}
+                        </button>
+                      )}
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
+                        {effectiveGdpxDiffReport.unchangedCount} OK
+                      </span>
+                    </div>
+                  </div>
+
+                  {showIgnoredGdpx && ignoredGdpxDiffs.length > 0 && (
+                    <div className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="text-slate-500 dark:text-slate-400 mr-1">
+                        {lang === 'de' ? 'Ignoriert:' : 'Ignored:'}
+                      </span>
+                      {ignoredGdpxDiffs.map((d) => (
+                        <button
+                          key={d.gdpxId}
+                          type="button"
+                          onClick={() => void onRestoreGdpxModel?.(d.gdpxId)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
+                          title={lang === 'de' ? 'Wieder aktivieren' : 'Restore'}
+                        >
+                          <span>{d.gdpxName}</span>
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Diff-Only GDPx Rows */}
+                  {actionableGdpxDiffs.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                              <th className="py-1.5 px-2.5 w-7"></th>
+                              <th className="py-1.5 px-3">{lang === 'de' ? 'GDPx-Modell' : 'GDPx Model'}</th>
+                              <th className="py-1.5 px-3">{lang === 'de' ? 'Sheet-Zeile' : 'Sheet Row'}</th>
+                              <th className="py-1.5 px-3">Spalte {GDPX_COL_LETTER}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+                            {actionableGdpxDiffs.map((item) => {
+                              const target = resolveEffectiveGdpxTarget(item);
+                              const canSelect = Boolean(
+                                target.sheetRowNumber && target.sheetRowNumber >= 36
+                              );
+                              return (
+                                <tr
+                                  key={item.gdpxId}
+                                  className={
+                                    item.status === 'new_unmatched'
+                                      ? 'bg-purple-50/35 dark:bg-purple-950/15'
+                                      : 'bg-amber-50/35 dark:bg-amber-950/15'
+                                  }
+                                >
+                                  <td className="py-1.5 px-2.5 align-middle">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(selectedGdpxIds[item.gdpxId])}
+                                      disabled={!canSelect}
+                                      onChange={() => handleToggleGdpxItem(item.gdpxId)}
+                                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                    />
+                                  </td>
+                                  <td className="py-1.5 px-3 align-middle whitespace-nowrap">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-slate-900 dark:text-white">
+                                        {item.gdpxName}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">
+                                        ({item.lab})
+                                      </span>
+                                      {renderGdpxStatusBadge(item.status)}
+                                    </div>
+                                  </td>
+                                  <td className="py-1.5 px-3 align-middle">
+                                    {item.status === 'new_unmatched' ? (
+                                      <select
+                                        value={manualGdpxRowOverrides[item.gdpxId] ?? ''}
+                                        onChange={(e) =>
+                                          handleAssignManualGdpxRow(item.gdpxId, e.target.value)
+                                        }
+                                        className="w-full max-w-[240px] px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100"
+                                      >
+                                        <option value="">
+                                          {lang === 'de'
+                                            ? '— Zeile zuordnen (ab Z. 36) —'
+                                            : '— Assign Row (36+) —'}
+                                        </option>
+                                        <option value={IGNORE_OPTION_VALUE}>
+                                          {lang === 'de'
+                                            ? '🚫 Ignorieren (nicht mehr nachfragen)'
+                                            : "🚫 Ignore (don't ask again)"}
+                                        </option>
+                                        {sortedPickerOptionsFor(item.lab).map((m) => (
+                                          <option key={m.id} value={m.sheetRowNumber}>
+                                            #{m.sheetRowNumber} · {m.displayName} (
+                                            {m.rawScores.trickQuestions !== null
+                                              ? `J=${formatGdpxScore(m.rawScores.trickQuestions)}`
+                                              : 'J leer'}
+                                            )
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <span className="text-xs text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                                        <span className="font-mono text-[10px] text-slate-400 mr-1">
+                                          #{target.sheetRowNumber}
+                                        </span>
+                                        {target.matchedDisplayName}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-1.5 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
+                                    <div className="inline-flex items-center gap-1.5">
+                                      <span className="text-slate-400 line-through">
+                                        {target.currentColJ !== null
+                                          ? formatGdpxScore(target.currentColJ)
+                                          : '—'}
+                                      </span>
+                                      <ArrowRight className="w-3 h-3 text-slate-400" />
+                                      <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                                        {formatGdpxScore(item.liveScore)}
+                                      </span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Compact Integrity-Bench Section: Strictly Diff-Only (No full 43-row table!) */}
+          {apiAvailable && (
+            <div className="space-y-2 pt-1 border-t border-slate-200/80 dark:border-slate-800/80">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Scale className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                  <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {lang === 'de'
+                      ? `Integrity-Prüfer (Spalte ${INTEGRITY_COL_LETTER} · ab Z. 36)`
+                      : `Integrity Checker (Column ${INTEGRITY_COL_LETTER} · Row 36+)`}
+                  </h3>
+                  <a
+                    href="https://integrity-bench.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] font-mono text-teal-600 dark:text-teal-400 hover:underline"
+                  >
+                    <span>integrity-bench.com</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+                <div className="flex items-center gap-2">
+                  {actionableIntegrityDiffs.length > 1 && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAllIntegrity(true)}
+                        className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        {lang === 'de' ? 'Alle' : 'All'}
+                      </button>
+                      <span className="text-slate-300 dark:text-slate-700">·</span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAllIntegrity(false)}
+                        className="text-slate-500 hover:underline cursor-pointer"
+                      >
+                        {lang === 'de' ? 'Keine' : 'None'}
+                      </button>
+                    </div>
+                  )}
+                  {integrityReport && (
+                    <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                      {integrityReport.totalSourceModels} LLMs
+                      {integrityReport.sourceUpdatedAt
+                        ? ` · ${formatTimestamp(integrityReport.sourceUpdatedAt)}`
+                        : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {isCheckingIntegrity && !effectiveIntegrityDiffReport && (
+                <div className="px-3.5 py-2.5 rounded-xl border border-teal-200 dark:border-teal-900 bg-teal-50/70 dark:bg-teal-950/30 flex items-center gap-2.5 text-xs">
+                  <RefreshCw className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 animate-spin shrink-0" />
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                    {lang === 'de'
+                      ? `Prüfe integrity-bench.com ("Table") für Spalte ${INTEGRITY_COL_LETTER}…`
+                      : `Checking integrity-bench.com ("Table") for Column ${INTEGRITY_COL_LETTER}…`}
+                  </span>
+                </div>
+              )}
+
+              {!isSheetsConnected && integrityReport && (
+                <div className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between gap-2">
+                  <span>{lang === 'de' ? integrityReport.summaryDe : integrityReport.summaryEn}</span>
+                  <span className="font-mono text-[11px] text-slate-400 shrink-0">
+                    {integrityReport.totalSourceModels} LLMs
+                  </span>
+                </div>
+              )}
+
+              {effectiveIntegrityDiffReport && (
+                <>
+                  <div
+                    className={`px-3.5 py-2 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
+                      effectiveIntegrityDiffReport.actionableCount > 0
+                        ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
+                        : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/25'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {effectiveIntegrityDiffReport.actionableCount > 0 ? (
+                        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      ) : (
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      )}
+                      <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug">
+                        <strong className="font-bold text-slate-900 dark:text-white">
+                          {effectiveIntegrityDiffReport.actionableCount > 0
+                            ? lang === 'de'
+                              ? `Integrity: ${effectiveIntegrityDiffReport.actionableCount} Änderung(en):`
+                              : `Integrity: ${effectiveIntegrityDiffReport.actionableCount} update(s):`
+                            : 'Integrity OK:'}
+                        </strong>{' '}
+                        {lang === 'de'
+                          ? effectiveIntegrityDiffReport.summaryDe
+                          : effectiveIntegrityDiffReport.summaryEn}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 font-mono tabular-nums text-[11px] shrink-0">
+                      {effectiveIntegrityDiffReport.unmatchedCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-bold">
+                          {effectiveIntegrityDiffReport.unmatchedCount}{' '}
+                          {lang === 'de' ? 'Ohne Zeile' : 'Unmatched'}
+                        </span>
+                      )}
+                      {effectiveIntegrityDiffReport.missingCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
+                          {effectiveIntegrityDiffReport.missingCount}{' '}
+                          {lang === 'de' ? 'Fehlt' : 'Missing'}
+                        </span>
+                      )}
+                      {(effectiveIntegrityDiffReport.overwriteEstimateCount ?? 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                          {effectiveIntegrityDiffReport.overwriteEstimateCount}{' '}
+                          {lang === 'de' ? 'Schätzwert' : 'Estimate'}
+                        </span>
+                      )}
+                      {effectiveIntegrityDiffReport.changedCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                          {effectiveIntegrityDiffReport.changedCount}{' '}
+                          {lang === 'de' ? 'Geändert' : 'Changed'}
+                        </span>
+                      )}
+                      {ignoredIntegrityDiffs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowIgnoredIntegrity((prev) => !prev)}
+                          className="px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-300/80 dark:hover:bg-slate-700 cursor-pointer"
+                          title={
+                            lang === 'de'
+                              ? 'Ignorierte Modelle anzeigen / wiederherstellen'
+                              : 'Show / restore ignored models'
+                          }
+                        >
+                          {ignoredIntegrityDiffs.length}{' '}
+                          {lang === 'de' ? 'ignoriert' : 'ignored'}
+                        </button>
+                      )}
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
+                        {effectiveIntegrityDiffReport.unchangedCount} OK
+                      </span>
+                    </div>
+                  </div>
+
+                  {showIgnoredIntegrity && ignoredIntegrityDiffs.length > 0 && (
+                    <div className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="text-slate-500 dark:text-slate-400 mr-1">
+                        {lang === 'de' ? 'Ignoriert:' : 'Ignored:'}
+                      </span>
+                      {ignoredIntegrityDiffs.map((d) => (
+                        <button
+                          key={d.integrityId}
+                          type="button"
+                          onClick={() => void onRestoreIntegrityModel?.(d.integrityId)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-teal-400 hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer"
+                          title={lang === 'de' ? 'Wieder aktivieren' : 'Restore'}
+                        >
+                          <span>{d.integrityName}</span>
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Diff-Only Integrity Rows */}
+                  {actionableIntegrityDiffs.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                      <div className="overflow-x-auto max-h-[260px] overflow-y-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="sticky top-0 z-10">
+                            <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                              <th className="py-1.5 px-2.5 w-7"></th>
+                              <th className="py-1.5 px-3">
+                                {lang === 'de' ? 'Integrity-Modell' : 'Integrity Model'}
+                              </th>
+                              <th className="py-1.5 px-3">
+                                {lang === 'de' ? 'Sheet-Zeile' : 'Sheet Row'}
+                              </th>
+                              <th className="py-1.5 px-3">Spalte {INTEGRITY_COL_LETTER}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+                            {actionableIntegrityDiffs.map((item) => {
+                              const target = resolveEffectiveIntegrityTarget(item);
+                              const canSelect = Boolean(
+                                target.sheetRowNumber && target.sheetRowNumber >= 36
+                              );
+                              return (
+                                <tr
+                                  key={item.integrityId}
+                                  className={
+                                    item.status === 'new_unmatched'
+                                      ? 'bg-purple-50/35 dark:bg-purple-950/15'
+                                      : 'bg-amber-50/35 dark:bg-amber-950/15'
+                                  }
+                                >
+                                  <td className="py-1.5 px-2.5 align-middle">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(selectedIntegrityIds[item.integrityId])}
+                                      disabled={!canSelect}
+                                      onChange={() => handleToggleIntegrityItem(item.integrityId)}
+                                      className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                    />
+                                  </td>
+                                  <td className="py-1.5 px-3 align-middle whitespace-nowrap">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-mono text-[10px] text-slate-400">
+                                        #{item.rank}
+                                      </span>
+                                      <span className="font-semibold text-slate-900 dark:text-white">
+                                        {item.integrityName}
+                                      </span>
+                                      {item.isSiteNew && (
+                                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300">
+                                          NEW
+                                        </span>
+                                      )}
+                                      {renderIntegrityStatusBadge(item.status)}
+                                    </div>
+                                  </td>
+                                  <td className="py-1.5 px-3 align-middle">
+                                    {item.status === 'new_unmatched' ? (
+                                      <select
+                                        value={manualIntegrityRowOverrides[item.integrityId] ?? ''}
+                                        onChange={(e) =>
+                                          handleAssignManualIntegrityRow(
+                                            item.integrityId,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full max-w-[240px] px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100"
+                                      >
+                                        <option value="">
+                                          {lang === 'de'
+                                            ? '— Zeile zuordnen (ab Z. 36) —'
+                                            : '— Assign Row (36+) —'}
+                                        </option>
+                                        <option value={IGNORE_OPTION_VALUE}>
+                                          {lang === 'de'
+                                            ? '🚫 Ignorieren (nicht mehr nachfragen)'
+                                            : "🚫 Ignore (don't ask again)"}
+                                        </option>
+                                        {sortedIntegrityPickerOptionsFor(item.integrityName).map(
+                                          (m) => {
+                                            const rowVal =
+                                              integrityColByRow.get(m.sheetRowNumber ?? 0) ?? null;
+                                            return (
+                                              <option key={m.id} value={m.sheetRowNumber}>
+                                                #{m.sheetRowNumber} · {m.displayName} (
+                                                {rowVal !== null
+                                                  ? `${INTEGRITY_COL_LETTER}=${formatIntegrityScore(rowVal)}`
+                                                  : `${INTEGRITY_COL_LETTER} leer`}
+                                                )
+                                              </option>
+                                            );
+                                          }
+                                        )}
+                                      </select>
+                                    ) : (
+                                      <span className="text-xs text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                                        <span className="font-mono text-[10px] text-slate-400 mr-1">
+                                          #{target.sheetRowNumber}
+                                        </span>
+                                        {target.matchedDisplayName}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-1.5 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
+                                    <div className="inline-flex items-center gap-1.5">
+                                      <span className="text-slate-400 line-through">
+                                        {target.currentColAN !== null
+                                          ? formatIntegrityScore(target.currentColAN)
+                                          : '—'}
+                                      </span>
+                                      <ArrowRight className="w-3 h-3 text-slate-400" />
+                                      <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                                        {formatIntegrityScore(item.liveScore)}
+                                      </span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Unified Sheet Update Action Bar */}
+          {apiAvailable && isSheetsConnected && hasAnyActionable && (
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {lang === 'de'
+                  ? `Schreibt ausschließlich ab Zeile 36 in Spalten ${colDeLetter}/${colUsLetter || 'US'}, ${GDPX_COL_LETTER} bzw. ${INTEGRITY_COL_LETTER}.`
+                  : `Writes strictly from Row 36+ to Columns ${colDeLetter}/${colUsLetter || 'US'}, ${GDPX_COL_LETTER} and ${INTEGRITY_COL_LETTER}.`}
+              </span>
+
+              {accessToken ? (
+                <button
+                  type="button"
+                  disabled={totalSelectedCount === 0}
+                  onClick={handlePrepareSheetUpdates}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>
+                    {lang === 'de'
+                      ? `${totalSelectedCount} ausgewählte Änderung(en) prüfen & ins Sheet schreiben`
+                      : `Review & Write ${totalSelectedCount} Selected Update(s) to Sheet`}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void onSignIn()}
+                  disabled={isSigningIn}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <span>
+                    {isSigningIn
+                      ? lang === 'de'
+                        ? 'Verbinde…'
+                        : 'Connecting…'
+                      : authUser
+                      ? lang === 'de'
+                        ? 'Google Sheets neu verbinden um zu schreiben'
+                        : 'Reconnect Google Sheets to Apply'
+                      : lang === 'de'
+                      ? 'Mit Google anmelden um Änderungen ins Sheet zu übernehmen'
+                      : 'Sign in with Google to Apply Changes'}
+                  </span>
+                </button>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Explicit Sheet Write Confirmation Dialog */}
+        {/* Explicit Unified Sheet Write Confirmation Dialog */}
         {pendingWrite && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-4">
             <div className="w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
@@ -800,13 +1880,13 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     {lang === 'de'
-                      ? `${pendingWrite.length} Preiszelle(n) in Google Sheets schreiben?`
-                      : `Write ${pendingWrite.length} pricing cell(s) to Google Sheets?`}
+                      ? `${pendingWrite.length} Zelle(n) in Google Sheets schreiben?`
+                      : `Write ${pendingWrite.length} cell(s) to Google Sheets?`}
                   </h3>
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                     {lang === 'de'
-                      ? 'Alle Updates erfolgen ausschließlich ab Zeile 36 in den Preisspalten T/U.'
-                      : 'All updates target History rows (Row 36+) in pricing columns T/U only.'}
+                      ? `Alle Updates erfolgen ausschließlich ab Zeile 36 (Preise, GDPx Spalte ${GDPX_COL_LETTER} & Integrity Spalte ${INTEGRITY_COL_LETTER}).`
+                      : 'All updates target History rows (Row 36+) only.'}
                   </p>
                 </div>
               </div>
@@ -825,10 +1905,10 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                     </div>
                     <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
                       <div className="px-2 py-1 rounded bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 break-words">
-                        − {roundCurrencyString(c.before)}
+                        − {c.kind === 'price' ? roundCurrencyString(c.before) : c.before}
                       </div>
                       <div className="px-2 py-1 rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 break-words">
-                        + {roundCurrencyString(c.after)}
+                        + {c.kind === 'price' ? roundCurrencyString(c.after) : c.after}
                       </div>
                     </div>
                   </div>

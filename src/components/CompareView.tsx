@@ -256,6 +256,31 @@ function getRow33Source(
   return { text: item?.text, url: item?.sourceUrl };
 }
 
+function pickNewestCompareModels(
+  pool: ModelRecord[],
+  count: number,
+  mode: ScoreMode
+): ModelRecord[] {
+  if (pool.length === 0) return [];
+  const datedPool = pool.filter(
+    (m) => Boolean(m.hasConcreteReleaseDate) && /^\d{4}-\d{2}-\d{2}$/.test(m.releaseDate || '')
+  );
+  const scoredDatedPool = datedPool.filter((m) => getScoreForMode(m, mode) !== null);
+  const candidatePool =
+    scoredDatedPool.length >= count
+      ? scoredDatedPool
+      : datedPool.length > 0
+      ? datedPool
+      : pool;
+  return [...candidatePool]
+    .sort((a, b) => {
+      const cmp = (b.releaseDate || '').localeCompare(a.releaseDate || '');
+      if (cmp !== 0) return cmp;
+      return (getScoreForMode(b, mode) ?? -9999) - (getScoreForMode(a, mode) ?? -9999);
+    })
+    .slice(0, Math.min(count, candidatePool.length));
+}
+
 function pickDefaultCompareIds(
   pool: ModelRecord[],
   count: number,
@@ -553,17 +578,17 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/70 transition-colors cursor-pointer text-left focus:outline-hidden focus-visible:ring-2 ${theme.ring}`}
+        className={`w-full flex items-center justify-between gap-1.5 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/70 transition-colors cursor-pointer text-left focus:outline-hidden focus-visible:ring-2 ${theme.ring}`}
       >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span
-            className={`w-5 h-5 rounded text-[11px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
+            className={`w-4 h-4 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
           >
             {slot}
           </span>
           {selectedModel ? (
             <>
-              <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shrink-0">
+              <span className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shrink-0">
                 <img
                   src={selectedModel.faviconUrl}
                   alt=""
@@ -575,24 +600,18 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                   }}
                 />
               </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 min-w-0">
-                  {selectedModel.flag && (
-                    <span className="text-xs shrink-0 leading-none">{selectedModel.flag}</span>
-                  )}
-                  <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
-                    {selectedModel.displayName}
+              <div className="flex items-center gap-1 min-w-0 flex-1">
+                {selectedModel.flag && (
+                  <span className="text-xs shrink-0 leading-none">{selectedModel.flag}</span>
+                )}
+                <span className="font-bold text-xs sm:text-[13px] text-slate-900 dark:text-white truncate">
+                  {selectedModel.displayName}
+                </span>
+                {selectedModel.isNew && (
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 shrink-0">
+                    NEW
                   </span>
-                  {selectedModel.isNew && (
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 shrink-0">
-                      NEW
-                    </span>
-                  )}
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                  {selectedModel.companyName}
-                  {selectedModel.releaseDate ? ` · ${selectedModel.releaseDate}` : ''}
-                </div>
+                )}
               </div>
             </>
           ) : (
@@ -602,7 +621,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
           )}
         </div>
         <ChevronDown
-          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
+          className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -783,7 +802,7 @@ interface CategoryComparisonRow {
   isRescaled: boolean;
 }
 
-function wrapRadarLabel(label: string, maxChars = 17): string[] {
+function wrapRadarLabel(label: string, maxChars = 16): string[] {
   const clean = label.trim();
   if (clean.length <= maxChars) return [clean];
 
@@ -895,9 +914,9 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
     return Math.max(0, Math.min(1, (val - minFloor) / span));
   };
 
-  const cx = 400;
-  const cy = 270;
-  const R = 160;
+  const cx = 370;
+  const cy = 250;
+  const R = 178;
   const axisCount = categoryComparisons.length || 8;
   const ringValues = useMemo(() => {
     const steps = 5;
@@ -956,7 +975,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
     : null;
 
   return (
-    <div className="p-3 sm:p-4 space-y-3">
+    <div className="p-2 sm:p-3 space-y-2.5">
       {/* Toolbar: Scale toggle + hint */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
         <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
@@ -969,25 +988,27 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
 
         <div className="flex items-center gap-2">
           {canZoom && (
-            <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 p-0.5 text-[11px] font-mono">
+            <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/90 p-0.5 text-xs font-mono font-bold">
               <button
                 type="button"
+                aria-pressed={scaleMode === 'full'}
                 onClick={() => setScaleMode('full')}
-                className={`px-2 py-0.5 rounded-md font-semibold transition-colors cursor-pointer ${
+                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                   scaleMode === 'full'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 0–100%
               </button>
               <button
                 type="button"
+                aria-pressed={scaleMode === 'zoom'}
                 onClick={() => setScaleMode('zoom')}
-                className={`px-2 py-0.5 rounded-md font-semibold transition-colors cursor-pointer ${
+                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                   scaleMode === 'zoom'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
                 title={
                   lang === 'de'
@@ -1012,12 +1033,12 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
       </div>
 
       {/* Main Responsive Grid: Radar SVG + Interactive Inspector */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,1fr)] gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(290px,1fr)] gap-3 items-start">
         {/* Left: SVG Spider / Radar Chart */}
-        <div className="relative rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 p-2 sm:p-3">
+        <div className="relative rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 p-1 sm:p-1.5">
           <svg
-            viewBox="0 0 800 540"
-            className="w-full h-auto max-h-[540px] select-none overflow-visible"
+            viewBox="0 0 740 504"
+            className="w-full h-auto max-h-[560px] select-none overflow-visible"
             role="img"
             aria-label={
               lang === 'de'
@@ -1047,10 +1068,10 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                   />
                   {/* Scale tick label slightly right of top spoke */}
                   <text
-                    x={cx + 5}
-                    y={cy - ringR + 3}
-                    fontSize="10"
-                    className="fill-slate-400 dark:fill-slate-500 font-mono"
+                    x={cx + 6}
+                    y={cy - ringR + (isOuter ? 12 : 4)}
+                    fontSize="12"
+                    className="fill-slate-400 dark:fill-slate-500 font-mono font-semibold"
                   >
                     {tickVal}%
                   </text>
@@ -1064,7 +1085,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                 x={cx}
                 y={cy + 4}
                 textAnchor="middle"
-                fontSize="10"
+                fontSize="12"
                 className="fill-slate-400 dark:fill-slate-500 font-mono font-semibold"
               >
                 {minFloor}%
@@ -1205,7 +1226,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
               const angle = getAxisAngle(idx);
               const cos = Math.cos(angle);
               const sin = Math.sin(angle);
-              const labelDist = R + 22;
+              const labelDist = R + 18;
               const lx = cx + labelDist * cos;
               const ly = cy + labelDist * sin;
 
@@ -1215,22 +1236,22 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
               const textAnchor: 'middle' | 'start' | 'end' =
                 isTop || isBottom ? 'middle' : isRight ? 'start' : 'end';
 
-              const lines = wrapRadarLabel(row.label, 17);
+              const lines = wrapRadarLabel(row.label, 16);
               const isAxisActive = inspectedAxisIdx === idx;
               const isExpanded = expandedCategoryId === row.comp.id;
 
               // Determine vertical baseline offset cleanly
               let baseDy = 0;
               if (isTop) {
-                baseDy = lines.length > 1 ? -22 : -10;
+                baseDy = lines.length > 1 ? -34 : -16;
               } else if (isBottom) {
-                baseDy = 14;
+                baseDy = 15;
               } else if (sin < -0.25) {
-                baseDy = lines.length > 1 ? -10 : -2;
+                baseDy = lines.length > 1 ? -14 : -4;
               } else if (sin > 0.25) {
-                baseDy = 8;
+                baseDy = 10;
               } else {
-                baseDy = lines.length > 1 ? -4 : 3;
+                baseDy = lines.length > 1 ? -7 : 2;
               }
 
               // Winner badge on visible models for this axis
@@ -1293,7 +1314,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                     x={lx}
                     y={ly + baseDy}
                     textAnchor={textAnchor}
-                    fontSize="12"
+                    fontSize="15"
                     fontWeight={isAxisActive || isExpanded ? 700 : 600}
                     className={
                       isAxisActive || isExpanded
@@ -1302,7 +1323,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                     }
                   >
                     {lines.map((line, lineIdx) => (
-                      <tspan key={lineIdx} x={lx} dy={lineIdx === 0 ? 0 : 14}>
+                      <tspan key={lineIdx} x={lx} dy={lineIdx === 0 ? 0 : 18}>
                         {line}
                       </tspan>
                     ))}
@@ -1312,9 +1333,9 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                   {axisLeaderText && (
                     <text
                       x={lx}
-                      y={ly + baseDy + lines.length * 14}
+                      y={ly + baseDy + lines.length * 18}
                       textAnchor={textAnchor}
-                      fontSize="10.5"
+                      fontSize="13"
                       fontWeight={700}
                       fill={axisLeaderColor}
                       className="font-mono"
@@ -1694,18 +1715,39 @@ export const CompareView: React.FC<CompareViewProps> = ({
   const effectiveCount = Math.max(2, Math.min(modelCount, maxCompareCount));
 
   const [slotIds, setSlotIds] = useState<string[]>(() => {
-    const pool = rankedModels.length >= 2 ? rankedModels : allModels;
-    return pickDefaultCompareIds(pool, MAX_COMPARE_MODELS, scoreMode);
+    const pool =
+      pickerModels.length >= 2
+        ? pickerModels
+        : rankedModels.length >= 2
+        ? rankedModels
+        : allModels;
+    const newestIds = pickNewestCompareModels(pool, MAX_COMPARE_MODELS, scoreMode).map((m) => m.id);
+    if (newestIds.length >= Math.min(MAX_COMPARE_MODELS, pool.length)) {
+      return newestIds;
+    }
+    const fallback = pickDefaultCompareIds(pool, MAX_COMPARE_MODELS, scoreMode);
+    const merged = [...newestIds];
+    const seen = new Set(newestIds);
+    for (const id of fallback) {
+      if (merged.length >= MAX_COMPARE_MODELS) break;
+      if (!seen.has(id)) {
+        seen.add(id);
+        merged.push(id);
+      }
+    }
+    return merged;
   });
 
-  const [activePreset, setActivePreset] = useState<PresetKind | null>(null);
-  const [presetSubLabel, setPresetSubLabel] = useState<string>('');
+  const [activePreset, setActivePreset] = useState<PresetKind | null>('newest');
+  const [presetSubLabel, setPresetSubLabel] = useState<string>(() =>
+    lang === 'de' ? 'Aktuellste Releases' : 'Latest releases'
+  );
   const [priceBucketIndex, setPriceBucketIndex] = useState<number>(0);
   const [familyGroupIndex, setFamilyGroupIndex] = useState<number>(0);
   const [sizeClassIndex, setSizeClassIndex] = useState<number>(0);
 
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
-  const [benchmarkChartMode, setBenchmarkChartMode] = useState<'bars' | 'radar'>('bars');
+  const [benchmarkChartMode, setBenchmarkChartMode] = useState<'bars' | 'radar'>('radar');
   const [showHistoricalBenchmarks, setShowHistoricalBenchmarks] = useState<boolean>(false);
 
   // Keep selections valid & mutually distinct across all 7 slots whenever live Sheet updates reload models
@@ -1714,11 +1756,38 @@ export const CompareView: React.FC<CompareViewProps> = ({
     const pool = pickerModels.length >= 2 ? pickerModels : allModels;
     if (pool.length === 0) return;
 
-    const defaults = pickDefaultCompareIds(pool, MAX_COMPARE_MODELS, scoreMode);
+    const newestIds = pickNewestCompareModels(pool, MAX_COMPARE_MODELS, scoreMode).map((m) => m.id);
+    const defaults =
+      newestIds.length > 0 ? newestIds : pickDefaultCompareIds(pool, MAX_COMPARE_MODELS, scoreMode);
+
     setSlotIds((prev) => {
+      const targetLen = Math.min(MAX_COMPARE_MODELS, pool.length);
+      if (activePreset === 'newest') {
+        const next: string[] = [];
+        const used = new Set<string>();
+        for (const id of defaults) {
+          if (next.length >= targetLen) break;
+          if (!used.has(id)) {
+            next.push(id);
+            used.add(id);
+          }
+        }
+        for (const m of pool) {
+          if (next.length >= targetLen) break;
+          if (!used.has(m.id)) {
+            next.push(m.id);
+            used.add(m.id);
+          }
+        }
+        if (next.length === prev.length && next.every((id, idx) => id === prev[idx])) {
+          return prev;
+        }
+        return next;
+      }
+
       const next: string[] = [];
       const used = new Set<string>();
-      for (let i = 0; i < Math.min(MAX_COMPARE_MODELS, pool.length); i++) {
+      for (let i = 0; i < targetLen; i++) {
         const cur = prev[i];
         if (cur && byId.has(cur) && !used.has(cur)) {
           next.push(cur);
@@ -1737,7 +1806,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
       }
       return next;
     });
-  }, [allModels, pickerModels, scoreMode]);
+  }, [allModels, pickerModels, scoreMode, activePreset]);
 
   const activeSlots = useMemo(() => {
     const byId = new Map(allModels.map((m) => [m.id, m]));
@@ -1836,17 +1905,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
   const applyPresetForCount = (preset: PresetKind, count: number, idxOverride?: number) => {
     const targetCount = Math.max(2, Math.min(count, maxCompareCount));
     if (preset === 'newest') {
-      const datedPool = pickerModels.filter(
-        (m) => Boolean(m.hasConcreteReleaseDate) && /^\d{4}-\d{2}-\d{2}$/.test(m.releaseDate || '')
-      );
-      const scoredDatedPool = datedPool.filter((m) => getScoreForMode(m, scoreMode) !== null);
-      const candidatePool = scoredDatedPool.length >= targetCount ? scoredDatedPool : datedPool;
-      const newestSorted = [...candidatePool].sort((a, b) => {
-        const cmp = (b.releaseDate || '').localeCompare(a.releaseDate || '');
-        if (cmp !== 0) return cmp;
-        return (getScoreForMode(b, scoreMode) ?? -9999) - (getScoreForMode(a, scoreMode) ?? -9999);
-      });
-      const chosen = newestSorted.slice(0, targetCount);
+      const chosen = pickNewestCompareModels(pickerModels, targetCount, scoreMode);
       applySlotSelection(chosen);
       setActivePreset('newest');
       setPresetSubLabel(lang === 'de' ? 'Aktuellste Releases' : 'Latest releases');
@@ -2228,9 +2287,14 @@ export const CompareView: React.FC<CompareViewProps> = ({
             <span>{lang === 'de' ? 'Gleiche Größenklasse' : 'Same Size Class'}</span>
           </button>
 
-          {activePreset && presetSubLabel && (
+          {activePreset && (presetSubLabel || activePreset === 'newest') && (
             <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 pl-1">
-              · {presetSubLabel}
+              ·{' '}
+              {activePreset === 'newest'
+                ? lang === 'de'
+                  ? 'Aktuellste Releases'
+                  : 'Latest releases'
+                : presetSubLabel}
               {activePreset !== 'newest' && (
                 <span className="text-slate-400 dark:text-slate-500 font-normal">
                   {' '}
@@ -2320,7 +2384,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
       {/* Split Overview Cards (2 to 8 Responsive Cards) */}
       <section
         aria-label={lang === 'de' ? 'Modellauswahl und Übersicht' : 'Model Selection and Overview'}
-        className={`grid gap-2.5 overflow-visible ${
+        className={`grid gap-2 overflow-visible ${
           effectiveCount === 2
             ? 'grid-cols-1 md:grid-cols-2'
             : effectiveCount === 3
@@ -2379,10 +2443,10 @@ export const CompareView: React.FC<CompareViewProps> = ({
           return (
             <div
               key={slot}
-              className={`p-3.5 flex flex-col gap-2.5 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs border-t-2 ${theme.borderTop}`}
+              className={`p-2.5 flex flex-col gap-1.5 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs border-t-2 ${theme.borderTop}`}
             >
               {/* Selector + Compact Direct Links */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <div className="flex-1 min-w-0">
                   <ModelSelector
                     slot={slot}
@@ -2401,7 +2465,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                     href={chatUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors shrink-0"
+                    className="inline-flex items-center gap-1 px-1.5 py-1.5 text-[11px] font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors shrink-0"
                     title={t.openChatbotApp}
                   >
                     <span>Chat</span>
@@ -2413,7 +2477,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                     href={model.apiLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 transition-colors shrink-0"
+                    className="inline-flex items-center gap-1 px-1.5 py-1.5 text-[11px] font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 transition-colors shrink-0"
                     title={lang === 'de' ? 'Kostenloser API-Zugang' : 'Free API access'}
                   >
                     <Globe className="w-3 h-3" />
@@ -2423,7 +2487,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
               </div>
 
               {/* Clean Compact Metadata Line */}
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-600 dark:text-slate-400">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-tight text-slate-600 dark:text-slate-400">
                 {onSelectCompany ? (
                   <button
                     type="button"
@@ -2470,7 +2534,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                   <>
                     <span className="text-slate-300 dark:text-slate-700">·</span>
                     <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">
-                      🌐 API
+                      API
                     </span>
                   </>
                 )}
@@ -2485,30 +2549,30 @@ export const CompareView: React.FC<CompareViewProps> = ({
               </div>
 
               {/* Primary Composite Score + Gap to Leader */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800/90 flex items-baseline justify-between gap-2">
-                <div className="flex items-baseline gap-1.5 min-w-0">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+              <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800/90 flex items-baseline justify-between gap-2">
+                <div className="flex items-baseline gap-1 min-w-0">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
                     {activeScoreLabel}
                   </span>
-                  <span className={`text-2xl font-mono tabular-nums font-extrabold tracking-tight ${theme.text}`}>
+                  <span className={`text-xl font-mono tabular-nums font-extrabold tracking-tight leading-none ${theme.text}`}>
                     {primaryScore !== null ? formatNumber(primaryScore, 1) : '—'}
                   </span>
-                  <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">/100</span>
+                  <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">/100</span>
                 </div>
 
                 {deltaVsTop !== null && (
                   <div
-                    className={`text-xs font-mono tabular-nums font-bold flex items-center gap-1 shrink-0 ${
+                    className={`text-[11px] font-mono tabular-nums font-bold flex items-center gap-1 shrink-0 ${
                       isLeader
                         ? 'text-emerald-600 dark:text-emerald-400'
                         : 'text-slate-500 dark:text-slate-400'
                     }`}
                   >
-                    {isLeader && <Trophy className="w-3.5 h-3.5 shrink-0" />}
+                    {isLeader && <Trophy className="w-3 h-3 shrink-0" />}
                     <span>
                       {isLeader
                         ? lang === 'de'
-                          ? '#1 im Vergleich'
+                          ? '#1'
                           : 'Leader'
                         : isAllTied
                         ? lang === 'de'
@@ -2521,13 +2585,13 @@ export const CompareView: React.FC<CompareViewProps> = ({
               </div>
 
               {/* Synced Row-2 Secondary Composite Scores Strip */}
-              <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
-                <div className="min-w-0">
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+              <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[11px] leading-tight">
+                <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreNew}>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
                     {labelScoreNew}
-                  </div>
-                  <div
-                    className={`font-mono tabular-nums font-bold ${
+                  </span>
+                  <span
+                    className={`font-mono tabular-nums font-bold shrink-0 ${
                       scoreMode === 'new'
                         ? 'text-slate-900 dark:text-white'
                         : 'text-slate-600 dark:text-slate-300'
@@ -2535,43 +2599,43 @@ export const CompareView: React.FC<CompareViewProps> = ({
                   >
                     {scoreNewVal !== null ? formatNumber(scoreNewVal, 1) : '—'}
                     {!model.hasAll8Benchmarks && scoreNewVal !== null && (
-                      <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400 ml-0.5">*</span>
+                      <span className="text-[9px] font-normal text-amber-600 dark:text-amber-400 ml-0.5">*</span>
                     )}
-                  </div>
+                  </span>
                 </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreOld}>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
                     {labelScoreOld}
-                  </div>
-                  <div
-                    className={`font-mono tabular-nums font-bold ${
+                  </span>
+                  <span
+                    className={`font-mono tabular-nums font-bold shrink-0 ${
                       scoreMode === 'old'
                         ? 'text-slate-900 dark:text-white'
                         : 'text-slate-600 dark:text-slate-300'
                     }`}
                   >
                     {scoreOldVal !== null ? formatNumber(scoreOldVal, 1) : '—'}
-                  </div>
+                  </span>
                 </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreWorst}>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
                     {labelScoreWorst}
-                  </div>
-                  <div
-                    className={`font-mono tabular-nums font-bold ${
+                  </span>
+                  <span
+                    className={`font-mono tabular-nums font-bold shrink-0 ${
                       scoreMode === 'worstCase'
                         ? 'text-slate-900 dark:text-white'
                         : 'text-slate-600 dark:text-slate-300'
                     }`}
                   >
                     {scoreWorstVal !== null ? formatNumber(scoreWorstVal, 1) : '—'}
-                  </div>
+                  </span>
                 </div>
               </div>
 
               {storylineText && (
                 <p
-                  className="text-[11px] text-slate-600 dark:text-slate-300 italic leading-snug border-t border-slate-100 dark:border-slate-800/80 pt-1.5 line-clamp-2"
+                  className="text-[11px] text-slate-600 dark:text-slate-300 italic leading-tight border-t border-slate-100 dark:border-slate-800/80 pt-1 truncate"
                   title={storylineText}
                 >
                   {storylineText}
@@ -2711,7 +2775,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
           <div className="flex flex-wrap items-center gap-3 min-h-[28px]">
             {/* Chart Type Switcher: Fixed Top-Left (Balken vs Spinnennetz) */}
             <div
-              className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 font-sans shrink-0"
+              className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/90 p-0.5 font-mono shrink-0"
               role="group"
               aria-label={
                 lang === 'de'
@@ -2723,10 +2787,10 @@ export const CompareView: React.FC<CompareViewProps> = ({
                 type="button"
                 onClick={() => setBenchmarkChartMode('bars')}
                 aria-pressed={benchmarkChartMode === 'bars'}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
                   benchmarkChartMode === 'bars'
                     ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 <BarChart3 className="w-3.5 h-3.5" />
@@ -2736,10 +2800,10 @@ export const CompareView: React.FC<CompareViewProps> = ({
                 type="button"
                 onClick={() => setBenchmarkChartMode('radar')}
                 aria-pressed={benchmarkChartMode === 'radar'}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
                   benchmarkChartMode === 'radar'
                     ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 <Radar className="w-3.5 h-3.5" />

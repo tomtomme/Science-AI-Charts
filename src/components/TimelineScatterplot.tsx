@@ -1299,6 +1299,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
                 <button
                   type="button"
+                  aria-pressed={timelineScope === 'all'}
                   onClick={() => setTimelineScope('all')}
                   className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                     timelineScope === 'all'
@@ -1310,6 +1311,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 </button>
                 <button
                   type="button"
+                  aria-pressed={timelineScope === 'frontier'}
                   onClick={() => setTimelineScope('frontier')}
                   className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
                     timelineScope === 'frontier'
@@ -1322,7 +1324,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                       : 'Only models setting a new record score at release date (pioneers)'
                   }
                 >
-                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  <Sparkles className={`w-3 h-3 ${timelineScope === 'frontier' ? 'text-white' : 'text-amber-500'}`} />
                   <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
                   <span className="text-xs opacity-90">({frontierPointIds.size})</span>
                 </button>

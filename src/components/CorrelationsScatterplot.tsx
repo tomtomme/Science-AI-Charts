@@ -1703,6 +1703,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
         <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
           <button
             type="button"
+            aria-pressed={scope === 'all'}
             onClick={() => setScope('all')}
             className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
               scope === 'all'
@@ -1714,6 +1715,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
           </button>
           <button
             type="button"
+            aria-pressed={scope === 'frontier'}
             onClick={() => setScope('frontier')}
             className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
               scope === 'frontier'
@@ -1726,7 +1728,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                 : 'Only pioneer models (historical record breakers / Pareto frontier)'
             }
           >
-            <Sparkles className="w-3 h-3 text-amber-300" />
+            <Sparkles className={`w-3 h-3 ${scope === 'frontier' ? 'text-white' : 'text-amber-500'}`} />
             <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
             <span className="text-xs opacity-90">({frontierPointIds.size})</span>
           </button>

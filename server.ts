@@ -6,6 +6,16 @@ import {
   getPricingMonitorStatus,
   runPricingCheck,
 } from './server/pricingMonitor.ts';
+import {
+  getGdpxMonitorStatus,
+  runGdpxCheck,
+  updateGdpxPreferences,
+} from './server/gdpxMonitor.ts';
+import {
+  getIntegrityMonitorStatus,
+  runIntegrityCheck,
+  updateIntegrityPreferences,
+} from './server/integrityMonitor.ts';
 import { getOrRefreshWeeklyTranslation } from './server/sheetTranslator.ts';
 import { fetchLabsGridFromPublishedHtml } from './server/labsGrid.ts';
 
@@ -86,6 +96,88 @@ async function createAppServer() {
           ? 429
           : 500;
       res.status(statusCode).json({ error: message });
+    }
+  });
+
+  app.get('/api/gdpx-monitor/status', async (_req, res) => {
+    try {
+      const status = await getGdpxMonitorStatus();
+      res.json(status);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load GDPx monitor status.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/gdpx-monitor/check', async (req, res) => {
+    try {
+      const models = Array.isArray(req.body?.models) ? req.body.models : undefined;
+      const trigger = req.body?.trigger === 'daily_auto' ? 'daily_auto' : 'manual';
+      const report = await runGdpxCheck({ models, trigger });
+      res.json({ report });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'GDPx check failed.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/gdpx-monitor/preferences', async (req, res) => {
+    try {
+      const report = await updateGdpxPreferences({
+        ignoreIds: Array.isArray(req.body?.ignoreIds) ? req.body.ignoreIds : undefined,
+        unignoreIds: Array.isArray(req.body?.unignoreIds) ? req.body.unignoreIds : undefined,
+        manualMappings:
+          req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+            ? req.body.manualMappings
+            : undefined,
+        models: Array.isArray(req.body?.models) ? req.body.models : undefined,
+      });
+      res.json({ report });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update GDPx preferences.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.get('/api/integrity-monitor/status', async (_req, res) => {
+    try {
+      const status = await getIntegrityMonitorStatus();
+      res.json(status);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load Integrity-Bench monitor status.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/integrity-monitor/check', async (req, res) => {
+    try {
+      const models = Array.isArray(req.body?.models) ? req.body.models : undefined;
+      const trigger = req.body?.trigger === 'daily_auto' ? 'daily_auto' : 'manual';
+      const report = await runIntegrityCheck({ models, trigger });
+      res.json({ report });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Integrity-Bench check failed.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/integrity-monitor/preferences', async (req, res) => {
+    try {
+      const report = await updateIntegrityPreferences({
+        ignoreIds: Array.isArray(req.body?.ignoreIds) ? req.body.ignoreIds : undefined,
+        unignoreIds: Array.isArray(req.body?.unignoreIds) ? req.body.unignoreIds : undefined,
+        manualMappings:
+          req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+            ? req.body.manualMappings
+            : undefined,
+        models: Array.isArray(req.body?.models) ? req.body.models : undefined,
+      });
+      res.json({ report });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to update Integrity-Bench preferences.';
+      res.status(500).json({ error: message });
     }
   });
 

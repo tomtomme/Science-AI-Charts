@@ -33,6 +33,20 @@ import { PricingMonitorModal } from './components/PricingMonitorModal';
 import { PricingCheckReport } from './types/pricingMonitor';
 import { DEFAULT_LAB_PLANS } from './data/pricingPlansFallback';
 import { extractMonitoredModelSnapshots, fetchPricingMonitorStatus, isStaticPreviewError, triggerPricingCheck } from './services/pricingMonitorService';
+import { GdpxCheckReport } from './types/gdpxMonitor';
+import {
+  extractGdpxSheetSnapshots,
+  fetchGdpxMonitorStatus,
+  triggerGdpxCheck,
+  updateGdpxPreferencesApi,
+} from './services/gdpxMonitorService';
+import { IntegrityCheckReport, ManualRowMapping } from './types/integrityMonitor';
+import {
+  extractIntegritySheetSnapshots,
+  fetchIntegrityMonitorStatus,
+  triggerIntegrityCheck,
+  updateIntegrityPreferencesApi,
+} from './services/integrityMonitorService';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
 
@@ -425,6 +439,21 @@ export default function App() {
     }
   });
   const [hasAutoCheckedSession, setHasAutoCheckedSession] = useState<boolean>(false);
+
+  // In-App SemiAnalysis GDPx Leaderboard Monitor state (unified inside PricingMonitorModal)
+  const [gdpxReport, setGdpxReport] = useState<GdpxCheckReport | null>(null);
+  const [isCheckingGdpx, setIsCheckingGdpx] = useState<boolean>(false);
+  const [gdpxCheckError, setGdpxCheckError] = useState<string | null>(null);
+  const [gdpxApiAvailable, setGdpxApiAvailable] = useState<boolean>(true);
+  const [hasAutoCheckedGdpxSession, setHasAutoCheckedGdpxSession] = useState<boolean>(false);
+
+  // In-App Integrity-Bench Monitor state (unified inside PricingMonitorModal, Column AN)
+  const [integrityReport, setIntegrityReport] = useState<IntegrityCheckReport | null>(null);
+  const [isCheckingIntegrity, setIsCheckingIntegrity] = useState<boolean>(false);
+  const [integrityCheckError, setIntegrityCheckError] = useState<string | null>(null);
+  const [integrityApiAvailable, setIntegrityApiAvailable] = useState<boolean>(true);
+  const [hasAutoCheckedIntegritySession, setHasAutoCheckedIntegritySession] =
+    useState<boolean>(false);
 
   // LLM Labs Datensatz (aus Google Sheets gid=355721692 mit Fallback)
   const [labs, setLabs] = useState<LabEntry[]>(FALLBACK_LAB_ENTRIES);
@@ -912,6 +941,10 @@ export default function App() {
     setPricingReport(null);
     setPricingCheckError(null);
     setHasAutoCheckedSession(false);
+    setGdpxCheckError(null);
+    setHasAutoCheckedGdpxSession(false);
+    setIntegrityCheckError(null);
+    setHasAutoCheckedIntegritySession(false);
   }, []);
 
   // Sync on mount
@@ -1064,6 +1097,405 @@ export default function App() {
     checkPricingMonitorStatus,
     doesReportMatchLiveSheet,
   ]);
+
+  const doesGdpxReportMatchLiveSheet = useCallback(
+    (report: GdpxCheckReport, allModels: ModelRecord[]): boolean => {
+      const liveSnapshots = extractGdpxSheetSnapshots(allModels);
+      if (
+        liveSnapshots.length === 0 ||
+        report.diffs.length === 0 ||
+        typeof report.overwriteEstimateCount !== 'number'
+      ) {
+        return false;
+      }
+      const liveById = new Map(liveSnapshots.map((m) => [m.id, m]));
+      for (const diff of report.diffs) {
+        if (!diff.matchedModelId) continue;
+        const live = liveById.get(diff.matchedModelId);
+        if (!live) return false;
+        if (live.colJ !== diff.currentColJ) return false;
+      }
+      return true;
+    },
+    []
+  );
+
+  const handleRunGdpxCheck = useCallback(
+    async (trigger: 'manual' | 'daily_auto' = 'manual') => {
+      setIsCheckingGdpx(true);
+      setGdpxCheckError(null);
+      try {
+        const snapshots = isSheetsConnected ? extractGdpxSheetSnapshots(loadedData.allModels) : [];
+        const report = await triggerGdpxCheck(snapshots, trigger);
+        setGdpxApiAvailable(true);
+        setGdpxReport(report);
+      } catch (err) {
+        if (isStaticPreviewError(err)) {
+          setGdpxApiAvailable(false);
+          setGdpxCheckError(null);
+        } else {
+          const msg = err instanceof Error ? err.message : 'GDPx check failed.';
+          setGdpxCheckError(msg);
+        }
+      } finally {
+        setIsCheckingGdpx(false);
+      }
+    },
+    [isSheetsConnected, loadedData.allModels]
+  );
+
+  const isGdpxDiffValidForSheet = useMemo(() => {
+    if (!isSheetsConnected || !gdpxReport) return false;
+    return doesGdpxReportMatchLiveSheet(gdpxReport, loadedData.allModels);
+  }, [isSheetsConnected, gdpxReport, loadedData.allModels, doesGdpxReportMatchLiveSheet]);
+
+  const checkGdpxMonitorStatus = useCallback(async () => {
+    try {
+      const status = await fetchGdpxMonitorStatus();
+      setGdpxApiAvailable(true);
+      if (status.report) {
+        setGdpxReport(status.report);
+      }
+      if (status.lastError) {
+        setGdpxCheckError(status.lastError);
+      }
+      return status;
+    } catch (err) {
+      if (isStaticPreviewError(err)) {
+        setGdpxApiAvailable(false);
+      }
+      return null;
+    }
+  }, []);
+
+  // Probe GDPx monitor status on mount; auto-check once per 24h or when Sheet data / modal requires live diff
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const status = await checkGdpxMonitorStatus();
+      if (cancelled || !status) {
+        return;
+      }
+
+      if (
+        isPricingModalOpen &&
+        (!status.report ||
+          (isSheetsConnected &&
+            loadedData.allModels.length > 0 &&
+            !doesGdpxReportMatchLiveSheet(status.report, loadedData.allModels))) &&
+        !isCheckingGdpx &&
+        !gdpxCheckError
+      ) {
+        setHasAutoCheckedGdpxSession(true);
+        await handleRunGdpxCheck('manual');
+        return;
+      }
+
+      if (isSheetsConnected && loadedData.allModels.length > 0) {
+        const cachedMatchesLive =
+          Boolean(status.report) &&
+          doesGdpxReportMatchLiveSheet(status.report as GdpxCheckReport, loadedData.allModels);
+        const needsRun = !cachedMatchesLive || status.isDue;
+
+        if (
+          !hasAutoCheckedGdpxSession &&
+          dailyAutoCheckEnabled &&
+          needsRun &&
+          !status.isRunning
+        ) {
+          setHasAutoCheckedGdpxSession(true);
+          await handleRunGdpxCheck('daily_auto');
+        }
+      } else if (!hasAutoCheckedGdpxSession && dailyAutoCheckEnabled && status.isDue && !status.isRunning) {
+        setHasAutoCheckedGdpxSession(true);
+        await handleRunGdpxCheck('daily_auto');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isSheetsConnected,
+    hasAutoCheckedGdpxSession,
+    loadedData.allModels,
+    dailyAutoCheckEnabled,
+    isPricingModalOpen,
+    isCheckingGdpx,
+    gdpxCheckError,
+    handleRunGdpxCheck,
+    checkGdpxMonitorStatus,
+    doesGdpxReportMatchLiveSheet,
+  ]);
+
+  const doesIntegrityReportMatchLiveSheet = useCallback(
+    (report: IntegrityCheckReport, allModels: ModelRecord[], rawRows?: string[][]): boolean => {
+      const liveSnapshots = extractIntegritySheetSnapshots(allModels, rawRows);
+      if (liveSnapshots.length === 0 || report.diffs.length === 0) {
+        return false;
+      }
+      const liveById = new Map(liveSnapshots.map((m) => [m.id, m]));
+      for (const diff of report.diffs) {
+        if (!diff.matchedModelId) continue;
+        const live = liveById.get(diff.matchedModelId);
+        if (!live) return false;
+        if (live.colAN !== diff.currentColAN) return false;
+      }
+      return true;
+    },
+    []
+  );
+
+  const handleRunIntegrityCheck = useCallback(
+    async (trigger: 'manual' | 'daily_auto' = 'manual') => {
+      setIsCheckingIntegrity(true);
+      setIntegrityCheckError(null);
+      try {
+        const snapshots = isSheetsConnected
+          ? extractIntegritySheetSnapshots(loadedData.allModels, loadedData.rawRows)
+          : [];
+        const report = await triggerIntegrityCheck(snapshots, trigger);
+        setIntegrityApiAvailable(true);
+        setIntegrityReport(report);
+      } catch (err) {
+        if (isStaticPreviewError(err)) {
+          setIntegrityApiAvailable(false);
+          setIntegrityCheckError(null);
+        } else {
+          const msg = err instanceof Error ? err.message : 'Integrity-Bench check failed.';
+          setIntegrityCheckError(msg);
+        }
+      } finally {
+        setIsCheckingIntegrity(false);
+      }
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.rawRows]
+  );
+
+  const isIntegrityDiffValidForSheet = useMemo(() => {
+    if (!isSheetsConnected || !integrityReport) return false;
+    return doesIntegrityReportMatchLiveSheet(
+      integrityReport,
+      loadedData.allModels,
+      loadedData.rawRows
+    );
+  }, [
+    isSheetsConnected,
+    integrityReport,
+    loadedData.allModels,
+    loadedData.rawRows,
+    doesIntegrityReportMatchLiveSheet,
+  ]);
+
+  const checkIntegrityMonitorStatus = useCallback(async () => {
+    try {
+      const status = await fetchIntegrityMonitorStatus();
+      setIntegrityApiAvailable(true);
+      if (status.report) {
+        setIntegrityReport(status.report);
+      }
+      if (status.lastError) {
+        setIntegrityCheckError(status.lastError);
+      }
+      return status;
+    } catch (err) {
+      if (isStaticPreviewError(err)) {
+        setIntegrityApiAvailable(false);
+      }
+      return null;
+    }
+  }, []);
+
+  // Probe Integrity-Bench monitor status on mount; auto-check once per 24h or when Sheet data / modal requires live diff
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const status = await checkIntegrityMonitorStatus();
+      if (cancelled || !status) {
+        return;
+      }
+
+      if (
+        isPricingModalOpen &&
+        (!status.report ||
+          (isSheetsConnected &&
+            loadedData.allModels.length > 0 &&
+            !doesIntegrityReportMatchLiveSheet(
+              status.report,
+              loadedData.allModels,
+              loadedData.rawRows
+            ))) &&
+        !isCheckingIntegrity &&
+        !integrityCheckError
+      ) {
+        setHasAutoCheckedIntegritySession(true);
+        await handleRunIntegrityCheck('manual');
+        return;
+      }
+
+      if (isSheetsConnected && loadedData.allModels.length > 0) {
+        const cachedMatchesLive =
+          Boolean(status.report) &&
+          doesIntegrityReportMatchLiveSheet(
+            status.report as IntegrityCheckReport,
+            loadedData.allModels,
+            loadedData.rawRows
+          );
+        const needsRun = !cachedMatchesLive || status.isDue;
+
+        if (
+          !hasAutoCheckedIntegritySession &&
+          dailyAutoCheckEnabled &&
+          needsRun &&
+          !status.isRunning
+        ) {
+          setHasAutoCheckedIntegritySession(true);
+          await handleRunIntegrityCheck('daily_auto');
+        }
+      } else if (
+        !hasAutoCheckedIntegritySession &&
+        dailyAutoCheckEnabled &&
+        status.isDue &&
+        !status.isRunning
+      ) {
+        setHasAutoCheckedIntegritySession(true);
+        await handleRunIntegrityCheck('daily_auto');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isSheetsConnected,
+    hasAutoCheckedIntegritySession,
+    loadedData.allModels,
+    loadedData.rawRows,
+    dailyAutoCheckEnabled,
+    isPricingModalOpen,
+    isCheckingIntegrity,
+    integrityCheckError,
+    handleRunIntegrityCheck,
+    checkIntegrityMonitorStatus,
+    doesIntegrityReportMatchLiveSheet,
+  ]);
+
+  const handleIgnoreGdpxModel = useCallback(
+    async (gdpxId: string) => {
+      try {
+        const snapshots = isSheetsConnected ? extractGdpxSheetSnapshots(loadedData.allModels) : [];
+        const updated = await updateGdpxPreferencesApi({
+          ignoreIds: [gdpxId],
+          models: snapshots,
+        });
+        if (updated) setGdpxReport(updated);
+      } catch (err) {
+        if (!isStaticPreviewError(err)) {
+          setGdpxCheckError(err instanceof Error ? err.message : 'Failed to ignore GDPx model.');
+        }
+      }
+    },
+    [isSheetsConnected, loadedData.allModels]
+  );
+
+  const handleRestoreGdpxModel = useCallback(
+    async (gdpxId: string) => {
+      try {
+        const snapshots = isSheetsConnected ? extractGdpxSheetSnapshots(loadedData.allModels) : [];
+        const updated = await updateGdpxPreferencesApi({
+          unignoreIds: [gdpxId],
+          models: snapshots,
+        });
+        if (updated) setGdpxReport(updated);
+      } catch (err) {
+        if (!isStaticPreviewError(err)) {
+          setGdpxCheckError(err instanceof Error ? err.message : 'Failed to restore GDPx model.');
+        }
+      }
+    },
+    [isSheetsConnected, loadedData.allModels]
+  );
+
+  const handleIgnoreIntegrityModel = useCallback(
+    async (integrityId: string) => {
+      try {
+        const snapshots = isSheetsConnected
+          ? extractIntegritySheetSnapshots(loadedData.allModels, loadedData.rawRows)
+          : [];
+        const updated = await updateIntegrityPreferencesApi({
+          ignoreIds: [integrityId],
+          models: snapshots,
+        });
+        if (updated) setIntegrityReport(updated);
+      } catch (err) {
+        if (!isStaticPreviewError(err)) {
+          setIntegrityCheckError(
+            err instanceof Error ? err.message : 'Failed to ignore Integrity model.'
+          );
+        }
+      }
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.rawRows]
+  );
+
+  const handleRestoreIntegrityModel = useCallback(
+    async (integrityId: string) => {
+      try {
+        const snapshots = isSheetsConnected
+          ? extractIntegritySheetSnapshots(loadedData.allModels, loadedData.rawRows)
+          : [];
+        const updated = await updateIntegrityPreferencesApi({
+          unignoreIds: [integrityId],
+          models: snapshots,
+        });
+        if (updated) setIntegrityReport(updated);
+      } catch (err) {
+        if (!isStaticPreviewError(err)) {
+          setIntegrityCheckError(
+            err instanceof Error ? err.message : 'Failed to restore Integrity model.'
+          );
+        }
+      }
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.rawRows]
+  );
+
+  const handleSaveManualMappings = useCallback(
+    async (mappings: {
+      gdpx?: Record<string, ManualRowMapping>;
+      integrity?: Record<string, ManualRowMapping>;
+    }) => {
+      const tasks: Promise<unknown>[] = [];
+      if (mappings.gdpx && Object.keys(mappings.gdpx).length > 0) {
+        const gdpxSnapshots = isSheetsConnected
+          ? extractGdpxSheetSnapshots(loadedData.allModels)
+          : [];
+        tasks.push(
+          updateGdpxPreferencesApi({
+            manualMappings: mappings.gdpx,
+            models: gdpxSnapshots,
+          }).then((updated) => {
+            if (updated) setGdpxReport(updated);
+          })
+        );
+      }
+      if (mappings.integrity && Object.keys(mappings.integrity).length > 0) {
+        const integritySnapshots = isSheetsConnected
+          ? extractIntegritySheetSnapshots(loadedData.allModels, loadedData.rawRows)
+          : [];
+        tasks.push(
+          updateIntegrityPreferencesApi({
+            manualMappings: mappings.integrity,
+            models: integritySnapshots,
+          }).then((updated) => {
+            if (updated) setIntegrityReport(updated);
+          })
+        );
+      }
+      await Promise.allSettled(tasks);
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.rawRows]
+  );
 
   const formatSyncDate = (d: Date | null) => {
     if (!d) return '';
@@ -1380,9 +1812,9 @@ export default function App() {
 
             <button
               onClick={() => setActiveTab('labs')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
                 activeTab === 'labs'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
@@ -1611,19 +2043,22 @@ export default function App() {
                   </Tooltip>
                 </div>
 
-                {/* Advanced Button (ganz rechts, Pop-up entfernt) */}
+                {/* Advanced Button (ganz rechts) */}
                 <button
                   type="button"
                   onClick={() => setShowAdvanced((prev) => !prev)}
+                  aria-expanded={showAdvanced}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border shrink-0 ${
                     showAdvanced
-                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs'
-                      : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-2xs ring-2 ring-blue-500/20'
+                      : 'bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700/80'
                   }`}
                 >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <SlidersHorizontal className={`w-3.5 h-3.5 ${showAdvanced ? 'text-white' : 'text-blue-500'}`} />
                   <span>{t.advanced}</span>
-                  <span className="text-xs opacity-80">{showAdvanced ? '▲' : '▼'}</span>
+                  <span className={`text-[10px] ${showAdvanced ? 'text-blue-100' : 'text-slate-400'}`}>
+                    {showAdvanced ? '▲' : '▼'}
+                  </span>
                 </button>
               </div>
             )}
@@ -1681,6 +2116,7 @@ export default function App() {
                 <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0">
                   <button
                     type="button"
+                    aria-pressed={timelineScope === 'all'}
                     onClick={() => setTimelineScope('all')}
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                       timelineScope === 'all'
@@ -1692,6 +2128,7 @@ export default function App() {
                   </button>
                   <button
                     type="button"
+                    aria-pressed={timelineScope === 'frontier'}
                     onClick={() => setTimelineScope('frontier')}
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
                       timelineScope === 'frontier'
@@ -1704,7 +2141,7 @@ export default function App() {
                         : 'Only pioneer models (historical record breakers / Pareto frontier)'
                     }
                   >
-                    <Sparkles className="w-3 h-3 text-amber-300" />
+                    <Sparkles className={`w-3 h-3 ${timelineScope === 'frontier' ? 'text-white' : 'text-amber-500'}`} />
                     <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
                     <span className="text-xs opacity-90">({timelineFrontierCount})</span>
                   </button>
@@ -1896,13 +2333,14 @@ export default function App() {
                   <button
                     type="button"
                     disabled={!isTimelineMultiLevelFeasible}
+                    aria-pressed={isTimelineMultiLevelActive}
                     onClick={() => isTimelineMultiLevelFeasible && setTimelineMultiLevel((prev) => !prev)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all shrink-0 ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold transition-all shrink-0 ${
                       !isTimelineMultiLevelFeasible
-                        ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500'
+                        ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 text-slate-400 dark:text-slate-500'
                         : isTimelineMultiLevelActive
                         ? 'bg-indigo-600 text-white border-indigo-500 shadow-2xs ring-2 ring-indigo-500/20 cursor-pointer'
-                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'
+                        : 'bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer'
                     }`}
                   >
                     <Layers className="w-3.5 h-3.5 shrink-0" />
@@ -1928,6 +2366,7 @@ export default function App() {
                 <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0">
                   <button
                     type="button"
+                    aria-pressed={correlationsScope === 'all'}
                     onClick={() => setCorrelationsScope('all')}
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                       correlationsScope === 'all'
@@ -1939,6 +2378,7 @@ export default function App() {
                   </button>
                   <button
                     type="button"
+                    aria-pressed={correlationsScope === 'frontier'}
                     onClick={() => setCorrelationsScope('frontier')}
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
                       correlationsScope === 'frontier'
@@ -1951,7 +2391,7 @@ export default function App() {
                         : 'Only pioneer models (historical record breakers / Pareto frontier)'
                     }
                   >
-                    <Sparkles className="w-3 h-3 text-amber-300" />
+                    <Sparkles className={`w-3 h-3 ${correlationsScope === 'frontier' ? 'text-white' : 'text-amber-500'}`} />
                     <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
                     <span className="text-xs opacity-90">({correlationsFrontierCount})</span>
                   </button>
@@ -2170,7 +2610,7 @@ export default function App() {
               </div>
             )}
 
-            {/* Ecosystem / Lab Matrix View Header Controls: original sheet pill -> glossary pill -> lab category pills -> advanced toggle */}
+            {/* Ecosystem / Lab Matrix View Header Controls: original sheet pill -> lab category pills -> advanced toggle */}
             {activeTab === 'labs' && (
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 {/* 1. Original Sheet Pill */}
@@ -2178,7 +2618,7 @@ export default function App() {
                   href="https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=355721692#gid=355721692"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 shrink-0"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700/80 shrink-0"
                   title={lang === 'de' ? 'Original-Tabelle in neuem Tab öffnen' : 'Open original spreadsheet in new tab'}
                 >
                   <span>{lang === 'de' ? 'Original-Sheet' : 'Original Sheet'}</span>
@@ -2186,14 +2626,14 @@ export default function App() {
                 </a>
 
                 {/* 2. Lab Category Pills */}
-                <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs shrink-0 max-w-full overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/90 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700/80 shrink-0 max-w-full overflow-x-auto no-scrollbar">
                   <button
                     type="button"
                     onClick={() => setLabActiveGroup('all')}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'all'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Alle (${labCounts.all})` : `All (${labCounts.all})`}
@@ -2201,10 +2641,10 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setLabActiveGroup('top10')}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'top10'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Top LLM (${labCounts.top10})` : `Top LLM (${labCounts.top10})`}
@@ -2212,10 +2652,10 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setLabActiveGroup('contender')}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'contender'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Herausforderer (${labCounts.contender})` : `Contenders (${labCounts.contender})`}
@@ -2223,10 +2663,10 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setLabActiveGroup('tweakers')}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'tweakers'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Tweakers (${labCounts.tweakers})` : `Tweakers (${labCounts.tweakers})`}
@@ -2234,10 +2674,10 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setLabActiveGroup('small')}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'small'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Spezialisiert (${labCounts.small})` : `Specialized (${labCounts.small})`}
@@ -2245,10 +2685,10 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setLabActiveGroup('harness')}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'harness'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Agentensteuerung (${labCounts.harness})` : `Scaffolding (${labCounts.harness})`}
@@ -2259,15 +2699,16 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowLabAdvanced((prev) => !prev)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg transition-all border cursor-pointer shrink-0 ${
+                  aria-expanded={showLabAdvanced}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border shrink-0 ${
                     showLabAdvanced
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-500/20'
-                      : 'text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-2xs'
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-2xs ring-2 ring-blue-500/20'
+                      : 'bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700/80'
                   }`}
                 >
                   <SlidersHorizontal className={`w-3.5 h-3.5 ${showLabAdvanced ? 'text-white' : 'text-blue-500'}`} />
-                  <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
-                  <span className={`text-xs ml-0.5 ${showLabAdvanced ? 'text-blue-200' : 'text-slate-400'}`}>
+                  <span>{t.advanced}</span>
+                  <span className={`text-[10px] ${showLabAdvanced ? 'text-blue-100' : 'text-slate-400'}`}>
                     {showLabAdvanced ? '▲' : '▼'}
                   </span>
                 </button>
@@ -2280,7 +2721,7 @@ export default function App() {
       {/* Main Content Area */}
       {activeTab === 'benchmark' ? (
         benchmarkView === 'timeline' ? (
-          <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-4 flex flex-col space-y-4">
+          <main className="flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-6 py-4 flex flex-col space-y-4">
             <TimelineScatterplot
               models={fullTimelineModels}
               allModels={fullTimelineModels}
@@ -2346,7 +2787,7 @@ export default function App() {
             </div>
           </main>
         ) : benchmarkView === 'correlations' ? (
-          <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-4 flex flex-col space-y-4">
+          <main className="flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-6 py-4 flex flex-col space-y-4">
             <CorrelationsScatterplot
               models={fullTimelineModels}
               allModels={fullTimelineModels}
@@ -2448,7 +2889,7 @@ export default function App() {
             </div>
           </main>
         ) : (
-          <main className="flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-5 py-2.5 sm:py-3 flex flex-col space-y-2.5">
+          <main className="flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex flex-col space-y-2.5">
             {/* Search Bar mit Sortierung (Datum / Punktzahl), Kategorie-Slider, 5er-Schritt-Slider, NEW/OLD Score, Current/All Scope, Volle Explosion und alphabetischen Hersteller-Filtern */}
             <SearchBar
               value={searchFilter}
@@ -2643,64 +3084,118 @@ export default function App() {
               </button>
             </Tooltip>
 
-            {/* Preischecker / Aktuelle Tarife */}
-            <Tooltip
-              title={lang === 'de' ? 'Aktuelle Tarife & Preischecker' : 'Current Plans & Price Checker'}
-              badge={
-                isCheckingPricing
-                  ? lang === 'de'
-                    ? 'Prüfe…'
-                    : 'Checking…'
-                  : isPricingDiffValidForSheet && pricingReport && pricingReport.changedCount > 0
-                  ? `${pricingReport.changedCount} Diff`
-                  : isPricingDiffValidForSheet && pricingReport
-                  ? 'OK'
-                  : lang === 'de'
-                  ? 'Tarife DE/US'
-                  : 'Plans DE/US'
-              }
-              content={
-                isPricingDiffValidForSheet && pricingReport
-                  ? lang === 'de'
-                    ? `${pricingReport.summaryDe} Klicken für aktuelle Tarife & erkannte Preis-Diffs.`
-                    : `${pricingReport.summaryEn} Click for current plans & detected price diffs.`
-                  : lang === 'de'
-                  ? 'Zeigt aktuelle Browser-Chat-Tarife (DE € / US $) für OpenAI, Anthropic, Google & Meta (ohne Login nutzbar).'
-                  : 'View current browser chat plans (DE € / US $) for OpenAI, Anthropic, Google & Meta (available without login).'
-              }
-              position="top"
-              align="center"
-              width="w-72"
-            >
-              <button
-                type="button"
-                onClick={() => setIsPricingModalOpen(true)}
-                className={`relative inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer border ${
-                  isPricingDiffValidForSheet && pricingReport && pricingReport.changedCount > 0
-                    ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
-                }`}
-                aria-label={lang === 'de' ? 'Tarife & Preischecker öffnen' : 'Open plans & price checker'}
-              >
-                <Bell
-                  className={`w-3.5 h-3.5 ${
-                    isCheckingPricing
-                      ? 'animate-pulse text-blue-500'
-                      : isPricingDiffValidForSheet && pricingReport && pricingReport.changedCount > 0
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : isPricingDiffValidForSheet && pricingReport
-                      ? 'text-emerald-500'
-                      : 'text-slate-500'
-                  }`}
-                />
-                <span>{lang === 'de' ? 'Preischecker' : 'Price Checker'}</span>
-                {isPricingDiffValidForSheet && pricingReport && pricingReport.changedCount > 0 && (
-                  <span className="min-w-[16px] h-[16px] px-1 rounded-full text-[10px] leading-[16px] text-center font-mono font-bold bg-amber-600 text-white">
-                    {pricingReport.changedCount}
-                  </span>
-                )}
-              </button>
-            </Tooltip>
+            {/* Unified Preis-, GDPx- & Integrity-Prüfer */}
+            {(() => {
+              const priceAlertCount =
+                isPricingDiffValidForSheet && pricingReport ? pricingReport.changedCount : 0;
+              const gdpxAlertCount =
+                isGdpxDiffValidForSheet && gdpxReport ? gdpxReport.actionableCount : 0;
+              const integrityAlertCount =
+                isIntegrityDiffValidForSheet && integrityReport
+                  ? integrityReport.actionableCount
+                  : 0;
+              const totalAlerts = priceAlertCount + gdpxAlertCount + integrityAlertCount;
+              const isAnyMonitorChecking =
+                isCheckingPricing || isCheckingGdpx || isCheckingIntegrity;
+              const allSyncedOk =
+                isPricingDiffValidForSheet &&
+                pricingReport &&
+                isGdpxDiffValidForSheet &&
+                gdpxReport &&
+                isIntegrityDiffValidForSheet &&
+                integrityReport &&
+                totalAlerts === 0;
+
+              return (
+                <Tooltip
+                  title={
+                    lang === 'de'
+                      ? 'Preis-, GDPx- & Integrity-Prüfer'
+                      : 'Plans, Price, GDPx & Integrity Checker'
+                  }
+                  badge={
+                    isAnyMonitorChecking
+                      ? lang === 'de'
+                        ? 'Prüfe…'
+                        : 'Checking…'
+                      : totalAlerts > 0
+                      ? `${totalAlerts} Diff`
+                      : allSyncedOk
+                      ? 'OK'
+                      : lang === 'de'
+                      ? '3 Prüfer'
+                      : '3 Checks'
+                  }
+                  content={
+                    <div className="space-y-1 text-xs">
+                      <div>
+                        {isPricingDiffValidForSheet && pricingReport
+                          ? lang === 'de'
+                            ? pricingReport.summaryDe
+                            : pricingReport.summaryEn
+                          : lang === 'de'
+                          ? 'Aktuelle DE/US Browser-Chat-Tarife & Preis-Diffs.'
+                          : 'Current DE/US browser chat plans & pricing diffs.'}
+                      </div>
+                      <div className="border-t border-slate-700/50 pt-1">
+                        {isGdpxDiffValidForSheet && gdpxReport
+                          ? lang === 'de'
+                            ? gdpxReport.summaryDe
+                            : gdpxReport.summaryEn
+                          : lang === 'de'
+                          ? 'Überwacht gdpx.semianalysis.com auf Neuzugänge (Spalte J).'
+                          : 'Monitors gdpx.semianalysis.com for new LLMs (Column J).'}
+                      </div>
+                      <div className="border-t border-slate-700/50 pt-1">
+                        {isIntegrityDiffValidForSheet && integrityReport
+                          ? lang === 'de'
+                            ? integrityReport.summaryDe
+                            : integrityReport.summaryEn
+                          : lang === 'de'
+                          ? 'Überwacht integrity-bench.com ("Table") für Spalte AN.'
+                          : 'Monitors integrity-bench.com ("Table") for Column AN.'}
+                      </div>
+                    </div>
+                  }
+                  position="top"
+                  align="center"
+                  width="w-80"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setIsPricingModalOpen(true)}
+                    className={`relative inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer border ${
+                      totalAlerts > 0
+                        ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    }`}
+                    aria-label={
+                      lang === 'de'
+                        ? 'Preis-, GDPx- & Integrity-Prüfer öffnen'
+                        : 'Open price, GDPx & integrity checker'
+                    }
+                  >
+                    <Bell
+                      className={`w-3.5 h-3.5 ${
+                        isAnyMonitorChecking
+                          ? 'animate-pulse text-blue-500'
+                          : totalAlerts > 0
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : allSyncedOk
+                          ? 'text-emerald-500'
+                          : 'text-slate-500'
+                      }`}
+                    />
+                    <span>{lang === 'de' ? 'Prüfer' : 'Checker'}</span>
+                    {totalAlerts > 0 && (
+                      <span className="min-w-[16px] h-[16px] px-1 rounded-full text-[10px] leading-[16px] text-center font-mono font-bold bg-amber-600 text-white">
+                        {totalAlerts}
+                      </span>
+                    )}
+                  </button>
+                </Tooltip>
+              );
+            })()}
 
             {/* Data Source Link */}
             <Tooltip
@@ -2743,7 +3238,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Daily In-App AI Pricing Monitor Modal */}
+      {/* Unified Plans, Pricing, GDPx & Integrity Monitor Modal */}
       <PricingMonitorModal
         isOpen={isPricingModalOpen}
         onClose={() => setIsPricingModalOpen(false)}
@@ -2752,9 +3247,24 @@ export default function App() {
         isDiffValid={isPricingDiffValidForSheet}
         isChecking={isCheckingPricing}
         checkError={pricingCheckError}
+        onRunCheck={() => handleRunPricingCheck('manual')}
+        gdpxReport={gdpxReport}
+        isGdpxDiffValid={isGdpxDiffValidForSheet}
+        isCheckingGdpx={isCheckingGdpx}
+        gdpxCheckError={gdpxCheckError}
+        onRunGdpxCheck={() => handleRunGdpxCheck('manual')}
+        integrityReport={integrityReport}
+        isIntegrityDiffValid={isIntegrityDiffValidForSheet}
+        isCheckingIntegrity={isCheckingIntegrity}
+        integrityCheckError={integrityCheckError}
+        onRunIntegrityCheck={() => handleRunIntegrityCheck('manual')}
+        onIgnoreGdpxModel={handleIgnoreGdpxModel}
+        onRestoreGdpxModel={handleRestoreGdpxModel}
+        onIgnoreIntegrityModel={handleIgnoreIntegrityModel}
+        onRestoreIntegrityModel={handleRestoreIntegrityModel}
+        onSaveManualMappings={handleSaveManualMappings}
         dailyAutoEnabled={dailyAutoCheckEnabled}
         onToggleDailyAuto={handleToggleDailyAutoCheck}
-        onRunCheck={() => handleRunPricingCheck('manual')}
         loadedData={loadedData}
         accessToken={oauthAccessToken}
         authUser={authUser}
@@ -2764,9 +3274,13 @@ export default function App() {
         activeSpreadsheetId={activeSpreadsheetId}
         onRefreshFromSheets={(sheetIdOverride) => refreshData(oauthAccessToken, sheetIdOverride)}
         isSheetsConnected={isSheetsConnected}
-        apiAvailable={pricingApiAvailable}
+        apiAvailable={pricingApiAvailable || gdpxApiAvailable || integrityApiAvailable}
         onRetryConnection={async () => {
-          await checkPricingMonitorStatus();
+          await Promise.all([
+            checkPricingMonitorStatus(),
+            checkGdpxMonitorStatus(),
+            checkIntegrityMonitorStatus(),
+          ]);
         }}
       />
     </div>

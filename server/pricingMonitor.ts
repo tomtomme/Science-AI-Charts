@@ -16,7 +16,7 @@ import {
   roundCurrencyTokensInText,
 } from '../src/utils/priceFormat.ts';
 
-const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-pricing-monitor-cache-v4.json');
+const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-pricing-monitor-cache-v6.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const QUOTA_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
@@ -133,6 +133,67 @@ function normalizePriceForComparison(val: string | undefined | null): string {
     .replace(/–|—/g, '-')
     .replace(/^eur/, '€')
     .replace(/^usd/, '$');
+}
+
+function hasCustomPricingComment(val: string | undefined | null): boolean {
+  if (!val) return false;
+  // Remove standard bare price expressions, currency tokens, and regional markers
+  const stripped = val
+    .toLowerCase()
+    .replace(/\bus\s*only\b/g, ' ')
+    .replace(/\b(usd|eur|dollars?|dolars?|euros?|free|gratis|n\/a|none|per\s+month|pro\s+monat|mo|month|monat)\b/g, ' ')
+    .replace(/[$€0-9.,/~≈<>+\-–—():;]+/g, ' ')
+    .trim();
+  return /[a-zäöüß]{2,}/i.test(stripped);
+}
+
+function extractNumericPricesKey(val: string | undefined | null): string {
+  if (!val) return '';
+  const matches = val.match(/\d+(?:[.,]\d+)?/g);
+  return matches ? matches.map((n) => parseFloat(n.replace(',', '.'))).join(',') : '';
+}
+
+function isCliOrCodingComparison(compRec: Record<string, unknown> | undefined): boolean {
+  if (!compRec) return false;
+  const text = `${String(compRec.matchedPlanName || '')} ${String(compRec.reason || '')}`.toLowerCase();
+  return /\b(cli|muse\s*code|coder|coders|coding|kein\s*browser|no\s*chat)\b/i.test(text);
+}
+
+function parseRangeBounds(val: string | undefined | null): { low: number; high: number } | null {
+  if (!val) return null;
+  const m = val.trim().match(/^(?:[$€]\s*)?(\d+)\s*[-–—]\s*(\d+)\s*(?:[$€])?$/);
+  if (!m) return null;
+  const low = Number(m[1]);
+  const high = Number(m[2]);
+  if (!Number.isFinite(low) || !Number.isFinite(high) || low >= high) return null;
+  return { low, high };
+}
+
+function parseSingleNumber(val: string | undefined | null): number | null {
+  if (!val) return null;
+  const m = val.trim().match(/^(?:~|ca\.?)?\s*(?:[$€]\s*)?(\d+)\s*(?:[$€])?$/i);
+  if (!m) return null;
+  const num = Number(m[1]);
+  return Number.isFinite(num) ? num : null;
+}
+
+function preserveAnnualRangeIfMonthlyOnly(
+  currentVal: string,
+  liveVal: string,
+  reason: string
+): string {
+  if (/annual\s*(?:removed|ended|discontinued)|no\s*annual|kein\s*jahres/i.test(reason)) {
+    return liveVal;
+  }
+  const range = parseRangeBounds(currentVal);
+  const liveSingle = parseSingleNumber(liveVal);
+  // Annual-discount consumer plans (e.g. 5-10€, 14-22€, $17-20, 15-18€) have high <= 30;
+  // when fetched static HTML only renders the non-discounted monthly price (equals range.high),
+  // preserve the full annual-to-monthly range.
+  if (range && range.high <= 30 && liveSingle !== null && liveSingle === range.high) {
+    return currentVal;
+  }
+  return liveVal;
 }
 
 function determineCellStatus(
@@ -414,14 +475,14 @@ You MUST include ALL relevant CONSUMER browser/app plans across all 4 AI labs in
   * Muse Maximum ($100 / US only — muse.ai browser agent, 3B tok/wk; quota only)
 
 CRITICAL VERIFICATION & MODEL-TO-TIER RULES:
-1. NEVER blindly trust or copy the Google Sheet's current "de" / "us" values! Verify EVERY model strictly against the fetched sources below first.
+1. NEVER blindly trust or copy the Google Sheet's current "de" / "us" values! Verify EVERY model strictly against the fetched sources below first — EXCEPT keep annual-to-monthly discount ranges whenever a static webpage only prints the monthly rate without its interactive annual toggle (e.g. Google AI Pro static HTML only shows $19.99/mo = $20 and 21,99€/mo = 22€, so keep "$17-20" / "14-22€" unless the monthly price itself changed!).
 2. Always match each paid model to the CHEAPEST / LOWEST CONSUMER BROWSER subscription tier that grants access to that model — EXCEPT for the flagship multi-step Pro/Max/Ultra tiers below, which span multiple expensive capacity/quota levels (no annual discount, instead multiple plan steps like Pro 100 -> Pro 500 or Max -> Ultra):
    - NEVER assign a consumer baseline to a CLI coding plan ("Muse Code" $5/$15/$50/$200)!
    - Meta (Consumer browser / non-coder baseline):
      * Casual meta.ai browser chat is FREE ($0 / 0€) and Meta One ($8 / $20) only increases media/app perks — Meta One does NOT unlock Muse Spark 1.3, Muse Wonder, or Muse Wonder Full.
      * "Muse Spark 1.3": Consumer browser access is via muse.ai ("Meta Muse" web/app, US only — not in meta.ai chat). Paid consumer browser tier is "Muse Power" ($20 / US only) — NEVER assign "Muse Code Everyday ($5)" CLI or "Muse Maximum ($100)"!
      * "Muse Wonder": Rolling out to muse.ai consumer subscribers — consumer browser baseline is "Muse Power" ($20 / US only), NOT "Muse Code Everyday ($5)" CLI!
-     * "Muse Wonder Full": Currently has NO consumer browser chat plan on meta.ai or muse.ai (only available via developer CLI "Muse Code Power" at $50 / US only). Unless the fetched sources show Muse Wonder Full launching in muse.ai/meta.ai browser chat, match it as "Muse Code Power (CLI only)" with liveDe="US only". For liveUs: if the sheet's current "us" already mentions "no chat", "CLI", or "coder" alongside "$50" (e.g. "no chat / $50 for coders"), KEEP that exact sheet string unchanged as liveUs so the user's note is preserved; otherwise set liveUs="$50". State "CLI only (kein Browser-Chat)" in "reason".
+     * "Muse Wonder Full": Currently has NO consumer browser chat plan on meta.ai or muse.ai (only available via developer CLI "Muse Code Power" at $50 / US only). Unless the fetched sources show Muse Wonder Full launching in muse.ai/meta.ai browser chat, match it as "Muse Code Power (CLI only)" with liveDe="US only". For liveUs: if the sheet's current "us" already contains ANY descriptive comment/note (e.g. "no chat, 50 dolar for coders", "no chat / $50 for coders", "CLI", "coder", "coding", "no chat"), ALWAYS KEEP that exact sheet string unchanged as liveUs so the user's comment is preserved; otherwise set liveUs="$50". State "CLI only (kein Browser-Chat)" in "reason".
    - OpenAI:
      * GPT-6.1 Sol / Terra unlock at ChatGPT Plus ($20 / 23€).
      * GPT-6 Astra / ChatGPT-6 Astra spans the multi-step ChatGPT Pro tiers from Pro 100 ($100 / 103€) up to Pro 500 ($500 / 510€) -> output the full multi-tier range liveUs="$100-500", liveDe="103-510€" (and update either bound if OpenAI changes Pro 100 or Pro 500 pricing).
@@ -429,7 +490,7 @@ CRITICAL VERIFICATION & MODEL-TO-TIER RULES:
      * Claude Opus 5.5 unlocks at Claude Pro ($17-20 / 15-18€).
      * Claude Fable 5.2 spans the multi-step Max/Ultra tiers from Claude Max ($100 / 90€) up to Claude Ultra ($200 / 180€) -> output the full multi-tier range liveUs="$100-200", liveDe="90-180€" (and update either bound if Anthropic changes Max or Ultra pricing).
    - Google:
-     * Gemini 4 Argon unlocks at Google AI Pro ($17-20 / 14-22€).
+     * Google AI Pro (Gemini 4 Argon / Gemini 4 Neon) includes BOTH the annual-discount effective monthly rate AND the regular monthly rate: ALWAYS output liveUs="$17-20" and liveDe="14-22€" (do NOT drop the annual lower bound to "$20" or "22€" when the static HTML only shows the monthly rate).
      * Gemini 4 Carbon spans the multi-step Google AI Ultra tiers from Ultra 5x ($100 / 100€) up to Ultra 20x ($200 / 220€) -> output the full multi-tier range liveUs="$100-200", liveDe="100-220€" (and update either bound if Google changes Ultra tier pricing).
 3. Sheet formatting rules (Columns T & U):
    - ALWAYS round ALL dollar and euro prices to WHOLE integers (no decimals/cents like .99 or .50) AND round psychological "-1" prices ending in 9 (e.g. 99€ -> 100€, $99 -> $100, 199€ -> 200€, $199 -> $200, 219€ -> 220€) up to the clean figure: use "$5", "5-10€", "$8", "$20", "15-18€", "23€", "90-180€", "100-220€", "$100-200", "103-510€", "$100-500", "$50".
@@ -545,12 +606,19 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
           const tierRaw = String(rec.tierKey || 'standard').toLowerCase();
           const tierKey: LabPlanInfo['tierKey'] =
             tierRaw === 'pro' || tierRaw === 'ultra' || tierRaw === 'free' ? tierRaw : 'standard';
+          const planName = String(rec.planName || `${lab} Plan`).trim();
+          let usMonthly = roundCurrencyString(String(rec.usMonthly || '').trim());
+          let deMonthly = roundCurrencyString(String(rec.deMonthly || '').trim());
+          if (lab === 'Google' && /(?:google\s*)?ai\s*pro\b/i.test(planName)) {
+            if (parseSingleNumber(usMonthly) === 20) usMonthly = '$17-20';
+            if (parseSingleNumber(deMonthly) === 22) deMonthly = '14-22€';
+          }
           return {
             lab,
-            planName: String(rec.planName || `${lab} Plan`).trim(),
+            planName,
             tierKey,
-            usMonthly: roundCurrencyString(String(rec.usMonthly || '').trim()),
-            deMonthly: roundCurrencyString(String(rec.deMonthly || '').trim()),
+            usMonthly,
+            deMonthly,
             billingNotes: roundCurrencyTokensInText(String(rec.billingNotes || '').trim()),
             sourceUrl: typeof rec.sourceUrl === 'string' && rec.sourceUrl.startsWith('http') ? rec.sourceUrl : undefined,
           };
@@ -569,10 +637,52 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
       const diffs: PricingDiffItem[] = monitoredModels.map((m) => {
         const lab = normalizeLab(m.companyName) as MonitoredLab;
         const comp = compById.get(m.id);
+        const compPlanName = comp ? String(comp.matchedPlanName || '').trim() : '';
+        const compReason = comp ? String(comp.reason || '').trim() : '';
         const currentDe = roundCurrencyString((m.priceDeMonthly || '').trim());
         const currentUs = roundCurrencyString((m.priceUsMonthly || '').trim());
-        const liveDe = comp ? roundCurrencyString(String(comp.liveDe ?? currentDe).trim()) : currentDe;
-        const liveUs = comp ? roundCurrencyString(String(comp.liveUs ?? currentUs).trim()) : currentUs;
+        let liveDe = comp ? roundCurrencyString(String(comp.liveDe ?? currentDe).trim()) : currentDe;
+        let liveUs = comp ? roundCurrencyString(String(comp.liveUs ?? currentUs).trim()) : currentUs;
+
+        const cliOrCodingOnly =
+          isCliOrCodingComparison(comp) ||
+          (/\bmuse\s+wonder\s+full\b/i.test(m.displayName) &&
+            hasCustomPricingComment(currentUs) &&
+            (!comp || extractNumericPricesKey(liveUs) === '50'));
+
+        // Preserve user-written comments (e.g. "no chat, 50 dolar for coders" or coding-abo notes)
+        // when the numeric price matches or the model is CLI/coding-only.
+        if (
+          hasCustomPricingComment(currentDe) &&
+          (cliOrCodingOnly ||
+            (extractNumericPricesKey(currentDe) !== '' &&
+              extractNumericPricesKey(currentDe) === extractNumericPricesKey(liveDe)))
+        ) {
+          liveDe = currentDe;
+        }
+        if (
+          hasCustomPricingComment(currentUs) &&
+          (cliOrCodingOnly ||
+            (extractNumericPricesKey(currentUs) !== '' &&
+              extractNumericPricesKey(currentUs) === extractNumericPricesKey(liveUs)))
+        ) {
+          liveUs = currentUs;
+        }
+
+        // Preserve annual-to-monthly discount range for Google AI Pro when static HTML only shows $20 / 22€
+        const isGoogleAiPro =
+          lab === 'Google' &&
+          (/(?:google\s*)?ai\s*pro\b/i.test(compPlanName) ||
+            (parseRangeBounds(currentDe)?.low === 14 && parseRangeBounds(currentDe)?.high === 22) ||
+            (parseRangeBounds(currentUs)?.low === 17 && parseRangeBounds(currentUs)?.high === 20));
+        if (isGoogleAiPro && !/annual\s*(?:removed|ended|discontinued)|no\s*annual|kein\s*jahres/i.test(compReason)) {
+          if (parseSingleNumber(liveDe) === 22) liveDe = '14-22€';
+          if (parseSingleNumber(liveUs) === 20) liveUs = '$17-20';
+        }
+
+        // General safeguard: preserve annual-to-monthly range if live value only returned the monthly upper bound
+        liveDe = preserveAnnualRangeIfMonthlyOnly(currentDe, liveDe, compReason);
+        liveUs = preserveAnnualRangeIfMonthlyOnly(currentUs, liveUs, compReason);
 
         const deStatus = determineCellStatus(currentDe, liveDe, m.isPaid);
         const usStatus = determineCellStatus(currentUs, liveUs, m.isPaid);

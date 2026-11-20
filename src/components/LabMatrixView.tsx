@@ -1551,13 +1551,13 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-6 space-y-5">
+    <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 py-4 space-y-4">
       {/* Top Bar: Permanently visible Category Tabs on the left, Glossary / Original Sheet / Advanced on the right */}
       {!hideHeaderControls && (
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         {/* Segmented Filter: "All Labs" to "Agent Scaffolding" */}
         <div
-          className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs overflow-x-auto scrollbar-none sm:scrollbar-thin max-w-full"
+          className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/90 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700/80 overflow-x-auto scrollbar-none sm:scrollbar-thin max-w-full"
           onWheel={handleHorizontalWheel}
         >
           <button
@@ -1669,7 +1669,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             <button
               type="button"
               onClick={() => scrollToGlossary()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700/80 cursor-pointer"
             >
               <BookOpen className="w-3.5 h-3.5 text-blue-500" />
               <span>{lang === 'de' ? 'Glossar' : 'Glossary'}</span>
@@ -1680,7 +1680,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             href="https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=355721692#gid=355721692"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700/80"
             title={lang === 'de' ? 'Original-Tabelle in neuem Tab öffnen' : 'Open original spreadsheet in new tab'}
           >
             <span>{lang === 'de' ? 'Original-Sheet' : 'Original Sheet'}</span>
@@ -1691,22 +1691,23 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
           <button
             type="button"
             onClick={toggleAdvanced}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border cursor-pointer ${
+            aria-expanded={showAdvanced}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all border cursor-pointer shrink-0 ${
               showAdvanced
-                ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-500/20'
-                : 'text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-2xs'
+                ? 'bg-blue-600 text-white border-blue-500 shadow-2xs ring-2 ring-blue-500/20'
+                : 'bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700/80'
             }`}
           >
             <SlidersHorizontal className={`w-3.5 h-3.5 ${showAdvanced ? 'text-white' : 'text-blue-500'}`} />
             <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
             {activeAdvancedFiltersCount > 0 && (
-              <span className={`text-xs px-1.5 py-0.2 rounded-full font-bold ${
+              <span className={`text-[10px] px-1.5 py-0.5 leading-none rounded-full font-bold ${
                 showAdvanced ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
               }`}>
                 {activeAdvancedFiltersCount}
               </span>
             )}
-            <span className={`text-xs ml-0.5 ${showAdvanced ? 'text-blue-200' : 'text-slate-400'}`}>
+            <span className={`text-[10px] ${showAdvanced ? 'text-blue-100' : 'text-slate-400'}`}>
               {showAdvanced ? '▲' : '▼'}
             </span>
           </button>
@@ -2867,7 +2868,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   }`}
                 >
                   <span>{lang === 'de' ? cat.labelDe : cat.labelEn}</span>
-                  <span className={`text-[10.5px] px-1 py-0.2 rounded-full font-mono ${isActive ? 'bg-blue-500/80 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                  <span className={`text-[10.5px] px-1.5 py-0.5 leading-none rounded-full font-mono ${isActive ? 'bg-blue-500/80 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
                     {count}
                   </span>
                 </button>
