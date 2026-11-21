@@ -1100,6 +1100,7 @@ interface LabAccessBadge {
 
 interface LabPricingSummary {
   accessBadges: LabAccessBadge[];
+  freeApiBadge?: LabAccessBadge;
   hasFreeAccess: boolean;
   hasFreeApi: boolean;
   isPaidOnly: boolean;
@@ -1192,20 +1193,20 @@ function resolveLabPricingSummary(
     });
   }
 
-  if (hasFreeApi) {
-    accessBadges.push({
-      label: lang === 'de' ? '🌐 Gratis API' : '🌐 Free API',
-      kind: 'freeApi',
-      href: freeApiUrl,
-      title: freeApiUrl
-        ? lang === 'de'
-          ? 'Kostenloser API-Zugang verfügbar (z. B. für JASP oder Agenten) — API-Seite öffnen'
-          : 'Free API access available (e.g. for JASP or agents) — Open API page'
-        : lang === 'de'
-        ? 'Kostenloser API-Zugang verfügbar (z. B. für JASP oder Agenten)'
-        : 'Free API access available (e.g. for JASP or agents)',
-    });
-  }
+  const freeApiBadge: LabAccessBadge | undefined = hasFreeApi
+    ? {
+        label: lang === 'de' ? '🌐 Gratis API' : '🌐 Free API',
+        kind: 'freeApi',
+        href: freeApiUrl,
+        title: freeApiUrl
+          ? lang === 'de'
+            ? 'Kostenloser API-Zugang verfügbar (z. B. für JASP oder Agenten) — API-Seite öffnen'
+            : 'Free API access available (e.g. for JASP or agents) — Open API page'
+          : lang === 'de'
+          ? 'Kostenloser API-Zugang verfügbar (z. B. für JASP oder Agenten)'
+          : 'Free API access available (e.g. for JASP or agents)',
+      }
+    : undefined;
 
   let primaryText = '';
   const secondaryText: string | undefined = undefined;
@@ -1258,6 +1259,7 @@ function resolveLabPricingSummary(
 
   return {
     accessBadges,
+    freeApiBadge,
     hasFreeAccess: hasFreeChat || hasFreeApi,
     hasFreeApi,
     isPaidOnly: hasPaid && !hasFreeChat && !hasFreeApi,
@@ -1557,7 +1559,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         {/* Segmented Filter: "All Labs" to "Agent Scaffolding" */}
         <div
-          className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/90 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700/80 overflow-x-auto scrollbar-none sm:scrollbar-thin max-w-full"
+          className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/90 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700/80 overflow-x-auto scrollbar-none sm:scrollbar-thin w-full min-w-0 max-w-full"
           onWheel={handleHorizontalWheel}
         >
           <button
@@ -1701,13 +1703,13 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             <SlidersHorizontal className={`w-3.5 h-3.5 ${showAdvanced ? 'text-white' : 'text-blue-500'}`} />
             <span>{lang === 'de' ? 'Erweitert' : 'Advanced'}</span>
             {activeAdvancedFiltersCount > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.5 leading-none rounded-full font-bold ${
+              <span className={`text-xs px-1.5 py-0.5 leading-none rounded-full font-bold ${
                 showAdvanced ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
               }`}>
                 {activeAdvancedFiltersCount}
               </span>
             )}
-            <span className={`text-[10px] ${showAdvanced ? 'text-blue-100' : 'text-slate-400'}`}>
+            <span className={`text-xs ${showAdvanced ? 'text-blue-100' : 'text-slate-600 dark:text-slate-400'}`}>
               {showAdvanced ? '▲' : '▼'}
             </span>
           </button>
@@ -1929,7 +1931,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
 
             {/* Search Input */}
             <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-4 h-4 text-slate-600 dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -1939,13 +1941,13 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     ? 'Lab, Modellfamilie, Tooling oder Land filtern...'
                     : 'Filter by lab, model family, tooling or country...'
                 }
-                className="w-full pl-9 pr-8 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-8 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs px-1 cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 text-xs px-1 cursor-pointer"
                 >
                   ✕
                 </button>
@@ -1971,7 +1973,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-help">
                 <Cpu className="w-3.5 h-3.5 text-blue-500" />
                 <span>{lang === 'de' ? 'Modellgröße:' : 'Model Size:'}</span>
-                <HelpCircle className="w-3 h-3 text-slate-400" />
+                <HelpCircle className="w-3 h-3 text-slate-600 dark:text-slate-400" />
               </div>
             </Tooltip>
 
@@ -1982,7 +1984,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 onClick={() => handleSliderStep(-1)}
                 disabled={currentSliderIndex === 0}
                 aria-label="Decrease model size filter"
-                className="w-5 h-5 flex items-center justify-center rounded text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-xs"
+                className="w-5 h-5 flex items-center justify-center rounded text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-xs"
               >
                 <Minus className="w-3 h-3" />
               </button>
@@ -2003,7 +2005,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 onClick={() => handleSliderStep(1)}
                 disabled={currentSliderIndex === GRANULAR_SLIDER_KEYS.length - 1}
                 aria-label="Increase model size filter"
-                className="w-5 h-5 flex items-center justify-center rounded text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-xs"
+                className="w-5 h-5 flex items-center justify-center rounded text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-xs"
               >
                 <Plus className="w-3 h-3" />
               </button>
@@ -2054,14 +2056,14 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       ? 'bg-blue-600 text-white shadow-2xs'
                       : isSubSelected
                       ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-2 border-blue-500 shadow-2xs'
-                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
+                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:text-slate-950 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
                   {cat.key !== 'all' && (
                     <span className={`w-2 h-2 rounded-full ${cat.dotClass} shrink-0`} />
                   )}
                   <span>{lang === 'de' ? cat.nameDe : cat.nameEn}</span>
-                  <span className={`text-xs ${isExact ? 'text-blue-100' : isSubSelected ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400'}`}>
+                  <span className={`text-xs ${isExact ? 'text-blue-100' : isSubSelected ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-600 dark:text-slate-400'}`}>
                     ({count})
                   </span>
                 </button>
@@ -2189,12 +2191,12 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             >
               <div>
                 {/* Lab Card Header */}
-                <div className="flex items-center justify-between mb-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl leading-none" title={lab.country}>
+                <div className="flex items-start justify-between gap-2 mb-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xl leading-none shrink-0" title={lab.country}>
                       {lab.countryFlag}
                     </span>
-                    <div>
+                    <div className="min-w-0">
                       {onSelectLabForBenchmark ? (
                         <button
                           type="button"
@@ -2202,45 +2204,73 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                           className="text-base font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors text-left cursor-pointer"
                           title={lang === 'de' ? `Benchmark-Modelle von ${lab.creator} anzeigen` : `Show benchmark models for ${lab.creator}`}
                         >
-                          <span>{lab.creator}</span>
+                          <span className="truncate">{lab.creator}</span>
                         </button>
                       ) : (
-                        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 truncate">
                           {lab.creator}
                         </h3>
                       )}
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
                         {lab.country}
                       </div>
                     </div>
                   </div>
 
-                  {/* Weights Badge with anchor link to explainer (hidden in compact size view) */}
-                  {!isSimplifiedView && lab.weightsType && (
-                    <button
-                      type="button"
-                      onClick={() => scrollToWeightsExplainer(`weights-${lab.weightsType}`)}
-                      className={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 cursor-pointer transition-transform hover:scale-105 ${
-                        lab.weightsType === 'open'
-                          ? 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800'
-                          : lab.weightsType === 'hybrid'
-                          ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800'
-                          : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
-                      }`}
-                      title={
-                        lab.weightsType === 'open'
-                          ? (lang === 'de' ? WEIGHTS_CONCEPTS.open.tooltipDe : WEIGHTS_CONCEPTS.open.tooltipEn)
-                          : lab.weightsType === 'hybrid'
-                          ? (lang === 'de' ? WEIGHTS_CONCEPTS.hybrid.tooltipDe : WEIGHTS_CONCEPTS.hybrid.tooltipEn)
-                          : (lang === 'de' ? WEIGHTS_CONCEPTS.closed.tooltipDe : WEIGHTS_CONCEPTS.closed.tooltipEn)
-                      }
-                    >
-                      {lab.weightsType === 'open'
-                        ? (lang === 'de' ? 'Offen' : 'Open')
-                        : lab.weightsType === 'hybrid'
-                        ? 'Hybrid'
-                        : (lang === 'de' ? 'Geschlossen' : 'Closed')}
-                    </button>
+                  {/* Top Status Badges: Gratis API + Open/Hybrid/Closed Weights */}
+                  {!isSimplifiedView && (pricingSummary?.freeApiBadge || lab.weightsType) && (
+                    <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
+                      {pricingSummary?.freeApiBadge && (() => {
+                        const freeBadge = pricingSummary.freeApiBadge;
+                        const freeClasses = `text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 whitespace-nowrap ${
+                          freeBadge.href
+                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/70 hover:border-blue-400 dark:hover:border-blue-600 hover:underline transition-colors cursor-pointer'
+                            : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+                        }`;
+                        return freeBadge.href ? (
+                          <a
+                            href={freeBadge.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={freeBadge.title}
+                            className={freeClasses}
+                          >
+                            {freeBadge.label}
+                          </a>
+                        ) : (
+                          <span title={freeBadge.title} className={freeClasses}>
+                            {freeBadge.label}
+                          </span>
+                        );
+                      })()}
+
+                      {lab.weightsType && (
+                        <button
+                          type="button"
+                          onClick={() => scrollToWeightsExplainer(`weights-${lab.weightsType}`)}
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 cursor-pointer transition-transform hover:scale-105 ${
+                            lab.weightsType === 'open'
+                              ? 'bg-cyan-50 text-cyan-800 border-cyan-300 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800'
+                              : lab.weightsType === 'hybrid'
+                              ? 'bg-purple-50 text-purple-800 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800'
+                              : 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                          }`}
+                          title={
+                            lab.weightsType === 'open'
+                              ? (lang === 'de' ? WEIGHTS_CONCEPTS.open.tooltipDe : WEIGHTS_CONCEPTS.open.tooltipEn)
+                              : lab.weightsType === 'hybrid'
+                              ? (lang === 'de' ? WEIGHTS_CONCEPTS.hybrid.tooltipDe : WEIGHTS_CONCEPTS.hybrid.tooltipEn)
+                              : (lang === 'de' ? WEIGHTS_CONCEPTS.closed.tooltipDe : WEIGHTS_CONCEPTS.closed.tooltipEn)
+                          }
+                        >
+                          {lab.weightsType === 'open'
+                            ? (lang === 'de' ? 'Offen' : 'Open')
+                            : lab.weightsType === 'hybrid'
+                            ? 'Hybrid'
+                            : (lang === 'de' ? 'Geschlossen' : 'Closed')}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -2249,7 +2279,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   <div className="mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                     {lab.group === 'harness' ? (
                       <>
-                        <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
+                        <div className="text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold mb-0.5">
                           {lang === 'de' ? 'Agentensteuerung' : 'Agent Scaffolding & Execution Harness'}
                         </div>
                         <div className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate">
@@ -2270,15 +2300,15 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         <span className="text-blue-600 dark:text-blue-400 shrink-0">
                           {lab.engineName}
                         </span>
-                        <span className="text-xs font-normal text-slate-400 dark:text-slate-500 shrink-0">
+                        <span className="text-xs font-normal text-slate-600 dark:text-slate-400 shrink-0">
                           chatbot family
                         </span>
                         {(lab.famousFor || lab.specialties) && lab.specialties !== `Based on ${lab.basedOn}` && (
-                          <span className="text-xs font-normal text-slate-500 dark:text-slate-400 truncate flex items-baseline gap-1 min-w-0">
-                            <span className="text-slate-400 dark:text-slate-500 font-normal shrink-0">
+                          <span className="text-xs font-normal text-slate-600 dark:text-slate-400 truncate flex items-baseline gap-1 min-w-0">
+                            <span className="text-slate-600 dark:text-slate-400 font-normal shrink-0">
                               {lang === 'de' ? 'bekannt für' : 'famous for'}
                             </span>
-                            <span className="text-slate-600 dark:text-slate-300 truncate">
+                            <span className="text-slate-800 dark:text-slate-300 truncate">
                               {lab.famousFor || lab.specialties}
                             </span>
                           </span>
@@ -2292,9 +2322,9 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 {!isSimplifiedView && lab.group === 'harness' && (
                   <div className="space-y-2 mb-3">
                     {lab.form && (
-                      <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
-                        <Terminal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="font-semibold text-slate-500 text-xs">Form:</span>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
+                        <Terminal className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 shrink-0" />
+                        <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">Form:</span>
                         <span className="font-mono text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-medium text-slate-800 dark:text-slate-200">
                           {lab.form}
                         </span>
@@ -2407,7 +2437,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                               <span>{lang === 'de' ? tier.paramCountDe : tier.paramCountEn}</span>
                               {!isSimplifiedView && (
                                 <span
-                                  className={`text-[11px] font-sans font-semibold px-1.5 py-0.5 rounded-full border ${
+                                  className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded-full border ${
                                     isOpen
                                       ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40 dark:bg-cyan-100 dark:text-cyan-800 dark:border-cyan-300'
                                       : 'bg-slate-700/80 text-slate-300 border-slate-500/60 dark:bg-slate-200 dark:text-slate-700 dark:border-slate-300'
@@ -2429,7 +2459,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                                     href={priceBookingUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 hover:border-emerald-400 dark:hover:border-emerald-600 hover:underline shrink-0 transition-colors cursor-pointer"
+                                    className="font-mono tabular-nums text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 hover:border-emerald-400 dark:hover:border-emerald-600 hover:underline shrink-0 transition-colors cursor-pointer"
                                     title={
                                       lang === 'de'
                                         ? `${combinedLabel} — Abo buchen / Tarifseite öffnen`
@@ -2440,7 +2470,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                                   </a>
                                 ) : (
                                   <span
-                                    className="font-mono tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 shrink-0"
+                                    className="font-mono tabular-nums text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70 shrink-0"
                                     title={
                                       lang === 'de'
                                         ? `Freischaltung / Preis (${combinedLabel})`
@@ -2458,13 +2488,13 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   aria-label={`${modelVal} — ${lang === 'de' ? 'Chat öffnen' : 'Open chat'}`}
-                                  className={`font-mono text-xs text-right truncate min-w-0 hover:text-blue-600 dark:hover:text-blue-400 hover:underline decoration-blue-400/70 underline-offset-2 transition-colors ${
-                                    isSimplifiedView
-                                      ? 'font-bold text-slate-900 dark:text-slate-100'
-                                      : 'font-semibold text-slate-800 dark:text-slate-200'
+                                  title={`${modelVal} — ${lang === 'de' ? 'Zum Chat öffnen' : 'Open chat'}`}
+                                  className={`group/chatlink inline-flex items-center justify-end gap-1 font-mono text-xs text-right min-w-0 text-blue-700 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 underline decoration-blue-400/45 hover:decoration-blue-500 underline-offset-2 transition-colors ${
+                                    isSimplifiedView ? 'font-bold' : 'font-semibold'
                                   }`}
                                 >
-                                  {modelVal}
+                                  <span className="truncate">{modelVal}</span>
+                                  <ExternalLink className="w-3 h-3 shrink-0 text-blue-500 dark:text-blue-400 group-hover/chatlink:translate-x-0.5 group-hover/chatlink:-translate-y-0.5 transition-transform" />
                                 </a>
                               ) : (
                                 <span
@@ -2485,47 +2515,42 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   </div>
                 )}
 
-                {/* General Pricing Summary Row (model-specific prices shown directly inside the rows above) */}
-                {pricingSummary && (
+                {/* General Pricing Summary Row (only for Top 10 labs; heading removed) */}
+                {lab.group === 'top10' && pricingSummary && (pricingSummary.accessBadges.length > 0 || pricingSummary.primaryText) && (
                   <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-2 space-y-1">
-                    <div className="flex items-center justify-between gap-2 text-[11px]">
-                      <span className="font-semibold text-slate-500 dark:text-slate-400 shrink-0">
-                        {lang === 'de' ? 'Zugang & Tarife' : 'Access & Plans'}
-                      </span>
-                      {pricingSummary.accessBadges.length > 0 && (
-                        <div className="flex flex-wrap items-center justify-end gap-1">
-                          {pricingSummary.accessBadges.map((badge) => {
-                            const badgeClasses = `text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${
-                              badge.kind === 'paidOnly'
-                                ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
-                                : badge.href
-                                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/70 hover:border-blue-400 dark:hover:border-blue-600 hover:underline transition-colors cursor-pointer'
-                                : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
-                            }`;
-                            return badge.href ? (
-                              <a
-                                key={badge.kind}
-                                href={badge.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={badge.title}
-                                className={badgeClasses}
-                              >
-                                {badge.label}
-                              </a>
-                            ) : (
-                              <span
-                                key={badge.kind}
-                                title={badge.title}
-                                className={badgeClasses}
-                              >
-                                {badge.label}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                    {pricingSummary.accessBadges.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1 text-xs">
+                        {pricingSummary.accessBadges.map((badge) => {
+                          const badgeClasses = `text-xs font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${
+                            badge.kind === 'paidOnly'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                              : badge.href
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/70 hover:border-blue-400 dark:hover:border-blue-600 hover:underline transition-colors cursor-pointer'
+                              : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+                          }`;
+                          return badge.href ? (
+                            <a
+                              key={badge.kind}
+                              href={badge.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={badge.title}
+                              className={badgeClasses}
+                            >
+                              {badge.label}
+                            </a>
+                          ) : (
+                            <span
+                              key={badge.kind}
+                              title={badge.title}
+                              className={badgeClasses}
+                            >
+                              {badge.label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {pricingSummary.primaryText && (
                       pricingSummary.consumerPlans.length > 0 ? (
@@ -2536,7 +2561,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                           width="w-72"
                           className="w-full max-w-full"
                           content={
-                            <div className="space-y-1 text-[11px]">
+                            <div className="space-y-1 text-xs">
                               {pricingSummary.consumerPlans
                                 .filter((plan) => {
                                   const raw = lang === 'de' ? plan.deMonthly : plan.usMonthly;
@@ -2584,20 +2609,20 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                                   );
                                 })}
                               {pricingSummary.subscriptionTiers && (
-                                <div className="pt-1 mt-1 border-t border-slate-700/70 text-[10px] text-slate-400">
+                                <div className="pt-1 mt-1 border-t border-slate-700/70 text-xs text-slate-300">
                                   {lang === 'de' ? 'Alle Stufen:' : 'All tiers:'} {pricingSummary.subscriptionTiers}
                                 </div>
                               )}
                             </div>
                           }
                         >
-                          <p className="w-full font-mono tabular-nums text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-snug cursor-help truncate">
+                          <p className="w-full font-mono tabular-nums text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug cursor-help truncate">
                             {pricingSummary.primaryText}
                           </p>
                         </Tooltip>
                       ) : (
                         <p
-                          className={`font-mono tabular-nums text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-snug ${
+                          className={`font-mono tabular-nums text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug ${
                             isSimplifiedView ? 'truncate' : ''
                           }`}
                           title={pricingSummary.primaryText}
@@ -2615,10 +2640,10 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setExpandedLabId(isExpanded ? null : lab.id)}
-                      className="w-full flex items-center justify-between py-1 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-semibold cursor-pointer transition-colors group select-none"
+                      className="w-full flex items-center justify-between py-1 text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-semibold cursor-pointer transition-colors group select-none"
                     >
                       <span className="flex items-center gap-1.5">
-                        <Wrench className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                        <Wrench className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 group-hover:text-blue-500 transition-colors" />
                         <span className="group-hover:underline">
                           {lang === 'de' ? 'Werkzeuge & Agenten' : 'Tooling & Agents'}
                         </span>
@@ -2634,40 +2659,40 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       <div className="text-xs space-y-1.5 pt-2 mt-1.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-800/40 p-2.5 rounded-lg transition-all">
                         {lab.codingAgent && (
                           <div className="flex items-start gap-1.5">
-                            <span className="text-slate-400 text-xs shrink-0 font-medium">
+                            <span className="text-slate-600 dark:text-slate-400 text-xs shrink-0 font-medium">
                               {lang === 'de' ? 'Coding-Agent:' : 'Coding Agent:'}
                             </span>
-                            <span className="font-medium text-slate-700 dark:text-slate-300">
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
                               {lab.codingAgent}
                             </span>
                           </div>
                         )}
                         {lab.dailyAgent && (
                           <div className="flex items-start gap-1.5">
-                            <span className="text-slate-400 text-xs shrink-0 font-medium">
+                            <span className="text-slate-600 dark:text-slate-400 text-xs shrink-0 font-medium">
                               {lang === 'de' ? 'Alltags-Agent:' : 'Daily Agent:'}
                             </span>
-                            <span className="font-medium text-slate-700 dark:text-slate-300">
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
                               {lab.dailyAgent}
                             </span>
                           </div>
                         )}
                         {lab.harnessSdk && (
                           <div className="flex items-start gap-1.5 pt-0.5">
-                            <span className="text-slate-400 text-xs shrink-0 font-medium">
+                            <span className="text-slate-600 dark:text-slate-400 text-xs shrink-0 font-medium">
                               {lang === 'de' ? 'Agentensteuerung / SDK:' : 'Harness / SDK:'}
                             </span>
-                            <span className="font-medium text-slate-700 dark:text-slate-300">
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
                               {lab.harnessSdk}
                             </span>
                           </div>
                         )}
                         {lab.subscriptionTiers && (
                           <div className="flex items-start gap-1.5 pt-0.5">
-                            <span className="text-slate-400 text-xs shrink-0 font-medium">
+                            <span className="text-slate-600 dark:text-slate-400 text-xs shrink-0 font-medium">
                               {lang === 'de' ? 'Abo-Stufen:' : 'Subscription Tiers:'}
                             </span>
-                            <span className="font-medium text-slate-700 dark:text-slate-300">
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
                               {roundCurrencyTokensInText(lab.subscriptionTiers)}
                             </span>
                           </div>
@@ -2719,7 +2744,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               {lang === 'de' ? 'Konzepte: Open vs. Hybrid vs. Closed' : 'Concepts: Open vs. Hybrid vs. Closed'}
             </h3>
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-slate-600 dark:text-slate-400">
             {lang === 'de' ? 'Definition der Bereitstellungs- und Betriebsmodelle' : 'Definition of model distribution and access models'}
           </span>
         </div>
@@ -2747,8 +2772,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 </li>
               ))}
             </ul>
-            <div className="pt-2 border-t border-cyan-100 dark:border-cyan-900/40 text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
+            <div className="pt-2 border-t border-cyan-100 dark:border-cyan-900/40 text-xs text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-slate-800 dark:text-slate-300">
                 {lang === 'de' ? 'Beispiele: ' : 'Examples: '}
               </span>
               <span>{WEIGHTS_CONCEPTS.open.examples}</span>
@@ -2777,8 +2802,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 </li>
               ))}
             </ul>
-            <div className="pt-2 border-t border-purple-100 dark:border-purple-900/40 text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
+            <div className="pt-2 border-t border-purple-100 dark:border-purple-900/40 text-xs text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-slate-800 dark:text-slate-300">
                 {lang === 'de' ? 'Beispiele: ' : 'Examples: '}
               </span>
               <span>{WEIGHTS_CONCEPTS.hybrid.examples}</span>
@@ -2795,20 +2820,20 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0" />
                 <span>{lang === 'de' ? WEIGHTS_CONCEPTS.closed.titleDe : WEIGHTS_CONCEPTS.closed.titleEn}</span>
               </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full border bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
                 {lang === 'de' ? 'Geschlossen' : 'Closed'}
               </span>
             </div>
             <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 mb-3">
               {(lang === 'de' ? WEIGHTS_CONCEPTS.closed.bulletsDe : WEIGHTS_CONCEPTS.closed.bulletsEn).map((bullet, i) => (
                 <li key={i} className="flex items-start gap-1.5 leading-snug">
-                  <span className="text-slate-400 shrink-0 font-bold">•</span>
+                  <span className="text-slate-600 dark:text-slate-400 shrink-0 font-bold">•</span>
                   <span>{bullet}</span>
                 </li>
               ))}
             </ul>
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-slate-800 dark:text-slate-300">
                 {lang === 'de' ? 'Beispiele: ' : 'Examples: '}
               </span>
               <span>{WEIGHTS_CONCEPTS.closed.examples}</span>
@@ -2832,7 +2857,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               {lang === 'de' ? 'Glossar: Fachbegriffe, Modelltypen & Methoden' : 'Glossary: Key Concepts, Model Types & Methods'}
             </h3>
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-slate-600 dark:text-slate-400">
             {lang === 'de'
               ? 'Didaktisch aufbereitet für Erstsemester: Metaphern und Symbolbilder statt Fachchinesisch'
               : 'Intuitive explanations designed for first-semester students: visual metaphors over jargon'}
@@ -2864,11 +2889,11 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                   className={`px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200/80 dark:border-slate-700/80'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-slate-100 border border-slate-200/80 dark:border-slate-700/80'
                   }`}
                 >
                   <span>{lang === 'de' ? cat.labelDe : cat.labelEn}</span>
-                  <span className={`text-[10.5px] px-1.5 py-0.5 leading-none rounded-full font-mono ${isActive ? 'bg-blue-500/80 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                  <span className={`text-xs px-1.5 py-0.5 leading-none rounded-full font-mono ${isActive ? 'bg-blue-500/80 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>
                     {count}
                   </span>
                 </button>
@@ -2878,19 +2903,19 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
 
           {/* Suchleiste */}
           <div className="relative min-w-[200px] sm:w-64 shrink-0">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={glossarySearch}
               onChange={(e) => setGlossarySearch(e.target.value)}
               placeholder={lang === 'de' ? 'Begriff filtern...' : 'Filter concepts...'}
-              className="w-full pl-8 pr-7 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="w-full pl-8 pr-7 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
             />
             {glossarySearch && (
               <button
                 type="button"
                 onClick={() => setGlossarySearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-bold"
                 title="Suche leeren"
               >
                 ×
@@ -2901,7 +2926,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
 
         {/* Karten-Raster der Begriffe */}
         {filteredGlossaryTerms.length === 0 ? (
-          <div className="p-8 text-center bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs">
+          <div className="p-8 text-center bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs">
             {lang === 'de'
               ? 'Kein Glossarbegriff entspricht dem aktuellen Filter.'
               : 'No glossary terms match your current filter.'}
@@ -2937,7 +2962,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                       <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
                         {lang === 'de' ? term.termDe : term.termEn}
                       </h4>
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${badgeClass}`}>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ${badgeClass}`}>
                         {lang === 'de' ? term.badgeDe : term.badgeEn}
                       </span>
                     </div>
@@ -2953,7 +2978,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         detailText.split(/(Grundsatz:|Metapher:|Analogy:|Foundational rule:)/g).map((part, i) => {
                           if (['Grundsatz:', 'Metapher:', 'Analogy:', 'Foundational rule:'].includes(part)) {
                             return (
-                              <span key={i} className="font-bold text-slate-800 dark:text-slate-200 block pt-1 text-[11.5px]">
+                              <span key={i} className="font-bold text-slate-800 dark:text-slate-200 block pt-1 text-xs">
                                 💡 {part}
                               </span>
                             );

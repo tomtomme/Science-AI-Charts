@@ -420,7 +420,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
               e.stopPropagation();
               handleScroll(scoreScrollTargets.targetId);
             }}
-            className="w-full pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer text-left transition-colors group"
+            className="w-full pt-1.5 border-t border-slate-700/60 text-xs text-slate-200 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer text-left transition-colors group"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 group-hover:scale-125 transition-transform" />
             <span className="group-hover:underline font-medium">

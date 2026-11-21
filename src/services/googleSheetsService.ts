@@ -163,11 +163,12 @@ export async function fetchSheetValues(
 export interface SheetGridWithFormatting {
   rows: string[][];
   greenMask: boolean[][];
+  boldMask: boolean[][];
 }
 
 /**
- * Reads formatted values AND cell background colors (e.g. mint green OpenWeights cells)
- * directly from Google Sheets API v4 via includeGridData=true.
+ * Reads formatted values, cell background colors (e.g. mint green OpenWeights cells),
+ * and cell bold text formatting directly from Google Sheets API v4 via includeGridData=true.
  */
 export async function fetchSheetGridWithFormatting(
   spreadsheetId: string,
@@ -176,7 +177,7 @@ export async function fetchSheetGridWithFormatting(
 ): Promise<SheetGridWithFormatting> {
   const range = encodeURIComponent(quoteSheetTitle(sheetTitle));
   const fields = encodeURIComponent(
-    'sheets(merges,data(rowData(values(formattedValue,effectiveFormat(backgroundColor)))))'
+    'sheets(merges,data(rowData(values(formattedValue,effectiveFormat(backgroundColor,textFormat(bold))))))'
   );
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
     spreadsheetId
@@ -199,11 +200,13 @@ export async function fetchSheetGridWithFormatting(
 
   const rows: string[][] = [];
   const greenMask: boolean[][] = [];
+  const boldMask: boolean[][] = [];
 
   for (const rowItem of rowData) {
     const cells = Array.isArray(rowItem?.values) ? rowItem.values : [];
     const rowVals: string[] = [];
     const rowGreens: boolean[] = [];
+    const rowBolds: boolean[] = [];
 
     for (const cell of cells) {
       rowVals.push(cell?.formattedValue !== undefined && cell?.formattedValue !== null ? String(cell.formattedValue) : '');
@@ -217,13 +220,15 @@ export async function fetchSheetGridWithFormatting(
         isGreen = g > r + 0.03 && g > b + 0.03;
       }
       rowGreens.push(isGreen);
+      rowBolds.push(Boolean(cell?.effectiveFormat?.textFormat?.bold));
     }
 
     rows.push(rowVals);
     greenMask.push(rowGreens);
+    boldMask.push(rowBolds);
   }
 
-  return { rows, greenMask };
+  return { rows, greenMask, boldMask };
 }
 
 /**
@@ -416,6 +421,111 @@ export async function insertModelRowInSheet(
   if (!writeRes.ok) {
     throw await parseApiError(writeRes, `Row ${insertAtRow1Based} was inserted, but writing cell values failed`);
   }
+}
+
+export interface CellBoldSpec {
+  row1Based: number;
+  col0Based: number;
+  bold: boolean;
+}
+
+/**
+ * Sets userEnteredFormat.textFormat.bold on explicit cells without disturbing colors or number formats.
+ */
+export async function applyCellsBoldFormatting(
+  spreadsheetId: string,
+  sheetId: number,
+  cells: CellBoldSpec[],
+  accessToken: string
+): Promise<void> {
+  if (cells.length === 0) return;
+
+  const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+    spreadsheetId
+  )}:batchUpdate`;
+
+  const requests = cells.map((c) => ({
+    repeatCell: {
+      range: {
+        sheetId,
+        startRowIndex: c.row1Based - 1,
+        endRowIndex: c.row1Based,
+        startColumnIndex: c.col0Based,
+        endColumnIndex: c.col0Based + 1,
+      },
+      cell: {
+        userEnteredFormat: {
+          textFormat: {
+            bold: c.bold,
+          },
+        },
+      },
+      fields: 'userEnteredFormat.textFormat.bold',
+    },
+  }));
+
+  const res = await fetch(batchUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ requests }),
+  });
+
+  if (!res.ok) {
+    throw await parseApiError(res, 'Failed to apply bold text formatting in Google Sheet');
+  }
+}
+
+/**
+ * Inserts a new row at a 1-based row position, writes only explicit sparse cells (preserving
+ * any formula columns or unpopulated benchmark slots), and applies bold/non-bold text formatting.
+ */
+export async function insertRowAndWriteSparseCells(
+  spreadsheetId: string,
+  sheetId: number,
+  insertAtRow1Based: number,
+  cellUpdates: CellUpdateSpec[],
+  boldCells: CellBoldSpec[],
+  accessToken: string
+): Promise<{ totalUpdatedCells: number }> {
+  const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+    spreadsheetId
+  )}:batchUpdate`;
+
+  const insertRes = await fetch(batchUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      requests: [
+        {
+          insertDimension: {
+            range: {
+              sheetId,
+              dimension: 'ROWS',
+              startIndex: insertAtRow1Based - 1,
+              endIndex: insertAtRow1Based,
+            },
+            inheritFromBefore: true,
+          },
+        },
+      ],
+    }),
+  });
+
+  if (!insertRes.ok) {
+    throw await parseApiError(insertRes, `Failed to insert new row at row ${insertAtRow1Based}`);
+  }
+
+  const writeResult = await batchUpdateSheetCells(spreadsheetId, cellUpdates, accessToken);
+  if (boldCells.length > 0) {
+    await applyCellsBoldFormatting(spreadsheetId, sheetId, boldCells, accessToken);
+  }
+  return writeResult;
 }
 
 /**

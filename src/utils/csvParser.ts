@@ -1,7 +1,8 @@
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { getCompanyMeta, getFaviconUrl, normalizeCompanyLookupKey } from '../data/companies';
 import { lookupResearchedUsPrice } from '../data/usPricingData';
-import { ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata, Row33Metadata, SheetColumnLayout } from '../types';
+import { BenchmarkWeights, ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata, Row33Metadata, SheetColumnLayout } from '../types';
+import { computeWeightedBreakdown, isCustomWeighted } from './weighting';
 
 /**
  * Robust RFC-4180 CSV line parser handling quotes, embedded commas, and escaped quotes.
@@ -1115,8 +1116,12 @@ export function parseAllModels(csvText: string): ModelRecord[] {
 export function createModelBreakdown(
   rawScores: RawBenchmarkScores,
   targetScore: number,
-  mode: ScoreMode = 'new'
+  mode: ScoreMode = 'new',
+  weights?: BenchmarkWeights
 ): ComponentBreakdown[] {
+  if (mode === 'new' && weights && isCustomWeighted(weights)) {
+    return computeWeightedBreakdown(rawScores, targetScore, weights);
+  }
   if (mode === 'old') {
     const oldKeys = ['actCodeReason', 'nonHallucination', 'scienceKnowledge', 'visionPlot', 'trickQuestions'];
     const oldComponents = BENCHMARK_COMPONENTS.filter((comp) => oldKeys.includes(comp.id));

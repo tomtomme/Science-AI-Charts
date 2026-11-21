@@ -132,32 +132,32 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <button
                 type="button"
                 onClick={() => onModelScopeChange('current')}
-                className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                  modelScope === 'current'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {t.scopeCurrent}
-              </button>
-            </Tooltip>
-            <Tooltip
-              title={t.scopeAll}
-              content={t.scopeAllDesc}
-              align="left"
-              width="w-56"
-            >
-              <button
-                type="button"
-                onClick={() => onModelScopeChange('all')}
-                className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                  modelScope === 'all'
-                    ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {t.scopeAll}
-              </button>
+                    className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                      modelScope === 'current'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
+                    }`}
+                  >
+                    {t.scopeCurrent}
+                  </button>
+                </Tooltip>
+                <Tooltip
+                  title={t.scopeAll}
+                  content={t.scopeAllDesc}
+                  align="left"
+                  width="w-56"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onModelScopeChange('all')}
+                    className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                      modelScope === 'all'
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
+                    }`}
+                  >
+                    {t.scopeAll}
+                  </button>
             </Tooltip>
           </div>
 
@@ -213,7 +213,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           {explosionMode && onExplosionModeChange && (
             <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 font-mono text-xs self-center">
-              <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+              <span className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap shrink-0">
                 {t.explosionToggle}:
               </span>
               <div className="flex items-center bg-slate-200/60 dark:bg-slate-800/60 rounded p-0.5 gap-0.5">
@@ -234,7 +234,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                       explosionMode === 'on'
                         ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {t.explosionOn}
@@ -258,7 +258,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                       explosionMode === 'hover'
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {t.explosionHover}
@@ -282,7 +282,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                       explosionMode === 'off'
                         ? 'bg-slate-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {t.explosionOff}
@@ -306,19 +306,19 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             width="w-72 sm:w-80"
           >
             <div className="relative w-full flex items-center">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none z-10" />
+              <Search className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 absolute left-2.5 pointer-events-none z-10" />
               <input
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={t.searchPlaceholder}
-                className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
+                className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 transition-colors"
               />
               {value && (
                 <button
                   type="button"
                   onClick={() => onChange('')}
-                  className="absolute right-2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer z-10"
+                  className="absolute right-2 p-0.5 rounded text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer z-10"
                   title={t.reset}
                 >
                   <X className="w-3 h-3" />
@@ -338,7 +338,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           className={`text-xs px-2.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
             selectedFamilies.length === 0
               ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
-              : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
           }`}
         >
           {t.all}
@@ -355,7 +355,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               className={`text-xs px-2.5 py-0.5 rounded font-mono transition-all cursor-pointer ${
                 isSelected
                   ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
-                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               {family}

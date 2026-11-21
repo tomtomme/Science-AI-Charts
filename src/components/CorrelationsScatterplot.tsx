@@ -7,6 +7,7 @@ import {
   CORRELATION_DIMENSIONS,
   calculatePearson,
   calculateSpearman,
+  formatCorrelationDecimal,
   CorrelationDimension,
   CorrelationPoint,
 } from '../utils/correlationUtils';
@@ -308,9 +309,9 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const compositeDims = CORRELATION_DIMENSIONS.slice(0, 3);
   const componentDims = CORRELATION_DIMENSIONS.slice(3, 11);
   const retiredDims = CORRELATION_DIMENSIONS.slice(11);
+  const totalOptionsCount = componentDims.length + retiredDims.length;
 
   const alignClass =
     align === 'center'
@@ -338,50 +339,17 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-2 py-1 mb-1 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <span className="text-xs font-mono uppercase font-bold tracking-wider text-slate-400">
+          <span className="text-xs font-mono uppercase font-bold tracking-wider text-slate-700 dark:text-slate-300">
             {lang === 'de' ? 'Metrik auswählen' : 'Select Metric'}
           </span>
-          <span className="text-xs font-mono text-slate-400">
-            {CORRELATION_DIMENSIONS.length} {lang === 'de' ? 'Optionen' : 'Options'}
+          <span className="text-xs font-mono text-slate-600 dark:text-slate-400">
+            {totalOptionsCount} {lang === 'de' ? 'Optionen' : 'Options'}
           </span>
         </div>
 
-        {/* Section 1: Composite Scores */}
+        {/* Section 1: Component Categories */}
         <div className="mb-2">
-          <div className="px-2 py-0.5 text-xs font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
-            {lang === 'de' ? 'Gesamt-Scores (3)' : 'Composite Scores (3)'}
-          </div>
-          <div className="space-y-0.5 mt-0.5">
-            {compositeDims.map((dim) => {
-              const isSelected = dim.index === currentDimIndex;
-              return (
-                <button
-                  key={dim.id}
-                  type="button"
-                  onClick={() => onSelect(dim.index)}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left text-xs font-mono transition-colors cursor-pointer ${
-                    isSelected
-                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 font-bold'
-                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
-                      style={{ backgroundColor: dim.color }}
-                    />
-                    <span className="truncate">{getResolvedDimensionName(dim, lang, row2Labels)}</span>
-                  </div>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0 ml-1" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Section 2: Component Categories */}
-        <div className="mb-2">
-          <div className="px-2 py-0.5 text-xs font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
+          <div className="px-2 py-0.5 text-xs font-mono uppercase font-semibold text-slate-700 dark:text-slate-300">
             {lang === 'de' ? 'Einzel-Kategorien (8)' : 'Benchmark Categories (8)'}
           </div>
           <div className="space-y-0.5 mt-0.5">
@@ -395,7 +363,7 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
                   className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left text-xs font-mono transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 font-bold'
-                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300'
+                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-800 dark:text-slate-200'
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
@@ -415,7 +383,7 @@ const AxisDimensionDropdown: React.FC<AxisDimensionDropdownProps> = ({
         {/* Section 3: Retired Historical Benchmarks (Cols V-Y) */}
         {retiredDims.length > 0 && (
           <div>
-            <div className="px-2 py-0.5 text-xs font-mono uppercase font-semibold text-slate-400 dark:text-slate-500">
+            <div className="px-2 py-0.5 text-xs font-mono uppercase font-semibold text-slate-700 dark:text-slate-300">
               {lang === 'de' ? 'Historische Scores · Sp. V–Y (4)' : 'Historical Scores · Cols V–Y (4)'}
             </div>
             <div className="space-y-0.5 mt-0.5">
@@ -548,12 +516,12 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   const pearsonResult = useMemo(() => calculatePearson(activePoints), [activePoints]);
   const spearmanResult = useMemo(() => calculateSpearman(activePoints), [activePoints]);
 
-  // Quadratic 1:1 aspect ratio: 500 x 500 with square inner grid (400 x 400)
-  const svgWidth = 500;
-  const svgHeight = 500;
-  const margin = { top: 42, right: 44, bottom: 58, left: 56 };
-  const innerWidth = svgWidth - margin.left - margin.right; // 400
-  const innerHeight = svgHeight - margin.top - margin.bottom; // 400
+  // Quadratic 1:1 aspect ratio: 780 x 780 matches desktop column width (~780px) at ~1.0x for 15px axis parity
+  const svgWidth = 780;
+  const svgHeight = 780;
+  const margin = { top: 58, right: 54, bottom: 74, left: 74 };
+  const innerWidth = svgWidth - margin.left - margin.right; // 652
+  const innerHeight = svgHeight - margin.top - margin.bottom; // 652
 
   const { minX, maxX, minY, maxY } = useMemo(() => {
     if (activePoints.length === 0) {
@@ -738,7 +706,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             <button
               type="button"
               onClick={onSwapAxes}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-xs font-mono shadow-2xs"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-xs font-mono shadow-2xs"
             >
               <ArrowLeftRight className="w-3 h-3 text-blue-600 dark:text-blue-400" />
               <span>{lang === 'de' ? 'X ⇄ Y' : 'X ⇄ Y'}</span>
@@ -762,18 +730,17 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             }
           >
             <div
-              className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+              className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border font-mono transition-all ${
                 isLinearModel
                   ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
                   : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
               }`}
             >
-              <span className="text-xs font-bold text-slate-500 uppercase">r:</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">r:</span>
               <span className="text-xs font-extrabold tabular-nums" style={{ color: pearsonResult.color }}>
-                {pearsonResult.value >= 0 ? '+' : ''}
-                {pearsonResult.value.toFixed(2)}
+                {formatCorrelationDecimal(pearsonResult.value)}
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+              <span className="text-xs text-slate-600 dark:text-slate-300 hidden xl:inline">
                 ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
               </span>
             </div>
@@ -792,18 +759,17 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             }
           >
             <div
-              className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+              className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border font-mono transition-all ${
                 !isLinearModel
                   ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
                   : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
               }`}
             >
-              <span className="text-xs font-bold text-slate-500 uppercase">Rho:</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Rho:</span>
               <span className="text-xs font-extrabold tabular-nums" style={{ color: spearmanResult.color }}>
-                {spearmanResult.value >= 0 ? '+' : ''}
-                {spearmanResult.value.toFixed(2)}
+                {formatCorrelationDecimal(spearmanResult.value)}
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+              <span className="text-xs text-slate-600 dark:text-slate-300 hidden xl:inline">
                 ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
               </span>
             </div>
@@ -824,7 +790,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               setOpenAxisMenu(openAxisMenu === 'y' ? null : 'y');
               setHoveredPoint(null);
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-mono font-bold text-sm"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-sans font-bold text-[15px]"
             style={{ backgroundColor: yDim.color }}
             title={
               lang === 'de'
@@ -832,7 +798,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 : `Y-Axis: ${yDimLabel} (Click to choose category)`
             }
           >
-            <span className="text-xs uppercase tracking-wide opacity-80">Y:</span>
+            <span className="text-xs font-mono uppercase tracking-wide opacity-80">Y:</span>
             <span className="truncate max-w-[130px] sm:max-w-[180px]">
               {yDimLabel}
             </span>
@@ -894,16 +860,17 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   y1={margin.top}
                   x2={x}
                   y2={margin.top + innerHeight}
-                  className="stroke-slate-100 dark:stroke-slate-800/80"
+                  className="stroke-slate-200 dark:stroke-slate-800/80"
                   strokeWidth="1"
                   strokeDasharray="2,2"
                 />
                 <text
                   x={x}
-                  y={margin.top + innerHeight + 18}
+                  y={margin.top + innerHeight + 24}
                   textAnchor="middle"
-                  fontSize="14"
-                  className="fill-slate-400 dark:fill-slate-500 font-mono font-medium"
+                  fontSize="15"
+                  fontFamily="var(--font-mono)"
+                  className="fill-slate-700 dark:fill-slate-300 font-mono font-semibold"
                 >
                   {val}
                 </text>
@@ -921,16 +888,17 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   y1={y}
                   x2={margin.left + innerWidth}
                   y2={y}
-                  className="stroke-slate-100 dark:stroke-slate-800/80"
+                  className="stroke-slate-200 dark:stroke-slate-800/80"
                   strokeWidth="1"
                   strokeDasharray="2,2"
                 />
                 <text
-                  x={margin.left - 8}
+                  x={margin.left - 12}
                   y={y + 5}
                   textAnchor="end"
-                  fontSize="14"
-                  className="fill-slate-400 dark:fill-slate-500 font-mono font-medium"
+                  fontSize="15"
+                  fontFamily="var(--font-mono)"
+                  className="fill-slate-700 dark:fill-slate-300 font-mono font-semibold"
                 >
                   {val}
                 </text>
@@ -944,16 +912,16 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             y1={margin.top + innerHeight}
             x2={margin.left + innerWidth}
             y2={margin.top + innerHeight}
-            className="stroke-slate-300 dark:stroke-slate-700"
-            strokeWidth="1.2"
+            className="stroke-slate-500 dark:stroke-slate-600"
+            strokeWidth="1.6"
           />
           <line
             x1={margin.left}
             y1={margin.top}
             x2={margin.left}
             y2={margin.top + innerHeight}
-            className="stroke-slate-300 dark:stroke-slate-700"
-            strokeWidth="1.2"
+            className="stroke-slate-500 dark:stroke-slate-600"
+            strokeWidth="1.6"
           />
 
           {/* 95% Confidence Band */}
@@ -963,7 +931,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               fill={activeRegression.color}
               fillOpacity={0.16}
               stroke={activeRegression.color}
-              strokeWidth="0.8"
+              strokeWidth="1.2"
               strokeDasharray="3,3"
               strokeOpacity={0.4}
               className="pointer-events-none transition-all duration-300"
@@ -976,7 +944,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               d={regressionPath}
               fill="none"
               stroke={activeRegression.color}
-              strokeWidth="2.2"
+              strokeWidth="2.8"
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeDasharray={activeRegression.id === 'loess' ? '5,3' : undefined}
@@ -998,17 +966,17 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 onMouseLeave={handleDotMouseLeave}
               >
                 {/* Hit target padding */}
-                <circle cx={cx} cy={cy} r={14} fill="transparent" />
+                <circle cx={cx} cy={cy} r={20} fill="transparent" />
 
                 {/* SOTA Frontier Accent Ring */}
                 {isFrontier && (
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={isHovered ? 10 : 7}
+                    r={isHovered ? 13 : 9.5}
                     fill="none"
                     stroke="#f59e0b"
-                    strokeWidth={isHovered ? 2 : 1.5}
+                    strokeWidth={isHovered ? 2.4 : 1.8}
                     strokeDasharray={scope === 'frontier' ? undefined : '2,2'}
                     pointerEvents="none"
                   />
@@ -1019,10 +987,10 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={12}
+                    r={16}
                     fill="none"
                     stroke="#f43f5e"
-                    strokeWidth="2.2"
+                    strokeWidth="2.8"
                     className="animate-pulse"
                     pointerEvents="none"
                   />
@@ -1032,10 +1000,10 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={isHovered ? 6.5 : isFrontier ? 4.5 : 4}
+                  r={isHovered ? 9 : isFrontier ? 6.5 : 5.5}
                   fill={isHovered ? '#f43f5e' : isFrontier ? '#d97706' : xDim.color}
                   stroke="#ffffff"
-                  strokeWidth={isHovered ? 2 : 1}
+                  strokeWidth={isHovered ? 2.4 : 1.4}
                   filter={`url(#corrDotGlow-${svgUid})`}
                   className="transition-all duration-150 hover:opacity-95"
                   pointerEvents="none"
@@ -1053,7 +1021,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               setOpenAxisMenu(openAxisMenu === 'x' ? null : 'x');
               setHoveredPoint(null);
             }}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-mono font-bold text-sm"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-md text-white shadow-xs hover:ring-2 hover:ring-blue-400/50 transition-all cursor-pointer font-sans font-bold text-[15px]"
             style={{ backgroundColor: xDim.color }}
             title={
               lang === 'de'
@@ -1061,7 +1029,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 : `X-Axis: ${xDimLabel} (Click to choose category)`
             }
           >
-            <span className="text-xs uppercase tracking-wide opacity-80">X:</span>
+            <span className="text-xs font-mono uppercase tracking-wide opacity-80">X:</span>
             <span className="truncate max-w-[150px] sm:max-w-[220px]">
               {xDimLabel}
             </span>
@@ -1072,7 +1040,7 @@ const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
             <button
               type="button"
               onClick={() => onScrollToParagraph(xDim.targetId)}
-              className="p-1.5 rounded-md bg-white/95 dark:bg-slate-800/95 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-2xs border border-slate-200/80 dark:border-slate-700 cursor-pointer"
+              className="p-1.5 rounded-md bg-white/95 dark:bg-slate-800/95 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-2xs border border-slate-200/80 dark:border-slate-700 cursor-pointer"
               title={
                 lang === 'de'
                   ? `${xDimLabel}: Zur Erläuterung in „How to read this“ springen`
@@ -1203,44 +1171,57 @@ function getHeatmapShortLabel(
   return getResolvedDimensionShortLabel(dim, lang, row2Labels);
 }
 
-function getHeatmapCellColors(value: number | null): { bg: string; text: string } {
-  if (value === null || isNaN(value)) {
-    return { bg: '#f1f5f9', text: '#94a3b8' };
-  }
-  const v = Math.max(-1, Math.min(1, value));
-  const abs = Math.abs(v);
+const HEATMAP_MIN = -0.2;
+const HEATMAP_MAX = 1.0;
+const HEATMAP_PALETTE_INDICES = Array.from({ length: 20 }, (_, i) => i);
+
+function getHeatmapColorFromUnit(u: number): { bg: string; text: string } {
+  const clampedU = Math.max(0, Math.min(1, u));
   const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
   const rgbStr = (r: number, g: number, b: number) => `rgb(${r}, ${g}, ${b})`;
 
-  if (v >= 0) {
-    // 0 -> white (#ffffff), +0.5 -> blue-300 (#93c5fd), +1.0 -> blue-900 (#1e3a8a)
-    if (abs <= 0.5) {
-      const t = abs / 0.5;
+  if (clampedU >= 0.5) {
+    // 0.5 -> white (#ffffff), 0.75 -> blue-300 (#93c5fd), 1.0 -> blue-900 (#1e3a8a)
+    const s = (clampedU - 0.5) / 0.5;
+    if (s <= 0.5) {
+      const t = s / 0.5;
       return {
         bg: rgbStr(lerp(255, 147, t), lerp(255, 197, t), lerp(255, 253, t)),
         text: '#0f172a',
       };
     }
-    const t = (abs - 0.5) / 0.5;
+    const t = (s - 0.5) / 0.5;
     return {
       bg: rgbStr(lerp(147, 30, t), lerp(197, 58, t), lerp(253, 138, t)),
-      text: abs >= 0.72 ? '#ffffff' : '#0f172a',
+      text: clampedU >= 0.78 ? '#ffffff' : '#0f172a',
     };
   }
 
-  // 0 -> white (#ffffff), -0.5 -> red-300 (#fca5a5), -1.0 -> red-900 (#7f1d1d)
-  if (abs <= 0.5) {
-    const t = abs / 0.5;
+  // 0.5 -> white (#ffffff), 0.25 -> red-300 (#fca5a5), 0.0 -> red-900 (#7f1d1d)
+  const s = (0.5 - clampedU) / 0.5;
+  if (s <= 0.5) {
+    const t = s / 0.5;
     return {
       bg: rgbStr(lerp(255, 252, t), lerp(255, 165, t), lerp(255, 165, t)),
       text: '#0f172a',
     };
   }
-  const t = (abs - 0.5) / 0.5;
+  const t = (s - 0.5) / 0.5;
   return {
     bg: rgbStr(lerp(252, 127, t), lerp(165, 29, t), lerp(165, 29, t)),
-    text: abs >= 0.72 ? '#ffffff' : '#0f172a',
+    text: clampedU <= 0.12 ? '#ffffff' : '#0f172a',
   };
+}
+
+function getHeatmapCellColors(value: number | null): { bg: string; text: string } {
+  if (value === null || isNaN(value)) {
+    return { bg: '#f1f5f9', text: '#94a3b8' };
+  }
+  const clamped = Math.max(HEATMAP_MIN, Math.min(HEATMAP_MAX, value));
+  const norm = (clamped - HEATMAP_MIN) / (HEATMAP_MAX - HEATMAP_MIN);
+  // Quantize to 20 discrete colors across [-0.2, +1.0]
+  const bucket = Math.min(19, Math.max(0, Math.round(norm * 19)));
+  return getHeatmapColorFromUnit(bucket / 19);
 }
 
 interface CorrelationHeatmapProps {
@@ -1280,10 +1261,11 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
     return allModels;
   }, [allModels, scope, frontierPointIds]);
 
+  const heatmapDims = useMemo(() => CORRELATION_DIMENSIONS.slice(3), []);
+
   const matrix = useMemo(() => {
-    const dims = CORRELATION_DIMENSIONS;
-    return dims.map((rowDim, rIdx) =>
-      dims.map((colDim, cIdx) => {
+    return heatmapDims.map((rowDim, rIdx) =>
+      heatmapDims.map((colDim, cIdx) => {
         const pairs: Array<{ x: number; y: number }> = [];
         for (const m of scopedModels) {
           const vx = colDim.getValue(m);
@@ -1322,11 +1304,11 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
         };
       })
     );
-  }, [scopedModels]);
+  }, [scopedModels, heatmapDims]);
 
   const hoveredData = hoveredCell ? matrix[hoveredCell.rowIdx]?.[hoveredCell.colIdx] : null;
-  const hoveredRowDim = hoveredCell ? CORRELATION_DIMENSIONS[hoveredCell.rowIdx] : null;
-  const hoveredColDim = hoveredCell ? CORRELATION_DIMENSIONS[hoveredCell.colIdx] : null;
+  const hoveredRowDim = hoveredCell ? heatmapDims[hoveredCell.rowIdx] : null;
+  const hoveredColDim = hoveredCell ? heatmapDims[hoveredCell.colIdx] : null;
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-visible flex flex-col">
@@ -1350,14 +1332,14 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
             <button
               type="button"
               onClick={onToggleMetric}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-xs font-mono shadow-2xs"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all cursor-pointer text-xs font-mono shadow-2xs"
             >
               <ArrowLeftRight className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-              <span className={metric === 'pearson' ? 'font-bold text-blue-600 dark:text-blue-400' : 'opacity-55'}>
+              <span className={metric === 'pearson' ? 'font-bold text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400'}>
                 r
               </span>
-              <span className="opacity-45">⇄</span>
-              <span className={metric === 'spearman' ? 'font-bold text-rose-600 dark:text-rose-400' : 'opacity-55'}>
+              <span className="text-slate-500 dark:text-slate-500">⇄</span>
+              <span className={metric === 'spearman' ? 'font-bold text-rose-700 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}>
                 Rho
               </span>
             </button>
@@ -1366,20 +1348,30 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
           {headerToggle}
         </div>
 
-        {/* Diverging Color Scale Legend (-1 Red -> 0 White -> +1 Blue) */}
+        {/* Diverging Color Scale Legend (-0.2 Red -> +0.4 White -> +1.0 Blue) */}
         <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">
             {metric === 'pearson' ? 'Pearson r' : 'Spearman Rho'}
           </span>
           <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
-            <span className="text-[10px] font-bold text-red-700 dark:text-red-400">-1</span>
+            <span className="text-xs font-bold text-red-700 dark:text-red-400">-0.2</span>
             <div
-              className="w-16 sm:w-20 h-2.5 rounded-xs border border-slate-300/70 dark:border-slate-700"
-              style={{
-                background: 'linear-gradient(to right, #7f1d1d, #fca5a5, #ffffff, #93c5fd, #1e3a8a)',
-              }}
-            />
-            <span className="text-[10px] font-bold text-blue-800 dark:text-blue-400">+1</span>
+              className="w-20 sm:w-24 h-2.5 rounded-xs border border-slate-300/70 dark:border-slate-700 overflow-hidden flex"
+              title={
+                lang === 'de'
+                  ? 'Kontrastmaximierte 20-stufige Farbskala (-0,2 bis +1,0)'
+                  : 'Contrast-maximized 20-step color scale (-0.2 to +1.0)'
+              }
+            >
+              {HEATMAP_PALETTE_INDICES.map((idx) => (
+                <span
+                  key={idx}
+                  className="flex-1 h-full"
+                  style={{ backgroundColor: getHeatmapColorFromUnit(idx / 19).bg }}
+                />
+              ))}
+            </div>
+            <span className="text-xs font-bold text-blue-800 dark:text-blue-400">+1</span>
           </div>
         </div>
       </div>
@@ -1387,26 +1379,26 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
       {/* Matrix Container */}
       <div className="relative p-3 pt-2 bg-white dark:bg-slate-900 rounded-b-2xl select-none flex-1 flex flex-col justify-between">
         <div className="w-full overflow-x-auto sm:overflow-visible flex-1 flex flex-col justify-center">
-          <div className="min-w-[540px] w-full pr-6">
+          <div className="min-w-[500px] w-full pr-6">
             {/* Rotated Column Headers */}
             <div
               className="grid items-end gap-[2px] mb-1"
               style={{
-                gridTemplateColumns: '104px repeat(3, minmax(0, 1fr)) 4px repeat(8, minmax(0, 1fr)) 4px repeat(4, minmax(0, 1fr))',
+                gridTemplateColumns: '132px repeat(8, minmax(0, 1fr)) 4px repeat(4, minmax(0, 1fr))',
               }}
             >
-              <div className="h-[74px]" />
-              {CORRELATION_DIMENSIONS.map((colDim, cIdx) => {
+              <div className="h-[92px]" />
+              {heatmapDims.map((colDim, cIdx) => {
                 const isColHovered = hoveredCell?.colIdx === cIdx;
                 return (
                   <React.Fragment key={colDim.id}>
-                    {(cIdx === 3 || cIdx === 11) && <div />}
-                    <div className="relative h-[74px] flex items-end justify-center">
+                    {cIdx === 8 && <div />}
+                    <div className="relative h-[92px] flex items-end justify-center">
                       <div
-                        className={`absolute bottom-1 left-1/2 -rotate-45 origin-bottom-left whitespace-nowrap flex items-center gap-1 text-[9.5px] font-mono transition-colors ${
+                        className={`absolute bottom-1 left-1/2 -rotate-45 origin-bottom-left whitespace-nowrap flex items-center gap-1 text-xs font-sans transition-colors ${
                           isColHovered
-                            ? 'text-slate-950 dark:text-white font-bold'
-                            : 'text-slate-600 dark:text-slate-400 font-medium'
+                            ? 'text-blue-700 dark:text-white font-bold'
+                            : 'text-black dark:text-slate-100 font-semibold'
                         }`}
                       >
                         <span
@@ -1421,28 +1413,28 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
               })}
             </div>
 
-            {/* 15 Matrix Rows */}
+            {/* 12 Matrix Rows (8 active categories + 4 retired categories) */}
             <div className="space-y-[2px]">
-              {CORRELATION_DIMENSIONS.map((rowDim, rIdx) => {
+              {heatmapDims.map((rowDim, rIdx) => {
                 const isRowHovered = hoveredCell?.rowIdx === rIdx;
                 const rowDimFull = getResolvedDimensionName(rowDim, lang, row2Labels);
                 return (
                   <React.Fragment key={rowDim.id}>
-                    {(rIdx === 3 || rIdx === 11) && (
+                    {rIdx === 8 && (
                       <div className="h-[4px]" />
                     )}
                     <div
                       className="grid items-center gap-[2px]"
                       style={{
-                        gridTemplateColumns: '104px repeat(3, minmax(0, 1fr)) 4px repeat(8, minmax(0, 1fr)) 4px repeat(4, minmax(0, 1fr))',
+                        gridTemplateColumns: '132px repeat(8, minmax(0, 1fr)) 4px repeat(4, minmax(0, 1fr))',
                       }}
                     >
                       {/* Row Header Label */}
                       <div
-                        className={`pr-1.5 flex items-center justify-end gap-1 text-[9.5px] font-mono truncate transition-colors ${
+                        className={`pr-1.5 flex items-center justify-end gap-1 text-xs font-sans truncate transition-colors ${
                           isRowHovered
-                            ? 'text-slate-950 dark:text-white font-bold'
-                            : 'text-slate-600 dark:text-slate-400 font-medium'
+                            ? 'text-blue-700 dark:text-white font-bold'
+                            : 'text-black dark:text-slate-100 font-semibold'
                         }`}
                         title={rowDimFull}
                       >
@@ -1454,7 +1446,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                       </div>
 
                       {/* Score Cells (Diagonal omitted) */}
-                      {CORRELATION_DIMENSIONS.map((colDim, cIdx) => {
+                      {heatmapDims.map((colDim, cIdx) => {
                         const isDiag = rIdx === cIdx;
                         const cell = matrix[rIdx][cIdx];
                         const val = metric === 'pearson' ? cell.pearson : cell.spearman;
@@ -1463,7 +1455,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
 
                         return (
                           <React.Fragment key={`${rowDim.id}-${colDim.id}`}>
-                            {(cIdx === 3 || cIdx === 11) && <div />}
+                            {cIdx === 8 && <div />}
                             {isDiag ? (
                               <div className="aspect-square w-full" aria-hidden="true" />
                             ) : (
@@ -1471,7 +1463,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                                 type="button"
                                 onClick={() => {
                                   if (onSelectPairForOtherPlot) {
-                                    onSelectPairForOtherPlot(cIdx, rIdx);
+                                    onSelectPairForOtherPlot(colDim.index, rowDim.index);
                                   }
                                 }}
                                 onMouseEnter={(e) => {
@@ -1485,11 +1477,11 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                                   backgroundColor: bg,
                                   color: text,
                                 }}
-                                className={`aspect-square w-full flex items-center justify-center rounded-[3px] border border-slate-200/90 dark:border-slate-700/70 cursor-pointer hover:scale-110 hover:z-20 text-[9.5px] sm:text-[10.5px] lg:text-[9.5px] xl:text-[10.5px] font-mono font-bold leading-none tabular-nums tracking-tighter transition-transform duration-100 ${
+                                className={`aspect-square w-full flex items-center justify-center rounded-[3px] border border-slate-300/80 dark:border-slate-700/70 cursor-pointer hover:scale-110 hover:z-20 text-xs font-mono font-bold leading-none tabular-nums tracking-tighter transition-transform duration-100 ${
                                   isHovered ? 'ring-2 ring-slate-900 dark:ring-white z-20 scale-110' : ''
                                 }`}
                               >
-                                {val !== null ? val.toFixed(2).replace(/^-0\.00$/, '0.00') : '—'}
+                                {val !== null ? val.toFixed(1).replace(/^-0\.0$/, '0.0') : '—'}
                               </button>
                             )}
                           </React.Fragment>
@@ -1504,7 +1496,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
         </div>
 
         {/* Bottom Footnote */}
-        <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+        <div className="mt-2 pt-1.5 border-t border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-700 dark:text-slate-300">
           <span>
             {lang === 'de'
               ? `Basis: ${scopedModels.length} Modelle (${scope === 'frontier' ? 'Pioniere' : 'Alle'})`
@@ -1542,35 +1534,33 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
             >
               <div className="w-max max-w-[280px] px-3 py-2 rounded-xl shadow-2xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-xs font-sans">
                 <div className="space-y-1 pb-1.5 mb-1.5 border-b border-slate-800">
-                  <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
+                  <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredRowDim.color }} />
                     <span className="truncate">{getResolvedDimensionName(hoveredRowDim, lang, row2Labels)}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
+                  <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredColDim.color }} />
                     <span className="truncate">{getResolvedDimensionName(hoveredColDim, lang, row2Labels)}</span>
                   </div>
                 </div>
 
                 {hoveredData.pearson !== null && hoveredData.spearman !== null ? (
-                  <div className="space-y-0.5 font-mono text-[11px]">
-                    <div className={`flex items-center justify-between gap-4 ${metric === 'pearson' ? 'text-blue-300 font-bold' : 'text-slate-400'}`}>
+                  <div className="space-y-0.5 font-mono text-xs">
+                    <div className={`flex items-center justify-between gap-4 ${metric === 'pearson' ? 'text-blue-300 font-bold' : 'text-slate-300'}`}>
                       <span>Pearson r:</span>
                       <span>
-                        {hoveredData.pearson >= 0 ? '+' : ''}
-                        {hoveredData.pearson.toFixed(2)}
+                        {formatCorrelationDecimal(hoveredData.pearson)}
                         {hoveredData.pearsonRes && ` (${lang === 'de' ? hoveredData.pearsonRes.strengthDe : hoveredData.pearsonRes.strengthEn})`}
                       </span>
                     </div>
-                    <div className={`flex items-center justify-between gap-4 ${metric === 'spearman' ? 'text-rose-300 font-bold' : 'text-slate-400'}`}>
+                    <div className={`flex items-center justify-between gap-4 ${metric === 'spearman' ? 'text-rose-300 font-bold' : 'text-slate-300'}`}>
                       <span>Spearman Rho:</span>
                       <span>
-                        {hoveredData.spearman >= 0 ? '+' : ''}
-                        {hoveredData.spearman.toFixed(2)}
+                        {formatCorrelationDecimal(hoveredData.spearman)}
                         {hoveredData.spearmanRes && ` (${lang === 'de' ? hoveredData.spearmanRes.strengthDe : hoveredData.spearmanRes.strengthEn})`}
                       </span>
                     </div>
-                    <div className="pt-1 mt-1 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+                    <div className="pt-1 mt-1 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-300">
                       <span>n = {hoveredData.n}</span>
                       {hoveredCell.rowIdx !== hoveredCell.colIdx && (
                         <span className="text-emerald-400">
@@ -1580,7 +1570,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="font-mono text-[11px] text-slate-400">
+                  <div className="font-mono text-xs text-slate-300">
                     {lang === 'de' ? `Zu wenige Daten (n = ${hoveredData.n})` : `Insufficient data (n = ${hoveredData.n})`}
                   </div>
                 )}
@@ -1708,7 +1698,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
               scope === 'all'
                 ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
             }`}
           >
             {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({allModels.length})
@@ -1720,7 +1710,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
             className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
               scope === 'frontier'
                 ? 'bg-amber-500 text-white shadow-2xs'
-                : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+                : 'text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400'
             }`}
             title={
               lang === 'de'
@@ -1749,8 +1739,8 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   {lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
                 </p>
                 {activeRegression.id === 'polynomial' && (
-                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
-                    <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
+                    <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
                     <span className="font-bold">
                       {lang === 'de'
                         ? `Grad ${polyDegree} (${polyDegree === 2 ? 'Parabel' : polyDegree === 3 ? 'Wendepunkt' : 'Höhere Ordnung'})`
@@ -1759,20 +1749,20 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   </div>
                 )}
                 {activeRegression.id === 'loess' && (
-                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
-                    <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                  <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
+                    <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
                     <span className="font-bold">
                       {lang === 'de' ? `Span = ${loessSpan}% (Fensterbreite)` : `Span = ${loessSpan}% (Window width)`}
                     </span>
                   </div>
                 )}
                 {activeRegression.id !== 'frontier' && (
-                  <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 leading-snug">
+                  <div className="pt-1.5 border-t border-slate-700/60 text-xs text-slate-300 leading-snug">
                     <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                       <span>{lang === 'de' ? '95%-Konfidenzband' : '95% Confidence Band'}</span>
                     </div>
-                    <p className="text-[10.5px] text-slate-400 leading-normal">
+                    <p className="text-xs text-slate-300 leading-normal">
                       {lang === 'de'
                         ? 'Das schattierte Band zeigt den statistischen Unsicherheitsbereich der Schätzung: Bei dichter Datenlage ist es schmal, bei wenigen oder streuenden Punkten weitet es sich.'
                         : 'The shaded ribbon reflects estimation uncertainty: narrow where data is abundant, wider where observations are scarce or dispersed.'}
@@ -1844,7 +1834,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                 : ''
             }`}
           >
-            <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-300">
               Param:
             </span>
             {activeRegression.id === 'polynomial' ? (
@@ -1861,7 +1851,7 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   }}
                   className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
                 />
-                <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
+                <span className="text-xs font-mono text-slate-600 dark:text-slate-400 select-none">
                   deg
                 </span>
               </div>
@@ -1879,12 +1869,12 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
                   }}
                   className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
                 />
-                <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
+                <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-400 select-none">
                   %
                 </span>
               </div>
             ) : (
-              <div className="w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
+              <div className="w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-600 dark:text-slate-400 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
                 —
               </div>
             )}

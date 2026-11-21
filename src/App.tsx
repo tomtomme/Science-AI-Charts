@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent, PriceFilter, LabEntry, ExplosionMode } from './types';
+import { ModelRecord, ScoreMode, SortField, ModelScope, BenchmarkComponent, PriceFilter, LabEntry, ExplosionMode, ActiveBenchmarkKey, BenchmarkWeights } from './types';
 import { FALLBACK_CSV_CONTENT, GITHUB_REPO_URL } from './data/rawCsvFallback';
 import { FALLBACK_LAB_ENTRIES } from './data/rawLabCsvFallback';
 import { extractSheetDate, extractHeaderMetadata, extractCsvNotesMetadata, parseModelDataset, parseAllModels, parseCsvRows, detectSheetColumns } from './utils/csvParser';
@@ -15,15 +15,17 @@ import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS } from './data/benchm
 import { ExplodedBarChart } from './components/ExplodedBarChart';
 import { ScoreSlider } from './components/ScoreSlider';
 import { SearchBar } from './components/SearchBar';
+import { WeightingPanel } from './components/WeightingPanel';
 import { CsvNotesSection } from './components/CsvNotesSection';
 import { LabMatrixView, LabGroup } from './components/LabMatrixView';
 import { TimelineScatterplot, TIMELINE_REGRESSION_OPTIONS, DEFAULT_TIMELINE_REGRESSION_INDEX } from './components/TimelineScatterplot';
 import { CorrelationsScatterplot, CORRELATION_REGRESSION_OPTIONS, DEFAULT_CORRELATION_REGRESSION_INDEX } from './components/CorrelationsScatterplot';
-import { extractFrontierPoints, isMultiLevelSupported } from './utils/mathRegression';
+import { extractFrontierPoints } from './utils/mathRegression';
 import { DEFAULT_TIMELINE_LAB_LEVELS } from './data/labLevels';
 import { Language, TRANSLATIONS } from './utils/i18n';
 import { matchesSearchQuery } from './utils/searchUtils';
-import { RefreshCw, Github, FileSpreadsheet, BarChart2, Building2, SlidersHorizontal, TrendingUp, GitCompare, Columns2, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink, Layers, Bell } from 'lucide-react';
+import { DEFAULT_BENCHMARK_WEIGHTS, applyBenchmarkWeightsToModels } from './utils/weighting';
+import { RefreshCw, Github, FileSpreadsheet, BarChart2, Building2, SlidersHorizontal, Sliders, TrendingUp, GitCompare, Columns2, Sun, Moon, MapPin, BookOpen, Minus, Plus, Sparkles, ExternalLink, Bell } from 'lucide-react';
 import { CompareView } from './components/CompareView';
 import { Tooltip } from './components/Tooltip';
 import { User } from 'firebase/auth';
@@ -47,6 +49,21 @@ import {
   triggerIntegrityCheck,
   updateIntegrityPreferencesApi,
 } from './services/integrityMonitorService';
+import { ValsCheckReport } from './types/valsMonitor';
+import {
+  extractValsSheetSnapshots,
+  fetchValsMonitorStatus,
+  triggerValsCheck,
+  updateValsPreferencesApi,
+} from './services/valsMonitorService';
+import { SimpleBenchCheckReport } from './types/simpleBenchMonitor';
+import {
+  DEFAULT_SIMPLEBENCH_COL_INDEX,
+  extractSimpleBenchSheetSnapshots,
+  fetchSimpleBenchMonitorStatus,
+  triggerSimpleBenchCheck,
+  updateSimpleBenchPreferencesApi,
+} from './services/simpleBenchMonitorService';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
 
@@ -393,6 +410,12 @@ export default function App() {
   // Erweiterter Modus (Buttons & Slider eingeklappt als Standard, auf Klick ausklappbar)
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
+  // Personalisierte Benchmark-Gewichtung (Standard: ungewichtet 1/8 pro Kriterium)
+  const [showWeighting, setShowWeighting] = useState<boolean>(false);
+  const [benchmarkWeights, setBenchmarkWeights] = useState<BenchmarkWeights>(() => ({
+    ...DEFAULT_BENCHMARK_WEIGHTS,
+  }));
+
   // Tab-Navigation: 'benchmark' vs 'labs'
   const [activeTab, setActiveTab] = useState<'benchmark' | 'labs'>('benchmark');
   // Four-Way Tab for Benchmark: 'barchart' (Balkendiagramm) vs 'timeline' (Zeitachse) vs 'correlations' (Korrelationen) vs 'compare' (Vergleichen)
@@ -453,6 +476,21 @@ export default function App() {
   const [integrityCheckError, setIntegrityCheckError] = useState<string | null>(null);
   const [integrityApiAvailable, setIntegrityApiAvailable] = useState<boolean>(true);
   const [hasAutoCheckedIntegritySession, setHasAutoCheckedIntegritySession] =
+    useState<boolean>(false);
+
+  // In-App Vals Index v2.2 Monitor state (unified inside PricingMonitorModal, Column K)
+  const [valsReport, setValsReport] = useState<ValsCheckReport | null>(null);
+  const [isCheckingVals, setIsCheckingVals] = useState<boolean>(false);
+  const [valsCheckError, setValsCheckError] = useState<string | null>(null);
+  const [valsApiAvailable, setValsApiAvailable] = useState<boolean>(true);
+  const [hasAutoCheckedValsSession, setHasAutoCheckedValsSession] = useState<boolean>(false);
+
+  // In-App SimpleBench Monitor state (unified inside PricingMonitorModal, Column Y)
+  const [simpleBenchReport, setSimpleBenchReport] = useState<SimpleBenchCheckReport | null>(null);
+  const [isCheckingSimpleBench, setIsCheckingSimpleBench] = useState<boolean>(false);
+  const [simpleBenchCheckError, setSimpleBenchCheckError] = useState<string | null>(null);
+  const [simpleBenchApiAvailable, setSimpleBenchApiAvailable] = useState<boolean>(true);
+  const [hasAutoCheckedSimpleBenchSession, setHasAutoCheckedSimpleBenchSession] =
     useState<boolean>(false);
 
   // LLM Labs Datensatz (aus Google Sheets gid=355721692 mit Fallback)
@@ -541,6 +579,8 @@ export default function App() {
     setSelectedCategoryIndex(0);
     setTimelineCategoryIndex(0);
     setShowAdvanced(false);
+    setShowWeighting(false);
+    setBenchmarkWeights({ ...DEFAULT_BENCHMARK_WEIGHTS });
     setActiveTab('benchmark');
     setBenchmarkView('barchart');
     setCompareScope('current');
@@ -561,6 +601,38 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  const handleBenchmarkWeightChange = useCallback(
+    (key: ActiveBenchmarkKey, value: number) => {
+      const clamped = Math.max(0, Math.min(100, Math.round(value)));
+      setBenchmarkWeights((prev) => ({ ...prev, [key]: clamped }));
+      setScoreMode('new');
+      setSelectedCategoryIndex(0);
+      setCategoryInfoComp(null);
+    },
+    []
+  );
+
+  const handleApplyBenchmarkWeights = useCallback((nextWeights: BenchmarkWeights) => {
+    setBenchmarkWeights({ ...nextWeights });
+    setScoreMode('new');
+    setSelectedCategoryIndex(0);
+    setCategoryInfoComp(null);
+  }, []);
+
+  const handleResetBenchmarkWeights = useCallback(() => {
+    setBenchmarkWeights({ ...DEFAULT_BENCHMARK_WEIGHTS });
+  }, []);
+
+  const weightedDataset = useMemo(
+    () =>
+      applyBenchmarkWeightsToModels(
+        loadedData.newModels,
+        loadedData.allModels,
+        benchmarkWeights
+      ),
+    [loadedData.newModels, loadedData.allModels, benchmarkWeights]
+  );
+
   // Active models based on scoreMode, modelScope & priceFilter ('current' vs 'all', 'free' vs 'paid' vs 'all')
   // HINWEIS: Wenn im Freitextfilter gesucht wird, sollen immer alle Bots durchsucht werden, nicht nur 'current' Bots.
   const effectiveModelScope: ModelScope = searchFilter.trim().length > 0 ? 'all' : modelScope;
@@ -570,14 +642,14 @@ export default function App() {
     if (selectedCategoryIndex === 0) {
       base =
         scoreMode === 'new'
-          ? loadedData.newModels
+          ? weightedDataset.newModels
           : scoreMode === 'old'
           ? loadedData.oldModels
           : loadedData.worstCaseModels;
     } else {
       // Individual category selected: include ALL models from the CSV that have a valid score in this category
       const comp = BENCHMARK_COMPONENTS[selectedCategoryIndex - 1];
-      base = loadedData.allModels.filter((m) => m.rawScores[comp.key] !== null);
+      base = weightedDataset.allModels.filter((m) => m.rawScores[comp.key] !== null);
     }
 
     let list = effectiveModelScope === 'current' ? base.filter((m) => m.isAvailable) : base;
@@ -592,84 +664,29 @@ export default function App() {
     }
 
     return list;
-  }, [scoreMode, selectedCategoryIndex, effectiveModelScope, loadedData, priceFilter]);
+  }, [scoreMode, selectedCategoryIndex, effectiveModelScope, loadedData, weightedDataset, priceFilter]);
 
-  // Full unfiltered models dataset for Timeline tab and Correlations tab:
+  // Full unfiltered models dataset for Timeline tab and Correlations tab (with live benchmark weights applied):
   // Supplies all 237+ models scanned from row 36 downwards across all 8 categories and 3 scores.
   const fullTimelineModels = useMemo(() => {
-    return loadedData.allModels;
-  }, [loadedData.allModels]);
+    return weightedDataset.allModels;
+  }, [weightedDataset.allModels]);
 
   // Active regression options for header display
   const activeTimelineRegression = TIMELINE_REGRESSION_OPTIONS[timelineRegressionIndex] || TIMELINE_REGRESSION_OPTIONS[0];
-  const isTimelineMultiLevelFeasible = isMultiLevelSupported(activeTimelineRegression.id);
-  const isTimelineMultiLevelActive = timelineMultiLevel && isTimelineMultiLevelFeasible;
   const activeCorrelationsRegression = CORRELATION_REGRESSION_OPTIONS[correlationsRegressionIndex] || CORRELATION_REGRESSION_OPTIONS[0];
-
-  // Timeline eligible models count for header scope badge count
-  const timelineEligibleCount = useMemo(() => {
-    let count = 0;
-    for (const m of fullTimelineModels) {
-      if (!m.releaseDate) continue;
-      const ts = new Date(m.releaseDate).getTime();
-      if (isNaN(ts)) continue;
-      let score: number | null = null;
-      if (timelineCategoryIndex === 0) {
-        score = timelineScoreMode === 'old' ? m.scoreOld : timelineScoreMode === 'worstCase' ? m.scoreWorstCase : m.scoreNewReported;
-      } else {
-        const comp = timelineCategoryIndex > 8
-          ? RETIRED_TIMELINE_BENCHMARKS[timelineCategoryIndex - 9]
-          : BENCHMARK_COMPONENTS[timelineCategoryIndex - 1];
-        if (comp && m.rawScores) {
-          const raw = m.rawScores[comp.key];
-          score = typeof raw === 'number' && raw !== null ? comp.transform(raw) : null;
-        }
-      }
-      if (typeof score === 'number' && score > 0) {
-        count++;
-      }
-    }
-    return count;
-  }, [fullTimelineModels, timelineCategoryIndex, timelineScoreMode]);
-
-  // Timeline frontier points calculation for header scope badge count
-  const timelineFrontierCount = useMemo(() => {
-    const list: Array<{ id: string; timestamp: number; score: number }> = [];
-    for (const m of fullTimelineModels) {
-      if (!m.releaseDate) continue;
-      const ts = new Date(m.releaseDate).getTime();
-      if (isNaN(ts)) continue;
-      let score: number | null = null;
-      if (timelineCategoryIndex === 0) {
-        score = timelineScoreMode === 'old' ? m.scoreOld : timelineScoreMode === 'worstCase' ? m.scoreWorstCase : m.scoreNewReported;
-      } else {
-        const comp = timelineCategoryIndex > 8
-          ? RETIRED_TIMELINE_BENCHMARKS[timelineCategoryIndex - 9]
-          : BENCHMARK_COMPONENTS[timelineCategoryIndex - 1];
-        if (comp && m.rawScores) {
-          const raw = m.rawScores[comp.key];
-          score = typeof raw === 'number' && raw !== null ? comp.transform(raw) : null;
-        }
-      }
-      if (typeof score === 'number' && score > 0) {
-        list.push({ id: m.id, timestamp: ts, score });
-      }
-    }
-    list.sort((a, b) => a.timestamp - b.timestamp);
-    return extractFrontierPoints(list as any).length;
-  }, [fullTimelineModels, timelineCategoryIndex, timelineScoreMode]);
 
   // Correlation frontier points calculation for header scope badge count
   const correlationsFrontierCount = useMemo(() => {
     const eligible = fullTimelineModels
       .filter((m) => {
-        const sc = m.scoreOld ?? m.scoreNewReported;
+        const sc = m.scoreOld ?? m.scoreNew ?? m.scoreNewReported;
         return typeof sc === 'number' && sc > 0;
       })
       .map((m) => ({
         id: m.id,
         timestamp: new Date(m.releaseDate).getTime(),
-        score: (m.scoreOld ?? m.scoreNewReported) as number,
+        score: (m.scoreOld ?? m.scoreNew ?? m.scoreNewReported) as number,
       }));
     eligible.sort((a, b) => a.timestamp - b.timestamp);
     return extractFrontierPoints(eligible as any).length;
@@ -945,6 +962,10 @@ export default function App() {
     setHasAutoCheckedGdpxSession(false);
     setIntegrityCheckError(null);
     setHasAutoCheckedIntegritySession(false);
+    setValsCheckError(null);
+    setHasAutoCheckedValsSession(false);
+    setSimpleBenchCheckError(null);
+    setHasAutoCheckedSimpleBenchSession(false);
   }, []);
 
   // Sync on mount
@@ -1460,10 +1481,408 @@ export default function App() {
     [isSheetsConnected, loadedData.allModels, loadedData.rawRows]
   );
 
+  // Vals Index v2.2 Monitor (Column K, bold-aware)
+  const doesValsReportMatchLiveSheet = useCallback(
+    (report: ValsCheckReport, allModels: ModelRecord[], boldMask?: boolean[][]): boolean => {
+      const liveSnapshots = extractValsSheetSnapshots(allModels, boldMask);
+      if (liveSnapshots.length === 0 || report.diffs.length === 0) {
+        return false;
+      }
+      const liveById = new Map(liveSnapshots.map((m) => [m.id, m]));
+      for (const diff of report.diffs) {
+        if (!diff.matchedModelId) continue;
+        const live = liveById.get(diff.matchedModelId);
+        if (!live) return false;
+        if (live.colK !== diff.currentColK) return false;
+        if (live.colKIsBold !== diff.currentColKIsBold) return false;
+      }
+      return true;
+    },
+    []
+  );
+
+  const handleRunValsCheck = useCallback(
+    async (trigger: 'manual' | 'daily_auto' = 'manual') => {
+      setIsCheckingVals(true);
+      setValsCheckError(null);
+      try {
+        const snapshots = isSheetsConnected
+          ? extractValsSheetSnapshots(loadedData.allModels, loadedData.boldMask)
+          : [];
+        const report = await triggerValsCheck(snapshots, trigger);
+        setValsApiAvailable(true);
+        setValsReport(report);
+      } catch (err) {
+        if (isStaticPreviewError(err)) {
+          setValsApiAvailable(false);
+          setValsCheckError(null);
+        } else {
+          const msg = err instanceof Error ? err.message : 'Vals Index check failed.';
+          setValsCheckError(msg);
+        }
+      } finally {
+        setIsCheckingVals(false);
+      }
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.boldMask]
+  );
+
+  const isValsDiffValidForSheet = useMemo(() => {
+    if (!isSheetsConnected || !valsReport) return false;
+    return doesValsReportMatchLiveSheet(valsReport, loadedData.allModels, loadedData.boldMask);
+  }, [
+    isSheetsConnected,
+    valsReport,
+    loadedData.allModels,
+    loadedData.boldMask,
+    doesValsReportMatchLiveSheet,
+  ]);
+
+  const checkValsMonitorStatus = useCallback(async () => {
+    try {
+      const status = await fetchValsMonitorStatus();
+      setValsApiAvailable(true);
+      if (status.report) {
+        setValsReport(status.report);
+      }
+      if (status.lastError) {
+        setValsCheckError(status.lastError);
+      }
+      return status;
+    } catch (err) {
+      if (isStaticPreviewError(err)) {
+        setValsApiAvailable(false);
+      }
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const status = await checkValsMonitorStatus();
+      if (cancelled || !status) return;
+
+      if (
+        isPricingModalOpen &&
+        (!status.report ||
+          (isSheetsConnected &&
+            loadedData.allModels.length > 0 &&
+            !doesValsReportMatchLiveSheet(
+              status.report,
+              loadedData.allModels,
+              loadedData.boldMask
+            ))) &&
+        !isCheckingVals &&
+        !valsCheckError
+      ) {
+        setHasAutoCheckedValsSession(true);
+        await handleRunValsCheck('manual');
+        return;
+      }
+
+      if (isSheetsConnected && loadedData.allModels.length > 0) {
+        const cachedMatchesLive =
+          Boolean(status.report) &&
+          doesValsReportMatchLiveSheet(
+            status.report as ValsCheckReport,
+            loadedData.allModels,
+            loadedData.boldMask
+          );
+        const needsRun = !cachedMatchesLive || status.isDue;
+
+        if (!hasAutoCheckedValsSession && dailyAutoCheckEnabled && needsRun && !status.isRunning) {
+          setHasAutoCheckedValsSession(true);
+          await handleRunValsCheck('daily_auto');
+        }
+      } else if (!hasAutoCheckedValsSession && dailyAutoCheckEnabled && status.isDue && !status.isRunning) {
+        setHasAutoCheckedValsSession(true);
+        await handleRunValsCheck('daily_auto');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isSheetsConnected,
+    hasAutoCheckedValsSession,
+    loadedData.allModels,
+    loadedData.boldMask,
+    dailyAutoCheckEnabled,
+    isPricingModalOpen,
+    isCheckingVals,
+    valsCheckError,
+    handleRunValsCheck,
+    checkValsMonitorStatus,
+    doesValsReportMatchLiveSheet,
+  ]);
+
+  // SimpleBench Monitor (Column Y, bold-aware)
+  const simpleBenchColIdx = loadedData.columnLayout?.colTrickOld ?? DEFAULT_SIMPLEBENCH_COL_INDEX;
+
+  const doesSimpleBenchReportMatchLiveSheet = useCallback(
+    (
+      report: SimpleBenchCheckReport,
+      allModels: ModelRecord[],
+      boldMask?: boolean[][],
+      colIdx: number = DEFAULT_SIMPLEBENCH_COL_INDEX
+    ): boolean => {
+      const liveSnapshots = extractSimpleBenchSheetSnapshots(allModels, boldMask, colIdx);
+      if (liveSnapshots.length === 0 || report.diffs.length === 0) {
+        return false;
+      }
+      const liveById = new Map(liveSnapshots.map((m) => [m.id, m]));
+      for (const diff of report.diffs) {
+        if (!diff.matchedModelId) continue;
+        const live = liveById.get(diff.matchedModelId);
+        if (!live) return false;
+        if (live.colY !== diff.currentColY) return false;
+        if (live.colYIsBold !== diff.currentColYIsBold) return false;
+      }
+      return true;
+    },
+    []
+  );
+
+  const handleRunSimpleBenchCheck = useCallback(
+    async (trigger: 'manual' | 'daily_auto' = 'manual') => {
+      setIsCheckingSimpleBench(true);
+      setSimpleBenchCheckError(null);
+      try {
+        const snapshots = isSheetsConnected
+          ? extractSimpleBenchSheetSnapshots(
+              loadedData.allModels,
+              loadedData.boldMask,
+              simpleBenchColIdx
+            )
+          : [];
+        const report = await triggerSimpleBenchCheck(snapshots, trigger);
+        setSimpleBenchApiAvailable(true);
+        setSimpleBenchReport(report);
+      } catch (err) {
+        if (isStaticPreviewError(err)) {
+          setSimpleBenchApiAvailable(false);
+          setSimpleBenchCheckError(null);
+        } else {
+          const msg = err instanceof Error ? err.message : 'SimpleBench check failed.';
+          setSimpleBenchCheckError(msg);
+        }
+      } finally {
+        setIsCheckingSimpleBench(false);
+      }
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.boldMask, simpleBenchColIdx]
+  );
+
+  const isSimpleBenchDiffValidForSheet = useMemo(() => {
+    if (!isSheetsConnected || !simpleBenchReport) return false;
+    return doesSimpleBenchReportMatchLiveSheet(
+      simpleBenchReport,
+      loadedData.allModels,
+      loadedData.boldMask,
+      simpleBenchColIdx
+    );
+  }, [
+    isSheetsConnected,
+    simpleBenchReport,
+    loadedData.allModels,
+    loadedData.boldMask,
+    simpleBenchColIdx,
+    doesSimpleBenchReportMatchLiveSheet,
+  ]);
+
+  const checkSimpleBenchMonitorStatus = useCallback(async () => {
+    try {
+      const status = await fetchSimpleBenchMonitorStatus();
+      setSimpleBenchApiAvailable(true);
+      if (status.report) {
+        setSimpleBenchReport(status.report);
+      }
+      if (status.lastError) {
+        setSimpleBenchCheckError(status.lastError);
+      }
+      return status;
+    } catch (err) {
+      if (isStaticPreviewError(err)) {
+        setSimpleBenchApiAvailable(false);
+      }
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const status = await checkSimpleBenchMonitorStatus();
+      if (cancelled || !status) return;
+
+      if (
+        isPricingModalOpen &&
+        (!status.report ||
+          (isSheetsConnected &&
+            loadedData.allModels.length > 0 &&
+            !doesSimpleBenchReportMatchLiveSheet(
+              status.report,
+              loadedData.allModels,
+              loadedData.boldMask,
+              simpleBenchColIdx
+            ))) &&
+        !isCheckingSimpleBench &&
+        !simpleBenchCheckError
+      ) {
+        setHasAutoCheckedSimpleBenchSession(true);
+        await handleRunSimpleBenchCheck('manual');
+        return;
+      }
+
+      if (isSheetsConnected && loadedData.allModels.length > 0) {
+        const cachedMatchesLive =
+          Boolean(status.report) &&
+          doesSimpleBenchReportMatchLiveSheet(
+            status.report as SimpleBenchCheckReport,
+            loadedData.allModels,
+            loadedData.boldMask,
+            simpleBenchColIdx
+          );
+        const needsRun = !cachedMatchesLive || status.isDue;
+
+        if (
+          !hasAutoCheckedSimpleBenchSession &&
+          dailyAutoCheckEnabled &&
+          needsRun &&
+          !status.isRunning
+        ) {
+          setHasAutoCheckedSimpleBenchSession(true);
+          await handleRunSimpleBenchCheck('daily_auto');
+        }
+      } else if (
+        !hasAutoCheckedSimpleBenchSession &&
+        dailyAutoCheckEnabled &&
+        status.isDue &&
+        !status.isRunning
+      ) {
+        setHasAutoCheckedSimpleBenchSession(true);
+        await handleRunSimpleBenchCheck('daily_auto');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isSheetsConnected,
+    hasAutoCheckedSimpleBenchSession,
+    loadedData.allModels,
+    loadedData.boldMask,
+    simpleBenchColIdx,
+    dailyAutoCheckEnabled,
+    isPricingModalOpen,
+    isCheckingSimpleBench,
+    simpleBenchCheckError,
+    handleRunSimpleBenchCheck,
+    checkSimpleBenchMonitorStatus,
+    doesSimpleBenchReportMatchLiveSheet,
+  ]);
+
+  const handleIgnoreValsModel = useCallback(
+    async (valsId: string) => {
+      try {
+        const snapshots = isSheetsConnected
+          ? extractValsSheetSnapshots(loadedData.allModels, loadedData.boldMask)
+          : [];
+        const updated = await updateValsPreferencesApi({
+          ignoreIds: [valsId],
+          models: snapshots,
+        });
+        if (updated) setValsReport(updated);
+      } catch (err) {
+        if (!isStaticPreviewError(err)) {
+          setValsCheckError(err instanceof Error ? err.message : 'Failed to ignore Vals model.');
+        }
+      }
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.boldMask]
+  );
+
+  const handleRestoreValsModel = useCallback(
+    async (valsId: string) => {
+      try {
+        const snapshots = isSheetsConnected
+          ? extractValsSheetSnapshots(loadedData.allModels, loadedData.boldMask)
+          : [];
+        const updated = await updateValsPreferencesApi({
+          unignoreIds: [valsId],
+          models: snapshots,
+        });
+        if (updated) setValsReport(updated);
+      } catch (err) {
+        if (!isStaticPreviewError(err)) {
+          setValsCheckError(err instanceof Error ? err.message : 'Failed to restore Vals model.');
+        }
+      }
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.boldMask]
+  );
+
+  const handleIgnoreSimpleBenchModel = useCallback(
+    async (simpleBenchId: string) => {
+      try {
+        const snapshots = isSheetsConnected
+          ? extractSimpleBenchSheetSnapshots(
+              loadedData.allModels,
+              loadedData.boldMask,
+              simpleBenchColIdx
+            )
+          : [];
+        const updated = await updateSimpleBenchPreferencesApi({
+          ignoreIds: [simpleBenchId],
+          models: snapshots,
+        });
+        if (updated) setSimpleBenchReport(updated);
+      } catch (err) {
+        if (!isStaticPreviewError(err)) {
+          setSimpleBenchCheckError(
+            err instanceof Error ? err.message : 'Failed to ignore SimpleBench model.'
+          );
+        }
+      }
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.boldMask, simpleBenchColIdx]
+  );
+
+  const handleRestoreSimpleBenchModel = useCallback(
+    async (simpleBenchId: string) => {
+      try {
+        const snapshots = isSheetsConnected
+          ? extractSimpleBenchSheetSnapshots(
+              loadedData.allModels,
+              loadedData.boldMask,
+              simpleBenchColIdx
+            )
+          : [];
+        const updated = await updateSimpleBenchPreferencesApi({
+          unignoreIds: [simpleBenchId],
+          models: snapshots,
+        });
+        if (updated) setSimpleBenchReport(updated);
+      } catch (err) {
+        if (!isStaticPreviewError(err)) {
+          setSimpleBenchCheckError(
+            err instanceof Error ? err.message : 'Failed to restore SimpleBench model.'
+          );
+        }
+      }
+    },
+    [isSheetsConnected, loadedData.allModels, loadedData.boldMask, simpleBenchColIdx]
+  );
+
   const handleSaveManualMappings = useCallback(
     async (mappings: {
       gdpx?: Record<string, ManualRowMapping>;
       integrity?: Record<string, ManualRowMapping>;
+      vals?: Record<string, ManualRowMapping>;
+      simpleBench?: Record<string, ManualRowMapping>;
     }) => {
       const tasks: Promise<unknown>[] = [];
       if (mappings.gdpx && Object.keys(mappings.gdpx).length > 0) {
@@ -1492,9 +1911,45 @@ export default function App() {
           })
         );
       }
+      if (mappings.vals && Object.keys(mappings.vals).length > 0) {
+        const valsSnapshots = isSheetsConnected
+          ? extractValsSheetSnapshots(loadedData.allModels, loadedData.boldMask)
+          : [];
+        tasks.push(
+          updateValsPreferencesApi({
+            manualMappings: mappings.vals,
+            models: valsSnapshots,
+          }).then((updated) => {
+            if (updated) setValsReport(updated);
+          })
+        );
+      }
+      if (mappings.simpleBench && Object.keys(mappings.simpleBench).length > 0) {
+        const sbSnapshots = isSheetsConnected
+          ? extractSimpleBenchSheetSnapshots(
+              loadedData.allModels,
+              loadedData.boldMask,
+              simpleBenchColIdx
+            )
+          : [];
+        tasks.push(
+          updateSimpleBenchPreferencesApi({
+            manualMappings: mappings.simpleBench,
+            models: sbSnapshots,
+          }).then((updated) => {
+            if (updated) setSimpleBenchReport(updated);
+          })
+        );
+      }
       await Promise.allSettled(tasks);
     },
-    [isSheetsConnected, loadedData.allModels, loadedData.rawRows]
+    [
+      isSheetsConnected,
+      loadedData.allModels,
+      loadedData.rawRows,
+      loadedData.boldMask,
+      simpleBenchColIdx,
+    ]
   );
 
   const formatSyncDate = (d: Date | null) => {
@@ -1550,8 +2005,51 @@ export default function App() {
             </Tooltip>
           </div>
 
-          {/* Language, Glossary & Theme Controls */}
+          {/* Weighting, Glossary, Language & Theme Controls */}
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono shrink-0 self-start xl:self-center">
+            {/* Personalized Benchmark Weighting Toggle (above tabs) */}
+            <button
+              type="button"
+              onClick={() => setShowWeighting((prev) => !prev)}
+              aria-expanded={showWeighting}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border shrink-0 whitespace-nowrap ${
+                showWeighting
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-2xs ring-2 ring-emerald-500/20'
+                  : weightedDataset.isWeighted
+                  ? 'bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border-emerald-400 dark:border-emerald-700'
+                  : 'bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700/80'
+              }`}
+            >
+              <Sliders
+                className={`w-3.5 h-3.5 ${
+                  showWeighting
+                    ? 'text-white'
+                    : weightedDataset.isWeighted
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
+                }`}
+              />
+              <span>
+                {lang === 'de'
+                  ? weightedDataset.isWeighted && !showWeighting
+                    ? 'Gewichtung (Aktiv)'
+                    : 'Gewichtung'
+                  : weightedDataset.isWeighted && !showWeighting
+                  ? 'Weights (Active)'
+                  : 'Weights'}
+              </span>
+              <span
+                className={`text-xs ${
+                  showWeighting
+                    ? 'text-emerald-100'
+                    : weightedDataset.isWeighted
+                    ? 'text-emerald-700 dark:text-emerald-400'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                {showWeighting ? '▲' : '▼'}
+              </span>
+            </button>
 
             {/* Glossar-Knopf direkt in der obersten Zeile zwischen Sync und DE/EN */}
             <Tooltip
@@ -1571,11 +2069,11 @@ export default function App() {
                 className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center"
                 aria-label={lang === 'de' ? 'Glossar öffnen' : 'Open glossary'}
               >
-                <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+                <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               </button>
             </Tooltip>
 
-            {/* Language Switcher DE / EN - rechts vom Datum des letzten Syncs */}
+            {/* Language Switcher DE / EN */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
               <Tooltip
                 content={lang === 'de' ? 'Auf Deutsch umschalten' : 'Switch to German'}
@@ -1588,7 +2086,7 @@ export default function App() {
                   className={`px-2 py-0.5 rounded text-xs font-bold transition-colors cursor-pointer ${
                     lang === 'de'
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   DE
@@ -1605,7 +2103,7 @@ export default function App() {
                   className={`px-2 py-0.5 rounded text-xs font-bold transition-colors cursor-pointer ${
                     lang === 'en'
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   EN
@@ -1637,7 +2135,7 @@ export default function App() {
                       ? 'bg-white dark:bg-slate-700 text-amber-500 shadow-2xs'
                       : themePref === 'auto' && effectiveTheme === 'light'
                       ? 'text-amber-500/80 hover:text-amber-500'
-                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   aria-pressed={themePref === 'light'}
                 >
@@ -1663,7 +2161,7 @@ export default function App() {
                       ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-2xs'
                       : themePref === 'auto' && effectiveTheme === 'dark'
                       ? 'text-blue-400/80 hover:text-blue-400'
-                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   aria-pressed={themePref === 'dark'}
                 >
@@ -1692,7 +2190,7 @@ export default function App() {
                   className={`px-1.5 py-0.5 rounded text-xs font-bold font-mono transition-all cursor-pointer ${
                     themePref === 'auto'
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   aria-pressed={themePref === 'auto'}
                 >
@@ -1722,7 +2220,7 @@ export default function App() {
                   className={`p-1 py-0.5 rounded text-xs transition-all cursor-pointer flex items-center justify-center ${
                     geoCoords
                       ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
-                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   } ${isLocating ? 'animate-pulse opacity-75' : ''}`}
                   aria-label={lang === 'de' ? 'Standort via GPS abfragen' : 'Query location via GPS'}
                 >
@@ -1742,6 +2240,30 @@ export default function App() {
         </div>
       </header>
 
+      {/* Personalized Benchmark Weighting Panel (positioned globally above the tabs) */}
+      {showWeighting && (
+        <div className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-950/90 px-3 sm:px-6 py-2.5">
+          <div className="w-full max-w-[1720px] mx-auto">
+            <WeightingPanel
+              weights={benchmarkWeights}
+              onWeightChange={handleBenchmarkWeightChange}
+              onApplyWeights={handleApplyBenchmarkWeights}
+              onReset={handleResetBenchmarkWeights}
+              categoryNames={
+                lang === 'de'
+                  ? loadedData.headerMeta?.categoryNamesDe || loadedData.headerMeta?.categoryNames
+                  : loadedData.headerMeta?.categoryNames
+              }
+              isPreTranslatedCategoryNames={Boolean(
+                lang === 'de' && loadedData.headerMeta?.categoryNamesDe?.length === 8
+              )}
+              lang={lang}
+              onClose={() => setShowWeighting(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Primary Tab Switcher */}
       <div className="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 sticky top-0 z-30 px-3 sm:px-6 shadow-2xs">
         <div className="w-full max-w-[1720px] mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-2.5 py-1.5 sm:py-2">
@@ -1757,7 +2279,7 @@ export default function App() {
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                   activeTab === 'benchmark' && benchmarkView === 'barchart'
                     ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
                 <BarChart2 className="w-3.5 h-3.5" />
@@ -1772,7 +2294,7 @@ export default function App() {
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                   activeTab === 'benchmark' && benchmarkView === 'compare'
                     ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
                 <Columns2 className="w-3.5 h-3.5 text-emerald-500" />
@@ -1787,7 +2309,7 @@ export default function App() {
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                   activeTab === 'benchmark' && benchmarkView === 'timeline'
                     ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
                 <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
@@ -1802,7 +2324,7 @@ export default function App() {
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                   activeTab === 'benchmark' && benchmarkView === 'correlations'
                     ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
                 <GitCompare className="w-3.5 h-3.5 text-indigo-500" />
@@ -1815,7 +2337,7 @@ export default function App() {
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
                 activeTab === 'labs'
                   ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
@@ -1824,11 +2346,11 @@ export default function App() {
           </div>
 
           {/* Right section: Active filter reset notice + Benchmark Controls (accessible on mobile/tablet) */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 lg:ml-auto max-w-full py-0.5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full lg:w-auto lg:ml-auto min-w-0 max-w-full py-0.5">
             {/* Active filter reset notice */}
             {searchFilter && activeTab === 'benchmark' && benchmarkView === 'barchart' && (
               <div className="flex items-center gap-2 text-xs shrink-0">
-                <span className="text-slate-500 text-xs">
+                <span className="text-slate-600 dark:text-slate-400 text-xs">
                   {lang === 'de' ? 'Aktiver Lab-/Modell-Filter:' : 'Active Lab/Model filter:'} <strong className="text-slate-800 dark:text-slate-200 font-semibold">{searchFilter}</strong>
                 </span>
                 <button
@@ -1944,7 +2466,7 @@ export default function App() {
                         className={`px-0 py-0.5 rounded transition-all cursor-pointer ${
                           priceFilter === 'free_api'
                             ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                            : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                         }`}
                         aria-pressed={priceFilter === 'free_api'}
                       >
@@ -1952,7 +2474,7 @@ export default function App() {
                       </button>
                     </Tooltip>
 
-                    <span className="text-slate-400 dark:text-slate-600 text-xs px-0 select-none">|</span>
+                    <span className="text-slate-500 dark:text-slate-600 text-xs px-0 select-none">|</span>
 
                     {/* Chat Button */}
                     <Tooltip
@@ -1971,7 +2493,7 @@ export default function App() {
                         className={`px-0 py-0.5 rounded transition-all cursor-pointer ${
                           priceFilter === 'free_chat'
                             ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                            : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                         }`}
                         aria-pressed={priceFilter === 'free_chat'}
                       >
@@ -1983,7 +2505,7 @@ export default function App() {
                       className={`px-0 font-bold text-xs select-none ${
                         priceFilter === 'free_api' || priceFilter === 'free_chat'
                           ? 'text-emerald-700 dark:text-emerald-300'
-                          : 'text-slate-600 dark:text-slate-400'
+                          : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       )
@@ -2007,7 +2529,7 @@ export default function App() {
                       className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                         priceFilter === 'paid'
                           ? 'bg-amber-600 text-white shadow-2xs font-extrabold'
-                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                          : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                       }`}
                       aria-pressed={priceFilter === 'paid'}
                     >
@@ -2015,7 +2537,7 @@ export default function App() {
                     </button>
                   </Tooltip>
 
-                  <span className="text-slate-300 dark:text-slate-600 text-xs px-0.5 select-none">|</span>
+                  <span className="text-slate-400 dark:text-slate-600 text-xs px-0.5 select-none">|</span>
 
                   {/* All */}
                   <Tooltip
@@ -2034,7 +2556,7 @@ export default function App() {
                       className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                         priceFilter === 'all'
                           ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                          : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                       }`}
                       aria-pressed={priceFilter === 'all'}
                     >
@@ -2056,7 +2578,7 @@ export default function App() {
                 >
                   <SlidersHorizontal className={`w-3.5 h-3.5 ${showAdvanced ? 'text-white' : 'text-blue-500'}`} />
                   <span>{t.advanced}</span>
-                  <span className={`text-[10px] ${showAdvanced ? 'text-blue-100' : 'text-slate-400'}`}>
+                  <span className={`text-xs ${showAdvanced ? 'text-blue-100' : 'text-slate-600 dark:text-slate-400'}`}>
                     {showAdvanced ? '▲' : '▼'}
                   </span>
                 </button>
@@ -2112,41 +2634,6 @@ export default function App() {
                   allowRetiredScores={true}
                 />
 
-                {/* Scope Segmented Control */}
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0">
-                  <button
-                    type="button"
-                    aria-pressed={timelineScope === 'all'}
-                    onClick={() => setTimelineScope('all')}
-                    className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                      timelineScope === 'all'
-                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({timelineEligibleCount})
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={timelineScope === 'frontier'}
-                    onClick={() => setTimelineScope('frontier')}
-                    className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                      timelineScope === 'frontier'
-                        ? 'bg-amber-500 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
-                    }`}
-                    title={
-                      lang === 'de'
-                        ? 'Nur Pionier-Modelle (historische Rekordhalter / Pareto-Front)'
-                        : 'Only pioneer models (historical record breakers / Pareto frontier)'
-                    }
-                  >
-                    <Sparkles className={`w-3 h-3 ${timelineScope === 'frontier' ? 'text-white' : 'text-amber-500'}`} />
-                    <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
-                    <span className="text-xs opacity-90">({timelineFrontierCount})</span>
-                  </button>
-                </div>
-
                 {/* Regression Model Controller wrapped in Tooltip */}
                 <Tooltip
                   title={lang === 'de' ? activeTimelineRegression.labelDe : activeTimelineRegression.labelEn}
@@ -2160,8 +2647,8 @@ export default function App() {
                         {lang === 'de' ? activeTimelineRegression.descDe : activeTimelineRegression.descEn}
                       </p>
                       {activeTimelineRegression.id === 'polynomial' && (
-                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
-                          <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
+                          <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
                           <span className="font-bold">
                             {lang === 'de'
                               ? `Grad ${timelinePolyDegree} (${timelinePolyDegree === 2 ? 'Parabel' : timelinePolyDegree === 3 ? 'Wendepunkt' : 'Höhere Ordnung'})`
@@ -2170,20 +2657,20 @@ export default function App() {
                         </div>
                       )}
                       {activeTimelineRegression.id === 'loess' && (
-                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
-                          <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
+                          <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
                           <span className="font-bold">
                             {lang === 'de' ? `Span = ${timelineLoessSpan}% (Fensterbreite)` : `Span = ${timelineLoessSpan}% (Window width)`}
                           </span>
                         </div>
                       )}
                       {activeTimelineRegression.id !== 'frontier' && (
-                        <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 leading-snug">
+                        <div className="pt-1.5 border-t border-slate-700/60 text-xs text-slate-300 leading-snug">
                           <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                             <span>{lang === 'de' ? '95%-Konfidenzband' : '95% Confidence Band'}</span>
                           </div>
-                          <p className="text-[10.5px] text-slate-400 leading-normal">
+                          <p className="text-xs text-slate-300 leading-normal">
                             {lang === 'de'
                               ? 'Das schattierte Band zeigt den statistischen Unsicherheitsbereich der Schätzung: Bei dichter Datenlage ist es schmal, bei wenigen oder streuenden Punkten weitet es sich.'
                               : 'The shaded ribbon reflects estimation uncertainty: narrow where data is abundant, wider where observations are scarce or dispersed.'}
@@ -2255,7 +2742,7 @@ export default function App() {
                       : ''
                   }`}
                 >
-                  <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400">
+                  <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-400">
                     Param:
                   </span>
                   {activeTimelineRegression.id === 'polynomial' ? (
@@ -2272,7 +2759,7 @@ export default function App() {
                         }}
                         className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
                       />
-                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
+                      <span className="text-xs font-mono text-slate-600 dark:text-slate-400 select-none">
                         deg
                       </span>
                     </div>
@@ -2290,72 +2777,16 @@ export default function App() {
                         }}
                         className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
                       />
-                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
+                      <span className="text-xs font-mono text-slate-600 dark:text-slate-400 select-none">
                         %
                       </span>
                     </div>
                   ) : (
-                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
+                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-600 dark:text-slate-400 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
                       —
                     </div>
                   )}
                 </div>
-
-                {/* Multi-Level Model Switch */}
-                <Tooltip
-                  title={lang === 'de' ? 'Multi-Level-Modell' : 'Multi-level model'}
-                  badge={
-                    !isTimelineMultiLevelFeasible
-                      ? lang === 'de'
-                        ? 'Nicht verfügbar'
-                        : 'Unavailable'
-                      : isTimelineMultiLevelActive
-                      ? lang === 'de'
-                        ? 'Aktiv'
-                        : 'Active'
-                      : lang === 'de'
-                      ? 'Aus'
-                      : 'Off'
-                  }
-                  position="bottom"
-                  align="right"
-                  width="w-72"
-                  content={
-                    isTimelineMultiLevelFeasible
-                      ? lang === 'de'
-                        ? 'Schätzt pro KI-Labor eine eigene Trendkurve (Partial Pooling für Regression/LOESS bzw. Lab-Frontier für Pioniere).'
-                        : 'Fits separate per-lab trajectory curves (partial pooling for regression/LOESS, per-lab frontier envelopes for Pioneers).'
-                      : lang === 'de'
-                      ? 'Multi-Level-Ansicht ist für dieses Modell nicht verfügbar.'
-                      : 'Multi-level view is not available for this model.'
-                  }
-                >
-                  <button
-                    type="button"
-                    disabled={!isTimelineMultiLevelFeasible}
-                    aria-pressed={isTimelineMultiLevelActive}
-                    onClick={() => isTimelineMultiLevelFeasible && setTimelineMultiLevel((prev) => !prev)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold transition-all shrink-0 ${
-                      !isTimelineMultiLevelFeasible
-                        ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 text-slate-400 dark:text-slate-500'
-                        : isTimelineMultiLevelActive
-                        ? 'bg-indigo-600 text-white border-indigo-500 shadow-2xs ring-2 ring-indigo-500/20 cursor-pointer'
-                        : 'bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer'
-                    }`}
-                  >
-                    <Layers className="w-3.5 h-3.5 shrink-0" />
-                    <span>Multi-level</span>
-                    <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${
-                        !isTimelineMultiLevelFeasible
-                          ? 'bg-slate-400'
-                          : isTimelineMultiLevelActive
-                          ? 'bg-emerald-300'
-                          : 'bg-slate-300 dark:bg-slate-600'
-                      }`}
-                    />
-                  </button>
-                </Tooltip>
               </div>
             )}
 
@@ -2371,7 +2802,7 @@ export default function App() {
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                       correlationsScope === 'all'
                         ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({fullTimelineModels.length})
@@ -2383,7 +2814,7 @@ export default function App() {
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
                       correlationsScope === 'frontier'
                         ? 'bg-amber-500 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400'
                     }`}
                     title={
                       lang === 'de'
@@ -2410,8 +2841,8 @@ export default function App() {
                         {lang === 'de' ? activeCorrelationsRegression.descDe : activeCorrelationsRegression.descEn}
                       </p>
                       {activeCorrelationsRegression.id === 'polynomial' && (
-                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
-                          <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
+                          <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
                           <span className="font-bold">
                             {lang === 'de'
                               ? `Grad ${correlationsPolyDegree} (${correlationsPolyDegree === 2 ? 'Parabel' : correlationsPolyDegree === 3 ? 'Wendepunkt' : 'Höhere Ordnung'})`
@@ -2420,20 +2851,20 @@ export default function App() {
                         </div>
                       )}
                       {activeCorrelationsRegression.id === 'loess' && (
-                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
-                          <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                        <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
+                          <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
                           <span className="font-bold">
                             {lang === 'de' ? `Span = ${correlationsLoessSpan}% (Fensterbreite)` : `Span = ${correlationsLoessSpan}% (Window width)`}
                           </span>
                         </div>
                       )}
                       {activeCorrelationsRegression.id !== 'frontier' && (
-                        <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 leading-snug">
+                        <div className="pt-1.5 border-t border-slate-700/60 text-xs text-slate-300 leading-snug">
                           <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                             <span>{lang === 'de' ? '95%-Konfidenzband' : '95% Confidence Band'}</span>
                           </div>
-                          <p className="text-[10.5px] text-slate-400 leading-normal">
+                          <p className="text-xs text-slate-300 leading-normal">
                             {lang === 'de'
                               ? 'Das schattierte Band zeigt den statistischen Unsicherheitsbereich der Schätzung: Bei dichter Datenlage ist es schmal, bei wenigen oder streuenden Punkten weitet es sich.'
                               : 'The shaded ribbon reflects estimation uncertainty: narrow where data is abundant, wider where observations are scarce or dispersed.'}
@@ -2505,7 +2936,7 @@ export default function App() {
                       : ''
                   }`}
                 >
-                  <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400">
+                  <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-400">
                     Param:
                   </span>
                   {activeCorrelationsRegression.id === 'polynomial' ? (
@@ -2522,7 +2953,7 @@ export default function App() {
                         }}
                         className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
                       />
-                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
+                      <span className="text-xs font-mono text-slate-600 dark:text-slate-400 select-none">
                         deg
                       </span>
                     </div>
@@ -2540,12 +2971,12 @@ export default function App() {
                         }}
                         className="w-full bg-transparent font-mono text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-hidden text-right pr-1"
                       />
-                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 select-none">
+                      <span className="text-xs font-mono text-slate-600 dark:text-slate-400 select-none">
                         %
                       </span>
                     </div>
                   ) : (
-                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
+                    <div className="w-[72px] sm:w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-600 dark:text-slate-400 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
                       —
                     </div>
                   )}
@@ -2570,7 +3001,7 @@ export default function App() {
                       className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap ${
                         scoreMode === mode
                           ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs'
-                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                          : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                       }`}
                     >
                       {mode === 'new'
@@ -2590,7 +3021,7 @@ export default function App() {
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap ${
                       compareScope === 'current'
                         ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {t.scopeCurrent} ({loadedData.allModels.filter((m) => m.isAvailable).length})
@@ -2601,7 +3032,7 @@ export default function App() {
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap ${
                       compareScope === 'all'
                         ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {t.scopeAll} ({loadedData.allModels.length})
@@ -2612,7 +3043,7 @@ export default function App() {
 
             {/* Ecosystem / Lab Matrix View Header Controls: original sheet pill -> lab category pills -> advanced toggle */}
             {activeTab === 'labs' && (
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto min-w-0 max-w-full">
                 {/* 1. Original Sheet Pill */}
                 <a
                   href="https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=355721692#gid=355721692"
@@ -2626,14 +3057,14 @@ export default function App() {
                 </a>
 
                 {/* 2. Lab Category Pills */}
-                <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/90 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700/80 shrink-0 max-w-full overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/90 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700/80 w-full sm:w-auto min-w-0 max-w-full overflow-x-auto no-scrollbar">
                   <button
                     type="button"
                     onClick={() => setLabActiveGroup('all')}
                     className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'all'
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Alle (${labCounts.all})` : `All (${labCounts.all})`}
@@ -2644,7 +3075,7 @@ export default function App() {
                     className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'top10'
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Top LLM (${labCounts.top10})` : `Top LLM (${labCounts.top10})`}
@@ -2655,7 +3086,7 @@ export default function App() {
                     className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'contender'
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Herausforderer (${labCounts.contender})` : `Contenders (${labCounts.contender})`}
@@ -2666,7 +3097,7 @@ export default function App() {
                     className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'tweakers'
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Tweakers (${labCounts.tweakers})` : `Tweakers (${labCounts.tweakers})`}
@@ -2677,7 +3108,7 @@ export default function App() {
                     className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'small'
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Spezialisiert (${labCounts.small})` : `Specialized (${labCounts.small})`}
@@ -2688,7 +3119,7 @@ export default function App() {
                     className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all whitespace-nowrap cursor-pointer ${
                       labActiveGroup === 'harness'
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {lang === 'de' ? `Agentensteuerung (${labCounts.harness})` : `Scaffolding (${labCounts.harness})`}
@@ -2708,7 +3139,7 @@ export default function App() {
                 >
                   <SlidersHorizontal className={`w-3.5 h-3.5 ${showLabAdvanced ? 'text-white' : 'text-blue-500'}`} />
                   <span>{t.advanced}</span>
-                  <span className={`text-[10px] ${showLabAdvanced ? 'text-blue-100' : 'text-slate-400'}`}>
+                  <span className={`text-xs ${showLabAdvanced ? 'text-blue-100' : 'text-slate-600 dark:text-slate-400'}`}>
                     {showLabAdvanced ? '▲' : '▼'}
                   </span>
                 </button>
@@ -2837,13 +3268,13 @@ export default function App() {
         ) : benchmarkView === 'compare' ? (
           <main className="flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-6 py-4 flex flex-col space-y-4">
             <CompareView
-              allModels={loadedData.allModels}
+              allModels={weightedDataset.allModels}
               rankedModels={
                 scoreMode === 'old'
                   ? loadedData.oldModels
                   : scoreMode === 'worstCase'
                   ? loadedData.worstCaseModels
-                  : loadedData.newModels
+                  : weightedDataset.newModels
               }
               labs={labs}
               scoreMode={scoreMode}
@@ -2874,6 +3305,8 @@ export default function App() {
                 lang === 'de' && loadedData.headerMeta?.retiredCategoryNamesDe?.length === 4
               )}
               row33Meta={loadedData.headerMeta?.row33}
+              benchmarkWeights={benchmarkWeights}
+              isCustomWeighted={weightedDataset.isWeighted}
               onScrollToParagraph={scrollToParagraph}
               onSelectCompany={(company) => {
                 setSelectedCompany(company);
@@ -2941,6 +3374,8 @@ export default function App() {
                 hoveredCategoryComp={categoryInfoComp}
                 sortBy={sortBy}
                 scoreMode={scoreMode}
+                benchmarkWeights={benchmarkWeights}
+                isCustomWeighted={weightedDataset.isWeighted}
                 explosionMode={explosionMode}
                 onExplosionModeChange={handleExplosionModeChange}
                 searchFilter={searchFilter}
@@ -2992,11 +3427,11 @@ export default function App() {
       <footer className="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6 py-3">
         <div className="w-full max-w-[1720px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
           {/* Left: Dataset Source & Last Sync Info */}
-          <div className="flex flex-wrap items-center gap-2 text-slate-500 dark:text-slate-400">
-            <span className="font-semibold text-slate-700 dark:text-slate-200">
+          <div className="flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-300">
+            <span className="font-semibold text-slate-900 dark:text-slate-100">
               Science-AI Benchmarks
             </span>
-            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="text-slate-400 dark:text-slate-700">·</span>
             <span className="inline-flex items-center gap-1.5">
               <span
                 className={`w-2 h-2 rounded-full ${
@@ -3084,24 +3519,43 @@ export default function App() {
               </button>
             </Tooltip>
 
-            {/* Unified Preis-, GDPx- & Integrity-Prüfer */}
+            {/* Unified Preis-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer */}
             {(() => {
               const priceAlertCount =
                 isPricingDiffValidForSheet && pricingReport ? pricingReport.changedCount : 0;
               const gdpxAlertCount =
                 isGdpxDiffValidForSheet && gdpxReport ? gdpxReport.actionableCount : 0;
+              const valsAlertCount =
+                isValsDiffValidForSheet && valsReport ? valsReport.actionableCount : 0;
+              const simpleBenchAlertCount =
+                isSimpleBenchDiffValidForSheet && simpleBenchReport
+                  ? simpleBenchReport.actionableCount
+                  : 0;
               const integrityAlertCount =
                 isIntegrityDiffValidForSheet && integrityReport
                   ? integrityReport.actionableCount
                   : 0;
-              const totalAlerts = priceAlertCount + gdpxAlertCount + integrityAlertCount;
+              const totalAlerts =
+                priceAlertCount +
+                gdpxAlertCount +
+                valsAlertCount +
+                simpleBenchAlertCount +
+                integrityAlertCount;
               const isAnyMonitorChecking =
-                isCheckingPricing || isCheckingGdpx || isCheckingIntegrity;
+                isCheckingPricing ||
+                isCheckingGdpx ||
+                isCheckingVals ||
+                isCheckingSimpleBench ||
+                isCheckingIntegrity;
               const allSyncedOk =
                 isPricingDiffValidForSheet &&
                 pricingReport &&
                 isGdpxDiffValidForSheet &&
                 gdpxReport &&
+                isValsDiffValidForSheet &&
+                valsReport &&
+                isSimpleBenchDiffValidForSheet &&
+                simpleBenchReport &&
                 isIntegrityDiffValidForSheet &&
                 integrityReport &&
                 totalAlerts === 0;
@@ -3110,8 +3564,8 @@ export default function App() {
                 <Tooltip
                   title={
                     lang === 'de'
-                      ? 'Preis-, GDPx- & Integrity-Prüfer'
-                      : 'Plans, Price, GDPx & Integrity Checker'
+                      ? 'Preis-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer'
+                      : 'Plans, Price, GDPx, Vals, SimpleBench & Integrity Checker'
                   }
                   badge={
                     isAnyMonitorChecking
@@ -3123,8 +3577,8 @@ export default function App() {
                       : allSyncedOk
                       ? 'OK'
                       : lang === 'de'
-                      ? '3 Prüfer'
-                      : '3 Checks'
+                      ? '5 Prüfer'
+                      : '5 Checks'
                   }
                   content={
                     <div className="space-y-1 text-xs">
@@ -3145,6 +3599,24 @@ export default function App() {
                           : lang === 'de'
                           ? 'Überwacht gdpx.semianalysis.com auf Neuzugänge (Spalte J).'
                           : 'Monitors gdpx.semianalysis.com for new LLMs (Column J).'}
+                      </div>
+                      <div className="border-t border-slate-700/50 pt-1">
+                        {isValsDiffValidForSheet && valsReport
+                          ? lang === 'de'
+                            ? valsReport.summaryDe
+                            : valsReport.summaryEn
+                          : lang === 'de'
+                          ? 'Prüft Vals Index v2.2 (43 Modelle) in Spalte K.'
+                          : 'Checks Vals Index v2.2 (43 models) in Column K.'}
+                      </div>
+                      <div className="border-t border-slate-700/50 pt-1">
+                        {isSimpleBenchDiffValidForSheet && simpleBenchReport
+                          ? lang === 'de'
+                            ? simpleBenchReport.summaryDe
+                            : simpleBenchReport.summaryEn
+                          : lang === 'de'
+                          ? 'Prüft simple-bench.com in Spalte Y.'
+                          : 'Checks simple-bench.com in Column Y.'}
                       </div>
                       <div className="border-t border-slate-700/50 pt-1">
                         {isIntegrityDiffValidForSheet && integrityReport
@@ -3171,8 +3643,8 @@ export default function App() {
                     }`}
                     aria-label={
                       lang === 'de'
-                        ? 'Preis-, GDPx- & Integrity-Prüfer öffnen'
-                        : 'Open price, GDPx & integrity checker'
+                        ? 'Preis-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer öffnen'
+                        : 'Open price, GDPx, Vals, SimpleBench & integrity checker'
                     }
                   >
                     <Bell
@@ -3188,7 +3660,7 @@ export default function App() {
                     />
                     <span>{lang === 'de' ? 'Prüfer' : 'Checker'}</span>
                     {totalAlerts > 0 && (
-                      <span className="min-w-[16px] h-[16px] px-1 rounded-full text-[10px] leading-[16px] text-center font-mono font-bold bg-amber-600 text-white">
+                      <span className="min-w-[18px] h-[18px] px-1 rounded-full text-xs leading-[18px] text-center font-mono font-bold bg-amber-600 text-white">
                         {totalAlerts}
                       </span>
                     )}
@@ -3238,7 +3710,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Unified Plans, Pricing, GDPx & Integrity Monitor Modal */}
+      {/* Unified Plans, Pricing, GDPx, Vals, SimpleBench & Integrity Monitor Modal */}
       <PricingMonitorModal
         isOpen={isPricingModalOpen}
         onClose={() => setIsPricingModalOpen(false)}
@@ -3253,6 +3725,16 @@ export default function App() {
         isCheckingGdpx={isCheckingGdpx}
         gdpxCheckError={gdpxCheckError}
         onRunGdpxCheck={() => handleRunGdpxCheck('manual')}
+        valsReport={valsReport}
+        isValsDiffValid={isValsDiffValidForSheet}
+        isCheckingVals={isCheckingVals}
+        valsCheckError={valsCheckError}
+        onRunValsCheck={() => handleRunValsCheck('manual')}
+        simpleBenchReport={simpleBenchReport}
+        isSimpleBenchDiffValid={isSimpleBenchDiffValidForSheet}
+        isCheckingSimpleBench={isCheckingSimpleBench}
+        simpleBenchCheckError={simpleBenchCheckError}
+        onRunSimpleBenchCheck={() => handleRunSimpleBenchCheck('manual')}
         integrityReport={integrityReport}
         isIntegrityDiffValid={isIntegrityDiffValidForSheet}
         isCheckingIntegrity={isCheckingIntegrity}
@@ -3260,6 +3742,10 @@ export default function App() {
         onRunIntegrityCheck={() => handleRunIntegrityCheck('manual')}
         onIgnoreGdpxModel={handleIgnoreGdpxModel}
         onRestoreGdpxModel={handleRestoreGdpxModel}
+        onIgnoreValsModel={handleIgnoreValsModel}
+        onRestoreValsModel={handleRestoreValsModel}
+        onIgnoreSimpleBenchModel={handleIgnoreSimpleBenchModel}
+        onRestoreSimpleBenchModel={handleRestoreSimpleBenchModel}
         onIgnoreIntegrityModel={handleIgnoreIntegrityModel}
         onRestoreIntegrityModel={handleRestoreIntegrityModel}
         onSaveManualMappings={handleSaveManualMappings}
@@ -3274,11 +3760,19 @@ export default function App() {
         activeSpreadsheetId={activeSpreadsheetId}
         onRefreshFromSheets={(sheetIdOverride) => refreshData(oauthAccessToken, sheetIdOverride)}
         isSheetsConnected={isSheetsConnected}
-        apiAvailable={pricingApiAvailable || gdpxApiAvailable || integrityApiAvailable}
+        apiAvailable={
+          pricingApiAvailable ||
+          gdpxApiAvailable ||
+          valsApiAvailable ||
+          simpleBenchApiAvailable ||
+          integrityApiAvailable
+        }
         onRetryConnection={async () => {
           await Promise.all([
             checkPricingMonitorStatus(),
             checkGdpxMonitorStatus(),
+            checkValsMonitorStatus(),
+            checkSimpleBenchMonitorStatus(),
             checkIntegrityMonitorStatus(),
           ]);
         }}

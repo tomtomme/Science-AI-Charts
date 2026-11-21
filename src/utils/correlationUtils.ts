@@ -211,6 +211,13 @@ export function calculateSpearman(points: Array<{ x: number; y: number }>): Corr
   return formatCorrelationResult(pearsonOnRanks.value, 'spearman');
 }
 
+export function formatCorrelationDecimal(val: number): string {
+  const rounded = Math.round(val * 10) / 10;
+  const normalized = Object.is(rounded, -0) ? 0 : rounded;
+  const prefix = normalized > 0 ? '+' : '';
+  return `${prefix}${normalized.toFixed(1)}`;
+}
+
 function formatCorrelationResult(val: number, type: 'pearson' | 'spearman'): CorrelationMetricResult {
   const abs = Math.abs(val);
   const isPos = val >= 0;
@@ -251,8 +258,7 @@ function formatCorrelationResult(val: number, type: 'pearson' | 'spearman'): Cor
     color = '#64748b';
   }
 
-  const prefix = val >= 0 ? '+' : '';
-  const formattedVal = `${prefix}${val.toFixed(3)}`;
+  const formattedVal = formatCorrelationDecimal(val);
 
   return {
     value: val,

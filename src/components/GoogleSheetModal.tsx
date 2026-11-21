@@ -752,16 +752,16 @@ export const GoogleSheetModal: React.FC<GoogleSheetModalProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between gap-1 mb-1">
-                  <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
                     {lang === 'de' ? field.labelDe : field.labelEn}
                   </label>
-                  <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                  <span className="text-xs font-mono text-slate-600 dark:text-slate-400 shrink-0">
                     {colLetter}{selectedRowNumber}
                   </span>
                 </div>
 
                 {isFormula && (
-                  <div className="flex items-center justify-between gap-1 mb-1 px-1.5 py-0.5 rounded bg-amber-100/80 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-[10px] font-mono">
+                  <div className="flex items-center justify-between gap-1 mb-1 px-1.5 py-0.5 rounded bg-amber-100/80 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-xs font-mono">
                     <span className="truncate" title={rawFormula}>
                       {rawFormula}
                     </span>
@@ -997,7 +997,7 @@ export const GoogleSheetModal: React.FC<GoogleSheetModalProps> = ({
                         : 'US Pricing Column U (next to DE Column T)'}
                     </span>
                     <span
-                      className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${
+                      className={`px-1.5 py-0.5 rounded font-mono text-xs font-bold ${
                         columnLayout.hasUsPriceCol
                           ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300'
                           : 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300'
@@ -1191,7 +1191,7 @@ export const GoogleSheetModal: React.FC<GoogleSheetModalProps> = ({
                         key={`new-${field.key}`}
                         className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/50"
                       >
-                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 truncate">
                           {lang === 'de' ? field.labelDe : field.labelEn}
                         </label>
                         <input
@@ -1308,7 +1308,7 @@ export const GoogleSheetModal: React.FC<GoogleSheetModalProps> = ({
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                     {pendingConfirmation.description}
                   </p>
-                  <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-1">
+                  <p className="text-xs font-mono text-slate-600 dark:text-slate-400 mt-1">
                     {pendingConfirmation.spreadsheetTitle} → {pendingConfirmation.sheetTitle}
                   </p>
                 </div>
@@ -1322,18 +1322,18 @@ export const GoogleSheetModal: React.FC<GoogleSheetModalProps> = ({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-slate-800 dark:text-slate-200">{c.label}</span>
-                      <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                         {c.cellRef}
                       </span>
                     </div>
                     {c.hadFormula && (
-                      <div className="text-[11px] font-mono text-amber-600 dark:text-amber-400">
+                      <div className="text-xs font-mono text-amber-700 dark:text-amber-400">
                         {lang === 'de'
                           ? 'Achtung: Überschreibt eine bestehende Formel in dieser Zelle!'
                           : 'Warning: This will overwrite an existing spreadsheet formula!'}
                       </div>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-xs">
                       <div className="px-2 py-1 rounded bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 break-words">
                         − {c.before}
                       </div>

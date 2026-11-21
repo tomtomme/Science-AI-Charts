@@ -31,6 +31,18 @@ export interface RawBenchmarkScores {
   trickQuestionsOld?: number | null; // Col X (Trick Questions_old SimpleBench)
 }
 
+export type ActiveBenchmarkKey =
+  | 'actCodeReason'
+  | 'nonHallucination'
+  | 'scienceKnowledge'
+  | 'visionPlot'
+  | 'medReasoning'
+  | 'excelAgent'
+  | 'trickQuestions'
+  | 'econLegal';
+
+export type BenchmarkWeights = Record<ActiveBenchmarkKey, number>;
+
 export interface ComponentBreakdown {
   id: string;
   name: string;

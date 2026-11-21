@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode, ScoreMode } from '../types';
+import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode, ScoreMode, BenchmarkWeights } from '../types';
 import { BENCHMARK_COMPONENTS, getBenchmarkCategoryLabel } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
 import { matchesSearchQuery } from '../utils/searchUtils';
@@ -16,6 +16,8 @@ interface ExplodedBarChartProps {
   activeCategoryIndex?: number;
   sortBy?: 'score' | 'date';
   scoreMode?: ScoreMode;
+  benchmarkWeights?: BenchmarkWeights;
+  isCustomWeighted?: boolean;
   explodedViewEnabled?: boolean;
   explosionMode?: ExplosionMode;
   onExplosionModeChange?: (mode: ExplosionMode) => void;
@@ -79,6 +81,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   activeCategoryIndex = 0,
   sortBy = 'score',
   scoreMode = 'new',
+  benchmarkWeights,
+  isCustomWeighted = false,
   explodedViewEnabled = true,
   explosionMode,
   onExplosionModeChange,
@@ -113,8 +117,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     ? activeComp
     : (hoveredCategoryComp || activeComp);
 
-  // Index of hovered bar
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  // Hovered bar tracked stably by model.id so animated re-sorting preserves hover focus
+  const [hoveredModelId, setHoveredModelId] = useState<string | null>(null);
+  const hoveredIndex = useMemo(() => {
+    if (!hoveredModelId) return null;
+    const idx = models.findIndex((m) => m.id === hoveredModelId);
+    return idx >= 0 ? idx : null;
+  }, [hoveredModelId, models]);
   const [hoveredSegment, setHoveredSegment] = useState<HoveredSegmentInfo | null>(null);
   const [showAverageLine, setShowAverageLine] = useState<boolean>(false);
 
@@ -223,6 +232,23 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       };
     }
     // Default: 'new'
+    if (isCustomWeighted) {
+      return {
+        name: isDe ? 'Neuer Score (Personalisiert)' : 'NEW Score (Personalized)',
+        color: '#10B981', // Emerald
+        badgeLabel: isDe ? '8 Benchmarks (Gewichtet)' : '8 Benchmarks (Weighted)',
+        sourceName: 'ArtificialAnalysis · SemiAnalysis GDPx · Vals.ai',
+        sources: [
+          { name: 'ArtificialAnalysis', url: 'https://artificialanalysis.ai' },
+          { name: 'SemiAnalysis GDPx', url: 'https://gdpx.semianalysis.com' },
+          { name: 'Vals.ai', url: 'https://www.vals.ai' },
+        ],
+        description: isDe
+          ? 'Personalisierter Gesamtscore mit Ihren individuellen Faktor-Gewichtungen in Echtzeit.'
+          : 'Personalized total score recalculated in real time using your custom factor weights.',
+        targetId: 'note-col-m',
+      };
+    }
     return {
       name: isDe ? 'Neuer Score' : 'NEW Score',
       color: '#10B981', // Emerald
@@ -238,7 +264,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         : 'Weighted total score across all 8 scientific benchmarks with 12.5% weight each.',
       targetId: 'note-col-m',
     };
-  }, [scoreMode, lang]);
+  }, [scoreMode, lang, isCustomWeighted]);
 
   // Dynamic Y-axis scale based on single category (0-100%) or overall score (e.g. 74 in OLD mode, 69 in NEW mode)
   const maxScoreInPlot = activeComp
@@ -254,13 +280,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const barWidth = 26;
   const barGap = 12;
   const totalBarSlot = barWidth + barGap; // 38px
-  const marginLeft = 130; // Generous left margin so rotated text for bar 0 never clips off the left edge
+  const marginLeft = 138; // Generous left margin so 15px rotated text for bar 0 never clips off the left edge
   const marginRight = 36; // Right margin so the last bar and label are never clipped
   const calculatedWidth = marginLeft + models.length * totalBarSlot + marginRight;
   const chartWidth = Math.max(380, calculatedWidth);
-
-  // Exact pattern tile offset aligned with barX coordinates so flags (US stars, emblems) are 100% centered in every bar
-  const patternX = ((marginLeft % totalBarSlot) + totalBarSlot) % totalBarSlot;
 
   // Height formula strictly proportional to score
   const scaleY = (val: number) => {
@@ -314,8 +337,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   };
 
   const handleMouseEnter = (index: number) => {
-    setHoveredIndex(index);
     const m = models[index];
+    if (m) {
+      setHoveredModelId(m.id);
+    }
     if (m && currentExplosionMode !== 'off') {
       setPersistentModel(m);
       const benchmarkDivisor = scoreMode === 'old' ? 5 : 8;
@@ -354,11 +379,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     }
   };
 
-  const handleMouseLeave = (index?: number) => {
-    if (typeof index === 'number') {
-      setHoveredIndex((prev) => (prev === index ? null : prev));
+  const handleMouseLeave = (modelId?: string) => {
+    if (typeof modelId === 'string') {
+      setHoveredModelId((prev) => (prev === modelId ? null : prev));
     } else {
-      setHoveredIndex(null);
+      setHoveredModelId(null);
     }
     setHoveredSegment(null);
     setPriceTooltip(null);
@@ -696,11 +721,16 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
       const effectiveBreakdown =
         activeCategoryIndex === 0
-          ? createModelBreakdown(model.rawScores, score, scoreMode)
+          ? createModelBreakdown(model.rawScores, score, scoreMode, benchmarkWeights)
           : model.breakdown;
 
+      const visibleBreakdown =
+        scoreMode === 'new' && isCustomWeighted
+          ? effectiveBreakdown.filter((comp) => comp.pointsContribution > 0.004)
+          : effectiveBreakdown;
+
       let currentOffset = 0;
-      const segments = effectiveBreakdown.map((comp, segIdx) => {
+      const segments = visibleBreakdown.map((comp, segIdx) => {
         const segHeight = scaleY(comp.pointsContribution);
         const gapOffset = exploded ? segIdx * explosionGap : 0;
         const segY = baselineY - (currentOffset + segHeight + gapOffset);
@@ -738,7 +768,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
       const displayPrice = priceInfo.displayPrice || '';
       const isLongPrice = displayPrice.length >= 5;
-      const priceFontSize = isLongPrice ? 11.5 : 13.5;
+      const priceFontSize = isLongPrice ? 13 : 14;
       const charAdvance = isLongPrice ? priceFontSize * 0.56 : priceFontSize * 0.6;
       const textWidth = displayPrice.length * charAdvance;
       const priceX = model.isFreeApi ? barCenterX - 9 : barCenterX;
@@ -762,24 +792,24 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
           while (
             placedLabels.some(
               (p) =>
-                Math.abs(priceY - p.y) < 14 &&
+                Math.abs(priceY - p.y) < 15 &&
                 leftX - 3 < p.rightX &&
                 rightX + 3 > p.leftX
             )
           ) {
-            priceY += 14;
+            priceY += 15;
           }
         } else {
           while (
             priceY > 14 &&
             placedLabels.some(
               (p) =>
-                Math.abs(priceY - p.y) < 14 &&
+                Math.abs(priceY - p.y) < 15 &&
                 leftX - 3 < p.rightX &&
                 rightX + 3 > p.leftX
             )
           ) {
-            priceY -= 14;
+            priceY -= 15;
           }
         }
         placedLabels.push({ leftX, rightX, y: priceY });
@@ -813,6 +843,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       };
     });
   })();
+
+  const stableBarLayouts = [...barLayouts].sort((a, b) => a.model.id.localeCompare(b.model.id));
 
   const averageMetrics = (() => {
     if (barLayouts.length === 0) return null;
@@ -882,11 +914,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   </span>
                 )}
 
-                <span className="text-slate-400">·</span>
+                <span className="text-slate-500 dark:text-slate-400">·</span>
                 <button
                   type="button"
                   onClick={() => onSelectCompany?.(displayedModel.companyName)}
-                  className="font-mono text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 cursor-pointer text-left transition-colors"
+                  className="font-mono text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 cursor-pointer text-left transition-colors"
                   title={lang === 'de' ? `Nach Hersteller filtern: ${displayedModel.companyName}` : `Filter by company: ${displayedModel.companyName}`}
                 >
                   {t.company} <strong className="underline decoration-dotted underline-offset-2">{displayedModel.companyName}</strong>
@@ -894,8 +926,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
                 {displayedModel.releaseDate && (
                   <>
-                    <span className="text-slate-400">·</span>
-                    <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 shrink-0">
+                    <span className="text-slate-500 dark:text-slate-400">·</span>
+                    <span className="font-mono text-blue-700 dark:text-blue-400 font-semibold flex items-center gap-1 shrink-0">
                       <span className="opacity-75">📅</span>
                       <span>{displayedModel.releaseDate}</span>
                     </span>
@@ -904,8 +936,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
                 {activeCategoryIndex === 0 && (
                   <>
-                    <span className="text-slate-400">·</span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
+                    <span className="text-slate-500 dark:text-slate-400">·</span>
+                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold shrink-0">
                       {scoreMode === 'worstCase' ? t.scoreModeWorstCase : scoreMode === 'old' ? t.scoreModeOld : t.score}: {displayedModel.score ?? (scoreMode === 'old' ? (displayedModel.scoreOld ?? displayedModel.scoreOldCalculated) : (displayedModel.scoreNewReported ?? displayedModel.scoreNewCalculated))} {t.points} ({t.rank} #{displayedModel.rank})
                     </span>
                   </>
@@ -918,9 +950,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   if (pInfo.type === 'note') {
                     return (
                       <>
-                        <span className="text-slate-400">·</span>
-                        <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 shrink-0">
-                          <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-100 dark:bg-amber-950 border border-amber-500 text-amber-800 dark:text-amber-200 text-[10px] font-bold leading-none">!</span>
+                        <span className="text-slate-500 dark:text-slate-400">·</span>
+                        <span className="font-mono text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-1 shrink-0">
+                          <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-amber-100 dark:bg-amber-950 border border-amber-500 text-amber-800 dark:text-amber-200 text-xs font-bold leading-none">!</span>
                           <span>{pInfo.text}</span>
                         </span>
                       </>
@@ -936,12 +968,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   if (!cleanStory) return null;
                   return (
                     <>
-                      <span className="text-slate-400">·</span>
-                      <span className="text-slate-700 dark:text-slate-300 font-mono text-xs shrink-0 flex items-center gap-1">
-                        <strong className="font-semibold text-slate-800 dark:text-slate-200">
+                      <span className="text-slate-500 dark:text-slate-400">·</span>
+                      <span className="text-slate-800 dark:text-slate-300 font-mono text-xs shrink-0 flex items-center gap-1">
+                        <strong className="font-semibold text-slate-900 dark:text-slate-200">
                           {lang === 'de' ? 'Kommentar:' : 'Comment:'}
                         </strong>
-                        <span className="font-normal italic text-slate-600 dark:text-slate-300">
+                        <span className="font-normal italic text-slate-700 dark:text-slate-300">
                           {cleanStory}
                         </span>
                       </span>
@@ -951,7 +983,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </div>
 
               {/* Row 2: Hovered segment breakdown OR Non-hallucination + interaction hint */}
-              <div className="flex items-center gap-x-2 text-xs text-slate-600 dark:text-slate-400 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-x-2 text-xs text-slate-700 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar">
                 {displayedSegment ? (
                   <>
                     <Tooltip
@@ -984,7 +1016,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       </button>
                     </Tooltip>
 
-                    <span className="text-slate-400">·</span>
+                    <span className="text-slate-500 dark:text-slate-400">·</span>
                     {displayedSegment.comp.sourceUrl ? (
                       <Tooltip
                         content={`${displayedSegment.comp.sourceName} · ${t.openWebsite} (${displayedSegment.comp.sourceUrl})`}
@@ -996,20 +1028,20 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           href={displayedSegment.comp.sourceUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-mono text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                          className="font-mono text-xs text-slate-700 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-400 dark:decoration-slate-600 cursor-pointer shrink-0"
                         >
                           <span>{t.sourceLabel} <strong>{displayedSegment.comp.sourceName}</strong></span>
                           <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
                         </a>
                       </Tooltip>
                     ) : (
-                      <span className="font-mono text-xs text-slate-400 shrink-0">
+                      <span className="font-mono text-xs text-slate-700 dark:text-slate-300 shrink-0">
                         {t.sourceLabel} {displayedSegment.comp.sourceName}
                       </span>
                     )}
 
-                    <span className="text-slate-400">·</span>
-                    <span className="text-slate-500 dark:text-slate-400 truncate">
+                    <span className="text-slate-500 dark:text-slate-400">·</span>
+                    <span className="text-slate-700 dark:text-slate-300 truncate">
                       {lang === 'en' ? displayedSegment.comp.descriptionEn : displayedSegment.comp.descriptionDe}
                     </span>
                   </>
@@ -1017,13 +1049,13 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   <>
                     {displayedModel.rawScores.nonHallucination !== null && (
                       <>
-                        <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
+                        <span className="font-mono text-emerald-700 dark:text-emerald-400 font-semibold shrink-0">
                           {t.nonHallucinationLabel}: {displayedModel.rawScores.nonHallucination}%
                         </span>
-                        <span className="text-slate-400">·</span>
+                        <span className="text-slate-500 dark:text-slate-400">·</span>
                       </>
                     )}
-                    <span className="text-slate-400 dark:text-slate-500 text-xs truncate">
+                    <span className="text-slate-600 dark:text-slate-400 text-xs truncate">
                       {lang === 'de'
                         ? 'Balkensegmente berühren für Kriterien-Details · Firmenlogo klicken zum Filtern'
                         : 'Hover segments for benchmark details · Click company logo to filter'}
@@ -1067,12 +1099,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   </button>
                 </Tooltip>
 
-                <span className="text-slate-400">·</span>
-                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 shrink-0">
+                <span className="text-slate-500 dark:text-slate-400">·</span>
+                <span className="font-mono text-xs text-slate-700 dark:text-slate-300 shrink-0">
                   {lang === 'de' ? '12.5% Gewichtung' : '12.5% Weight'}
                 </span>
 
-                <span className="text-slate-400">·</span>
+                <span className="text-slate-500 dark:text-slate-400">·</span>
                 {displayedCategoryComp.sourceUrl ? (
                   <Tooltip
                     content={`${displayedCategoryComp.sourceName} · ${t.openWebsite} (${displayedCategoryComp.sourceUrl})`}
@@ -1084,22 +1116,22 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       href={displayedCategoryComp.sourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-mono text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-300 dark:decoration-slate-600 cursor-pointer shrink-0"
+                      className="font-mono text-xs text-slate-700 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors underline decoration-slate-400 dark:decoration-slate-600 cursor-pointer shrink-0"
                     >
                       <span>{t.sourceLabel} <strong className="underline">{displayedCategoryComp.sourceName}</strong></span>
                       <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
                     </a>
                   </Tooltip>
                 ) : (
-                  <span className="font-mono text-xs text-slate-400 shrink-0">
+                  <span className="font-mono text-xs text-slate-700 dark:text-slate-300 shrink-0">
                     {t.sourceLabel} {displayedCategoryComp.sourceName}
                   </span>
                 )}
 
                 {sortBy === 'date' && (
                   <>
-                    <span className="text-slate-400">·</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-mono text-xs font-semibold flex items-center gap-1 shrink-0">
+                    <span className="text-slate-500 dark:text-slate-400">·</span>
+                    <span className="text-blue-700 dark:text-blue-400 font-mono text-xs font-semibold flex items-center gap-1 shrink-0">
                       <span>📅</span>
                       <span>{t.sortedByDateLabel}</span>
                     </span>
@@ -1108,7 +1140,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </div>
 
               {/* Row 2: Full Category Description - completely readable & scrollable */}
-              <div className="flex items-center text-xs text-slate-600 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
+              <div className="flex items-center text-xs text-slate-700 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
                 <span className="font-normal">
                   {lang === 'en' ? displayedCategoryComp.descriptionEn : displayedCategoryComp.descriptionDe}
                 </span>
@@ -1158,22 +1190,22 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   </button>
                 </Tooltip>
 
-                <span className="text-slate-400">·</span>
-                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 shrink-0">
+                <span className="text-slate-500 dark:text-slate-400">·</span>
+                <span className="font-mono text-xs text-slate-700 dark:text-slate-300 shrink-0">
                   {currentScoreInfo.badgeLabel}
                 </span>
 
-                <span className="text-slate-400">·</span>
-                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 shrink-0 inline-flex items-center gap-1">
+                <span className="text-slate-500 dark:text-slate-400">·</span>
+                <span className="font-mono text-xs text-slate-700 dark:text-slate-300 shrink-0 inline-flex items-center gap-1">
                   <span>{t.sourceLabel}</span>
                   {currentScoreInfo.sources.map((src, idx) => (
                     <React.Fragment key={src.name}>
-                      {idx > 0 && <span className="text-slate-400 dark:text-slate-500 mx-0.5">·</span>}
+                      {idx > 0 && <span className="text-slate-500 dark:text-slate-400 mx-0.5">·</span>}
                       <a
                         href={src.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hover:text-blue-600 dark:hover:text-blue-300 font-bold underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 inline-flex items-center gap-0.5 transition-colors cursor-pointer"
+                        className="hover:text-blue-600 dark:hover:text-blue-300 font-bold underline decoration-slate-400 dark:decoration-slate-600 underline-offset-2 inline-flex items-center gap-0.5 transition-colors cursor-pointer"
                         title={`${src.name} (${src.url})`}
                       >
                         <span>{src.name}</span>
@@ -1185,8 +1217,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
 
                 {sortBy === 'date' && (
                   <>
-                    <span className="text-slate-400">·</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-mono text-xs font-semibold flex items-center gap-1 shrink-0">
+                    <span className="text-slate-500 dark:text-slate-400">·</span>
+                    <span className="text-blue-700 dark:text-blue-400 font-mono text-xs font-semibold flex items-center gap-1 shrink-0">
                       <span>📅</span>
                       <span>{t.sortedByDateLabel}</span>
                     </span>
@@ -1195,7 +1227,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               </div>
 
               {/* Row 2: Full Composite Score Description - completely readable & scrollable */}
-              <div className="flex items-center text-xs text-slate-600 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
+              <div className="flex items-center text-xs text-slate-700 dark:text-slate-300 h-[22px] min-h-[22px] whitespace-nowrap overflow-x-auto no-scrollbar leading-snug">
                 <span className="font-normal">
                   {currentScoreInfo.description}
                 </span>
@@ -1221,7 +1253,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               type="button"
               onClick={() => setShowAverageLine((prev) => !prev)}
               aria-pressed={showAverageLine}
-              className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-mono font-bold transition-all cursor-pointer tabular-nums ${
+              className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-mono font-bold transition-all cursor-pointer tabular-nums ${
                 showAverageLine
                   ? 'bg-amber-500 text-white border-amber-600 shadow-xs hover:bg-amber-600'
                   : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-400'
@@ -1251,7 +1283,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         className="relative select-none w-full overflow-x-auto overflow-y-hidden pb-2 sm:pb-3 custom-scrollbar"
       >
         {models.length === 0 ? (
-          <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">
+          <div className="py-12 text-center text-xs text-slate-700 dark:text-slate-300">
             {lang === 'de' ? 'Keine Modelle für die aktuelle Filterauswahl gefunden.' : 'No models match the current filter selection.'}
           </div>
         ) : (
@@ -1276,7 +1308,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* USA: Blau mit weißen Sternen - Stärker gezoomt & dezent verteilt */}
               <pattern
                 id="pattern-usa"
-                x={patternX}
+                x={0}
                 width="38"
                 height="42"
                 patternUnits="userSpaceOnUse"
@@ -1293,7 +1325,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* China: Rot mit gelber Sichel und Stern */}
               <pattern
                 id="pattern-china"
-                x={patternX}
+                x={0}
                 width="38"
                 height="44"
                 patternUnits="userSpaceOnUse"
@@ -1313,7 +1345,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* Singapur: Oben Rot mit weißer Mondsichel und 5 Sternen, unten Weiß (Flag of Singapore - z. B. Agnes) */}
               <pattern
                 id="pattern-singapore"
-                x={patternX}
+                x={0}
                 width="38"
                 height="42"
                 patternUnits="userSpaceOnUse"
@@ -1362,7 +1394,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* Südkorea: Weißer Hintergrund, zentrales rot-blaues Taegeuk & schwarze Trigramme */}
               <pattern
                 id="pattern-korea"
-                x={patternX}
+                x={0}
                 width="38"
                 height="42"
                 patternUnits="userSpaceOnUse"
@@ -1385,7 +1417,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* Spanien: Rot - Gelb (doppelt so breit) - Rot horizontal mit Wappen-Emblem */}
               <pattern
                 id="pattern-spain"
-                x={patternX}
+                x={0}
                 width="38"
                 height="40"
                 patternUnits="userSpaceOnUse"
@@ -1402,7 +1434,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* Kanada: Rot - Weiß (doppelt so breit) - Rot vertikal mit rotem Ahornblatt */}
               <pattern
                 id="pattern-canada"
-                x={patternX}
+                x={0}
                 width="38"
                 height="38"
                 patternUnits="userSpaceOnUse"
@@ -1420,7 +1452,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
               {/* Deutschland: Schwarz - Rot - Gold (drei gleiche horizontale Streifen) */}
               <pattern
                 id="pattern-germany"
-                x={patternX}
+                x={0}
                 width="38"
                 height="42"
                 patternUnits="userSpaceOnUse"
@@ -1442,7 +1474,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   y1={yPos}
                   x2={chartWidth - 14}
                   y2={yPos}
-                  stroke={isZero ? '#64748B' : '#E2E8F0'}
+                  stroke={isZero ? '#334155' : '#CBD5E1'}
                   className={isZero ? 'dark:stroke-slate-400' : 'dark:stroke-slate-800'}
                   strokeWidth={isZero ? 1.5 : 1}
                   strokeDasharray={isScienceKnowledge && !isZero ? '2,2' : undefined}
@@ -1451,10 +1483,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   x={marginLeft - 12}
                   y={yPos + 5}
                   textAnchor="end"
-                  fill={isZero ? '#475569' : '#94A3B8'}
-                  fontSize="14"
-                  fontFamily="monospace"
-                  className="tabular-nums font-semibold"
+                  fill={isZero ? '#0F172A' : '#334155'}
+                  fontSize="15"
+                  fontFamily="var(--font-mono)"
+                  className="dark:fill-slate-300 tabular-nums font-semibold"
                 >
                   {tick}
                 </text>
@@ -1462,12 +1494,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             );
           })}
 
-          {/* Model Bars */}
-          {barLayouts.map(({
+          {/* Model Bars rendered in stable ID order so CSS translateX animates rank reordering smoothly */}
+          {stableBarLayouts.map(({
             model,
             index,
             barX,
-            barCenterX,
             exploded,
             isHovered,
             highlighted,
@@ -1488,6 +1519,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             priceX,
             globeX,
           }) => {
+            const localBarX = 0;
+            const localBarCenterX = barWidth / 2;
+            const localPriceX = priceX - barX;
+            const localGlobeX = globeX - barX;
+
             // Unexploded country color fill: USA stars, China sickle, Europe blue-yellow
             const countryFill = getCountryBarFill(model);
 
@@ -1504,16 +1540,20 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             return (
               <g
                 key={model.id}
-                className="cursor-pointer"
-                style={{ opacity: barOpacity, transition: 'opacity 0.2s' }}
+                className="cursor-pointer motion-reduce:transition-none"
+                style={{
+                  transform: `translateX(${barX}px)`,
+                  opacity: barOpacity,
+                  transition: 'transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease',
+                }}
                 onMouseEnter={() => handleMouseEnter(index)}
                 onMouseLeave={() => {
-                  handleMouseLeave(index);
+                  handleMouseLeave(model.id);
                 }}
               >
                 {/* Full-column invisible hit rect for smooth mouse tracking with zero dead zones */}
                 <rect
-                  x={barX - barGap / 2}
+                  x={localBarX - barGap / 2}
                   y={0}
                   width={totalBarSlot}
                   height={chartHeight}
@@ -1546,7 +1586,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     }}
                   >
                     <rect
-                      x={barX}
+                      x={localBarX}
                       y={barTopY}
                       width={barWidth}
                       height={Math.max(1, totalBarHeight)}
@@ -1594,7 +1634,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         }}
                       >
                         <rect
-                          x={barX}
+                          x={localBarX}
                           y={seg.segY}
                           width={barWidth}
                           height={Math.max(1, seg.segHeight)}
@@ -1613,7 +1653,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           }
                           strokeWidth={exploded ? 0.5 : 0.75}
                           style={{
-                            transition: 'y 0.25s ease-out, fill 0.25s ease-out, opacity 0.2s',
+                            transition: 'y 0.25s ease-out, height 0.25s ease-out, fill 0.25s ease-out, opacity 0.2s',
                           }}
                           onMouseEnter={(e) => {
                             if (exploded && benchMeta) {
@@ -1633,7 +1673,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         {/* Seamless hit area covering the segment and explosion gap to eliminate any dead zones */}
                         {exploded && benchMeta && (
                           <rect
-                            x={barX - 2}
+                            x={localBarX - 2}
                             y={seg.segY - 1}
                             width={barWidth + 4}
                             height={Math.max(1, seg.segHeight + explosionGap + 2)}
@@ -1664,21 +1704,21 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         )}
 
                         {/* Umgerechneter Wert (Punkteanteil), der innerhalb des Scores dazugewonnen wurde */}
-                        {exploded && seg.segHeight >= 12 && (
+                        {exploded && seg.segHeight >= 13 && (
                           <text
-                            x={barCenterX}
-                            y={seg.segY + seg.segHeight / 2 + 4}
+                            x={localBarCenterX}
+                            y={seg.segY + seg.segHeight / 2 + 4.5}
                             textAnchor="middle"
                             fill="#FFFFFF"
-                            fontSize="12"
-                            fontFamily="monospace"
+                            fontSize="13"
+                            fontFamily="var(--font-mono)"
                             fontWeight="bold"
                             pointerEvents="none"
                             style={{
                               textShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 1px rgba(0,0,0,0.95)',
                             }}
                           >
-                            {`+${seg.comp.pointsContribution.toFixed(1)}`}
+                            {`+${Math.round(seg.comp.pointsContribution)}`}
                           </text>
                         )}
                       </g>
@@ -1722,11 +1762,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     >
                       <defs>
                         <clipPath id={clipId}>
-                          <circle cx={barCenterX} cy={iconCenterY} r={circleRadius - 0.75} />
+                          <circle cx={localBarCenterX} cy={iconCenterY} r={circleRadius - 0.75} />
                         </clipPath>
                       </defs>
                       <circle
-                        cx={barCenterX}
+                        cx={localBarCenterX}
                         cy={iconCenterY}
                         r={circleRadius}
                         fill="#FFFFFF"
@@ -1737,7 +1777,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       />
                       <image
                         href={model.faviconUrl}
-                        x={barCenterX - imgSize / 2}
+                        x={localBarCenterX - imgSize / 2}
                         y={iconCenterY - imgSize / 2}
                         width={imgSize}
                         height={imgSize}
@@ -1747,7 +1787,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       />
                       {/* Transparent hit area to make clicking 100% reliable without any jump */}
                       <circle
-                        cx={barCenterX}
+                        cx={localBarCenterX}
                         cy={iconCenterY}
                         r={circleRadius + 5}
                         fill="transparent"
@@ -1792,11 +1832,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     >
                       <defs>
                         <clipPath id={clipId}>
-                          <circle cx={barCenterX} cy={logoY} r={circleRadius - 0.75} />
+                          <circle cx={localBarCenterX} cy={logoY} r={circleRadius - 0.75} />
                         </clipPath>
                       </defs>
                       <circle
-                        cx={barCenterX}
+                        cx={localBarCenterX}
                         cy={logoY}
                         r={circleRadius}
                         fill="#FFFFFF"
@@ -1807,7 +1847,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       />
                       <image
                         href={model.faviconUrl}
-                        x={barCenterX - imgSize / 2}
+                        x={localBarCenterX - imgSize / 2}
                         y={logoY - imgSize / 2}
                         width={imgSize}
                         height={imgSize}
@@ -1817,7 +1857,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       />
                       {/* Transparent hit area to make clicking 100% reliable without any jump */}
                       <circle
-                        cx={barCenterX}
+                        cx={localBarCenterX}
                         cy={logoY}
                         r={circleRadius + 5}
                         fill="transparent"
@@ -1829,12 +1869,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 {/* Release Month & Year when sorted by date (Month + 2-digit Year only, score number removed) */}
                 {sortBy === 'date' && (
                   <text
-                    x={barCenterX}
+                    x={localBarCenterX}
                     y={catRaw < 0 && isScienceKnowledge ? barBottomY + 14 : barTopY - 6}
                     textAnchor="middle"
-                    className="fill-blue-600 dark:fill-blue-400 font-bold tabular-nums"
-                    fontSize="14"
-                    fontFamily="monospace"
+                    className="fill-blue-700 dark:fill-blue-400 font-bold tabular-nums"
+                    fontSize="15"
+                    fontFamily="var(--font-mono)"
                     style={{
                       transition: 'y 0.25s ease-out',
                     }}
@@ -1879,11 +1919,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     >
                       <defs>
                         <clipPath id={clipId}>
-                          <circle cx={barCenterX} cy={logoY} r={circleRadius - 0.75} />
+                          <circle cx={localBarCenterX} cy={logoY} r={circleRadius - 0.75} />
                         </clipPath>
                       </defs>
                       <circle
-                        cx={barCenterX}
+                        cx={localBarCenterX}
                         cy={logoY}
                         r={circleRadius}
                         fill="#FFFFFF"
@@ -1894,7 +1934,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       />
                       <image
                         href={model.faviconUrl}
-                        x={barCenterX - imgSize / 2}
+                        x={localBarCenterX - imgSize / 2}
                         y={logoY - imgSize / 2}
                         width={imgSize}
                         height={imgSize}
@@ -1904,7 +1944,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       />
                       {/* Transparent hit area to make clicking 100% reliable without any jump */}
                       <circle
-                        cx={barCenterX}
+                        cx={localBarCenterX}
                         cy={logoY}
                         r={circleRadius + 5}
                         fill="transparent"
@@ -1950,11 +1990,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     >
                       <defs>
                         <clipPath id={clipId}>
-                          <circle cx={barCenterX} cy={logoY} r={circleRadius - 0.75} />
+                          <circle cx={localBarCenterX} cy={logoY} r={circleRadius - 0.75} />
                         </clipPath>
                       </defs>
                       <circle
-                        cx={barCenterX}
+                        cx={localBarCenterX}
                         cy={logoY}
                         r={circleRadius}
                         fill="#FFFFFF"
@@ -1965,7 +2005,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       />
                       <image
                         href={model.faviconUrl}
-                        x={barCenterX - imgSize / 2}
+                        x={localBarCenterX - imgSize / 2}
                         y={logoY - imgSize / 2}
                         width={imgSize}
                         height={imgSize}
@@ -1975,7 +2015,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       />
                       {/* Transparent hit area to make clicking 100% reliable without any jump */}
                       <circle
-                        cx={barCenterX}
+                        cx={localBarCenterX}
                         cy={logoY}
                         r={circleRadius + 5}
                         fill="transparent"
@@ -2014,14 +2054,14 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       onMouseLeave={() => setPriceTooltip(null)}
                     >
                       <rect
-                        x={priceX - textWidth / 2 - 4}
+                        x={localPriceX - textWidth / 2 - 4}
                         y={priceY - priceFontSize}
                         width={textWidth + 8}
                         height={priceFontSize + 5}
                         fill="transparent"
                       />
                       <text
-                        x={priceX}
+                        x={localPriceX}
                         y={priceY}
                         textAnchor="middle"
                         className={`font-mono font-bold select-none fill-emerald-600 dark:fill-emerald-400 pointer-events-none transition-colors ${
@@ -2044,9 +2084,9 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   <g>
                     {isStaggeredUp && (
                       <line
-                        x1={barCenterX}
+                        x1={localBarCenterX}
                         y1={priceY + 3}
-                        x2={barCenterX}
+                        x2={localBarCenterX}
                         y2={basePriceY - 2}
                         stroke="#10B981"
                         strokeOpacity={0.4}
@@ -2075,7 +2115,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         : 'click me for\nfree API key';
                       const globeEl = (
                         <text
-                          x={globeX}
+                          x={localGlobeX}
                           y={priceY}
                           textAnchor="middle"
                           className={`select-none fill-blue-600 dark:fill-blue-400 font-bold transition-transform duration-150 ${
@@ -2084,7 +2124,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           fontSize="15"
                           style={{
                             transition: 'y 0.25s ease-out, transform 0.15s ease-out',
-                            transformOrigin: `${globeX}px ${priceY - 4}px`,
+                            transformOrigin: `${localGlobeX}px ${priceY - 4}px`,
                           }}
                         >
                           🌐
@@ -2138,25 +2178,25 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       onMouseLeave={() => setPriceTooltip(null)}
                     >
                       <circle
-                        cx={model.isFreeApi ? barCenterX - 10 : barCenterX}
+                        cx={model.isFreeApi ? localBarCenterX - 10 : localBarCenterX}
                         cy={priceY - 4}
-                        r={7}
+                        r={8}
                         className="fill-amber-100 dark:fill-amber-950 stroke-amber-500 dark:stroke-amber-400 group-hover/note:fill-amber-200 dark:group-hover/note:fill-amber-900 group-hover/note:stroke-amber-600 dark:group-hover/note:stroke-amber-300 transition-colors"
                         strokeWidth="1.2"
                         style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
                       />
                       <text
-                        x={model.isFreeApi ? barCenterX - 10 : barCenterX}
-                        y={priceY}
+                        x={model.isFreeApi ? localBarCenterX - 10 : localBarCenterX}
+                        y={priceY + 0.5}
                         textAnchor="middle"
                         className="fill-amber-800 dark:fill-amber-200 font-bold select-none pointer-events-none"
-                        fontSize="12"
-                        fontFamily="sans-serif"
+                        fontSize="13"
+                        fontFamily="var(--font-sans)"
                       >
                         !
                       </text>
                       <circle
-                        cx={model.isFreeApi ? barCenterX - 10 : barCenterX}
+                        cx={model.isFreeApi ? localBarCenterX - 10 : localBarCenterX}
                         cy={priceY - 4}
                         r={13}
                         fill="transparent"
@@ -2169,7 +2209,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         : 'click me for\nfree API key';
                       const globeEl = (
                         <text
-                          x={barCenterX + 10}
+                          x={localBarCenterX + 10}
                           y={priceY}
                           textAnchor="middle"
                           className={`select-none fill-blue-600 dark:fill-blue-400 font-bold transition-transform duration-150 ${
@@ -2178,7 +2218,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           fontSize="15"
                           style={{
                             transition: 'y 0.25s ease-out, transform 0.15s ease-out',
-                            transformOrigin: `${barCenterX + 10}px ${priceY - 4}px`,
+                            transformOrigin: `${localBarCenterX + 10}px ${priceY - 4}px`,
                           }}
                         >
                           🌐
@@ -2220,7 +2260,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     : 'click me for\nfree API key';
                   const globeEl = (
                     <text
-                      x={barCenterX}
+                      x={localBarCenterX}
                       y={priceY}
                       textAnchor="middle"
                       className={`select-none fill-blue-600 dark:fill-blue-400 font-bold transition-transform duration-150 ${
@@ -2229,7 +2269,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       fontSize="15"
                       style={{
                         transition: 'y 0.25s ease-out, transform 0.15s ease-out',
-                        transformOrigin: `${barCenterX}px ${priceY - 4}px`,
+                        transformOrigin: `${localBarCenterX}px ${priceY - 4}px`,
                       }}
                     >
                       🌐
@@ -2262,7 +2302,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 })()}
 
                 {/* Rotated Model Name below Baseline: OHNE Flagge, klickbar falls modelUrl vorhanden */}
-                <g transform={`translate(${barCenterX}, ${baselineY + 14})`}>
+                <g transform={`translate(${localBarCenterX}, ${baselineY + 14})`}>
                   {model.modelUrl ? (() => {
                     const modelNameTooltipText = model.isPaid
                       ? (lang === 'de' ? 'zum kostenpflichtigen\nChat' : 'to paid\nchat')
@@ -2293,10 +2333,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           y="0"
                           textAnchor="end"
                           transform="rotate(-52)"
-                          fill={isHovered || (hasActiveHighlight && highlighted) ? '#2563EB' : '#475569'}
-                          className="dark:fill-slate-300 transition-colors hover:fill-blue-600 dark:hover:fill-blue-400 cursor-pointer"
-                          fontSize="14"
-                          fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '500'}
+                          fill={isHovered || (hasActiveHighlight && highlighted) ? '#1D4ED8' : '#000000'}
+                          className="dark:fill-slate-100 transition-colors hover:fill-blue-600 dark:hover:fill-blue-400 cursor-pointer"
+                          fontSize="15"
+                          fontFamily="var(--font-sans)"
+                          fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '600'}
                         >
                           {model.displayName}
                           {model.isNew && (
@@ -2311,10 +2352,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       y="0"
                       textAnchor="end"
                       transform="rotate(-52)"
-                      fill={isHovered || (hasActiveHighlight && highlighted) ? '#0F172A' : '#475569'}
-                      className="dark:fill-slate-300 transition-colors"
-                      fontSize="14"
-                      fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '500'}
+                      fill={isHovered || (hasActiveHighlight && highlighted) ? '#1D4ED8' : '#000000'}
+                      className="dark:fill-slate-100 transition-colors"
+                      fontSize="15"
+                      fontFamily="var(--font-sans)"
+                      fontWeight={isHovered || (hasActiveHighlight && highlighted) ? '700' : '600'}
                     >
                       {model.displayName}
                       {model.isNew && (
@@ -2333,8 +2375,8 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
             const lineStartX = marginLeft - 4;
             const lineEndX = Math.max(lineStartX + 40, chartWidth - marginRight + 8);
             const badgeText = `Ø ${averageMetrics.avg.toFixed(1)}${activeComp ? '%' : ''}`;
-            const badgeW = badgeText.length * 7.2 + 16;
-            const badgeY = Math.max(12, avgY - 22);
+            const badgeW = badgeText.length * 8.2 + 16;
+            const badgeY = Math.max(12, avgY - 25);
             return (
               <g className="pointer-events-none select-none">
                 {/* Soft backdrop stroke so dashed amber line reads clearly over dark flags and light gaps */}
@@ -2362,7 +2404,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   x={marginLeft + 4}
                   y={badgeY}
                   width={badgeW}
-                  height={19}
+                  height={22}
                   rx={5}
                   fill="#B45309"
                   stroke="#FFFFFF"
@@ -2370,10 +2412,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                 />
                 <text
                   x={marginLeft + 4 + badgeW / 2}
-                  y={badgeY + 13}
+                  y={badgeY + 15}
                   textAnchor="middle"
                   fill="#FFFFFF"
-                  fontSize="11.5"
+                  fontSize="13"
+                  fontFamily="var(--font-mono)"
                   fontWeight="700"
                   className="font-mono tabular-nums"
                 >

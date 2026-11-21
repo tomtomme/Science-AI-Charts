@@ -20,7 +20,7 @@ import {
   DEFAULT_SPREADSHEET_ID,
   MAIN_SHEET_GID,
   fetchSpreadsheetMetadata,
-  fetchSheetValues,
+  fetchSheetGridWithFormatting,
   resolveSheetTab,
   GoogleSheetsApiError,
 } from './googleSheetsService';
@@ -56,6 +56,7 @@ export interface LoadedDatasets {
   sourcesNotesRow?: number | null;
   notesRow?: number;
   rawRows?: string[][];
+  boldMask?: boolean[][];
   columnLayout?: SheetColumnLayout;
   error: string | null;
   authError?: boolean;
@@ -129,7 +130,11 @@ export async function loadModelsData(options: LoadModelsOptions = {}): Promise<L
     try {
       const meta = await fetchSpreadsheetMetadata(spreadsheetId, accessToken);
       const tab = resolveSheetTab(meta, sheetGid);
-      const rows = await fetchSheetValues(spreadsheetId, tab.title, accessToken, 'FORMATTED_VALUE');
+      const { rows, boldMask } = await fetchSheetGridWithFormatting(
+        spreadsheetId,
+        tab.title,
+        accessToken
+      );
 
       const allModels = parseAllModelsFromRows(rows);
       const newModels = parseModelDatasetFromRows(rows, 'new');
@@ -164,6 +169,7 @@ export async function loadModelsData(options: LoadModelsOptions = {}): Promise<L
         sourcesNotesRow: structure.sourcesNotesRow,
         notesRow: structure.notesRow,
         rawRows: rows,
+        boldMask,
         columnLayout,
         error: null,
         headerMeta,

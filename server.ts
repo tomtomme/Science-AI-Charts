@@ -16,6 +16,16 @@ import {
   runIntegrityCheck,
   updateIntegrityPreferences,
 } from './server/integrityMonitor.ts';
+import {
+  getValsMonitorStatus,
+  runValsCheck,
+  updateValsPreferences,
+} from './server/valsMonitor.ts';
+import {
+  getSimpleBenchMonitorStatus,
+  runSimpleBenchCheck,
+  updateSimpleBenchPreferences,
+} from './server/simpleBenchMonitor.ts';
 import { getOrRefreshWeeklyTranslation } from './server/sheetTranslator.ts';
 import { fetchLabsGridFromPublishedHtml } from './server/labsGrid.ts';
 
@@ -177,6 +187,90 @@ async function createAppServer() {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to update Integrity-Bench preferences.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.get('/api/vals-monitor/status', async (_req, res) => {
+    try {
+      const status = await getValsMonitorStatus();
+      res.json(status);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load Vals Index monitor status.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/vals-monitor/check', async (req, res) => {
+    try {
+      const models = Array.isArray(req.body?.models) ? req.body.models : undefined;
+      const trigger = req.body?.trigger === 'daily_auto' ? 'daily_auto' : 'manual';
+      const report = await runValsCheck({ models, trigger });
+      res.json({ report });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Vals Index check failed.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/vals-monitor/preferences', async (req, res) => {
+    try {
+      const report = await updateValsPreferences({
+        ignoreIds: Array.isArray(req.body?.ignoreIds) ? req.body.ignoreIds : undefined,
+        unignoreIds: Array.isArray(req.body?.unignoreIds) ? req.body.unignoreIds : undefined,
+        manualMappings:
+          req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+            ? req.body.manualMappings
+            : undefined,
+        models: Array.isArray(req.body?.models) ? req.body.models : undefined,
+      });
+      res.json({ report });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to update Vals Index preferences.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.get('/api/simplebench-monitor/status', async (_req, res) => {
+    try {
+      const status = await getSimpleBenchMonitorStatus();
+      res.json(status);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load SimpleBench monitor status.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/simplebench-monitor/check', async (req, res) => {
+    try {
+      const models = Array.isArray(req.body?.models) ? req.body.models : undefined;
+      const trigger = req.body?.trigger === 'daily_auto' ? 'daily_auto' : 'manual';
+      const report = await runSimpleBenchCheck({ models, trigger });
+      res.json({ report });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'SimpleBench check failed.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/simplebench-monitor/preferences', async (req, res) => {
+    try {
+      const report = await updateSimpleBenchPreferences({
+        ignoreIds: Array.isArray(req.body?.ignoreIds) ? req.body.ignoreIds : undefined,
+        unignoreIds: Array.isArray(req.body?.unignoreIds) ? req.body.unignoreIds : undefined,
+        manualMappings:
+          req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+            ? req.body.manualMappings
+            : undefined,
+        models: Array.isArray(req.body?.models) ? req.body.models : undefined,
+      });
+      res.json({ report });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to update SimpleBench preferences.';
       res.status(500).json({ error: message });
     }
   });

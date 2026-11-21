@@ -24,12 +24,15 @@ import {
   EyeOff,
 } from 'lucide-react';
 import {
+  ActiveBenchmarkKey,
+  BenchmarkWeights,
   LabEntry,
   ModelRecord,
   ScoreMode,
   ModelScope,
   Row33Metadata,
 } from '../types';
+import { getNormalizedWeights } from '../utils/weighting';
 import {
   BENCHMARK_COMPONENTS,
   RETIRED_TIMELINE_BENCHMARKS,
@@ -166,6 +169,8 @@ interface CompareViewProps {
   retiredCategoryNames?: string[];
   isPreTranslatedRetiredCategoryNames?: boolean;
   row33Meta?: Row33Metadata;
+  benchmarkWeights?: BenchmarkWeights;
+  isCustomWeighted?: boolean;
   onScrollToParagraph?: (targetId: string) => void;
   onSelectCompany?: (company: string) => void;
 }
@@ -582,7 +587,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span
-            className={`w-4 h-4 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
+            className={`w-5 h-5 rounded text-xs font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
           >
             {slot}
           </span>
@@ -604,24 +609,24 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                 {selectedModel.flag && (
                   <span className="text-xs shrink-0 leading-none">{selectedModel.flag}</span>
                 )}
-                <span className="font-bold text-xs sm:text-[13px] text-slate-900 dark:text-white truncate">
+                <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
                   {selectedModel.displayName}
                 </span>
                 {selectedModel.isNew && (
-                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 shrink-0">
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 shrink-0">
                     NEW
                   </span>
                 )}
               </div>
             </>
           ) : (
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="text-xs text-slate-600 dark:text-slate-400">
               {lang === 'de' ? 'Chatbot auswählen…' : 'Select chatbot…'}
             </span>
           )}
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
+          className={`w-3.5 h-3.5 text-slate-600 dark:text-slate-400 shrink-0 transition-transform ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -634,7 +639,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         >
           <div className="p-2 border-b border-slate-200 dark:border-slate-800 space-y-2 bg-slate-50/70 dark:bg-slate-950/60">
             <div className="relative flex items-center">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+              <Search className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 absolute left-2.5 pointer-events-none" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -645,13 +650,13 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                     ? 'Modell oder Hersteller suchen…'
                     : 'Search model or company…'
                 }
-                className="w-full pl-8 pr-7 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-8 pr-7 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
               {query && (
                 <button
                   type="button"
                   onClick={() => setQuery('')}
-                  className="absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  className="absolute right-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer"
                   aria-label={lang === 'de' ? 'Suche leeren' : 'Clear search'}
                 >
                   <X className="w-3.5 h-3.5" />
@@ -659,7 +664,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
               )}
             </div>
             <div className="flex items-center justify-between gap-2">
-              <div className="inline-flex items-center bg-slate-200/70 dark:bg-slate-800 rounded-md p-0.5 text-[11px] font-mono font-semibold">
+              <div className="inline-flex items-center bg-slate-200/70 dark:bg-slate-800 rounded-md p-0.5 text-xs font-mono font-semibold">
                 {(['all', 'free', 'paid'] as const).map((tier) => (
                   <button
                     key={tier}
@@ -668,7 +673,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                     className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                       tierFilter === tier
                         ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     {tier === 'all'
@@ -685,7 +690,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                   </button>
                 ))}
               </div>
-              <span className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-mono tabular-nums text-slate-600 dark:text-slate-400">
                 {filteredModels.length} {lang === 'de' ? 'Treffer' : 'models'}
               </span>
             </div>
@@ -693,7 +698,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
 
           <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/70">
             {filteredModels.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+              <div className="px-4 py-6 text-center text-xs text-slate-600 dark:text-slate-400">
                 {lang === 'de'
                   ? 'Kein passender Chatbot gefunden.'
                   : 'No matching chatbot found.'}
@@ -719,7 +724,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="w-7 text-[11px] font-mono tabular-nums text-slate-400 dark:text-slate-500 shrink-0 text-right">
+                      <span className="w-8 text-xs font-mono tabular-nums text-slate-600 dark:text-slate-400 shrink-0 text-right">
                         {rank ? `#${rank}` : '—'}
                       </span>
                       <span className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-white border border-slate-200 dark:border-slate-700 shrink-0">
@@ -743,17 +748,17 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                             {m.displayName}
                           </span>
                           {m.isNew && (
-                            <span className="text-[10px] font-mono font-bold text-amber-600 dark:text-amber-400 shrink-0">
+                            <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400 shrink-0">
                               NEW
                             </span>
                           )}
                           {!m.isAvailable && (
-                            <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 shrink-0">
+                            <span className="text-xs font-mono text-slate-600 dark:text-slate-400 shrink-0">
                               (Hist.)
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
                           {m.companyName}
                           {m.releaseDate ? ` · ${m.releaseDate}` : ''}
                         </div>
@@ -762,7 +767,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
 
                     <div className="flex items-center gap-2 shrink-0">
                       {otherSlot && (
-                        <span className="text-[10px] font-mono font-semibold text-slate-400 dark:text-slate-500">
+                        <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-400">
                           ↔ {otherSlot}
                         </span>
                       )}
@@ -977,8 +982,8 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
   return (
     <div className="p-2 sm:p-3 space-y-2.5">
       {/* Toolbar: Scale toggle + hint */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
           <span>
             {lang === 'de'
               ? 'Modell anklicken zum Hervorheben · Achse überfahren oder klicken für Details'
@@ -996,7 +1001,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                 className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                   scaleMode === 'full'
                     ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
                 0–100%
@@ -1008,7 +1013,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                 className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                   scaleMode === 'zoom'
                     ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                 }`}
                 title={
                   lang === 'de'
@@ -1024,7 +1029,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
             <button
               type="button"
               onClick={() => setHiddenSlots(new Set())}
-              className="px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               {lang === 'de' ? 'Alle einblenden' : 'Show all'}
             </button>
@@ -1061,8 +1066,8 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                     fill={rIdx % 2 === 0 ? 'rgba(148, 163, 184, 0.04)' : 'none'}
                     className={
                       isOuter
-                        ? 'stroke-slate-300 dark:stroke-slate-600'
-                        : 'stroke-slate-200 dark:stroke-slate-800'
+                        ? 'stroke-slate-400 dark:stroke-slate-600'
+                        : 'stroke-slate-300 dark:stroke-slate-800'
                     }
                     strokeWidth={isOuter ? 1.25 : 1}
                   />
@@ -1070,8 +1075,9 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                   <text
                     x={cx + 6}
                     y={cy - ringR + (isOuter ? 12 : 4)}
-                    fontSize="12"
-                    className="fill-slate-400 dark:fill-slate-500 font-mono font-semibold"
+                    fontSize="13"
+                    fontFamily="var(--font-mono)"
+                    className="fill-slate-700 dark:fill-slate-300 font-mono font-semibold"
                   >
                     {tickVal}%
                   </text>
@@ -1085,8 +1091,9 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                 x={cx}
                 y={cy + 4}
                 textAnchor="middle"
-                fontSize="12"
-                className="fill-slate-400 dark:fill-slate-500 font-mono font-semibold"
+                fontSize="13"
+                fontFamily="var(--font-mono)"
+                className="fill-slate-700 dark:fill-slate-300 font-mono font-semibold"
               >
                 {minFloor}%
               </text>
@@ -1105,8 +1112,8 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                   y2={end.y}
                   className={
                     isAxisActive
-                      ? 'stroke-slate-400 dark:stroke-slate-500'
-                      : 'stroke-slate-200 dark:stroke-slate-800'
+                      ? 'stroke-slate-600 dark:stroke-slate-400'
+                      : 'stroke-slate-300 dark:stroke-slate-800'
                   }
                   strokeWidth={isAxisActive ? 1.8 : 1}
                 />
@@ -1259,7 +1266,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                 (e) => !hiddenSlots.has(e.slot) && e.val !== null
               );
               let axisLeaderText = '';
-              let axisLeaderColor = '#64748b';
+              let axisLeaderColor = '#475569';
               if (visibleEntries.length >= 2) {
                 const sorted = [...visibleEntries].sort(
                   (a, b) => (b.val as number) - (a.val as number)
@@ -1315,11 +1322,12 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                     y={ly + baseDy}
                     textAnchor={textAnchor}
                     fontSize="15"
+                    fontFamily="var(--font-sans)"
                     fontWeight={isAxisActive || isExpanded ? 700 : 600}
                     className={
                       isAxisActive || isExpanded
-                        ? 'fill-blue-600 dark:fill-blue-400'
-                        : 'fill-slate-700 dark:fill-slate-200'
+                        ? 'fill-blue-700 dark:fill-blue-400'
+                        : 'fill-black dark:fill-slate-100'
                     }
                   >
                     {lines.map((line, lineIdx) => (
@@ -1336,6 +1344,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                       y={ly + baseDy + lines.length * 18}
                       textAnchor={textAnchor}
                       fontSize="13"
+                      fontFamily="var(--font-mono)"
                       fontWeight={700}
                       fill={axisLeaderColor}
                       className="font-mono"
@@ -1353,7 +1362,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
         <div className="space-y-3 min-w-0">
           {/* Active Models Legend / Highlight & Visibility Controls */}
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 overflow-hidden">
-            <div className="px-3 py-2 bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+            <div className="px-3 py-2 bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
               <span>
                 {lang === 'de'
                   ? `Modelle im Netz (${visibleSlots.length}/${activeSlots.length})`
@@ -1363,7 +1372,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                 <button
                   type="button"
                   onClick={() => setPinnedSlot(null)}
-                  className="text-[10px] normal-case font-sans font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  className="text-xs normal-case font-sans font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                 >
                   {lang === 'de' ? 'Fokus lösen' : 'Clear focus'}
                 </button>
@@ -1415,7 +1424,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                       }
                     >
                       <span
-                        className={`w-4 h-4 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
+                        className={`w-5 h-5 rounded text-xs font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
                       >
                         {slot}
                       </span>
@@ -1429,7 +1438,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                         {model.displayName}
                       </span>
                       {rank !== undefined && (
-                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 shrink-0">
+                        <span className="text-xs font-mono text-slate-600 dark:text-slate-400 shrink-0">
                           #{rank}
                         </span>
                       )}
@@ -1442,7 +1451,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                       <button
                         type="button"
                         onClick={() => toggleSlotVisibility(slot)}
-                        className="p-1 rounded hover:bg-slate-200/70 dark:hover:bg-slate-700/70 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                        className="p-1 rounded hover:bg-slate-200/70 dark:hover:bg-slate-700/70 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors cursor-pointer"
                         aria-label={
                           isHidden
                             ? lang === 'de'
@@ -1484,8 +1493,8 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                     {inspectedRow.label}
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
-                  {inspectedRow.sourceName} · {inspectedRow.comp.weightPct}%
+                <span className="text-xs font-mono text-slate-600 dark:text-slate-400 shrink-0">
+                  {inspectedRow.sourceName}
                 </span>
               </div>
 
@@ -1498,7 +1507,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                       key={r.comp.id}
                       type="button"
                       onClick={() => setSelectedAxisIdx(idx)}
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                      className={`px-1.5 py-0.5 rounded text-xs font-mono transition-colors cursor-pointer ${
                         isCurr
                           ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -1512,7 +1521,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                 <button
                   type="button"
                   onClick={() => onToggleExpandCategory(inspectedRow.comp.id)}
-                  className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                 >
                   <Info className="w-3 h-3" />
                   <span>
@@ -1558,7 +1567,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
                         }`}
                       >
                         <span
-                          className={`w-4 h-4 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
+                          className={`w-5 h-5 rounded text-xs font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
                         >
                           {entry.slot}
                         </span>
@@ -1608,7 +1617,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
               <button
                 type="button"
                 onClick={() => onToggleExpandCategory(expandedRow.comp.id)}
-                className="ml-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                className="ml-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer"
                 aria-label={lang === 'de' ? 'Schließen' : 'Close'}
               >
                 <X className="w-3.5 h-3.5" />
@@ -1617,9 +1626,9 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
             <p className="leading-relaxed">
               {lang === 'de' ? expandedRow.comp.descriptionDe : expandedRow.comp.descriptionEn}
             </p>
-            <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="font-mono text-xs text-slate-600 dark:text-slate-400">
               {lang === 'de' ? 'Berechnung:' : 'Formula:'}{' '}
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
+              <span className="font-semibold text-slate-800 dark:text-slate-300">
                 {expandedRow.comp.formulaDesc}
               </span>
               {expandedRow.isRescaled && (
@@ -1678,6 +1687,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
   retiredCategoryNames,
   isPreTranslatedRetiredCategoryNames = false,
   row33Meta,
+  benchmarkWeights,
+  isCustomWeighted = false,
   onScrollToParagraph,
   onSelectCompany,
 }) => {
@@ -1748,7 +1759,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
 
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
   const [benchmarkChartMode, setBenchmarkChartMode] = useState<'bars' | 'radar'>('radar');
-  const [showHistoricalBenchmarks, setShowHistoricalBenchmarks] = useState<boolean>(false);
+  const [showHistoricalBenchmarks, setShowHistoricalBenchmarks] = useState<boolean>(true);
 
   // Keep selections valid & mutually distinct across all 7 slots whenever live Sheet updates reload models
   useEffect(() => {
@@ -2057,13 +2068,23 @@ export const CompareView: React.FC<CompareViewProps> = ({
       ? labelScoreWorst
       : labelScoreNew;
 
+  const normalizedWeights = useMemo(
+    () => (benchmarkWeights ? getNormalizedWeights(benchmarkWeights) : null),
+    [benchmarkWeights]
+  );
+
   // Compute detailed benchmark comparisons across all 8 active categories (D-K)
   const categoryComparisons = useMemo(() => {
     return BENCHMARK_COMPONENTS.map((comp, idx) => {
+      const weightRatio =
+        scoreMode === 'new' && isCustomWeighted && normalizedWeights
+          ? normalizedWeights[comp.key as ActiveBenchmarkKey] ?? 1 / 8
+          : 1 / 8;
+
       const entries = activeSlots.map(({ slot, model }) => {
         const raw = model.rawScores[comp.key];
         const val = typeof raw === 'number' && raw !== null ? comp.transform(raw) : null;
-        const contrib = val !== null ? val / 8 : null;
+        const contrib = val !== null ? val * weightRatio : null;
         return { slot, model, raw, val, contrib };
       });
 
@@ -2099,9 +2120,9 @@ export const CompareView: React.FC<CompareViewProps> = ({
         isRescaled,
       };
     });
-  }, [activeSlots, categoryNames, lang, isPreTranslatedCategoryNames, row33Meta]);
+  }, [activeSlots, categoryNames, lang, isPreTranslatedCategoryNames, row33Meta, scoreMode, isCustomWeighted, normalizedWeights]);
 
-  // Historical sub-benchmarks from Columns V-Y (synced Row-2 labels)
+  // Historical sub-benchmarks from Columns V-Y (Synced Row-2 Labels) — only rows with available data
   const historicalComparisons = useMemo(() => {
     return RETIRED_TIMELINE_BENCHMARKS.map((comp, idx) => {
       const entries = activeSlots.map(({ slot, model }) => {
@@ -2127,12 +2148,10 @@ export const CompareView: React.FC<CompareViewProps> = ({
         winners,
         isTie: valid.length >= 2 && winners.length === valid.length,
       };
-    });
+    }).filter((row) => row.entries.some((e) => e.val !== null));
   }, [activeSlots, retiredCategoryNames, lang, isPreTranslatedRetiredCategoryNames]);
 
-  const hasAnyHistorical = historicalComparisons.some((c) =>
-    c.entries.some((e) => e.val !== null)
-  );
+  const hasAnyHistorical = historicalComparisons.length > 0;
 
   // Aggregate summary metrics across 2 to 8 active models
   const summaryStats = useMemo(() => {
@@ -2181,8 +2200,6 @@ export const CompareView: React.FC<CompareViewProps> = ({
   const validPrimaries = primaryScores.filter((p) => p.score !== null);
   const topPrimaryScore =
     validPrimaries.length > 0 ? Math.max(...validPrimaries.map((p) => p.score as number)) : null;
-  const minPrimaryScore =
-    validPrimaries.length > 0 ? Math.min(...validPrimaries.map((p) => p.score as number)) : null;
   const overallLeaders =
     topPrimaryScore !== null
       ? validPrimaries.filter((p) => topPrimaryScore - (p.score as number) < 0.05)
@@ -2190,7 +2207,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
 
   if (activeSlots.length < 2) {
     return (
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-10 text-center text-sm text-slate-500 dark:text-slate-400">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-10 text-center text-sm text-slate-600 dark:text-slate-400">
         {lang === 'de'
           ? 'Mindestens zwei Chatbots werden für den Vergleich benötigt.'
           : 'At least two chatbots are required for comparison.'}
@@ -2206,7 +2223,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 shadow-xs flex flex-wrap items-center justify-between gap-2"
       >
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">
+          <span className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold mr-1">
             {lang === 'de' ? 'Presets:' : 'Presets:'}
           </span>
 
@@ -2288,7 +2305,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
           </button>
 
           {activePreset && (presetSubLabel || activePreset === 'newest') && (
-            <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 pl-1">
+            <span className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 pl-1">
               ·{' '}
               {activePreset === 'newest'
                 ? lang === 'de'
@@ -2296,7 +2313,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                   : 'Latest releases'
                 : presetSubLabel}
               {activePreset !== 'newest' && (
-                <span className="text-slate-400 dark:text-slate-500 font-normal">
+                <span className="text-slate-600 dark:text-slate-400 font-normal">
                   {' '}
                   ({lang === 'de' ? 'nochmal klicken = nächstes' : 'click again = next'})
                 </span>
@@ -2322,7 +2339,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
           >
             {effectiveCount > 2 ? (
               <>
-                <RotateCw className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                <RotateCw className="w-3 h-3 text-slate-600 dark:text-slate-400" />
                 <span>
                   {effectiveCount === 3
                     ? 'A→B→C'
@@ -2331,7 +2348,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
               </>
             ) : (
               <>
-                <ArrowLeftRight className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                <ArrowLeftRight className="w-3 h-3 text-slate-600 dark:text-slate-400" />
                 <span>A↔B</span>
               </>
             )}
@@ -2374,7 +2391,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
             >
               <Plus className="w-3 h-3" />
             </button>
-            <span className="text-[11px] font-mono font-bold tabular-nums text-slate-800 dark:text-slate-100 pl-0.5 min-w-[66px] text-center">
+            <span className="text-xs font-mono font-bold tabular-nums text-slate-800 dark:text-slate-100 pl-0.5 min-w-[70px] text-center">
               {effectiveCount} {lang === 'de' ? 'Modelle' : 'Models'}
             </span>
           </div>
@@ -2465,7 +2482,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                     href={chatUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-1.5 py-1.5 text-[11px] font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors shrink-0"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors shrink-0"
                     title={t.openChatbotApp}
                   >
                     <span>Chat</span>
@@ -2477,7 +2494,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                     href={model.apiLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-1.5 py-1.5 text-[11px] font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 transition-colors shrink-0"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 transition-colors shrink-0"
                     title={lang === 'de' ? 'Kostenloser API-Zugang' : 'Free API access'}
                   >
                     <Globe className="w-3 h-3" />
@@ -2487,7 +2504,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
               </div>
 
               {/* Clean Compact Metadata Line */}
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-tight text-slate-600 dark:text-slate-400">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-tight text-slate-600 dark:text-slate-400">
                 {onSelectCompany ? (
                   <button
                     type="button"
@@ -2551,21 +2568,21 @@ export const CompareView: React.FC<CompareViewProps> = ({
               {/* Primary Composite Score + Gap to Leader */}
               <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800/90 flex items-baseline justify-between gap-2">
                 <div className="flex items-baseline gap-1 min-w-0">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                  <span className="text-xs font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 truncate">
                     {activeScoreLabel}
                   </span>
                   <span className={`text-xl font-mono tabular-nums font-extrabold tracking-tight leading-none ${theme.text}`}>
                     {primaryScore !== null ? formatNumber(primaryScore, 1) : '—'}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">/100</span>
+                  <span className="text-xs font-mono text-slate-600 dark:text-slate-400">/100</span>
                 </div>
 
                 {deltaVsTop !== null && (
                   <div
-                    className={`text-[11px] font-mono tabular-nums font-bold flex items-center gap-1 shrink-0 ${
+                    className={`text-xs font-mono tabular-nums font-bold flex items-center gap-1 shrink-0 ${
                       isLeader
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-slate-500 dark:text-slate-400'
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : 'text-slate-600 dark:text-slate-400'
                     }`}
                   >
                     {isLeader && <Trophy className="w-3 h-3 shrink-0" />}
@@ -2584,58 +2601,46 @@ export const CompareView: React.FC<CompareViewProps> = ({
                 )}
               </div>
 
-              {/* Synced Row-2 Secondary Composite Scores Strip */}
-              <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[11px] leading-tight">
-                <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreNew}>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                    {labelScoreNew}
-                  </span>
-                  <span
-                    className={`font-mono tabular-nums font-bold shrink-0 ${
-                      scoreMode === 'new'
-                        ? 'text-slate-900 dark:text-white'
-                        : 'text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {scoreNewVal !== null ? formatNumber(scoreNewVal, 1) : '—'}
-                    {!model.hasAll8Benchmarks && scoreNewVal !== null && (
-                      <span className="text-[9px] font-normal text-amber-600 dark:text-amber-400 ml-0.5">*</span>
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreOld}>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                    {labelScoreOld}
-                  </span>
-                  <span
-                    className={`font-mono tabular-nums font-bold shrink-0 ${
-                      scoreMode === 'old'
-                        ? 'text-slate-900 dark:text-white'
-                        : 'text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {scoreOldVal !== null ? formatNumber(scoreOldVal, 1) : '—'}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreWorst}>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                    {labelScoreWorst}
-                  </span>
-                  <span
-                    className={`font-mono tabular-nums font-bold shrink-0 ${
-                      scoreMode === 'worstCase'
-                        ? 'text-slate-900 dark:text-white'
-                        : 'text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {scoreWorstVal !== null ? formatNumber(scoreWorstVal, 1) : '—'}
-                  </span>
-                </div>
+              {/* Other Secondary Composite Scores (only the 2 non-active scores, avoiding redundancy with primary above) */}
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80 text-xs leading-tight">
+                {scoreMode !== 'new' && (
+                  <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreNew}>
+                    <span className="text-slate-600 dark:text-slate-400 truncate">
+                      {labelScoreNew}
+                    </span>
+                    <span className="font-mono tabular-nums font-bold shrink-0 text-slate-700 dark:text-slate-300">
+                      {scoreNewVal !== null ? formatNumber(scoreNewVal, 1) : '—'}
+                      {!model.hasAll8Benchmarks && scoreNewVal !== null && (
+                        <span className="font-normal text-amber-600 dark:text-amber-400 ml-0.5">*</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+                {scoreMode !== 'old' && (
+                  <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreOld}>
+                    <span className="text-slate-600 dark:text-slate-400 truncate">
+                      {labelScoreOld}
+                    </span>
+                    <span className="font-mono tabular-nums font-bold shrink-0 text-slate-700 dark:text-slate-300">
+                      {scoreOldVal !== null ? formatNumber(scoreOldVal, 1) : '—'}
+                    </span>
+                  </div>
+                )}
+                {scoreMode !== 'worstCase' && (
+                  <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreWorst}>
+                    <span className="text-slate-600 dark:text-slate-400 truncate">
+                      {labelScoreWorst}
+                    </span>
+                    <span className="font-mono tabular-nums font-bold shrink-0 text-slate-700 dark:text-slate-300">
+                      {scoreWorstVal !== null ? formatNumber(scoreWorstVal, 1) : '—'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {storylineText && (
                 <p
-                  className="text-[11px] text-slate-600 dark:text-slate-300 italic leading-tight border-t border-slate-100 dark:border-slate-800/80 pt-1 truncate"
+                  className="text-xs text-slate-600 dark:text-slate-300 italic leading-tight border-t border-slate-100 dark:border-slate-800/80 pt-1 truncate"
                   title={storylineText}
                 >
                   {storylineText}
@@ -2646,27 +2651,27 @@ export const CompareView: React.FC<CompareViewProps> = ({
         })}
       </section>
 
-      {/* Compact Summary Strip */}
+      {/* Compact Summary Strip (Category Wins + Biggest Category Edge; NEW Spread box removed) */}
       <section
         aria-label={lang === 'de' ? 'Vergleichs-Zusammenfassung' : 'Comparison Summary'}
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-slate-800"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-slate-800"
       >
         {/* Category Wins Distribution */}
         <div className="p-3 sm:px-4 flex flex-col justify-between gap-1.5">
-          <div className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
             {lang === 'de' ? 'Kategorie-Siege (D–K)' : 'Category Wins (D–K)'}
           </div>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono tabular-nums text-xs sm:text-sm font-bold">
             {activeSlots.map(({ slot }, i) => (
               <React.Fragment key={slot}>
-                {i > 0 && <span className="text-slate-300 dark:text-slate-700">·</span>}
+                {i > 0 && <span className="text-slate-400 dark:text-slate-700">·</span>}
                 <span className={SLOT_THEME[slot].text}>
                   {slot}: {summaryStats.wins[slot]}
                 </span>
               </React.Fragment>
             ))}
-            <span className="text-slate-300 dark:text-slate-700">·</span>
-            <span className="text-slate-500 dark:text-slate-400">
+            <span className="text-slate-400 dark:text-slate-700">·</span>
+            <span className="text-slate-600 dark:text-slate-400">
               {lang === 'de' ? 'Patt' : 'Tie'}: {summaryStats.ties}
             </span>
           </div>
@@ -2691,38 +2696,9 @@ export const CompareView: React.FC<CompareViewProps> = ({
           )}
         </div>
 
-        {/* Composite Spread */}
-        <div className="p-3 sm:px-4 flex flex-col justify-between gap-1">
-          <div className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            {activeScoreLabel} {lang === 'de' ? 'Spanne' : 'Spread'}
-          </div>
-          {topPrimaryScore !== null && minPrimaryScore !== null && validPrimaries.length >= 2 ? (
-            <>
-              <div className="font-mono tabular-nums text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                {overallLeaders.length === validPrimaries.length ? (
-                  lang === 'de' ? '0.0 Pkt. (Gleichstand)' : '0.0 pts (Tied)'
-                ) : (
-                  <span className={SLOT_THEME[overallLeaders[0].slot].text}>
-                    🏆 {overallLeaders.map((l) => l.slot).join('/')} · {topPrimaryScore.toFixed(1)} {lang === 'de' ? 'Pkt.' : 'pts'}
-                  </span>
-                )}
-              </div>
-              <div className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                {lang === 'de' ? 'Abstand #1 zu Schlusslicht:' : 'Spread top to bottom:'}{' '}
-                <strong className="text-slate-700 dark:text-slate-200">
-                  +{(topPrimaryScore - minPrimaryScore).toFixed(1)}
-                </strong>{' '}
-                {lang === 'de' ? 'Pkt.' : 'pts'}
-              </div>
-            </>
-          ) : (
-            <div className="text-sm font-mono text-slate-400 dark:text-slate-500">—</div>
-          )}
-        </div>
-
         {/* Peak Edge per Active Model */}
         <div className="p-3 sm:px-4 flex flex-col justify-between gap-1">
-          <div className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
             {lang === 'de' ? 'Größte Einzelstärke' : 'Biggest Category Edge'}
           </div>
           <div
@@ -2744,7 +2720,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                         {edge.label}
                       </span>
                     ) : (
-                      <span className="text-slate-400 dark:text-slate-500">
+                      <span className="text-slate-600 dark:text-slate-400">
                         {lang === 'de' ? 'kein Vorsprung' : 'no lead'}
                       </span>
                     )}
@@ -2771,7 +2747,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden"
       >
         {/* Header Bar */}
-        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 text-xs font-mono text-slate-700 dark:text-slate-300">
           <div className="flex flex-wrap items-center gap-3 min-h-[28px]">
             {/* Chart Type Switcher: Fixed Top-Left (Balken vs Spinnennetz) */}
             <div
@@ -2790,7 +2766,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
                   benchmarkChartMode === 'bars'
                     ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
                 <BarChart3 className="w-3.5 h-3.5" />
@@ -2803,7 +2779,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
                   benchmarkChartMode === 'radar'
                     ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
                 <Radar className="w-3.5 h-3.5" />
@@ -2811,10 +2787,10 @@ export const CompareView: React.FC<CompareViewProps> = ({
               </button>
             </div>
 
-            <span className="uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">
+            <span className="uppercase tracking-wider font-semibold text-slate-800 dark:text-slate-200">
               {lang === 'de'
-                ? 'Alle 8 Benchmarks im Direktvergleich (je 12,5%)'
-                : 'All 8 Benchmarks Side-by-Side (12.5% each)'}
+                ? 'Alle 8 Benchmarks im Direktvergleich'
+                : 'All 8 Benchmarks Side-by-Side'}
             </span>
           </div>
 
@@ -2875,28 +2851,26 @@ export const CompareView: React.FC<CompareViewProps> = ({
                             className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: row.comp.color }}
                           />
-                          <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate transition-colors">
+                          <span className="text-[15px] font-sans font-bold text-black dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate transition-colors">
                             {row.label}
                           </span>
                           {isExpanded ? (
-                            <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <ChevronUp className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 shrink-0" />
                           ) : (
-                            <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                            <Info className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 group-hover:text-blue-500 shrink-0" />
                           )}
                         </button>
 
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 pl-4">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 pl-4">
                           <span className="truncate">{row.sourceName}</span>
-                          <span>·</span>
-                          <span className="font-mono tabular-nums shrink-0">{row.comp.weightPct}%</span>
                         </div>
                       </div>
 
-                      <div className="font-mono tabular-nums text-[11px] font-bold shrink-0 pt-0.5">
+                      <div className="font-mono tabular-nums text-xs font-bold shrink-0 pt-0.5">
                         {row.winners.length === 0 ? (
-                          <span className="text-slate-400 dark:text-slate-500">—</span>
+                          <span className="text-slate-600 dark:text-slate-400">—</span>
                         ) : row.isTie ? (
-                          <span className="text-slate-500 dark:text-slate-400">
+                          <span className="text-slate-600 dark:text-slate-400">
                             {lang === 'de' ? 'Patt' : 'Tie'}
                           </span>
                         ) : (
@@ -2918,7 +2892,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                         return (
                           <div key={entry.slot} className="flex items-center gap-2 min-w-0">
                             <span
-                              className={`w-4 h-4 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
+                              className={`w-5 h-5 rounded text-xs font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
                             >
                               {entry.slot}
                             </span>
@@ -2937,20 +2911,20 @@ export const CompareView: React.FC<CompareViewProps> = ({
                               )}
                             </div>
 
-                            <div className="w-28 sm:w-36 text-right font-mono tabular-nums text-xs shrink-0 flex items-baseline justify-end gap-1.5">
+                            <div className="w-32 sm:w-40 text-right font-mono tabular-nums text-[15px] shrink-0 flex items-baseline justify-end gap-1.5">
                               <span
                                 className={
                                   entry.val === null
-                                    ? 'text-slate-400 dark:text-slate-500 font-semibold'
+                                    ? 'text-slate-600 dark:text-slate-400 font-semibold'
                                     : isWinner
                                     ? `font-extrabold ${theme.text}`
-                                    : 'font-semibold text-slate-700 dark:text-slate-300'
+                                    : 'font-semibold text-slate-800 dark:text-slate-200'
                                 }
                               >
                                 {entry.val !== null ? `${formatNumber(entry.val, 1)}%` : '—'}
                               </span>
                               {entry.contrib !== null && (
-                                <span className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:inline">
+                                <span className="text-xs text-slate-600 dark:text-slate-400 hidden sm:inline">
                                   {row.isRescaled && entry.raw !== null
                                     ? `(${formatNumber(entry.raw, 0)}%)`
                                     : `+${entry.contrib.toFixed(1)}`}
@@ -2965,12 +2939,12 @@ export const CompareView: React.FC<CompareViewProps> = ({
 
                   {/* Expandable Category Details Drawer */}
                   {isExpanded && (
-                    <div className="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-700 dark:text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="space-y-1 max-w-3xl">
                         <p className="leading-relaxed">
                           {lang === 'de' ? row.comp.descriptionDe : row.comp.descriptionEn}
                         </p>
-                        <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                        <div className="font-mono text-xs text-slate-600 dark:text-slate-400">
                           {lang === 'de' ? 'Berechnung:' : 'Formula:'}{' '}
                           <span className="font-semibold text-slate-700 dark:text-slate-300">
                             {row.comp.formulaDesc}
@@ -3016,26 +2990,6 @@ export const CompareView: React.FC<CompareViewProps> = ({
             })}
           </div>
         )}
-
-        {/* Totals Footer Row */}
-        <div className="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-950/70 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-300">
-            {activeScoreLabel} ({lang === 'de' ? 'Gesamt' : 'Total'})
-          </span>
-          <div className="flex flex-wrap items-center gap-4 font-mono tabular-nums text-sm">
-            {primaryScores.map(({ slot, model, score }) => (
-              <div key={slot} className="flex items-baseline gap-1.5">
-                <span className={`font-bold text-xs ${SLOT_THEME[slot].text}`}>
-                  {slot} ({model.displayName}):
-                </span>
-                <span className={`font-extrabold ${SLOT_THEME[slot].text}`}>
-                  {score !== null ? formatNumber(score, 1) : '—'}
-                </span>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">/100</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* Historical Sub-Benchmarks (Columns V-Y, Synced Row-2 Labels) */}
@@ -3053,7 +3007,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                   : `Historical Sub-Benchmarks (${labelScoreOld}, Columns V–Y)`}
               </span>
             </div>
-            <span className="inline-flex items-center gap-1 text-xs font-mono text-slate-500 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1 text-xs font-mono text-slate-600 dark:text-slate-400">
               <span>
                 {showHistoricalBenchmarks
                   ? lang === 'de'
@@ -3076,13 +3030,13 @@ export const CompareView: React.FC<CompareViewProps> = ({
               {historicalComparisons.map((row) => (
                 <div
                   key={row.comp.id}
-                  className="px-4 py-2.5 grid grid-cols-1 sm:grid-cols-[220px_minmax(0,1fr)] items-center gap-2 text-xs"
+                  className="px-4 py-2.5 grid grid-cols-1 sm:grid-cols-[240px_minmax(0,1fr)] items-center gap-2 text-xs"
                 >
                   <div>
-                    <div className="font-semibold text-slate-800 dark:text-slate-200">
+                    <div className="text-[15px] font-sans font-semibold text-black dark:text-slate-100">
                       {row.label}
                     </div>
-                    <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                    <div className="text-xs text-slate-600 dark:text-slate-400">
                       {row.comp.sourceName}
                     </div>
                   </div>
@@ -3108,10 +3062,10 @@ export const CompareView: React.FC<CompareViewProps> = ({
                           <span
                             className={
                               entry.val === null
-                                ? 'text-slate-400'
+                                ? 'text-slate-600 dark:text-slate-400'
                                 : isWin
                                 ? `font-extrabold ${theme.text}`
-                                : 'font-semibold text-slate-700 dark:text-slate-300'
+                                : 'font-semibold text-slate-800 dark:text-slate-200'
                             }
                           >
                             {entry.val !== null ? `${formatNumber(entry.val, 1)}%` : '—'}

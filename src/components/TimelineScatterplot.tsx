@@ -4,7 +4,7 @@ import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint, Row33Metadat
 import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS, getBenchmarkCategoryLabel, getCompositeScoreLabel } from '../data/benchmarks';
 import { calculateMultiLevelRegression, calculateRegression, extractFrontierPoints, isMultiLevelSupported } from '../utils/mathRegression';
 import { DEFAULT_TIMELINE_LAB_LEVELS, TIMELINE_MAIN_LAB_LEVELS, TimelineLabLevel } from '../data/labLevels';
-import { calculatePearson, calculateSpearman } from '../utils/correlationUtils';
+import { calculatePearson, calculateSpearman, formatCorrelationDecimal } from '../utils/correlationUtils';
 import { Tooltip } from './Tooltip';
 import { TRANSLATIONS } from '../utils/i18n';
 
@@ -258,7 +258,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
         } else if (scoreMode === 'worstCase') {
           score = m.scoreWorstCase;
         } else {
-          score = m.scoreNewReported;
+          score = m.scoreNew ?? m.scoreNewReported;
         }
       } else if (activeComponent) {
         // Individual benchmark component score: empty cells from CSV are missing (null)
@@ -307,10 +307,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     return scatterPoints;
   }, [scatterPoints, frontierPoints, timelineScope]);
 
-  // SVG dimensions & scales
-  const svgWidth = 1000;
-  const svgHeight = 520;
-  const margin = { top: 40, right: 40, bottom: 70, left: 70 };
+  // SVG dimensions & scales (1200x624 matches ~1.0x CSS rendering on desktop for 15px axis parity)
+  const svgWidth = 1200;
+  const svgHeight = 624;
+  const margin = { top: 44, right: 44, bottom: 82, left: 84 };
   const innerWidth = svgWidth - margin.left - margin.right;
   const innerHeight = svgHeight - margin.top - margin.bottom;
 
@@ -851,7 +851,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                       e.stopPropagation();
                       handleScroll(scoreScrollTargets.targetId);
                     }}
-                    className="w-full pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer text-left transition-colors group"
+                    className="w-full pt-1.5 border-t border-slate-700/60 text-xs text-slate-300 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer text-left transition-colors group"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 group-hover:scale-125 transition-transform" />
                     <span className="group-hover:underline font-medium">
@@ -1021,8 +1021,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 >
                   <span className="text-xs font-bold text-slate-500 uppercase">r:</span>
                   <span className="text-xs font-extrabold tabular-nums" style={{ color: pearsonResult.color }}>
-                    {pearsonResult.value >= 0 ? '+' : ''}
-                    {pearsonResult.value.toFixed(2)}
+                    {formatCorrelationDecimal(pearsonResult.value)}
                   </span>
                   <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
                     ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
@@ -1051,8 +1050,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 >
                   <span className="text-xs font-bold text-slate-500 uppercase">Rho:</span>
                   <span className="text-xs font-extrabold tabular-nums" style={{ color: spearmanResult.color }}>
-                    {spearmanResult.value >= 0 ? '+' : ''}
-                    {spearmanResult.value.toFixed(2)}
+                    {formatCorrelationDecimal(spearmanResult.value)}
                   </span>
                   <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
                     ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
@@ -1075,13 +1073,13 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                       {lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
                     </p>
                     {regression.formula && (
-                      <div className="pt-1.5 border-t border-slate-700/60 font-mono text-[11px] text-amber-300">
+                      <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs text-amber-300">
                         {regression.formula}
                       </div>
                     )}
                     {activeRegression.id === 'polynomial' && (
-                      <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
-                        <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                      <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
+                        <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
                         <span className="font-bold">
                           {lang === 'de'
                             ? `Grad ${polyDegree} (${polyDegree === 2 ? 'Parabel' : polyDegree === 3 ? 'Wendepunkt' : 'Höhere Ordnung'})`
@@ -1090,20 +1088,20 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                       </div>
                     )}
                     {activeRegression.id === 'loess' && (
-                      <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-[11px] text-amber-300">
-                        <span className="text-slate-400">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
+                      <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
+                        <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
                         <span className="font-bold">
                           {lang === 'de' ? `Span = ${loessSpan}% (Fensterbreite)` : `Span = ${loessSpan}% (Window width)`}
                         </span>
                       </div>
                     )}
                     {activeRegression.id !== 'frontier' && (
-                      <div className="pt-1.5 border-t border-slate-700/60 text-[11px] text-slate-300 leading-snug">
+                      <div className="pt-1.5 border-t border-slate-700/60 text-xs text-slate-300 leading-snug">
                         <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                           <span>{lang === 'de' ? '95%-Konfidenzband' : '95% Confidence Band'}</span>
                         </div>
-                        <p className="text-[10.5px] text-slate-400 leading-normal">
+                        <p className="text-xs text-slate-300 leading-normal">
                           {lang === 'de'
                             ? 'Das schattierte Band zeigt den statistischen Unsicherheitsbereich der Schätzung: Bei dichter Datenlage ist es schmal, bei wenigen oder streuenden Punkten weitet es sich.'
                             : 'The shaded ribbon reflects estimation uncertainty: narrow where data is abundant, wider where observations are scarce or dispersed.'}
@@ -1262,13 +1260,14 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 <button
                   type="button"
                   disabled={!isMultiLevelFeasible}
+                  aria-pressed={isMultiLevelActive}
                   onClick={() => isMultiLevelFeasible && setMultiLevelEnabled((prev) => !prev)}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold transition-all shrink-0 ${
                     !isMultiLevelFeasible
-                      ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500'
+                      ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 text-slate-400 dark:text-slate-500'
                       : isMultiLevelActive
                       ? 'bg-indigo-600 text-white border-indigo-500 shadow-2xs ring-2 ring-indigo-500/20 cursor-pointer'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'
+                      : 'bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer'
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5 shrink-0" />
@@ -1304,7 +1303,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                     timelineScope === 'all'
                       ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
                   }`}
                 >
                   {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({scatterPoints.length})
@@ -1316,7 +1315,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
                     timelineScope === 'frontier'
                       ? 'bg-amber-500 text-white shadow-2xs'
-                      : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+                      : 'text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400'
                   }`}
                   title={
                     lang === 'de'
@@ -1346,18 +1345,17 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 }
               >
                 <div
-                  className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                  className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border font-mono transition-all ${
                     isLinearModel
                       ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
                       : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
                   }`}
                 >
-                  <span className="text-xs font-bold text-slate-500 uppercase">r:</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">r:</span>
                   <span className="text-xs font-extrabold tabular-nums" style={{ color: pearsonResult.color }}>
-                    {pearsonResult.value >= 0 ? '+' : ''}
-                    {pearsonResult.value.toFixed(2)}
+                    {formatCorrelationDecimal(pearsonResult.value)}
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                  <span className="text-xs text-slate-600 dark:text-slate-300 hidden xl:inline">
                     ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
                   </span>
                 </div>
@@ -1376,18 +1374,17 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                 }
               >
                 <div
-                  className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                  className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border font-mono transition-all ${
                     !isLinearModel
                       ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
                       : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
                   }`}
                 >
-                  <span className="text-xs font-bold text-slate-500 uppercase">Rho:</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Rho:</span>
                   <span className="text-xs font-extrabold tabular-nums" style={{ color: spearmanResult.color }}>
-                    {spearmanResult.value >= 0 ? '+' : ''}
-                    {spearmanResult.value.toFixed(2)}
+                    {formatCorrelationDecimal(spearmanResult.value)}
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                  <span className="text-xs text-slate-600 dark:text-slate-300 hidden xl:inline">
                     ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
                   </span>
                 </div>
@@ -1398,100 +1395,16 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
       </div>
       )}
 
-      {/* Multi-Level Lab Company Selector Pills (copied from Bar Chart advanced section; active when Multi-level is ON) */}
-      {isMultiLevelActive && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2 sm:px-3 shadow-2xs flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400 mr-0.5 flex items-center gap-1 shrink-0">
-            <Layers className="w-3.5 h-3.5 text-indigo-500" />
-            <span>{lang === 'de' ? 'Ebenen (Labs):' : 'Levels (Labs):'}</span>
-          </span>
-
-          {/* 'All' / Reset Pills */}
-          <button
-            type="button"
-            onClick={() => {
-              const allIds = TIMELINE_MAIN_LAB_LEVELS.map((l) => l.id);
-              if (selectedLabLevels.length === allIds.length) {
-                setSelectedLabLevels(DEFAULT_TIMELINE_LAB_LEVELS);
-              } else {
-                setSelectedLabLevels(allIds);
-              }
-            }}
-            className={`text-xs px-2.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
-              selectedLabLevels.length === TIMELINE_MAIN_LAB_LEVELS.length
-                ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
-                : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            {t.all}
-          </button>
-
-          {!(
-            selectedLabLevels.length === DEFAULT_TIMELINE_LAB_LEVELS.length &&
-            DEFAULT_TIMELINE_LAB_LEVELS.every((id) => selectedLabLevels.includes(id))
-          ) && (
-            <button
-              type="button"
-              onClick={() => setSelectedLabLevels(DEFAULT_TIMELINE_LAB_LEVELS)}
-              className="text-xs px-2 py-0.5 rounded font-mono bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              title={lang === 'de' ? 'Zurücksetzen auf OpenAI, Anthropic, Google' : 'Reset to OpenAI, Anthropic, Google'}
-            >
-              {lang === 'de' ? 'Standard (3)' : 'Default (3)'}
-            </button>
-          )}
-
-          <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block shrink-0 mx-0.5" />
-
-          {TIMELINE_MAIN_LAB_LEVELS.map((lab) => {
-            const isSelected = selectedLabLevels.includes(lab.id);
-            const cnt = labPointCounts[lab.id] || 0;
-            return (
-              <button
-                key={lab.id}
-                type="button"
-                onClick={() => {
-                  setSelectedLabLevels((prev) =>
-                    prev.includes(lab.id) ? prev.filter((id) => id !== lab.id) : [...prev, lab.id]
-                  );
-                }}
-                onMouseEnter={() => isSelected && setHoveredLabId(lab.id)}
-                onMouseLeave={() => setHoveredLabId(null)}
-                title={`${lab.label} (${lab.familyHint}) · ${cnt} ${lang === 'de' ? 'Modelle' : 'models'}`}
-                className={`text-xs px-2.5 py-0.5 rounded font-mono transition-all cursor-pointer inline-flex items-center gap-1.5 border ${
-                  isSelected
-                    ? 'text-white font-bold shadow-2xs'
-                    : 'bg-slate-100 dark:bg-slate-800/80 border-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-                style={
-                  isSelected
-                    ? { backgroundColor: lab.color, borderColor: lab.color }
-                    : undefined
-                }
-              >
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: isSelected ? '#ffffff' : lab.color }}
-                />
-                <span>{lab.label}</span>
-                <span className={`text-[10.5px] ${isSelected ? 'opacity-90' : 'text-slate-400 dark:text-slate-500'}`}>
-                  {cnt}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Scatterplot Canvas Container */}
       <div
         ref={containerRef}
         className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden select-none flex flex-col"
       >
-        {/* Diagram Header Bar: Category / Criterion info on the left, Pearson r & Spearman Rho on the right (matching Correlations Tab) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 p-3 sm:px-4 bg-slate-50/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
+        {/* Diagram Header Bar: Criterion info on the left, Scope + Multi-level + Correlation badges on the right */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 sm:px-4 bg-slate-50/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-blue-500" />
+            <span className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               <span>
                 {activeCategoryName
                   ? activeCategoryName
@@ -1502,19 +1415,114 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   : t.scoreModeNew}
               </span>
             </span>
-            <span className="text-xs font-mono text-slate-400 dark:text-slate-500">
+            <span className="text-xs font-mono text-slate-700 dark:text-slate-300 font-semibold">
               ({scatterPoints.length} {lang === 'de' ? 'Modelle' : 'models'})
             </span>
-            {timelineScope === 'frontier' && (
+            {!hideHeaderControls && timelineScope === 'frontier' && (
               <span className="inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-500 text-white shadow-2xs">
-                <Sparkles className="w-3 h-3 text-amber-200" />
+                <Sparkles className="w-3 h-3 text-white" />
                 <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
               </span>
             )}
           </div>
 
-          {/* Side-by-Side Pearson r & Spearmans Rho Badges (Matching Correlations Tab) */}
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {/* Right Group: Scope (Alle vs Pioniere), Multi-level Switch, Multi-level R², Pearson r & Spearman Rho */}
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:ml-auto">
+            {hideHeaderControls && (
+              <>
+                {/* Scope Segmented Control: Alle Modelle vs Pioniere */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0">
+                  <button
+                    type="button"
+                    aria-pressed={timelineScope === 'all'}
+                    onClick={() => setTimelineScope('all')}
+                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                      timelineScope === 'all'
+                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
+                    }`}
+                  >
+                    {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({scatterPoints.length})
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={timelineScope === 'frontier'}
+                    onClick={() => setTimelineScope('frontier')}
+                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      timelineScope === 'frontier'
+                        ? 'bg-amber-500 text-white shadow-2xs'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400'
+                    }`}
+                    title={
+                      lang === 'de'
+                        ? 'Nur Pionier-Modelle (historische Rekordhalter / Pareto-Front)'
+                        : 'Only pioneer models (historical record breakers / Pareto frontier)'
+                    }
+                  >
+                    <Sparkles className={`w-3 h-3 ${timelineScope === 'frontier' ? 'text-white' : 'text-amber-500'}`} />
+                    <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
+                    <span className="text-xs opacity-90">({frontierPointIds.size})</span>
+                  </button>
+                </div>
+
+                {/* Multi-Level Model Switch */}
+                <Tooltip
+                  title={lang === 'de' ? 'Multi-Level-Modell' : 'Multi-level model'}
+                  badge={
+                    !isMultiLevelFeasible
+                      ? lang === 'de'
+                        ? 'Nicht verfügbar'
+                        : 'Unavailable'
+                      : isMultiLevelActive
+                      ? lang === 'de'
+                        ? 'Aktiv'
+                        : 'Active'
+                      : lang === 'de'
+                      ? 'Aus'
+                      : 'Off'
+                  }
+                  position="bottom"
+                  align="center"
+                  width="w-72"
+                  content={
+                    isMultiLevelFeasible
+                      ? lang === 'de'
+                        ? 'Schätzt pro KI-Labor eine eigene Trendkurve (Partial Pooling für Regression/LOESS bzw. Lab-Frontier für Pioniere).'
+                        : 'Fits separate per-lab trajectory curves (partial pooling for regression/LOESS, per-lab frontier envelopes for Pioneers).'
+                      : lang === 'de'
+                      ? 'Multi-Level-Ansicht ist für dieses Modell nicht verfügbar.'
+                      : 'Multi-level view is not available for this model.'
+                  }
+                >
+                  <button
+                    type="button"
+                    disabled={!isMultiLevelFeasible}
+                    aria-pressed={isMultiLevelActive}
+                    onClick={() => isMultiLevelFeasible && setMultiLevelEnabled((prev) => !prev)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold transition-all shrink-0 ${
+                      !isMultiLevelFeasible
+                        ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 text-slate-400 dark:text-slate-500'
+                        : isMultiLevelActive
+                        ? 'bg-indigo-600 text-white border-indigo-500 shadow-2xs ring-2 ring-indigo-500/20 cursor-pointer'
+                        : 'bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5 shrink-0" />
+                    <span>Multi-level</span>
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        !isMultiLevelFeasible
+                          ? 'bg-slate-400'
+                          : isMultiLevelActive
+                          ? 'bg-emerald-300'
+                          : 'bg-slate-300 dark:bg-slate-600'
+                      }`}
+                    />
+                  </button>
+                </Tooltip>
+              </>
+            )}
+
             {isMultiLevelActive && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 font-mono font-bold text-xs">
                 <Layers className="w-3 h-3" />
@@ -1534,18 +1542,17 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               }
             >
               <div
-                className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border font-mono transition-all ${
                   isLinearModel
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-2 ring-blue-500/20'
                     : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
                 }`}
               >
-                <span className="text-xs font-bold text-slate-500 uppercase">r:</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">r:</span>
                 <span className="text-xs font-extrabold tabular-nums" style={{ color: pearsonResult.color }}>
-                  {pearsonResult.value >= 0 ? '+' : ''}
-                  {pearsonResult.value.toFixed(2)}
+                  {formatCorrelationDecimal(pearsonResult.value)}
                 </span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                <span className="text-xs text-slate-600 dark:text-slate-300 hidden xl:inline">
                   ({lang === 'de' ? pearsonResult.strengthDe : pearsonResult.strengthEn})
                 </span>
               </div>
@@ -1564,18 +1571,17 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
               }
             >
               <div
-                className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border transition-all ${
+                className={`flex items-baseline gap-1 px-2 py-0.5 rounded-lg border font-mono transition-all ${
                   !isLinearModel
                     ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
                     : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800'
                 }`}
               >
-                <span className="text-xs font-bold text-slate-500 uppercase">Rho:</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Rho:</span>
                 <span className="text-xs font-extrabold tabular-nums" style={{ color: spearmanResult.color }}>
-                  {spearmanResult.value >= 0 ? '+' : ''}
-                  {spearmanResult.value.toFixed(2)}
+                  {formatCorrelationDecimal(spearmanResult.value)}
                 </span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 hidden xl:inline">
+                <span className="text-xs text-slate-600 dark:text-slate-300 hidden xl:inline">
                   ({lang === 'de' ? spearmanResult.strengthDe : spearmanResult.strengthEn})
                 </span>
               </div>
@@ -1583,11 +1589,95 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           </div>
         </div>
 
+        {/* Multi-Level Lab Company Selector Pills (active when Multi-level is ON) */}
+        {isMultiLevelActive && (
+          <div className="px-3 sm:px-4 py-2 bg-slate-50/40 dark:bg-slate-950/30 border-b border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 mr-0.5 flex items-center gap-1 shrink-0">
+              <Layers className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{lang === 'de' ? 'Ebenen (Labs):' : 'Levels (Labs):'}</span>
+            </span>
+
+            {/* 'All' / Reset Pills */}
+            <button
+              type="button"
+              onClick={() => {
+                const allIds = TIMELINE_MAIN_LAB_LEVELS.map((l) => l.id);
+                if (selectedLabLevels.length === allIds.length) {
+                  setSelectedLabLevels(DEFAULT_TIMELINE_LAB_LEVELS);
+                } else {
+                  setSelectedLabLevels(allIds);
+                }
+              }}
+              className={`text-xs px-2.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                selectedLabLevels.length === TIMELINE_MAIN_LAB_LEVELS.length
+                  ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
+                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {t.all}
+            </button>
+
+            {!(
+              selectedLabLevels.length === DEFAULT_TIMELINE_LAB_LEVELS.length &&
+              DEFAULT_TIMELINE_LAB_LEVELS.every((id) => selectedLabLevels.includes(id))
+            ) && (
+              <button
+                type="button"
+                onClick={() => setSelectedLabLevels(DEFAULT_TIMELINE_LAB_LEVELS)}
+                className="text-xs px-2 py-0.5 rounded font-mono bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                title={lang === 'de' ? 'Zurücksetzen auf OpenAI, Anthropic, Google' : 'Reset to OpenAI, Anthropic, Google'}
+              >
+                {lang === 'de' ? 'Standard (3)' : 'Default (3)'}
+              </button>
+            )}
+
+            <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 hidden sm:block shrink-0 mx-0.5" />
+
+            {TIMELINE_MAIN_LAB_LEVELS.map((lab) => {
+              const isSelected = selectedLabLevels.includes(lab.id);
+              const cnt = labPointCounts[lab.id] || 0;
+              return (
+                <button
+                  key={lab.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedLabLevels((prev) =>
+                      prev.includes(lab.id) ? prev.filter((id) => id !== lab.id) : [...prev, lab.id]
+                    );
+                  }}
+                  onMouseEnter={() => isSelected && setHoveredLabId(lab.id)}
+                  onMouseLeave={() => setHoveredLabId(null)}
+                  title={`${lab.label} (${lab.familyHint}) · ${cnt} ${lang === 'de' ? 'Modelle' : 'models'}`}
+                  className={`text-xs px-2.5 py-0.5 rounded font-mono transition-all cursor-pointer inline-flex items-center gap-1.5 border ${
+                    isSelected
+                      ? 'text-white font-bold shadow-2xs'
+                      : 'bg-slate-100 dark:bg-slate-800/80 border-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                  style={
+                    isSelected
+                      ? { backgroundColor: lab.color, borderColor: lab.color }
+                      : undefined
+                  }
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: isSelected ? '#ffffff' : lab.color }}
+                  />
+                  <span>{lab.label}</span>
+                  <span className={`text-xs ${isSelected ? 'opacity-90' : 'text-slate-600 dark:text-slate-400'}`}>
+                    {cnt}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Multi-Level Active Curves Legend */}
         {isMultiLevelActive && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 bg-slate-50/40 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800/80 text-xs font-mono">
             {multiLevelSvgCurves.length === 0 ? (
-              <span className="text-slate-400 dark:text-slate-500">
+              <span className="text-slate-600 dark:text-slate-400">
                 {lang === 'de'
                   ? 'Bitte mindestens eine Lab-Ebene oben auswählen.'
                   : 'Select at least one lab level above to display regression lines.'}
@@ -1610,10 +1700,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                       className="w-3.5 h-1 rounded-full shrink-0"
                       style={{ backgroundColor: curve.color }}
                     />
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{curve.label}</span>
-                    <span className="text-slate-400 dark:text-slate-500">
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{curve.label}</span>
+                    <span className="text-slate-700 dark:text-slate-300">
                       (n={curve.count}
-                      {hasLine ? `, R²=${curve.regression.r2.toFixed(2)}` : ', n<2'})
+                      {hasLine ? `, R²=${curve.regression.r2.toFixed(1)}` : ', n<2'})
                     </span>
                   </div>
                 );
@@ -1653,7 +1743,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   x2={svgWidth - margin.right}
                   y2={y}
                   stroke="currentColor"
-                  className="text-slate-200 dark:text-slate-800/80"
+                  className="text-slate-300/80 dark:text-slate-800/80"
                   strokeWidth="1"
                   strokeDasharray="4 4"
                 />
@@ -1661,8 +1751,9 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   x={margin.left - 12}
                   y={y + 5}
                   textAnchor="end"
-                  fontSize="14"
-                  className="font-mono font-medium fill-slate-400 dark:fill-slate-500"
+                  fontSize="15"
+                  fontFamily="var(--font-mono)"
+                  className="font-mono font-semibold fill-slate-700 dark:fill-slate-300"
                 >
                   {tick}
                 </text>
@@ -1681,16 +1772,17 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
                   x2={x}
                   y2={svgHeight - margin.bottom}
                   stroke="currentColor"
-                  className="text-slate-200 dark:text-slate-800/80"
+                  className="text-slate-300/80 dark:text-slate-800/80"
                   strokeWidth="1"
                   strokeDasharray="4 4"
                 />
                 <text
                   x={x}
-                  y={svgHeight - margin.bottom + 22}
+                  y={svgHeight - margin.bottom + 26}
                   textAnchor="middle"
-                  fontSize="14"
-                  className="font-mono font-medium fill-slate-400 dark:fill-slate-500"
+                  fontSize="15"
+                  fontFamily="var(--font-mono)"
+                  className="font-mono font-semibold fill-slate-700 dark:fill-slate-300"
                 >
                   {tick.label}
                 </text>
@@ -1705,7 +1797,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             x2={svgWidth - margin.right}
             y2={svgHeight - margin.bottom}
             stroke="currentColor"
-            className="text-slate-300 dark:text-slate-700"
+            className="text-slate-500 dark:text-slate-600"
             strokeWidth="2"
           />
           <line
@@ -1714,7 +1806,7 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             x2={margin.left}
             y2={svgHeight - margin.bottom}
             stroke="currentColor"
-            className="text-slate-300 dark:text-slate-700"
+            className="text-slate-500 dark:text-slate-600"
             strokeWidth="2"
           />
 
@@ -1723,18 +1815,20 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             x={margin.left + innerWidth / 2}
             y={svgHeight - 16}
             textAnchor="middle"
-            fontSize="14"
-            className="font-bold fill-slate-600 dark:fill-slate-400 uppercase tracking-wider"
+            fontSize="15"
+            fontFamily="var(--font-sans)"
+            className="font-sans font-bold fill-black dark:fill-white uppercase tracking-wider"
           >
             {lang === 'de' ? 'Veröffentlichungsdatum' : 'Release Date'}
           </text>
           <text
-            transform={`rotate(-90 ${margin.left - 46} ${margin.top + innerHeight / 2})`}
-            x={margin.left - 46}
+            transform={`rotate(-90 ${margin.left - 56} ${margin.top + innerHeight / 2})`}
+            x={margin.left - 56}
             y={margin.top + innerHeight / 2}
             textAnchor="middle"
-            fontSize="14"
-            className="font-bold fill-slate-600 dark:fill-slate-400 tracking-wider"
+            fontSize="15"
+            fontFamily="var(--font-sans)"
+            className="font-sans font-bold fill-black dark:fill-white tracking-wider"
           >
             {yAxisLabel}
           </text>

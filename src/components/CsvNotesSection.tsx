@@ -24,7 +24,7 @@ function renderTextWithLinks(text: string) {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white font-mono inline-flex items-center gap-0.5 break-all font-semibold underline-offset-2 text-[11px]"
+          className="text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-500 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white font-mono inline-flex items-center gap-0.5 break-all font-semibold underline-offset-2 text-xs"
         >
           <span>{part}</span>
           <ExternalLink className="w-2 h-2 shrink-0 inline ml-0.5 opacity-80" />
@@ -701,12 +701,12 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                     }`}
                   >
                     <div className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg border-l-4 border-slate-700 dark:border-slate-300 mb-1 shadow-2xs">
-                      <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-[13px] tracking-tight leading-snug">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-xs tracking-tight leading-snug">
                         {p.heading}
                       </h4>
                     </div>
                     {p.text && (
-                      <p className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line px-1 mb-1 text-xs">
+                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line px-1 mb-1 text-xs">
                         {renderTextWithLinks(p.text)}
                       </p>
                     )}
@@ -737,7 +737,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                       </h4>
                     );
                   })()}
-                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
                     {renderTextWithLinks(p.text)}
                   </p>
                   {p.link && (
@@ -745,7 +745,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                       href={p.link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
+                      className="inline-flex items-center gap-1 text-xs font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-500 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
                     >
                       <span>{p.link.label}</span>
                       <ExternalLink className="w-2 h-2 opacity-80" />
@@ -777,7 +777,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                     <span>{p.heading}</span>
                   </h4>
                 )}
-                <p className="text-slate-600 dark:text-slate-300 leading-normal whitespace-pre-line">
+                <p className="text-slate-700 dark:text-slate-300 leading-normal whitespace-pre-line">
                   {renderTextWithLinks(p.text)}
                 </p>
                 {p.link && (
@@ -785,7 +785,7 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                     href={p.link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-400 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
+                    className="inline-flex items-center gap-1 text-xs font-mono text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 underline decoration-slate-500 dark:decoration-slate-500 hover:decoration-black dark:hover:decoration-white underline-offset-2 mt-0.5 font-semibold"
                   >
                     <span>{p.link.label}</span>
                     <ExternalLink className="w-2 h-2 opacity-80" />
