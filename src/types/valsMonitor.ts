@@ -12,7 +12,8 @@ export interface ValsLeaderboardModel {
   company: string;
   rank: number;
   score: number; // Exact reported accuracy percentage (e.g. 71.31)
-  roundedScore: number; // Integer score written to Column K (e.g. 71)
+  scoreDecimals?: number; // Number of decimal places reported on vals.ai (e.g. 2)
+  roundedScore: number; // Exact score (kept for backward compatibility)
   cost: number | null;
   isNewToSource: boolean;
 }
@@ -34,7 +35,8 @@ export interface ValsDiffItem {
   company: string;
   rank: number;
   liveScore: number; // Exact Vals accuracy (e.g. 71.31)
-  writeScore: number; // Integer Sheet Col K score (e.g. 71)
+  scoreDecimals?: number; // Number of decimal places reported on vals.ai
+  writeScore: number; // Exact score written to Column K (e.g. 71.31)
   status: ValsDiffStatus;
   matchedModelId: string | null;
   matchedDisplayName: string | null;

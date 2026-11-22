@@ -11,9 +11,9 @@ import type {
 } from '../src/types/valsMonitor.ts';
 
 const VALS_INDEX_URL = 'https://www.vals.ai/benchmarks/vals_index';
-const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-vals-monitor-cache-v1.json');
+const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-vals-monitor-cache-v2.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const SCORE_DIFF_THRESHOLD = 0.5;
+const SCORE_DIFF_THRESHOLD = 1e-4;
 
 interface PersistedValsCache {
   report: ValsCheckReport | null;
@@ -242,11 +242,13 @@ export async function fetchLiveValsLeaderboard(
     if (!name) continue;
 
     const company = String(raw.company || '').trim();
-    const accNum = Number(String(raw.accuracy ?? '').replace(/%$/, '').trim());
+    const accRaw = String(raw.accuracy ?? '').replace(/%$/, '').trim();
+    const accNum = Number(accRaw);
     if (!Number.isFinite(accNum)) continue;
 
-    const score = Math.round(accNum * 100) / 100;
-    const roundedScore = Math.round(accNum);
+    const dotIdx = accRaw.indexOf('.');
+    const scoreDecimals = dotIdx !== -1 ? accRaw.length - dotIdx - 1 : 0;
+    const score = accNum;
     const rankNum = Number(raw.position);
     const rank = Number.isFinite(rankNum) && rankNum > 0 ? rankNum : i + 1;
     const costNum = raw.cost !== null && raw.cost !== undefined ? Number(raw.cost) : null;
@@ -267,7 +269,8 @@ export async function fetchLiveValsLeaderboard(
       company,
       rank,
       score,
-      roundedScore,
+      scoreDecimals,
+      roundedScore: score,
       cost: costNum !== null && Number.isFinite(costNum) ? Math.round(costNum * 100) / 100 : null,
       isNewToSource: hasBaseline && !prevSet.has(id),
     });
@@ -528,6 +531,18 @@ export function buildValsDiffs(
 
   const diffs: ValsDiffItem[] = [];
 
+  const formatExact = (val: number, minDecimals?: number): string => {
+    const str = String(val);
+    if (typeof minDecimals === 'number' && minDecimals > 0) {
+      const dot = str.indexOf('.');
+      const curDec = dot !== -1 ? str.length - dot - 1 : 0;
+      if (curDec < minDecimals) {
+        return val.toFixed(minDecimals);
+      }
+    }
+    return str;
+  };
+
   for (const src of sourceModels) {
     if (ignoredSet.has(src.id)) {
       diffs.push({
@@ -536,7 +551,8 @@ export function buildValsDiffs(
         company: src.company,
         rank: src.rank,
         liveScore: src.score,
-        writeScore: src.roundedScore,
+        scoreDecimals: src.scoreDecimals,
+        writeScore: src.score,
         status: 'ignored',
         matchedModelId: null,
         matchedDisplayName: null,
@@ -557,7 +573,8 @@ export function buildValsDiffs(
         company: src.company,
         rank: src.rank,
         liveScore: src.score,
-        writeScore: src.roundedScore,
+        scoreDecimals: src.scoreDecimals,
+        writeScore: src.score,
         status: 'new_unmatched',
         matchedModelId: null,
         matchedDisplayName: null,
@@ -576,7 +593,8 @@ export function buildValsDiffs(
         company: src.company,
         rank: src.rank,
         liveScore: src.score,
-        writeScore: src.roundedScore,
+        scoreDecimals: src.scoreDecimals,
+        writeScore: src.score,
         status: 'missing',
         matchedModelId: bestMatch.id,
         matchedDisplayName: bestMatch.displayName,
@@ -589,8 +607,8 @@ export function buildValsDiffs(
     }
 
     const isEstimateNonBold = bestMatch.colKIsBold === false;
-    const deltaExact = Math.abs(bestMatch.colK - src.score);
-    const deltaRounded = Math.abs(bestMatch.colK - src.roundedScore);
+    const delta = Math.abs(bestMatch.colK - src.score);
+    const liveFormatted = formatExact(src.score, src.scoreDecimals);
 
     if (isEstimateNonBold) {
       diffs.push({
@@ -599,33 +617,35 @@ export function buildValsDiffs(
         company: src.company,
         rank: src.rank,
         liveScore: src.score,
-        writeScore: src.roundedScore,
+        scoreDecimals: src.scoreDecimals,
+        writeScore: src.score,
         status: 'overwrite_estimate',
         matchedModelId: bestMatch.id,
         matchedDisplayName: bestMatch.displayName,
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColK: bestMatch.colK,
         currentColKIsBold: false,
-        reason: `Nicht-fetter Schätzwert (${bestMatch.colK}) → offiziellen Vals-Score (${src.roundedScore}, fett) übernehmen.`,
+        reason: `Nicht-fetter Schätzwert (${bestMatch.colK}) → offiziellen Vals-Score (${liveFormatted}, fett) übernehmen.`,
       });
       continue;
     }
 
-    if (deltaExact >= SCORE_DIFF_THRESHOLD && deltaRounded >= SCORE_DIFF_THRESHOLD) {
+    if (delta >= SCORE_DIFF_THRESHOLD) {
       diffs.push({
         valsId: src.id,
         valsName: src.name,
         company: src.company,
         rank: src.rank,
         liveScore: src.score,
-        writeScore: src.roundedScore,
+        scoreDecimals: src.scoreDecimals,
+        writeScore: src.score,
         status: 'changed',
         matchedModelId: bestMatch.id,
         matchedDisplayName: bestMatch.displayName,
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColK: bestMatch.colK,
         currentColKIsBold: bestMatch.colKIsBold,
-        reason: `Offizieller Score weicht ab (${bestMatch.colK} → ${src.roundedScore} [${src.score}%]).`,
+        reason: `Offizieller Score weicht ab (${bestMatch.colK} → ${liveFormatted}).`,
       });
       continue;
     }
@@ -636,7 +656,8 @@ export function buildValsDiffs(
       company: src.company,
       rank: src.rank,
       liveScore: src.score,
-      writeScore: src.roundedScore,
+      scoreDecimals: src.scoreDecimals,
+      writeScore: src.score,
       status: 'unchanged',
       matchedModelId: bestMatch.id,
       matchedDisplayName: bestMatch.displayName,

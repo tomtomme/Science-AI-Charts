@@ -1,3 +1,5 @@
+import type { AuthorSocialLink } from '../types';
+
 export const DEFAULT_SPREADSHEET_ID = '1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI';
 export const MAIN_SHEET_GID = 170267419;
 export const LABS_SHEET_GID = 355721692;
@@ -164,11 +166,42 @@ export interface SheetGridWithFormatting {
   rows: string[][];
   greenMask: boolean[][];
   boldMask: boolean[][];
+  cellO1Links?: AuthorSocialLink[];
+}
+
+function extractCellRichLinks(cell: any): AuthorSocialLink[] {
+  const formatted = typeof cell?.formattedValue === 'string' ? cell.formattedValue : '';
+  const runs: any[] = Array.isArray(cell?.textFormatRuns) ? cell.textFormatRuns : [];
+  const links: AuthorSocialLink[] = [];
+
+  if (formatted && runs.length > 0) {
+    for (let i = 0; i < runs.length; i++) {
+      const uri = runs[i]?.format?.link?.uri;
+      if (!uri || typeof uri !== 'string') continue;
+      const start = Number(runs[i]?.startIndex ?? 0);
+      const end =
+        i + 1 < runs.length ? Number(runs[i + 1]?.startIndex ?? formatted.length) : formatted.length;
+      const label = formatted
+        .slice(start, end)
+        .replace(/^[\s,:;·|-]+|[\s,:;·|-]+$/g, '')
+        .trim();
+      if (label && /^https?:\/\//i.test(uri)) {
+        links.push({ label, url: uri });
+      }
+    }
+  }
+
+  if (links.length === 0 && typeof cell?.hyperlink === 'string' && /^https?:\/\//i.test(cell.hyperlink)) {
+    const label = formatted.trim() || 'Link';
+    links.push({ label, url: cell.hyperlink });
+  }
+
+  return links;
 }
 
 /**
  * Reads formatted values, cell background colors (e.g. mint green OpenWeights cells),
- * and cell bold text formatting directly from Google Sheets API v4 via includeGridData=true.
+ * cell bold text formatting, and cell O1 hyperlinks directly from Google Sheets API v4 via includeGridData=true.
  */
 export async function fetchSheetGridWithFormatting(
   spreadsheetId: string,
@@ -177,7 +210,7 @@ export async function fetchSheetGridWithFormatting(
 ): Promise<SheetGridWithFormatting> {
   const range = encodeURIComponent(quoteSheetTitle(sheetTitle));
   const fields = encodeURIComponent(
-    'sheets(merges,data(rowData(values(formattedValue,effectiveFormat(backgroundColor,textFormat(bold))))))'
+    'sheets(merges,data(rowData(values(formattedValue,effectiveValue(numberValue),hyperlink,textFormatRuns(startIndex,format(link(uri))),effectiveFormat(backgroundColor,textFormat(bold),numberFormat(type))))))'
   );
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
     spreadsheetId
@@ -201,6 +234,8 @@ export async function fetchSheetGridWithFormatting(
   const rows: string[][] = [];
   const greenMask: boolean[][] = [];
   const boldMask: boolean[][] = [];
+  const row0Cells = Array.isArray(rowData[0]?.values) ? rowData[0].values : [];
+  const cellO1Links = row0Cells[14] ? extractCellRichLinks(row0Cells[14]) : [];
 
   for (const rowItem of rowData) {
     const cells = Array.isArray(rowItem?.values) ? rowItem.values : [];
@@ -209,7 +244,29 @@ export async function fetchSheetGridWithFormatting(
     const rowBolds: boolean[] = [];
 
     for (const cell of cells) {
-      rowVals.push(cell?.formattedValue !== undefined && cell?.formattedValue !== null ? String(cell.formattedValue) : '');
+      const formattedStr =
+        cell?.formattedValue !== undefined && cell?.formattedValue !== null
+          ? String(cell.formattedValue)
+          : '';
+      const rawNumVal = cell?.effectiveValue?.numberValue;
+      const fmtType = cell?.effectiveFormat?.numberFormat?.type;
+      let cellVal = formattedStr;
+
+      if (
+        typeof rawNumVal === 'number' &&
+        Number.isFinite(rawNumVal) &&
+        (!fmtType || fmtType === 'NUMBER' || fmtType === 'SCIENTIFIC') &&
+        !/[%$€£¥/:a-zA-Z]/.test(formattedStr) &&
+        !/^\d{4}-\d{2}-\d{2}/.test(formattedStr.trim()) &&
+        !/^\d{1,2}\.\d{1,2}\.\d{2,4}$/.test(formattedStr.trim())
+      ) {
+        const parsedFmt = parseFloat(formattedStr.trim().replace(',', '.'));
+        if (formattedStr.trim() === '' || (Number.isFinite(parsedFmt) && Math.abs(parsedFmt - rawNumVal) <= 1)) {
+          cellVal = String(rawNumVal);
+        }
+      }
+
+      rowVals.push(cellVal);
       const bg = cell?.effectiveFormat?.backgroundColor;
       let isGreen = false;
       if (bg && typeof bg === 'object') {
@@ -228,7 +285,7 @@ export async function fetchSheetGridWithFormatting(
     boldMask.push(rowBolds);
   }
 
-  return { rows, greenMask, boldMask };
+  return { rows, greenMask, boldMask, cellO1Links };
 }
 
 /**
@@ -426,11 +483,13 @@ export async function insertModelRowInSheet(
 export interface CellBoldSpec {
   row1Based: number;
   col0Based: number;
-  bold: boolean;
+  bold?: boolean;
+  numberFormatPattern?: string;
 }
 
 /**
- * Sets userEnteredFormat.textFormat.bold on explicit cells without disturbing colors or number formats.
+ * Sets userEnteredFormat.textFormat.bold and/or userEnteredFormat.numberFormat on explicit cells
+ * without disturbing colors or unrelated formatting.
  */
 export async function applyCellsBoldFormatting(
   spreadsheetId: string,
@@ -444,25 +503,44 @@ export async function applyCellsBoldFormatting(
     spreadsheetId
   )}:batchUpdate`;
 
-  const requests = cells.map((c) => ({
-    repeatCell: {
-      range: {
-        sheetId,
-        startRowIndex: c.row1Based - 1,
-        endRowIndex: c.row1Based,
-        startColumnIndex: c.col0Based,
-        endColumnIndex: c.col0Based + 1,
-      },
-      cell: {
-        userEnteredFormat: {
-          textFormat: {
-            bold: c.bold,
+  const requests = cells
+    .map((c) => {
+      const userEnteredFormat: Record<string, unknown> = {};
+      const fieldPaths: string[] = [];
+
+      if (typeof c.bold === 'boolean') {
+        userEnteredFormat.textFormat = { bold: c.bold };
+        fieldPaths.push('userEnteredFormat.textFormat.bold');
+      }
+      if (typeof c.numberFormatPattern === 'string' && c.numberFormatPattern) {
+        userEnteredFormat.numberFormat = {
+          type: 'NUMBER',
+          pattern: c.numberFormatPattern,
+        };
+        fieldPaths.push('userEnteredFormat.numberFormat');
+      }
+
+      if (fieldPaths.length === 0) return null;
+
+      return {
+        repeatCell: {
+          range: {
+            sheetId,
+            startRowIndex: c.row1Based - 1,
+            endRowIndex: c.row1Based,
+            startColumnIndex: c.col0Based,
+            endColumnIndex: c.col0Based + 1,
           },
+          cell: {
+            userEnteredFormat,
+          },
+          fields: fieldPaths.join(','),
         },
-      },
-      fields: 'userEnteredFormat.textFormat.bold',
-    },
-  }));
+      };
+    })
+    .filter((req): req is NonNullable<typeof req> => req !== null);
+
+  if (requests.length === 0) return;
 
   const res = await fetch(batchUrl, {
     method: 'POST',
@@ -474,13 +552,13 @@ export async function applyCellsBoldFormatting(
   });
 
   if (!res.ok) {
-    throw await parseApiError(res, 'Failed to apply bold text formatting in Google Sheet');
+    throw await parseApiError(res, 'Failed to apply cell formatting in Google Sheet');
   }
 }
 
 /**
  * Inserts a new row at a 1-based row position, writes only explicit sparse cells (preserving
- * any formula columns or unpopulated benchmark slots), and applies bold/non-bold text formatting.
+ * any formula columns or unpopulated benchmark slots), and applies bold/non-bold text & number formatting.
  */
 export async function insertRowAndWriteSparseCells(
   spreadsheetId: string,

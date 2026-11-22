@@ -17,6 +17,7 @@ import { ScoreSlider } from './components/ScoreSlider';
 import { SearchBar } from './components/SearchBar';
 import { WeightingPanel } from './components/WeightingPanel';
 import { CsvNotesSection } from './components/CsvNotesSection';
+import { AuthorSocialSubtitle } from './components/AuthorSocialIcons';
 import { LabMatrixView, LabGroup } from './components/LabMatrixView';
 import { TimelineScatterplot, TIMELINE_REGRESSION_OPTIONS, DEFAULT_TIMELINE_REGRESSION_INDEX } from './components/TimelineScatterplot';
 import { CorrelationsScatterplot, CORRELATION_REGRESSION_OPTIONS, DEFAULT_CORRELATION_REGRESSION_INDEX } from './components/CorrelationsScatterplot';
@@ -857,6 +858,7 @@ export default function App() {
           loadModelsData({
             accessToken: effectiveToken,
             spreadsheetId: effectiveSpreadsheetId,
+            forceRefresh,
           }),
           fetchLiveLabEntries({
             accessToken: effectiveToken,
@@ -3426,38 +3428,44 @@ export default function App() {
       {/* App Footer with Sync, Google Login, Preischecker, Sheets Link & GitHub Link */}
       <footer className="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6 py-3">
         <div className="w-full max-w-[1720px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
-          {/* Left: Dataset Source & Last Sync Info */}
-          <div className="flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-300">
-            <span className="font-semibold text-slate-900 dark:text-slate-100">
-              Science-AI Benchmarks
-            </span>
-            <span className="text-slate-400 dark:text-slate-700">·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  loadedData.dataSource === 'sheets_api'
-                    ? 'bg-emerald-500'
-                    : loadedData.isLive
-                    ? 'bg-blue-500'
-                    : 'bg-amber-500'
-                }`}
-              />
-              <span>
-                {loadedData.dataSource === 'sheets_api'
-                  ? `Sheets API (${loadedData.activeSheetTitle || 'Live'})`
-                  : loadedData.dataSource === 'csv'
-                  ? 'CSV Live'
-                  : 'Snapshot'}
+          {/* Left: Dataset Source, Last Sync & Author / Social Links (Cell O1) */}
+          <div className="flex flex-col items-center sm:items-start gap-1.5">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-slate-700 dark:text-slate-300">
+              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                Science-AI Benchmarks
               </span>
-            </span>
-            {lastSyncedAt && (
-              <>
-                <span className="text-slate-300 dark:text-slate-700">·</span>
+              <span className="text-slate-400 dark:text-slate-700">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    loadedData.dataSource === 'sheets_api'
+                      ? 'bg-emerald-500'
+                      : loadedData.isLive
+                      ? 'bg-blue-500'
+                      : 'bg-amber-500'
+                  }`}
+                />
                 <span>
-                  {t.lastSync}: <strong className="text-slate-700 dark:text-slate-300">{formatSyncDate(lastSyncedAt)}</strong>
+                  {loadedData.dataSource === 'sheets_api'
+                    ? `Sheets API (${loadedData.activeSheetTitle || 'Live'})`
+                    : loadedData.dataSource === 'csv'
+                    ? 'CSV Live'
+                    : 'Snapshot'}
                 </span>
-              </>
-            )}
+              </span>
+              {lastSyncedAt && (
+                <>
+                  <span className="text-slate-300 dark:text-slate-700">·</span>
+                  <span>
+                    {t.lastSync}: <strong className="text-slate-700 dark:text-slate-300">{formatSyncDate(lastSyncedAt)}</strong>
+                  </span>
+                </>
+              )}
+            </div>
+            <AuthorSocialSubtitle
+              authorMeta={loadedData.headerMeta?.authorMeta}
+              lang={lang}
+            />
           </div>
 
           {/* Right: Sync, Preischecker, Data Source Link & Code Source Link */}

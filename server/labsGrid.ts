@@ -172,3 +172,101 @@ export async function fetchLabsGridFromPublishedHtml(forceRefresh = false): Prom
   cachedAtMs = Date.now();
   return parsed;
 }
+
+const PUBHTML_MAIN_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vR8QbYqPYx_PnohNVTT-hAU-NkOt9hVh-INeH_SJPwoYJpoRsBUGdmanYRZiz3ll1J0scf5U_vju3nG/pubhtml/sheet?headers=false&gid=170267419';
+
+export interface MainO1LinksResponse {
+  cellO1Text: string;
+  links: Array<{ label: string; url: string }>;
+  fetchedAt: string;
+}
+
+let cachedO1Links: MainO1LinksResponse | null = null;
+let cachedO1AtMs = 0;
+const O1_CACHE_MS = 60 * 1000;
+
+function unwrapGoogleRedirectUrl(rawHref: string): string {
+  const decoded = decodeHtmlEntities(rawHref);
+  try {
+    const u = new URL(decoded);
+    if ((u.hostname === 'www.google.com' || u.hostname === 'google.com') && u.pathname === '/url') {
+      const target = u.searchParams.get('q');
+      if (target && /^https?:\/\//i.test(target)) {
+        return target;
+      }
+    }
+  } catch {
+    // Keep decoded URL if URL constructor fails
+  }
+  return decoded;
+}
+
+export function parseMainO1LinksFromHtml(html: string): MainO1LinksResponse {
+  const tbodyStart = html.indexOf('<tbody>');
+  const tbodyEnd = html.indexOf('</tbody>');
+  const tbody = tbodyStart !== -1 && tbodyEnd !== -1 ? html.slice(tbodyStart, tbodyEnd) : html;
+
+  for (const trMatch of tbody.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
+    const trContent = trMatch[1];
+    let col = 0;
+    for (const tdMatch of trContent.matchAll(/<td([^>]*)>([\s\S]*?)<\/td>/g)) {
+      const attrs = tdMatch[1] || '';
+      if (attrs.includes('freezebar-cell')) continue;
+      const colspan = Math.max(1, Number(attrs.match(/colspan="(\d+)"/i)?.[1] || 1));
+      const innerHtml = tdMatch[2] || '';
+      if (col <= 14 && col + colspan > 14) {
+        const links: Array<{ label: string; url: string }> = [];
+        for (const aMatch of innerHtml.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+          const url = unwrapGoogleRedirectUrl(aMatch[1] || '');
+          const label = decodeHtmlEntities(aMatch[2] || '');
+          if (label && /^https?:\/\//i.test(url)) {
+            links.push({ label, url });
+          }
+        }
+        const cellO1Text = decodeHtmlEntities(innerHtml);
+        if (cellO1Text || links.length > 0) {
+          return {
+            cellO1Text,
+            links,
+            fetchedAt: new Date().toISOString(),
+          };
+        }
+      }
+      col += colspan;
+    }
+  }
+
+  return {
+    cellO1Text: '',
+    links: [],
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function fetchMainO1LinksFromPublishedHtml(
+  forceRefresh = false
+): Promise<MainO1LinksResponse> {
+  if (!forceRefresh && cachedO1Links && Date.now() - cachedO1AtMs < O1_CACHE_MS) {
+    return cachedO1Links;
+  }
+
+  const response = await fetch(`${PUBHTML_MAIN_URL}&_t=${Date.now()}`, {
+    cache: 'no-store',
+    headers: {
+      Accept: 'text/html, */*',
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch main sheet HTML for cell O1 (HTTP ${response.status})`);
+  }
+
+  const html = await response.text();
+  const parsed = parseMainO1LinksFromHtml(html);
+  cachedO1Links = parsed;
+  cachedO1AtMs = Date.now();
+  return parsed;
+}

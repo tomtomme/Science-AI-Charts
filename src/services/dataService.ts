@@ -1,5 +1,5 @@
 import { FALLBACK_CSV_CONTENT, RAW_CSV_URL, DIRECT_EXPORT_CSV_URL } from '../data/rawCsvFallback';
-import { ModelRecord, CsvNotesMetadata, SheetColumnLayout } from '../types';
+import { AuthorSocialLink, ModelRecord, CsvNotesMetadata, SheetColumnLayout } from '../types';
 import {
   extractHeaderMetadata,
   extractHeaderMetadataFromRows,
@@ -68,6 +68,7 @@ export interface LoadModelsOptions {
   accessToken?: string | null;
   spreadsheetId?: string;
   sheetGid?: number;
+  forceRefresh?: boolean;
 }
 
 /**
@@ -123,14 +124,19 @@ export async function fetchLiveCsv(): Promise<{
  * - Otherwise falls back to public CSV / embedded snapshot so charts still render before sign-in.
  */
 export async function loadModelsData(options: LoadModelsOptions = {}): Promise<LoadedDatasets> {
-  const { accessToken, spreadsheetId = DEFAULT_SPREADSHEET_ID, sheetGid = MAIN_SHEET_GID } = options;
+  const {
+    accessToken,
+    spreadsheetId = DEFAULT_SPREADSHEET_ID,
+    sheetGid = MAIN_SHEET_GID,
+    forceRefresh = false,
+  } = options;
   const now = new Date();
 
   if (accessToken) {
     try {
       const meta = await fetchSpreadsheetMetadata(spreadsheetId, accessToken);
       const tab = resolveSheetTab(meta, sheetGid);
-      const { rows, boldMask } = await fetchSheetGridWithFormatting(
+      const { rows, boldMask, cellO1Links } = await fetchSheetGridWithFormatting(
         spreadsheetId,
         tab.title,
         accessToken
@@ -141,7 +147,7 @@ export async function loadModelsData(options: LoadModelsOptions = {}): Promise<L
       const oldModels = parseModelDatasetFromRows(rows, 'old');
       const worstCaseModels = parseModelDatasetFromRows(rows, 'worstCase');
       const sheetFileDate = extractSheetDateFromRows(rows);
-      const headerMeta = extractHeaderMetadataFromRows(rows);
+      const headerMeta = extractHeaderMetadataFromRows(rows, cellO1Links);
       const notesMeta = extractCsvNotesMetadataFromRows(rows);
       const structure = findSheetStructuralRows(rows);
       const columnLayout = detectSheetColumns(rows);
@@ -211,14 +217,41 @@ export async function loadModelsData(options: LoadModelsOptions = {}): Promise<L
     }
   }
 
-  const { csvText, isLive, headerDate } = await fetchLiveCsv();
+  const fetchLiveO1Links = async (): Promise<AuthorSocialLink[] | undefined> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
+      const endpoint = forceRefresh ? '/api/sheet-o1-links?refresh=1' : '/api/sheet-o1-links';
+      const res = await fetch(endpoint, {
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) return undefined;
+      const payload = await res.json();
+      if (Array.isArray(payload?.links) && payload.links.length > 0) {
+        return payload.links.filter(
+          (item: any): item is AuthorSocialLink =>
+            typeof item?.label === 'string' && typeof item?.url === 'string'
+        );
+      }
+    } catch {
+      // Static preview or offline mode falls back to KNOWN_AUTHOR_SOCIAL_URLS inside parseCellO1
+    }
+    return undefined;
+  };
+
+  const [{ csvText, isLive, headerDate }, liveO1Links] = await Promise.all([
+    fetchLiveCsv(),
+    fetchLiveO1Links(),
+  ]);
   try {
     const allModels = parseAllModels(csvText);
     const newModels = parseModelDataset(csvText, 'new');
     const oldModels = parseModelDataset(csvText, 'old');
     const worstCaseModels = parseModelDataset(csvText, 'worstCase');
     const sheetFileDate = extractSheetDate(csvText);
-    const headerMeta = extractHeaderMetadata(csvText);
+    const headerMeta = extractHeaderMetadata(csvText, liveO1Links);
     const notesMeta = extractCsvNotesMetadata(csvText);
     const parsedRows = parseCsvRows(csvText);
     const columnLayout = detectSheetColumns(parsedRows);

@@ -12,9 +12,9 @@ import type {
 
 const SIMPLE_BENCH_URL = 'https://simple-bench.com/';
 const FALLBACK_DATA_URL = 'https://simple-bench.com/static/js/leaderboard-data.js';
-const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-simplebench-monitor-cache-v1.json');
+const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-simplebench-monitor-cache-v2.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const SCORE_DIFF_THRESHOLD = 0.05;
+const SCORE_DIFF_THRESHOLD = 1e-4;
 
 interface PersistedSimpleBenchCache {
   report: SimpleBenchCheckReport | null;
@@ -328,7 +328,9 @@ export async function fetchLiveSimpleBenchLeaderboard(
 
     const scoreNum = Number(scoreRaw);
     if (!Number.isFinite(scoreNum)) continue;
-    const score = Math.round(scoreNum * 10) / 10;
+    const dotIdx = scoreRaw.indexOf('.');
+    const scoreDecimals = dotIdx !== -1 ? scoreRaw.length - dotIdx - 1 : 0;
+    const score = scoreNum;
 
     llmRankCounter++;
     const rankMatch = rankLabel.match(/^(\d+)/);
@@ -349,6 +351,7 @@ export async function fetchLiveSimpleBenchLeaderboard(
       rank,
       rankLabel: rankLabel || `${rank}`,
       score,
+      scoreDecimals,
       dateAdded,
       isNewToSource: hasBaseline && !prevSet.has(id),
     });
@@ -679,6 +682,18 @@ export function buildSimpleBenchDiffs(
 
   const diffs: SimpleBenchDiffItem[] = [];
 
+  const formatExact = (val: number, minDecimals?: number): string => {
+    const str = String(val);
+    if (typeof minDecimals === 'number' && minDecimals > 0) {
+      const dot = str.indexOf('.');
+      const curDec = dot !== -1 ? str.length - dot - 1 : 0;
+      if (curDec < minDecimals) {
+        return val.toFixed(minDecimals);
+      }
+    }
+    return str;
+  };
+
   for (const src of sourceModels) {
     if (ignoredSet.has(src.id)) {
       diffs.push({
@@ -687,6 +702,7 @@ export function buildSimpleBenchDiffs(
         organization: src.organization,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         dateAdded: src.dateAdded,
         status: 'ignored',
         matchedModelId: null,
@@ -708,6 +724,7 @@ export function buildSimpleBenchDiffs(
         organization: src.organization,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         dateAdded: src.dateAdded,
         status: 'new_unmatched',
         matchedModelId: null,
@@ -727,6 +744,7 @@ export function buildSimpleBenchDiffs(
         organization: src.organization,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         dateAdded: src.dateAdded,
         status: 'missing',
         matchedModelId: bestMatch.id,
@@ -741,6 +759,7 @@ export function buildSimpleBenchDiffs(
 
     const isEstimateNonBold = bestMatch.colYIsBold === false;
     const delta = Math.abs(bestMatch.colY - src.score);
+    const liveFormatted = formatExact(src.score, src.scoreDecimals);
 
     if (isEstimateNonBold) {
       diffs.push({
@@ -749,6 +768,7 @@ export function buildSimpleBenchDiffs(
         organization: src.organization,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         dateAdded: src.dateAdded,
         status: 'overwrite_estimate',
         matchedModelId: bestMatch.id,
@@ -756,7 +776,7 @@ export function buildSimpleBenchDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColY: bestMatch.colY,
         currentColYIsBold: false,
-        reason: `Nicht-fetter Schätzwert (${bestMatch.colY}) → offiziellen SimpleBench-Score (${src.score}, fett) übernehmen.`,
+        reason: `Nicht-fetter Schätzwert (${bestMatch.colY}) → offiziellen SimpleBench-Score (${liveFormatted}, fett) übernehmen.`,
       });
       continue;
     }
@@ -768,6 +788,7 @@ export function buildSimpleBenchDiffs(
         organization: src.organization,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         dateAdded: src.dateAdded,
         status: 'changed',
         matchedModelId: bestMatch.id,
@@ -775,7 +796,7 @@ export function buildSimpleBenchDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColY: bestMatch.colY,
         currentColYIsBold: bestMatch.colYIsBold,
-        reason: `Offizieller Score weicht ab (${bestMatch.colY} → ${src.score}).`,
+        reason: `Offizieller Score weicht ab (${bestMatch.colY} → ${liveFormatted}).`,
       });
       continue;
     }
@@ -786,6 +807,7 @@ export function buildSimpleBenchDiffs(
       organization: src.organization,
       rank: src.rank,
       liveScore: src.score,
+      scoreDecimals: src.scoreDecimals,
       dateAdded: src.dateAdded,
       status: 'unchanged',
       matchedModelId: bestMatch.id,

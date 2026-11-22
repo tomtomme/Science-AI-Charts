@@ -181,6 +181,26 @@ export interface Row33Metadata {
   moreSourcesUrls?: string[];
 }
 
+export interface AuthorSocialLink {
+  label: string;
+  url: string;
+}
+
+export interface AuthorHeadlineSegment {
+  text: string;
+  url?: string;
+}
+
+export interface SheetAuthorMeta {
+  rawText: string;
+  prefixEn: string;
+  prefixDe: string;
+  authorName: string;
+  headlineSegmentsEn?: AuthorHeadlineSegment[];
+  headlineSegmentsDe?: AuthorHeadlineSegment[];
+  links: AuthorSocialLink[];
+}
+
 export interface LabEntry {
   id: string;
   group: 'top10' | 'contender' | 'tweakers' | 'small' | 'harness';

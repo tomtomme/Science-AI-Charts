@@ -1,7 +1,7 @@
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { getCompanyMeta, getFaviconUrl, normalizeCompanyLookupKey } from '../data/companies';
 import { lookupResearchedUsPrice } from '../data/usPricingData';
-import { BenchmarkWeights, ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata, Row33Metadata, SheetColumnLayout } from '../types';
+import { AuthorHeadlineSegment, AuthorSocialLink, BenchmarkWeights, ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata, Row33Metadata, SheetAuthorMeta, SheetColumnLayout } from '../types';
 import { computeWeightedBreakdown, isCustomWeighted } from './weighting';
 
 /**
@@ -82,6 +82,8 @@ export function extractSheetDate(csvText: string): string | null {
 export interface CsvHeaderMetadata {
   cellA1: string;
   cellC1: string;
+  cellO1?: string;
+  authorMeta?: SheetAuthorMeta;
   combinedTitle: string;
   subtitle: string;
   titleDe?: string;
@@ -95,6 +97,234 @@ export interface CsvHeaderMetadata {
   translatedAt?: string;
   translationSource?: 'gemini_weekly' | 'local_fallback';
   row33?: Row33Metadata;
+}
+
+const KNOWN_AUTHOR_SOCIAL_URLS: Record<string, string> = {
+  youtube: 'https://www.youtube.com/@StatisticsSupreme',
+  github: 'https://github.com/tomtomme',
+  orcid: 'https://orcid.org/0000-0001-5867-4997',
+  zotero: 'https://www.zotero.org/thomas_langkamp',
+  'google scholar': 'https://scholar.google.com/citations?user=aedKy9AAAAAJ&hl=de',
+  scholar: 'https://scholar.google.com/citations?user=aedKy9AAAAAJ&hl=de',
+  researchgate: 'https://www.researchgate.net/profile/Thomas-Langkamp',
+};
+
+const KNOWN_HEADLINE_URLS: Record<string, string> = {
+  app: 'https://tomtomme.github.io/Science-AI-Charts/',
+  table: 'https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=170267419#gid=170267419',
+  tabelle: 'https://docs.google.com/spreadsheets/d/1Meep9uT4Q2qRWaBM1Bwu4ZnYNB0J51ib-hP1OsOOCuI/edit?gid=170267419#gid=170267419',
+};
+
+function normalizeSocialKey(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function linkifyHeadlineText(
+  text: string,
+  headlineLinksMap: Map<string, AuthorSocialLink>
+): AuthorHeadlineSegment[] {
+  if (!text) return [];
+  if (headlineLinksMap.size === 0) return [{ text }];
+
+  const escapedTerms = Array.from(headlineLinksMap.values())
+    .map((item) => item.label.trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+  if (escapedTerms.length === 0) return [{ text }];
+
+  const regex = new RegExp(`\\b(${escapedTerms.join('|')})\\b`, 'gi');
+  const segments: AuthorHeadlineSegment[] = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(regex)) {
+    const idx = match.index ?? 0;
+    if (idx > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, idx) });
+    }
+    const matchedText = match[0];
+    const matchedLink = headlineLinksMap.get(normalizeSocialKey(matchedText));
+    segments.push({
+      text: matchedText,
+      url: matchedLink?.url,
+    });
+    lastIndex = idx + matchedText.length;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex) });
+  }
+
+  return segments.length > 0 ? segments : [{ text }];
+}
+
+export function parseCellO1(
+  rawCellO1: string,
+  extractedLinks?: AuthorSocialLink[]
+): SheetAuthorMeta | undefined {
+  const trimmed = (rawCellO1 || '').replace(/\s+/g, ' ').trim();
+  const hasExtracted = Array.isArray(extractedLinks) && extractedLinks.length > 0;
+  if (!trimmed && !hasExtracted) return undefined;
+
+  const colonIdx = trimmed.indexOf(':');
+  const headline = (colonIdx !== -1 ? trimmed.slice(0, colonIdx) : trimmed).trim();
+  const linksRaw = colonIdx !== -1 ? trimmed.slice(colonIdx + 1).trim() : '';
+
+  const extractedByKey = new Map<string, AuthorSocialLink>();
+  if (hasExtracted) {
+    for (const item of extractedLinks!) {
+      if (item.label && item.url) {
+        extractedByKey.set(normalizeSocialKey(item.label), item);
+      }
+    }
+  }
+
+  const linkTokens = linksRaw
+    ? linksRaw
+        .split(/\s*[,;|·]\s*/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+  const linkTokenKeys = new Set(linkTokens.map((t) => normalizeSocialKey(t)));
+
+  // Separate extracted links into inline headline links (e.g. App, Table) vs. social icon links
+  const headlineLinksMap = new Map<string, AuthorSocialLink>();
+  const headlineKeySet = new Set<string>();
+
+  if (hasExtracted) {
+    for (const item of extractedLinks!) {
+      const key = normalizeSocialKey(item.label);
+      if (!key) continue;
+      const appearsInHeadline =
+        headline &&
+        new RegExp(`\\b${item.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(headline);
+      const isExplicitHeadlineWord = key === 'app' || key === 'table' || key === 'tabelle';
+      if ((appearsInHeadline && !linkTokenKeys.has(key)) || isExplicitHeadlineWord) {
+        headlineLinksMap.set(key, item);
+        headlineKeySet.add(key);
+      }
+    }
+  }
+
+  if (!headlineLinksMap.has('app') && /\bapp\b/i.test(headline)) {
+    headlineLinksMap.set('app', { label: 'App', url: KNOWN_HEADLINE_URLS.app });
+    headlineKeySet.add('app');
+  }
+  if (!headlineLinksMap.has('table') && !headlineLinksMap.has('tabelle') && /\b(table|tabelle)\b/i.test(headline)) {
+    headlineLinksMap.set('table', { label: 'Table', url: KNOWN_HEADLINE_URLS.table });
+    headlineKeySet.add('table');
+  }
+
+  let prefixEn = '';
+  let prefixDe = '';
+  let authorName = headline;
+  let headlineSegmentsEn: AuthorHeadlineSegment[] | undefined;
+  let headlineSegmentsDe: AuthorHeadlineSegment[] | undefined;
+
+  const appTableMatch = headline.match(
+    /^(App)\s*(&|and|und)\s*(Table|Tabelle)\s+(by|from|von)\s+(.+)$/i
+  );
+
+  if (appTableMatch) {
+    const appTerm = appTableMatch[1];
+    const tableTerm = appTableMatch[3];
+    authorName = appTableMatch[5].trim();
+    const appUrl =
+      headlineLinksMap.get('app')?.url ||
+      extractedByKey.get('app')?.url ||
+      KNOWN_HEADLINE_URLS.app;
+    const tableUrl =
+      headlineLinksMap.get('table')?.url ||
+      headlineLinksMap.get('tabelle')?.url ||
+      extractedByKey.get('table')?.url ||
+      extractedByKey.get('tabelle')?.url ||
+      KNOWN_HEADLINE_URLS.table;
+
+    prefixEn = `${appTerm} & ${tableTerm === 'Tabelle' ? 'Table' : tableTerm} by`;
+    prefixDe = `${appTerm} & Tabelle von`;
+    headlineSegmentsEn = [
+      { text: appTerm, url: appUrl },
+      { text: ' & ' },
+      { text: tableTerm === 'Tabelle' ? 'Table' : tableTerm, url: tableUrl },
+      { text: ' by' },
+    ];
+    headlineSegmentsDe = [
+      { text: appTerm, url: appUrl },
+      { text: ' & ' },
+      { text: 'Tabelle', url: tableUrl },
+      { text: ' von' },
+    ];
+  } else {
+    const prefixMatch = headline.match(
+      /^(A table from|Table by|Created by|By|Eine Tabelle von|Tabelle von|Erstellt von|Von)\s+(.+)$/i
+    );
+    if (prefixMatch) {
+      const rawPrefix = prefixMatch[1].trim();
+      authorName = prefixMatch[2].trim();
+      const low = rawPrefix.toLowerCase();
+      if (low === 'a table from' || low === 'eine tabelle von') {
+        prefixEn = 'A table from';
+        prefixDe = 'Eine Tabelle von';
+      } else if (low === 'table by' || low === 'tabelle von') {
+        prefixEn = 'Table by';
+        prefixDe = 'Tabelle von';
+      } else if (low === 'created by' || low === 'erstellt von') {
+        prefixEn = 'Created by';
+        prefixDe = 'Erstellt von';
+      } else {
+        prefixEn = 'By';
+        prefixDe = 'Von';
+      }
+      const deMap = new Map(headlineLinksMap);
+      const tblLink = deMap.get('table');
+      if (tblLink) {
+        deMap.set('tabelle', { label: 'Tabelle', url: tblLink.url });
+      }
+      headlineSegmentsEn = linkifyHeadlineText(prefixEn, headlineLinksMap);
+      headlineSegmentsDe = linkifyHeadlineText(prefixDe, deMap);
+    } else if (headline) {
+      authorName = '';
+      headlineSegmentsEn = linkifyHeadlineText(headline, headlineLinksMap);
+      headlineSegmentsDe = headlineSegmentsEn;
+    }
+  }
+
+  const links: AuthorSocialLink[] = [];
+  const seenKeys = new Set<string>();
+
+  for (const token of linkTokens) {
+    const key = normalizeSocialKey(token);
+    if (!key || seenKeys.has(key) || headlineKeySet.has(key)) continue;
+    const matched = extractedByKey.get(key);
+    const url = matched?.url || KNOWN_AUTHOR_SOCIAL_URLS[key];
+    if (url) {
+      links.push({ label: matched?.label || token, url });
+      seenKeys.add(key);
+    }
+  }
+
+  if (hasExtracted) {
+    for (const item of extractedLinks!) {
+      const key = normalizeSocialKey(item.label);
+      if (key && !seenKeys.has(key) && !headlineKeySet.has(key) && item.url) {
+        links.push(item);
+        seenKeys.add(key);
+      }
+    }
+  }
+
+  if (!authorName && !headline && links.length === 0) return undefined;
+
+  return {
+    rawText: trimmed,
+    prefixEn,
+    prefixDe,
+    authorName,
+    headlineSegmentsEn,
+    headlineSegmentsDe,
+    links,
+  };
 }
 
 /**
@@ -443,12 +673,17 @@ export function extractRow33Metadata(rows: string[][]): Row33Metadata {
 }
 
 /**
- * Extracts Title (A1), Subtitle (C1), Category Names (D2:K2),
+ * Extracts Title (A1), Subtitle (C1), Author & Social Links (O1), Category Names (D2:K2),
  * and Row 33 synced benchmark metadata directly from a 2D row matrix.
  */
-export function extractHeaderMetadataFromRows(rows: string[][]): CsvHeaderMetadata {
+export function extractHeaderMetadataFromRows(
+  rows: string[][],
+  authorLinks?: AuthorSocialLink[]
+): CsvHeaderMetadata {
   const cellA1 = (rows[0]?.[0] || 'Science-IQ of ChatBots').trim();
   const cellC1 = (rows[0]?.[2] || '').trim();
+  const cellO1 = (rows[0]?.[14] || '').trim();
+  const authorMeta = parseCellO1(cellO1, authorLinks);
   const combinedTitle = cellA1;
 
   const categoryNames: string[] = [];
@@ -487,6 +722,8 @@ export function extractHeaderMetadataFromRows(rows: string[][]): CsvHeaderMetada
   return {
     cellA1,
     cellC1,
+    cellO1: cellO1 || undefined,
+    authorMeta,
     combinedTitle,
     subtitle: cellC1,
     titleDe,
@@ -500,11 +737,14 @@ export function extractHeaderMetadataFromRows(rows: string[][]): CsvHeaderMetada
 }
 
 /**
- * Extracts Title (combined A1 and B2), Subtitle (cell C1), Category Names (cells D2 to K2),
+ * Extracts Title (combined A1 and B2), Subtitle (cell C1), Author (cell O1), Category Names (cells D2 to K2),
  * and Row 33 synced benchmark metadata directly from CSV.
  */
-export function extractHeaderMetadata(csvText: string): CsvHeaderMetadata {
-  return extractHeaderMetadataFromRows(parseCsvRows(csvText));
+export function extractHeaderMetadata(
+  csvText: string,
+  authorLinks?: AuthorSocialLink[]
+): CsvHeaderMetadata {
+  return extractHeaderMetadataFromRows(parseCsvRows(csvText), authorLinks);
 }
 
 /**

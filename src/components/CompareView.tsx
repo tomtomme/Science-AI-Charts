@@ -53,6 +53,10 @@ const BENCHMARK_ANCHOR_MAP: Record<string, string> = {
   excelAgent: 'note-col-i',
   trickQuestions: 'note-col-j',
   econLegal: 'note-col-k',
+  iqOld: 'note-col-d',
+  nonHalluOld: 'note-col-e',
+  scienceKnowledgeOld: 'note-col-f',
+  trickQuestionsOld: 'note-col-simplebench',
 };
 
 const COMPARE_SLOTS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
@@ -244,7 +248,7 @@ function getRow33Source(
   compId: string,
   row33Meta?: Row33Metadata
 ): { text?: string; url?: string } {
-  if (!row33Meta?.benchmarks) return {};
+  if (!row33Meta) return {};
   const map: Record<string, keyof Row33Metadata['benchmarks']> = {
     actCodeReason: 'actCodeReason',
     nonHallucination: 'nonHallucination',
@@ -256,9 +260,24 @@ function getRow33Source(
     econLegal: 'econLegal',
   };
   const key = map[compId];
-  if (!key) return {};
-  const item = row33Meta.benchmarks[key];
-  return { text: item?.text, url: item?.sourceUrl };
+  if (key && row33Meta.benchmarks) {
+    const item = row33Meta.benchmarks[key];
+    return { text: item?.text, url: item?.sourceUrl };
+  }
+  if (row33Meta.retiredBenchmarks) {
+    const retiredMap: Record<string, keyof NonNullable<Row33Metadata['retiredBenchmarks']>> = {
+      iqOld: 'iqOld',
+      nonHalluOld: 'nonHalluOld',
+      scienceKnowledgeOld: 'scienceKnowledgeOld',
+      trickQuestionsOld: 'trickQuestionsOld',
+    };
+    const retiredKey = retiredMap[compId];
+    if (retiredKey) {
+      const item = row33Meta.retiredBenchmarks[retiredKey];
+      return { text: item?.text, url: item?.sourceUrl };
+    }
+  }
+  return {};
 }
 
 function pickNewestCompareModels(
@@ -880,7 +899,13 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
       : null;
   const focusedSlot = effectiveHoveredSlot ?? effectivePinnedSlot;
 
-  const inspectedAxisIdx = hoveredAxisIdx ?? selectedAxisIdx;
+  const safeSelectedAxisIdx =
+    selectedAxisIdx < categoryComparisons.length ? selectedAxisIdx : 0;
+  const safeHoveredAxisIdx =
+    hoveredAxisIdx !== null && hoveredAxisIdx < categoryComparisons.length
+      ? hoveredAxisIdx
+      : null;
+  const inspectedAxisIdx = safeHoveredAxisIdx ?? safeSelectedAxisIdx;
   const inspectedRow = categoryComparisons[inspectedAxisIdx] ?? categoryComparisons[0];
 
   // Compute zoom floor if user enables zoomed scale
@@ -1047,8 +1072,8 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
             role="img"
             aria-label={
               lang === 'de'
-                ? 'Spinnennetzdiagramm über alle 8 Benchmarks'
-                : 'Radar chart across all 8 benchmarks'
+                ? `Spinnennetzdiagramm über alle ${axisCount} Benchmarks`
+                : `Radar chart across all ${axisCount} benchmarks`
             }
           >
             {/* Concentric Octagonal Grid Rings */}
@@ -1237,8 +1262,8 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
               const lx = cx + labelDist * cos;
               const ly = cy + labelDist * sin;
 
-              const isTop = idx === 0;
-              const isBottom = idx === 4;
+              const isTop = Math.abs(cos) < 0.15 && sin < -0.5;
+              const isBottom = Math.abs(cos) < 0.15 && sin > 0.5;
               const isRight = cos > 0.15;
               const textAnchor: 'middle' | 'start' | 'end' =
                 isTop || isBottom ? 'middle' : isRight ? 'start' : 'end';
@@ -1247,7 +1272,7 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
               const isAxisActive = inspectedAxisIdx === idx;
               const isExpanded = expandedCategoryId === row.comp.id;
 
-              // Determine vertical baseline offset cleanly
+              // Determine vertical baseline offset cleanly for both 5-axis and 8-axis geometry
               let baseDy = 0;
               if (isTop) {
                 baseDy = lines.length > 1 ? -34 : -16;
@@ -1624,17 +1649,23 @@ const BenchmarkRadarChart: React.FC<BenchmarkRadarChartProps> = ({
               </button>
             </div>
             <p className="leading-relaxed">
-              {lang === 'de' ? expandedRow.comp.descriptionDe : expandedRow.comp.descriptionEn}
+              {(lang === 'de' ? expandedRow.comp.descriptionDe : expandedRow.comp.descriptionEn)
+                .replace(/\s*Nur im Zeitreihendiagramm verfügbar\.?/i, '')
+                .replace(/\s*Available exclusively in the timeline chart\.?/i, '')}
             </p>
-            <div className="font-mono text-xs text-slate-600 dark:text-slate-400">
+            <div className="font-mono text-xs text-slate-700 dark:text-slate-300">
               {lang === 'de' ? 'Berechnung:' : 'Formula:'}{' '}
-              <span className="font-semibold text-slate-800 dark:text-slate-300">
+              <span className="font-semibold text-slate-900 dark:text-slate-200">
                 {expandedRow.comp.formulaDesc}
               </span>
               {expandedRow.isRescaled && (
                 <span>
                   {' · '}
-                  {lang === 'de'
+                  {expandedRow.comp.id === 'trickQuestionsOld'
+                    ? lang === 'de'
+                      ? 'Skaliert von 16,7% Rate-Basis auf 0–100%'
+                      : 'Rescaled from 16.7% guessing floor to 0–100%'
+                    : lang === 'de'
                     ? 'Skaliert von 29% Rate-Basis auf 0–100%'
                     : 'Rescaled from 29% guessing floor to 0–100%'}
                 </span>
@@ -2073,16 +2104,57 @@ export const CompareView: React.FC<CompareViewProps> = ({
     [benchmarkWeights]
   );
 
-  // Compute detailed benchmark comparisons across all 8 active categories (D-K)
+  // Compute detailed benchmark comparisons:
+  // - scoreMode === 'old': the 5 benchmarks that compose Old Score (4 historical V-Y + MMMU-Pro)
+  // - scoreMode === 'new' | 'worstCase': all 8 active benchmarks (D-K)
   const categoryComparisons = useMemo(() => {
-    return BENCHMARK_COMPONENTS.map((comp, idx) => {
-      const weightRatio =
-        scoreMode === 'new' && isCustomWeighted && normalizedWeights
-          ? normalizedWeights[comp.key as ActiveBenchmarkKey] ?? 1 / 8
-          : 1 / 8;
+    const specs =
+      scoreMode === 'old'
+        ? [
+            {
+              comp: { ...RETIRED_TIMELINE_BENCHMARKS[0], formulaDesc: 'U / 5', weightPct: 20 },
+              rawLabel: retiredCategoryNames?.[0],
+              isPreTranslated: isPreTranslatedRetiredCategoryNames,
+              weightRatio: 1 / 5,
+            },
+            {
+              comp: { ...RETIRED_TIMELINE_BENCHMARKS[1], formulaDesc: 'V / 5', weightPct: 20 },
+              rawLabel: retiredCategoryNames?.[1],
+              isPreTranslated: isPreTranslatedRetiredCategoryNames,
+              weightRatio: 1 / 5,
+            },
+            {
+              comp: { ...RETIRED_TIMELINE_BENCHMARKS[2], formulaDesc: 'W / 5', weightPct: 20 },
+              rawLabel: retiredCategoryNames?.[2],
+              isPreTranslated: isPreTranslatedRetiredCategoryNames,
+              weightRatio: 1 / 5,
+            },
+            {
+              comp: { ...BENCHMARK_COMPONENTS[3], formulaDesc: '1.4085 × (G - 29) / 5', weightPct: 20 },
+              rawLabel: categoryNames?.[3],
+              isPreTranslated: isPreTranslatedCategoryNames,
+              weightRatio: 1 / 5,
+            },
+            {
+              comp: { ...RETIRED_TIMELINE_BENCHMARKS[3], formulaDesc: '1.2 × (X - 16.67) / 5', weightPct: 20 },
+              rawLabel: retiredCategoryNames?.[3],
+              isPreTranslated: isPreTranslatedRetiredCategoryNames,
+              weightRatio: 1 / 5,
+            },
+          ]
+        : BENCHMARK_COMPONENTS.map((comp, idx) => ({
+            comp,
+            rawLabel: categoryNames?.[idx],
+            isPreTranslated: isPreTranslatedCategoryNames,
+            weightRatio:
+              scoreMode === 'new' && isCustomWeighted && normalizedWeights
+                ? normalizedWeights[comp.key as ActiveBenchmarkKey] ?? 1 / 8
+                : 1 / 8,
+          }));
 
+    return specs.map(({ comp, rawLabel, isPreTranslated, weightRatio }) => {
       const entries = activeSlots.map(({ slot, model }) => {
-        const raw = model.rawScores[comp.key];
+        const raw = model.rawScores[comp.key] ?? null;
         const val = typeof raw === 'number' && raw !== null ? comp.transform(raw) : null;
         const contrib = val !== null ? val * weightRatio : null;
         return { slot, model, raw, val, contrib };
@@ -2103,10 +2175,9 @@ export const CompareView: React.FC<CompareViewProps> = ({
         winners = [valid[0].slot];
       }
 
-      const rawLabel = categoryNames?.[idx];
-      const label = getBenchmarkCategoryLabel(rawLabel, lang, comp, isPreTranslatedCategoryNames);
+      const label = getBenchmarkCategoryLabel(rawLabel, lang, comp, isPreTranslated);
       const row33 = getRow33Source(comp.id, row33Meta);
-      const isRescaled = comp.id === 'visionPlot';
+      const isRescaled = comp.id === 'visionPlot' || comp.id === 'trickQuestionsOld';
 
       return {
         comp,
@@ -2120,7 +2191,18 @@ export const CompareView: React.FC<CompareViewProps> = ({
         isRescaled,
       };
     });
-  }, [activeSlots, categoryNames, lang, isPreTranslatedCategoryNames, row33Meta, scoreMode, isCustomWeighted, normalizedWeights]);
+  }, [
+    activeSlots,
+    categoryNames,
+    retiredCategoryNames,
+    lang,
+    isPreTranslatedCategoryNames,
+    isPreTranslatedRetiredCategoryNames,
+    row33Meta,
+    scoreMode,
+    isCustomWeighted,
+    normalizedWeights,
+  ]);
 
   // Historical sub-benchmarks from Columns V-Y (Synced Row-2 Labels) — only rows with available data
   const historicalComparisons = useMemo(() => {
@@ -2659,7 +2741,13 @@ export const CompareView: React.FC<CompareViewProps> = ({
         {/* Category Wins Distribution */}
         <div className="p-3 sm:px-4 flex flex-col justify-between gap-1.5">
           <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
-            {lang === 'de' ? 'Kategorie-Siege (D–K)' : 'Category Wins (D–K)'}
+            {scoreMode === 'old'
+              ? lang === 'de'
+                ? `Kategorie-Siege (${labelScoreOld} · 5 Benchmarks)`
+                : `Category Wins (${labelScoreOld} · 5 Benchmarks)`
+              : lang === 'de'
+              ? 'Kategorie-Siege (D–K)'
+              : 'Category Wins (D–K)'}
           </div>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono tabular-nums text-xs sm:text-sm font-bold">
             {activeSlots.map(({ slot }, i) => (
@@ -2737,17 +2825,17 @@ export const CompareView: React.FC<CompareViewProps> = ({
         </div>
       </section>
 
-      {/* Unified Compact Category-by-Category Horizontal Comparison (8 Benchmarks D-K) */}
+      {/* Unified Compact Category-by-Category Horizontal Comparison */}
       <section
         aria-label={
           lang === 'de'
-            ? 'Detaillierter Kategorienvergleich über alle 8 Benchmarks'
-            : 'Detailed comparison across all 8 benchmark categories'
+            ? `Detaillierter Kategorienvergleich über alle ${categoryComparisons.length} Benchmarks`
+            : `Detailed comparison across all ${categoryComparisons.length} benchmark categories`
         }
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden"
       >
         {/* Header Bar */}
-        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 text-xs font-mono text-slate-700 dark:text-slate-300">
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 text-xs font-mono text-slate-800 dark:text-slate-300">
           <div className="flex flex-wrap items-center gap-3 min-h-[28px]">
             {/* Chart Type Switcher: Fixed Top-Left (Balken vs Spinnennetz) */}
             <div
@@ -2755,7 +2843,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
               role="group"
               aria-label={
                 lang === 'de'
-                  ? 'Darstellungsform der 8 Benchmarks'
+                  ? `Darstellungsform der ${categoryComparisons.length} Benchmarks`
                   : 'Benchmark chart view'
               }
             >
@@ -2787,10 +2875,11 @@ export const CompareView: React.FC<CompareViewProps> = ({
               </button>
             </div>
 
-            <span className="uppercase tracking-wider font-semibold text-slate-800 dark:text-slate-200">
+            <span className="uppercase tracking-wider font-semibold text-black dark:text-slate-100">
               {lang === 'de'
-                ? 'Alle 8 Benchmarks im Direktvergleich'
-                : 'All 8 Benchmarks Side-by-Side'}
+                ? `Alle ${categoryComparisons.length} Benchmarks im Direktvergleich`
+                : `All ${categoryComparisons.length} Benchmarks Side-by-Side`}
+              {scoreMode === 'old' ? ` (${labelScoreOld})` : ''}
             </span>
           </div>
 
@@ -2822,6 +2911,26 @@ export const CompareView: React.FC<CompareViewProps> = ({
           />
         ) : (
           <div className="divide-y divide-slate-200 dark:divide-slate-800">
+            {/* Aligned 0–100% Scale Ruler */}
+            <div className="hidden md:grid px-4 py-1.5 bg-slate-50/80 dark:bg-slate-950/50 grid-cols-[270px_minmax(0,1fr)] lg:grid-cols-[310px_minmax(0,1fr)] items-center gap-4">
+              <div className="text-xs font-mono font-semibold text-slate-800 dark:text-slate-200">
+                {lang === 'de' ? 'Kategorie / Quelle' : 'Category / Source'}
+              </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-5 shrink-0" />
+                <div className="flex-1 flex items-center justify-between text-xs font-mono font-bold tabular-nums text-slate-800 dark:text-slate-200">
+                  <span>0%</span>
+                  <span>25%</span>
+                  <span>50%</span>
+                  <span>75%</span>
+                  <span>100%</span>
+                </div>
+                <div className="w-20 sm:w-24 text-right text-xs font-mono font-semibold text-slate-800 dark:text-slate-200 shrink-0">
+                  {lang === 'de' ? 'Score' : 'Score'}
+                </div>
+              </div>
+            </div>
+
             {categoryComparisons.map((row) => {
               const isExpanded = expandedCategoryId === row.comp.id;
               const anchorId = BENCHMARK_ANCHOR_MAP[row.comp.id] || 'note-col-d';
@@ -2832,7 +2941,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                   className="transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
                 >
                   <div className="px-4 py-2.5 grid grid-cols-1 md:grid-cols-[270px_minmax(0,1fr)] lg:grid-cols-[310px_minmax(0,1fr)] items-center gap-2.5 md:gap-4">
-                    {/* Left: Category Label + Source + Leader Pill */}
+                    {/* Left: Category Label + Source + Leader */}
                     <div className="flex items-start justify-between gap-2 min-w-0">
                       <div className="min-w-0">
                         <button
@@ -2855,22 +2964,22 @@ export const CompareView: React.FC<CompareViewProps> = ({
                             {row.label}
                           </span>
                           {isExpanded ? (
-                            <ChevronUp className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 shrink-0" />
+                            <ChevronUp className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300 shrink-0" />
                           ) : (
-                            <Info className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 group-hover:text-blue-500 shrink-0" />
+                            <Info className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300 group-hover:text-blue-500 shrink-0" />
                           )}
                         </button>
 
-                        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 pl-4">
-                          <span className="truncate">{row.sourceName}</span>
+                        <div className="text-xs text-slate-700 dark:text-slate-300 pl-4 truncate">
+                          {row.sourceName}
                         </div>
                       </div>
 
                       <div className="font-mono tabular-nums text-xs font-bold shrink-0 pt-0.5">
                         {row.winners.length === 0 ? (
-                          <span className="text-slate-600 dark:text-slate-400">—</span>
+                          <span className="text-slate-700 dark:text-slate-300">—</span>
                         ) : row.isTie ? (
-                          <span className="text-slate-600 dark:text-slate-400">
+                          <span className="text-slate-700 dark:text-slate-300">
                             {lang === 'de' ? 'Patt' : 'Tie'}
                           </span>
                         ) : (
@@ -2882,12 +2991,14 @@ export const CompareView: React.FC<CompareViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Right: Compact Stacked Bars for A, B, (C..H) */}
+                    {/* Right: Absolute Score Bars (0–100%) for A..H */}
                     <div className="space-y-1.5 min-w-0">
                       {row.entries.map((entry) => {
                         const theme = SLOT_THEME[entry.slot];
-                        const isWinner = row.winners.includes(entry.slot) && !row.isTie && row.winners.length > 0;
-                        const widthPct = entry.val !== null ? Math.max(0, Math.min(100, entry.val)) : 0;
+                        const isWinner =
+                          row.winners.includes(entry.slot) && !row.isTie && row.winners.length > 0;
+                        const widthPct =
+                          entry.val !== null ? Math.max(0, Math.min(100, entry.val)) : 0;
 
                         return (
                           <div key={entry.slot} className="flex items-center gap-2 min-w-0">
@@ -2897,13 +3008,14 @@ export const CompareView: React.FC<CompareViewProps> = ({
                               {entry.slot}
                             </span>
 
-                            <div className="relative flex-1 h-4 bg-slate-100 dark:bg-slate-800/90 rounded overflow-hidden border border-slate-200/80 dark:border-slate-700/70">
-                              <div className="absolute inset-y-0 left-1/4 w-px bg-slate-200/80 dark:bg-slate-700/60 pointer-events-none" />
-                              <div className="absolute inset-y-0 left-1/2 w-px bg-slate-200/80 dark:bg-slate-700/60 pointer-events-none" />
-                              <div className="absolute inset-y-0 left-3/4 w-px bg-slate-200/80 dark:bg-slate-700/60 pointer-events-none" />
+                            <div className="relative flex-1 h-4 bg-slate-100 dark:bg-slate-800/90 rounded overflow-hidden border border-slate-300/80 dark:border-slate-700/70">
+                              <div className="absolute inset-y-0 left-1/4 w-px bg-slate-300/60 dark:bg-slate-700/60 pointer-events-none" />
+                              <div className="absolute inset-y-0 left-1/2 w-px bg-slate-300/60 dark:bg-slate-700/60 pointer-events-none" />
+                              <div className="absolute inset-y-0 left-3/4 w-px bg-slate-300/60 dark:bg-slate-700/60 pointer-events-none" />
+
                               {entry.val !== null && (
                                 <div
-                                  className={`h-full rounded-r-xs transition-all duration-300 ${
+                                  className={`relative z-10 h-full rounded-r-xs transition-all duration-300 ${
                                     isWinner || row.isTie ? theme.barActive : theme.barDim
                                   }`}
                                   style={{ width: `${widthPct}%` }}
@@ -2911,23 +3023,20 @@ export const CompareView: React.FC<CompareViewProps> = ({
                               )}
                             </div>
 
-                            <div className="w-32 sm:w-40 text-right font-mono tabular-nums text-[15px] shrink-0 flex items-baseline justify-end gap-1.5">
-                              <span
-                                className={
-                                  entry.val === null
-                                    ? 'text-slate-600 dark:text-slate-400 font-semibold'
-                                    : isWinner
-                                    ? `font-extrabold ${theme.text}`
-                                    : 'font-semibold text-slate-800 dark:text-slate-200'
-                                }
-                              >
-                                {entry.val !== null ? `${formatNumber(entry.val, 1)}%` : '—'}
-                              </span>
-                              {entry.contrib !== null && (
-                                <span className="text-xs text-slate-600 dark:text-slate-400 hidden sm:inline">
-                                  {row.isRescaled && entry.raw !== null
-                                    ? `(${formatNumber(entry.raw, 0)}%)`
-                                    : `+${entry.contrib.toFixed(1)}`}
+                            <div className="w-20 sm:w-24 text-right font-mono tabular-nums text-[15px] shrink-0">
+                              {entry.val !== null ? (
+                                <span
+                                  className={
+                                    isWinner
+                                      ? `font-extrabold ${theme.text}`
+                                      : 'font-semibold text-slate-900 dark:text-slate-200'
+                                  }
+                                >
+                                  {formatNumber(entry.val, 1)}%
+                                </span>
+                              ) : (
+                                <span className="font-semibold text-slate-700 dark:text-slate-400">
+                                  —
                                 </span>
                               )}
                             </div>
@@ -2939,20 +3048,26 @@ export const CompareView: React.FC<CompareViewProps> = ({
 
                   {/* Expandable Category Details Drawer */}
                   {isExpanded && (
-                    <div className="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-700 dark:text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="px-4 py-2.5 bg-slate-50/90 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-800 dark:text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="space-y-1 max-w-3xl">
                         <p className="leading-relaxed">
-                          {lang === 'de' ? row.comp.descriptionDe : row.comp.descriptionEn}
+                          {(lang === 'de' ? row.comp.descriptionDe : row.comp.descriptionEn)
+                            .replace(/\s*Nur im Zeitreihendiagramm verfügbar\.?/i, '')
+                            .replace(/\s*Available exclusively in the timeline chart\.?/i, '')}
                         </p>
-                        <div className="font-mono text-xs text-slate-600 dark:text-slate-400">
+                        <div className="font-mono text-xs text-slate-700 dark:text-slate-300">
                           {lang === 'de' ? 'Berechnung:' : 'Formula:'}{' '}
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                          <span className="font-semibold text-slate-900 dark:text-slate-200">
                             {row.comp.formulaDesc}
                           </span>
                           {row.isRescaled && (
                             <span>
                               {' · '}
-                              {lang === 'de'
+                              {row.comp.id === 'trickQuestionsOld'
+                                ? lang === 'de'
+                                  ? 'Skaliert von 16,7% Rate-Basis auf 0–100%'
+                                  : 'Rescaled from 16.7% guessing floor to 0–100%'
+                                : lang === 'de'
                                 ? 'Skaliert von 29% Rate-Basis auf 0–100%'
                                 : 'Rescaled from 29% guessing floor to 0–100%'}
                             </span>
@@ -2966,7 +3081,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                             href={row.sourceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-colors"
                           >
                             <span>{t.sourceLink}</span>
                             <ExternalLink className="w-3 h-3" />
@@ -2992,8 +3107,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
         )}
       </section>
 
-      {/* Historical Sub-Benchmarks (Columns V-Y, Synced Row-2 Labels) */}
-      {hasAnyHistorical && (
+      {/* Historical Sub-Benchmarks (Columns V-Y, Synced Row-2 Labels) — hidden in Old Score mode since they are already the main axes */}
+      {scoreMode !== 'old' && hasAnyHistorical && (
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
           <button
             type="button"

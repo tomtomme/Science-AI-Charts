@@ -11,10 +11,10 @@ import type {
 import type { ManualRowMapping } from '../src/types/integrityMonitor.ts';
 
 const GDPX_URL = 'https://gdpx.semianalysis.com/';
-const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-gdpx-monitor-cache-v2.json');
+const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-gdpx-monitor-cache-v3.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const SCORE_DIFF_THRESHOLD = 0.5;
-const ESTIMATE_EXACT_TOLERANCE = 0.05;
+const SCORE_DIFF_THRESHOLD = 1e-4;
+const ESTIMATE_EXACT_TOLERANCE = 1e-4;
 
 // The 21 baseline models already present on gdpx.semianalysis.com;
 // any model outside this set is a new leaderboard entry whose existing Column J value is treated as an estimate to overwrite.
@@ -421,7 +421,7 @@ export async function fetchLiveGdpxLeaderboard(
     });
 
     const compositeRaw = mean(domainScores) ?? 0;
-    const score = Math.round(compositeRaw * 10) / 10;
+    const score = Math.round(compositeRaw * 10 + 1e-9) / 10;
 
     const overallCost = payload.overall?.[model.id]?.costPerTask ?? null;
     const overallTokens = payload.overall?.[model.id]?.tokensPerTask ?? null;
@@ -445,6 +445,7 @@ export async function fetchLiveGdpxLeaderboard(
       reasoning: model.reasoning || '',
       rawScore: compositeRaw,
       score,
+      scoreDecimals: 1,
       costPerTask: typeof costPerTask === 'number' ? Math.round(costPerTask * 100) / 100 : null,
       tokensPerTask: typeof tokensPerTask === 'number' ? Math.round(tokensPerTask) : null,
       isNewToSource: hasBaseline && !prevSet.has(model.id),
@@ -461,6 +462,7 @@ export async function fetchLiveGdpxLeaderboard(
     harness: item.harness,
     reasoning: item.reasoning,
     score: item.score,
+    scoreDecimals: item.scoreDecimals,
     costPerTask: item.costPerTask,
     tokensPerTask: item.tokensPerTask,
     rank: idx + 1,
@@ -646,6 +648,13 @@ export function buildGdpxDiffs(
 
   const diffs: GdpxDiffItem[] = [];
 
+  const formatExact = (val: number, minDecimals = 1): string => {
+    const str = String(val);
+    const dot = str.indexOf('.');
+    const curDec = dot !== -1 ? str.length - dot - 1 : 0;
+    return curDec < minDecimals ? val.toFixed(minDecimals) : str;
+  };
+
   for (const gdpx of gdpxModels) {
     if (ignoredSet.has(gdpx.id)) {
       diffs.push({
@@ -657,6 +666,7 @@ export function buildGdpxDiffs(
         openWeights: gdpx.openWeights,
         rank: gdpx.rank,
         liveScore: gdpx.score,
+        scoreDecimals: gdpx.scoreDecimals,
         costPerTask: gdpx.costPerTask,
         status: 'ignored',
         matchedModelId: null,
@@ -680,6 +690,7 @@ export function buildGdpxDiffs(
         openWeights: gdpx.openWeights,
         rank: gdpx.rank,
         liveScore: gdpx.score,
+        scoreDecimals: gdpx.scoreDecimals,
         costPerTask: gdpx.costPerTask,
         status: 'new_unmatched',
         matchedModelId: null,
@@ -701,6 +712,7 @@ export function buildGdpxDiffs(
         openWeights: gdpx.openWeights,
         rank: gdpx.rank,
         liveScore: gdpx.score,
+        scoreDecimals: gdpx.scoreDecimals,
         costPerTask: gdpx.costPerTask,
         status: 'missing',
         matchedModelId: bestMatch.id,
@@ -714,6 +726,7 @@ export function buildGdpxDiffs(
 
     const delta = Math.abs(bestMatch.colJ - gdpx.score);
     const isNewEntrantBeyondBaseline = !INITIAL_BASELINE_GDPX_IDS.has(gdpx.id);
+    const liveFormatted = formatExact(gdpx.score, gdpx.scoreDecimals ?? 1);
 
     if (isNewEntrantBeyondBaseline && delta >= ESTIMATE_EXACT_TOLERANCE) {
       diffs.push({
@@ -725,13 +738,14 @@ export function buildGdpxDiffs(
         openWeights: gdpx.openWeights,
         rank: gdpx.rank,
         liveScore: gdpx.score,
+        scoreDecimals: gdpx.scoreDecimals,
         costPerTask: gdpx.costPerTask,
         status: 'overwrite_estimate',
         matchedModelId: bestMatch.id,
         matchedDisplayName: bestMatch.displayName,
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColJ: bestMatch.colJ,
-        reason: `Neuzugang auf GDPx: Schätzwert in Spalte J (${bestMatch.colJ}) durch offiziellen Score (${gdpx.score}%) ersetzen.`,
+        reason: `Neuzugang auf GDPx: Schätzwert in Spalte J (${bestMatch.colJ}) durch offiziellen Score (${liveFormatted}%) ersetzen.`,
       });
       continue;
     }
@@ -746,13 +760,14 @@ export function buildGdpxDiffs(
         openWeights: gdpx.openWeights,
         rank: gdpx.rank,
         liveScore: gdpx.score,
+        scoreDecimals: gdpx.scoreDecimals,
         costPerTask: gdpx.costPerTask,
         status: 'changed',
         matchedModelId: bestMatch.id,
         matchedDisplayName: bestMatch.displayName,
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColJ: bestMatch.colJ,
-        reason: `Score weicht ab (${bestMatch.colJ} → ${gdpx.score}%).`,
+        reason: `Score weicht ab (${bestMatch.colJ} → ${liveFormatted}%).`,
       });
       continue;
     }
@@ -766,13 +781,14 @@ export function buildGdpxDiffs(
       openWeights: gdpx.openWeights,
       rank: gdpx.rank,
       liveScore: gdpx.score,
+      scoreDecimals: gdpx.scoreDecimals,
       costPerTask: gdpx.costPerTask,
       status: 'unchanged',
       matchedModelId: bestMatch.id,
       matchedDisplayName: bestMatch.displayName,
       sheetRowNumber: bestMatch.sheetRowNumber,
       currentColJ: bestMatch.colJ,
-      reason: delta > 0 ? `Synchron (Rundungsdifferenz ${bestMatch.colJ} vs. ${gdpx.score}%).` : 'Synchron.',
+      reason: 'Synchron.',
     });
   }
 

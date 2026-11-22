@@ -12,7 +12,8 @@ export interface SimpleBenchLeaderboardModel {
   organization: string;
   rank: number;
   rankLabel: string;
-  score: number; // 1-decimal percentage (e.g. 94.9)
+  score: number; // Exact reported percentage with all website decimals
+  scoreDecimals?: number; // Number of decimal places reported on simple-bench.com
   dateAdded: string | null;
   isNewToSource: boolean;
 }
@@ -34,6 +35,7 @@ export interface SimpleBenchDiffItem {
   organization: string;
   rank: number;
   liveScore: number;
+  scoreDecimals?: number;
   dateAdded: string | null;
   status: SimpleBenchDiffStatus;
   matchedModelId: string | null;

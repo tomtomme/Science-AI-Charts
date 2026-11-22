@@ -16,7 +16,7 @@ export function parseIntegrityCellNumber(raw: string | undefined): number | null
     return null;
   }
   const num = Number(clean);
-  return Number.isFinite(num) ? Math.round(num * 10) / 10 : null;
+  return Number.isFinite(num) ? num : null;
 }
 
 export function extractIntegritySheetSnapshots(

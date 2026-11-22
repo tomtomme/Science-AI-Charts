@@ -14,6 +14,7 @@ export interface GdpxLeaderboardModel {
   harness: string;
   reasoning: string;
   score: number;
+  scoreDecimals?: number;
   costPerTask: number | null;
   tokensPerTask: number | null;
   rank: number;
@@ -39,6 +40,7 @@ export interface GdpxDiffItem {
   openWeights: boolean;
   rank: number;
   liveScore: number;
+  scoreDecimals?: number;
   costPerTask: number | null;
   status: GdpxDiffStatus;
   matchedModelId: string | null;

@@ -17,6 +17,7 @@ export interface IntegrityLeaderboardModel {
   name: string;
   rank: number;
   score: number;
+  scoreDecimals?: number;
   scoreError: number | null;
   accuracy: number | null;
   accuracyError: number | null;
@@ -39,6 +40,7 @@ export interface IntegrityDiffItem {
   integrityName: string;
   rank: number;
   liveScore: number;
+  scoreDecimals?: number;
   scoreError: number | null;
   accuracy: number | null;
   isSiteNew: boolean;

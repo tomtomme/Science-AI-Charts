@@ -27,7 +27,7 @@ import {
   updateSimpleBenchPreferences,
 } from './server/simpleBenchMonitor.ts';
 import { getOrRefreshWeeklyTranslation } from './server/sheetTranslator.ts';
-import { fetchLabsGridFromPublishedHtml } from './server/labsGrid.ts';
+import { fetchLabsGridFromPublishedHtml, fetchMainO1LinksFromPublishedHtml } from './server/labsGrid.ts';
 
 async function createAppServer() {
   const app = express();
@@ -54,6 +54,18 @@ async function createAppServer() {
       res.json(grid);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch labs formatting grid.';
+      res.status(502).json({ error: message });
+    }
+  });
+
+  app.get('/api/sheet-o1-links', async (req, res) => {
+    try {
+      const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true';
+      const data = await fetchMainO1LinksFromPublishedHtml(forceRefresh);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.json(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch sheet cell O1 links.';
       res.status(502).json({ error: message });
     }
   });

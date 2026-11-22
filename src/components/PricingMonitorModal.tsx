@@ -170,6 +170,7 @@ interface PendingSheetCellChange {
   sheetRowNumber?: number;
   col0Based?: number;
   applyBold?: boolean;
+  numberFormatPattern?: string;
   matchedModelId?: string;
   matchedDisplayName?: string;
   isManualAssignment?: boolean;
@@ -181,6 +182,7 @@ interface PendingSheetCellChange {
     releaseDate: string;
     targetCol0Based: number;
     targetValue: string | number;
+    numberFormatPattern?: string;
   };
 }
 
@@ -572,16 +574,16 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     if (typeof overrideRow === 'number' && overrideRow >= 36) {
       const sheetModel = sheetRowByNumber.get(overrideRow);
       const rawVal = sheetModel?.rawScores.trickQuestionsOld;
-      const roundedVal =
+      const currentVal =
         typeof rawVal === 'number' && Number.isFinite(rawVal)
-          ? Math.round(rawVal * 10) / 10
+          ? rawVal
           : null;
       const maskCell = loadedData.boldMask?.[overrideRow - 1]?.[simpleBenchColIdx];
       return {
         sheetRowNumber: overrideRow,
         isNewRowInsert: false,
         matchedDisplayName: sheetModel?.displayName || `Row ${overrideRow}`,
-        currentColY: roundedVal,
+        currentColY: currentVal,
         currentColYIsBold: typeof maskCell === 'boolean' ? maskCell : null,
       };
     }
@@ -714,34 +716,38 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     });
   };
 
-  const formatGdpxScore = (val: number | null | undefined) => {
+  const formatExactScore = (val: number | null | undefined, minDecimals = 0) => {
     if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
-    const rounded = Math.round(val * 100) / 100;
-    return lang === 'de' ? String(rounded).replace('.', ',') : String(rounded);
-  };
-
-  const formatValsScore = (val: number | null | undefined, decimals = 0) => {
-    if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
-    if (decimals > 0) {
-      const fixed = val.toFixed(decimals);
-      return lang === 'de' ? fixed.replace('.', ',') : fixed;
+    let str = String(val);
+    if (minDecimals > 0) {
+      const dot = str.indexOf('.');
+      const curDec = dot !== -1 ? str.length - dot - 1 : 0;
+      if (curDec < minDecimals) {
+        str = val.toFixed(minDecimals);
+      }
     }
-    return String(Math.round(val));
+    return lang === 'de' ? str.replace('.', ',') : str;
   };
 
-  const formatSimpleBenchScore = (val: number | null | undefined) => {
-    if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
-    const rounded = Math.round(val * 10) / 10;
-    const formatted = rounded.toFixed(1);
-    return lang === 'de' ? formatted.replace('.', ',') : formatted;
+  const decimalsToPattern = (val: number, minDecimals = 0): string => {
+    const str = String(val);
+    const dot = str.indexOf('.');
+    const curDec = dot !== -1 ? str.length - dot - 1 : 0;
+    const dec = Math.max(curDec, minDecimals);
+    return dec > 0 ? `0.${'0'.repeat(dec)}` : '0';
   };
 
-  const formatIntegrityScore = (val: number | null | undefined) => {
-    if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
-    const rounded = Math.round(val * 10) / 10;
-    const formatted = rounded.toFixed(1);
-    return lang === 'de' ? formatted.replace('.', ',') : formatted;
-  };
+  const formatGdpxScore = (val: number | null | undefined, decimals = 0) =>
+    formatExactScore(val, decimals);
+
+  const formatValsScore = (val: number | null | undefined, decimals = 0) =>
+    formatExactScore(val, decimals);
+
+  const formatSimpleBenchScore = (val: number | null | undefined, decimals = 0) =>
+    formatExactScore(val, decimals);
+
+  const formatIntegrityScore = (val: number | null | undefined, decimals = 0) =>
+    formatExactScore(val, decimals);
 
   const handleRunAllChecks = async () => {
     await Promise.allSettled([
@@ -1124,7 +1130,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         const sheetModel = sheetRowByNumber.get(target.sheetRowNumber);
         const isManualAssignment = typeof manualGdpxRowOverrides[item.gdpxId] === 'number';
 
-        const numericScore = Math.round(item.liveScore * 10) / 10;
+        const numericScore = item.liveScore;
+        const scoreDec = item.scoreDecimals ?? 1;
         changes.push({
           cellRef: `${GDPX_COL_LETTER}${target.sheetRowNumber}`,
           label: `GDPx: ${item.gdpxName} → ${target.matchedDisplayName || `Zeile ${target.sheetRowNumber}`}`,
@@ -1134,12 +1141,14 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               : lang === 'de'
               ? '(leer)'
               : '(empty)',
-          after: formatGdpxScore(numericScore),
+          after: formatGdpxScore(numericScore, scoreDec),
           range: `${quoteSheetTitle(sheetTitle)}!${GDPX_COL_LETTER}${target.sheetRowNumber}`,
           value: numericScore,
           kind: 'gdpx',
           sourceId: item.gdpxId,
           sheetRowNumber: target.sheetRowNumber,
+          col0Based: GDPX_COL_INDEX,
+          numberFormatPattern: decimalsToPattern(numericScore, scoreDec),
           matchedModelId: sheetModel?.id ?? item.matchedModelId ?? undefined,
           matchedDisplayName: sheetModel?.displayName ?? target.matchedDisplayName ?? undefined,
           isManualAssignment,
@@ -1150,7 +1159,9 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     if (effectiveValsDiffReport) {
       for (const item of selectedValsItems) {
         const target = resolveEffectiveValsTarget(item);
-        const numericScore = item.writeScore;
+        const numericScore = item.liveScore;
+        const scoreDec = item.scoreDecimals ?? 2;
+        const numberFormatPattern = decimalsToPattern(numericScore, scoreDec);
         if (target.isNewRowInsert) {
           const companyMeta = resolveCompanyFlagAndName(item.company);
           const todayIso = new Date().toISOString().slice(0, 10);
@@ -1159,7 +1170,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             label: `Vals v2.2 NEU: ${item.valsName} (${companyMeta.companyName}) → neue Zeile ${firstReleasedHistoryRow}`,
             before: lang === 'de' ? '(neue Zeile in Tabelle)' : '(new row in table)',
             beforeIsBold: false,
-            after: `${formatValsScore(numericScore)} (${formatValsScore(item.liveScore, 2)}%)`,
+            after: formatValsScore(numericScore, scoreDec),
             afterIsBold: true,
             range: `${quoteSheetTitle(sheetTitle)}!${VALS_COL_LETTER}${firstReleasedHistoryRow}`,
             value: numericScore,
@@ -1167,6 +1178,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             sourceId: item.valsId,
             col0Based: VALS_COL_INDEX,
             applyBold: true,
+            numberFormatPattern,
             isNewRowInsert: true,
             newRowSpec: {
               insertAtRow1Based: firstReleasedHistoryRow,
@@ -1175,6 +1187,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               releaseDate: todayIso,
               targetCol0Based: VALS_COL_INDEX,
               targetValue: numericScore,
+              numberFormatPattern,
             },
           });
           continue;
@@ -1193,7 +1206,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               ? '(leer)'
               : '(empty)',
           beforeIsBold: target.currentColKIsBold,
-          after: `${formatValsScore(numericScore)} (${formatValsScore(item.liveScore, 2)}%)`,
+          after: formatValsScore(numericScore, scoreDec),
           afterIsBold: true,
           range: `${quoteSheetTitle(sheetTitle)}!${VALS_COL_LETTER}${target.sheetRowNumber}`,
           value: numericScore,
@@ -1202,6 +1215,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
           sheetRowNumber: target.sheetRowNumber,
           col0Based: VALS_COL_INDEX,
           applyBold: true,
+          numberFormatPattern,
           matchedModelId: sheetModel?.id ?? item.matchedModelId ?? undefined,
           matchedDisplayName: sheetModel?.displayName ?? target.matchedDisplayName ?? undefined,
           isManualAssignment,
@@ -1212,7 +1226,9 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     if (effectiveSimpleBenchDiffReport) {
       for (const item of selectedSimpleBenchItems) {
         const target = resolveEffectiveSimpleBenchTarget(item);
-        const numericScore = Math.round(item.liveScore * 10) / 10;
+        const numericScore = item.liveScore;
+        const scoreDec = item.scoreDecimals ?? 1;
+        const numberFormatPattern = decimalsToPattern(numericScore, scoreDec);
         if (target.isNewRowInsert) {
           const companyMeta = resolveCompanyFlagAndName(item.organization);
           const releaseDate =
@@ -1224,7 +1240,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             label: `SimpleBench NEU: ${item.simpleBenchName} (${companyMeta.companyName}) → neue Zeile ${firstReleasedHistoryRow}`,
             before: lang === 'de' ? '(neue Zeile in Tabelle)' : '(new row in table)',
             beforeIsBold: false,
-            after: formatSimpleBenchScore(numericScore),
+            after: formatSimpleBenchScore(numericScore, scoreDec),
             afterIsBold: true,
             range: `${quoteSheetTitle(sheetTitle)}!${simpleBenchColLetter}${firstReleasedHistoryRow}`,
             value: numericScore,
@@ -1232,6 +1248,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             sourceId: item.simpleBenchId,
             col0Based: simpleBenchColIdx,
             applyBold: true,
+            numberFormatPattern,
             isNewRowInsert: true,
             newRowSpec: {
               insertAtRow1Based: firstReleasedHistoryRow,
@@ -1240,6 +1257,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               releaseDate,
               targetCol0Based: simpleBenchColIdx,
               targetValue: numericScore,
+              numberFormatPattern,
             },
           });
           continue;
@@ -1259,7 +1277,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               ? '(leer)'
               : '(empty)',
           beforeIsBold: target.currentColYIsBold,
-          after: formatSimpleBenchScore(numericScore),
+          after: formatSimpleBenchScore(numericScore, scoreDec),
           afterIsBold: true,
           range: `${quoteSheetTitle(sheetTitle)}!${simpleBenchColLetter}${target.sheetRowNumber}`,
           value: numericScore,
@@ -1268,6 +1286,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
           sheetRowNumber: target.sheetRowNumber,
           col0Based: simpleBenchColIdx,
           applyBold: true,
+          numberFormatPattern,
           matchedModelId: sheetModel?.id ?? item.matchedModelId ?? undefined,
           matchedDisplayName: sheetModel?.displayName ?? target.matchedDisplayName ?? undefined,
           isManualAssignment,
@@ -1283,7 +1302,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         const isManualAssignment =
           typeof manualIntegrityRowOverrides[item.integrityId] === 'number';
 
-        const numericScore = Math.round(item.liveScore * 10) / 10;
+        const numericScore = item.liveScore;
+        const scoreDec = item.scoreDecimals ?? 1;
         changes.push({
           cellRef: `${INTEGRITY_COL_LETTER}${target.sheetRowNumber}`,
           label: `Integrity: ${item.integrityName} → ${target.matchedDisplayName || `Zeile ${target.sheetRowNumber}`}`,
@@ -1293,12 +1313,14 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               : lang === 'de'
               ? '(leer)'
               : '(empty)',
-          after: formatIntegrityScore(numericScore),
+          after: formatIntegrityScore(numericScore, scoreDec),
           range: `${quoteSheetTitle(sheetTitle)}!${INTEGRITY_COL_LETTER}${target.sheetRowNumber}`,
           value: numericScore,
           kind: 'integrity',
           sourceId: item.integrityId,
           sheetRowNumber: target.sheetRowNumber,
+          col0Based: INTEGRITY_COL_INDEX,
+          numberFormatPattern: decimalsToPattern(numericScore, scoreDec),
           matchedModelId: sheetModel?.id ?? item.matchedModelId ?? undefined,
           matchedDisplayName: sheetModel?.displayName ?? target.matchedDisplayName ?? undefined,
           isManualAssignment,
@@ -1341,21 +1363,27 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         const res = await batchUpdateSheetCells(activeSpreadsheetId, updates, accessToken);
         totalUpdatedCells += res.totalUpdatedCells;
 
-        const boldSpecs: CellBoldSpec[] = existingUpdates
+        const formatSpecs: CellBoldSpec[] = existingUpdates
           .filter(
             (c) =>
-              c.applyBold &&
+              (c.applyBold || c.numberFormatPattern) &&
               typeof c.sheetRowNumber === 'number' &&
               typeof c.col0Based === 'number'
           )
           .map((c) => ({
             row1Based: c.sheetRowNumber as number,
             col0Based: c.col0Based as number,
-            bold: true,
+            ...(c.applyBold ? { bold: true } : {}),
+            ...(c.numberFormatPattern ? { numberFormatPattern: c.numberFormatPattern } : {}),
           }));
 
-        if (boldSpecs.length > 0) {
-          await applyCellsBoldFormatting(activeSpreadsheetId, targetSheetId, boldSpecs, accessToken);
+        if (formatSpecs.length > 0) {
+          await applyCellsBoldFormatting(
+            activeSpreadsheetId,
+            targetSheetId,
+            formatSpecs,
+            accessToken
+          );
         }
       }
 
@@ -1383,12 +1411,15 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
           { range: `${quotedTitle}!${targetColLetter}${rowNum}`, value: spec.targetValue },
         ];
 
-        // Ensure official score cell is bold while all other benchmark slots remain non-bold
+        // Ensure official score cell is bold & formatted to exact decimals while other benchmark slots remain non-bold
         const benchmarkCols = [3, 4, 5, 6, 7, 8, 9, 10, simpleBenchColIdx];
         const boldSpecs: CellBoldSpec[] = benchmarkCols.map((colIdx) => ({
           row1Based: rowNum,
           col0Based: colIdx,
           bold: colIdx === spec.targetCol0Based,
+          ...(colIdx === spec.targetCol0Based && spec.numberFormatPattern
+            ? { numberFormatPattern: spec.numberFormatPattern }
+            : {}),
         }));
 
         const insertRes = await insertRowAndWriteSparseCells(
@@ -2318,7 +2349,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                                       </span>
                                       <ArrowRight className="w-3 h-3 text-slate-600 dark:text-slate-400" />
                                       <span className="font-bold text-emerald-700 dark:text-emerald-300">
-                                        {formatGdpxScore(item.liveScore)}
+                                        {formatGdpxScore(item.liveScore, item.scoreDecimals ?? 1)}
                                       </span>
                                     </div>
                                   </td>
@@ -2646,10 +2677,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                                       )}
                                       <ArrowRight className="w-3 h-3 text-slate-600 dark:text-slate-400" />
                                       <span className="font-bold text-emerald-700 dark:text-emerald-300">
-                                        {formatValsScore(item.writeScore)}
-                                      </span>
-                                      <span className="text-slate-600 dark:text-slate-400">
-                                        ({formatValsScore(item.liveScore, 1)}%)
+                                        {formatValsScore(item.liveScore, item.scoreDecimals ?? 2)}
                                       </span>
                                     </div>
                                   </td>
@@ -2993,7 +3021,10 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                                       )}
                                       <ArrowRight className="w-3 h-3 text-slate-600 dark:text-slate-400" />
                                       <span className="font-bold text-emerald-700 dark:text-emerald-300">
-                                        {formatSimpleBenchScore(item.liveScore)}
+                                        {formatSimpleBenchScore(
+                                          item.liveScore,
+                                          item.scoreDecimals ?? 1
+                                        )}
                                       </span>
                                     </div>
                                   </td>
@@ -3290,7 +3321,10 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                                       </span>
                                       <ArrowRight className="w-3 h-3 text-slate-600 dark:text-slate-400" />
                                       <span className="font-bold text-emerald-700 dark:text-emerald-300">
-                                        {formatIntegrityScore(item.liveScore)}
+                                        {formatIntegrityScore(
+                                          item.liveScore,
+                                          item.scoreDecimals ?? 1
+                                        )}
                                       </span>
                                     </div>
                                   </td>

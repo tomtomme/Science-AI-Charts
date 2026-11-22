@@ -12,10 +12,9 @@ import type {
 
 const INTEGRITY_URL = 'https://integrity-bench.com/';
 const INTEGRITY_INDEX_URL = 'https://integrity-bench.com/data/index.json';
-const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-integrity-monitor-cache-v1.json');
+const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-integrity-monitor-cache-v2.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-// Integrity scores are reported with 1 decimal place (e.g. 33.4, -0.2, -277.7)
-const SCORE_DIFF_THRESHOLD = 0.05;
+const SCORE_DIFF_THRESHOLD = 1e-4;
 
 // The 43 baseline models present in the Integrity-Bench Table view when initialized.
 // Any model outside this set is a new leaderboard entry; if a Sheet row already has an estimate in Col AN, it is flagged to overwrite.
@@ -231,9 +230,12 @@ function parseIntegrityTableRowsFromHtml(
     const scoreCell = numCells[0][1];
     const scoreMatch = scoreCell.match(/([-+]?\d+(?:\.\d+)?)/);
     if (!scoreMatch) continue;
-    const rawScore = Number(scoreMatch[1]);
+    const rawScoreStr = scoreMatch[1];
+    const rawScore = Number(rawScoreStr);
     if (!Number.isFinite(rawScore)) continue;
-    const score = Math.round(rawScore * 10) / 10;
+    const dotIdx = rawScoreStr.indexOf('.');
+    const scoreDecimals = dotIdx !== -1 ? rawScoreStr.length - dotIdx - 1 : 0;
+    const score = rawScore;
 
     const scoreErrMatch = scoreCell.match(/±\s*([\d.]+)/);
     const scoreError = scoreErrMatch ? Number(scoreErrMatch[1]) : null;
@@ -262,6 +264,7 @@ function parseIntegrityTableRowsFromHtml(
       name,
       rank: Number.isFinite(rank) ? rank : models.length + 1,
       score,
+      scoreDecimals,
       scoreError: typeof scoreError === 'number' && Number.isFinite(scoreError) ? scoreError : null,
       accuracy: typeof accuracy === 'number' && Number.isFinite(accuracy) ? accuracy : null,
       accuracyError:
@@ -498,6 +501,18 @@ export function buildIntegrityDiffs(
 
   const diffs: IntegrityDiffItem[] = [];
 
+  const formatExact = (val: number, minDecimals?: number): string => {
+    const str = String(val);
+    if (typeof minDecimals === 'number' && minDecimals > 0) {
+      const dot = str.indexOf('.');
+      const curDec = dot !== -1 ? str.length - dot - 1 : 0;
+      if (curDec < minDecimals) {
+        return val.toFixed(minDecimals);
+      }
+    }
+    return str;
+  };
+
   for (const src of sourceModels) {
     if (ignoredSet.has(src.id)) {
       diffs.push({
@@ -505,6 +520,7 @@ export function buildIntegrityDiffs(
         integrityName: src.name,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         scoreError: src.scoreError,
         accuracy: src.accuracy,
         isSiteNew: src.isSiteNew,
@@ -527,6 +543,7 @@ export function buildIntegrityDiffs(
         integrityName: src.name,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         scoreError: src.scoreError,
         accuracy: src.accuracy,
         isSiteNew: src.isSiteNew,
@@ -547,6 +564,7 @@ export function buildIntegrityDiffs(
         integrityName: src.name,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         scoreError: src.scoreError,
         accuracy: src.accuracy,
         isSiteNew: src.isSiteNew,
@@ -563,6 +581,7 @@ export function buildIntegrityDiffs(
 
     const delta = Math.abs(bestMatch.colAN - src.score);
     const isNewEntrantBeyondBaseline = !INITIAL_BASELINE_INTEGRITY_IDS.has(src.id);
+    const liveFormatted = formatExact(src.score, src.scoreDecimals);
 
     if (isNewEntrantBeyondBaseline && delta >= SCORE_DIFF_THRESHOLD) {
       diffs.push({
@@ -570,6 +589,7 @@ export function buildIntegrityDiffs(
         integrityName: src.name,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         scoreError: src.scoreError,
         accuracy: src.accuracy,
         isSiteNew: src.isSiteNew,
@@ -579,7 +599,7 @@ export function buildIntegrityDiffs(
         matchedDisplayName: bestMatch.displayName,
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColAN: bestMatch.colAN,
-        reason: `Neuzugang auf Integrity-Bench: Wert in Spalte AN (${bestMatch.colAN}) durch offiziellen Score (${src.score}) ersetzen.`,
+        reason: `Neuzugang auf Integrity-Bench: Wert in Spalte AN (${bestMatch.colAN}) durch offiziellen Score (${liveFormatted}) ersetzen.`,
       });
       continue;
     }
@@ -590,6 +610,7 @@ export function buildIntegrityDiffs(
         integrityName: src.name,
         rank: src.rank,
         liveScore: src.score,
+        scoreDecimals: src.scoreDecimals,
         scoreError: src.scoreError,
         accuracy: src.accuracy,
         isSiteNew: src.isSiteNew,
@@ -599,7 +620,7 @@ export function buildIntegrityDiffs(
         matchedDisplayName: bestMatch.displayName,
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColAN: bestMatch.colAN,
-        reason: `Score weicht ab (${bestMatch.colAN} → ${src.score}).`,
+        reason: `Score weicht ab (${bestMatch.colAN} → ${liveFormatted}).`,
       });
       continue;
     }
@@ -609,6 +630,7 @@ export function buildIntegrityDiffs(
       integrityName: src.name,
       rank: src.rank,
       liveScore: src.score,
+      scoreDecimals: src.scoreDecimals,
       scoreError: src.scoreError,
       accuracy: src.accuracy,
       isSiteNew: src.isSiteNew,

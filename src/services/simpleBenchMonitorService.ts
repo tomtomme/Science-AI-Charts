@@ -21,7 +21,7 @@ export function extractSimpleBenchSheetSnapshots(
       const rawVal = m.rawScores.trickQuestionsOld;
       const colY =
         typeof rawVal === 'number' && Number.isFinite(rawVal)
-          ? Math.round(rawVal * 10) / 10
+          ? rawVal
           : null;
       const maskCell = boldMask?.[rowNum - 1]?.[colIndex];
       return {
