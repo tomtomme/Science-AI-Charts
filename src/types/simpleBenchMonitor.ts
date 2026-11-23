@@ -1,3 +1,5 @@
+import type { ManualRowMapping } from './integrityMonitor';
+
 export type SimpleBenchDiffStatus =
   | 'new_unmatched'
   | 'missing'
@@ -64,6 +66,7 @@ export interface SimpleBenchCheckReport {
   unchangedCount: number;
   ignoredCount?: number;
   actionableCount: number;
+  manualMappings?: Record<string, ManualRowMapping>;
   summaryDe: string;
   summaryEn: string;
 }

@@ -7,6 +7,14 @@ import { DEFAULT_TIMELINE_LAB_LEVELS, TIMELINE_MAIN_LAB_LEVELS, TimelineLabLevel
 import { calculatePearson, calculateSpearman, formatCorrelationDecimal } from '../utils/correlationUtils';
 import { Tooltip } from './Tooltip';
 import { TRANSLATIONS } from '../utils/i18n';
+import {
+  TIMELINE_REGRESSION_OPTIONS,
+  DEFAULT_TIMELINE_REGRESSION_INDEX,
+  type RegressionOption,
+} from '../data/regressionOptions';
+
+export { TIMELINE_REGRESSION_OPTIONS, DEFAULT_TIMELINE_REGRESSION_INDEX };
+export type { RegressionOption };
 
 interface TimelineScatterplotProps {
   models: ModelRecord[];
@@ -41,86 +49,7 @@ interface TimelineScatterplotProps {
   row33Meta?: Row33Metadata;
 }
 
-export interface RegressionOption {
-  id: RegressionType;
-  labelDe: string;
-  labelEn: string;
-  shortDe: string;
-  shortEn: string;
-  descDe: string;
-  descEn: string;
-  color: string;
-}
-
-export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
-  {
-    id: 'linear',
-    labelDe: 'Linear (Trendlinie)',
-    labelEn: 'Linear (Trendline)',
-    shortDe: 'Linear',
-    shortEn: 'Linear',
-    descDe: 'Geht von einem gleichmäßigen Zuwachs pro Zeiteinheit aus. Als elementares Basismodell der deskriptiven Statistik veranschaulicht die Gerade die fundamentale Entwicklungsrichtung, kann jedoch Beschleunigungen oder Sättigungseffekte nicht abbilden.',
-    descEn: 'Assumes a steady rate of improvement over time. As the fundamental baseline in descriptive statistics, this straight line captures the general trajectory, though it cannot reflect acceleration or plateaus.',
-    color: '#6366f1', // Indigo
-  },
-  {
-    id: 'exponential',
-    labelDe: 'Exponential (Wachstum)',
-    labelEn: 'Exponential (Growth)',
-    shortDe: 'Expon.',
-    shortEn: 'Expon.',
-    descDe: 'Modelliert ein sich selbst verstärkendes, prozentuales Wachstum: Mit jedem Entwicklungsschritt fällt der absolute Punktgewinn größer aus. Eignet sich zur empirischen Prüfung von Thesen eines unaufhaltsamen KI-Sprungs („Law of Accelerating Returns“), stößt in der Realität jedoch unweigerlich an Grenzen.',
-    descEn: 'Models compounding percentage growth: absolute gains expand with every stage. Useful to empirically test hypotheses of runaway AI leaps, though real-world physical and evaluation constraints inevitably lead to saturation.',
-    color: '#8b5cf6', // Violet
-  },
-  {
-    id: 'power',
-    labelDe: 'Power (Potenzkurve)',
-    labelEn: 'Power (Scaling)',
-    shortDe: 'Power',
-    shortEn: 'Power',
-    descDe: 'Veranschaulicht klassische Skalierungsgesetze (Power Laws, y ∝ xᵇ): Anfangs steile Fortschritte flachen mit wachsender Modellbasis zunehmend ab (abnehmender Grenznutzen). Verdeutlicht, wie viel mehr Trainingsaufwand für die letzten Prozentpunkte auf dem Weg zur Perfektion nötig wird.',
-    descEn: 'Illustrates classic scaling laws (y ∝ xᵇ): rapid early leaps gradually taper off as the base expands (diminishing returns). Highlights how each subsequent percentage gain demands exponentially greater training effort and compute.',
-    color: '#ec4899', // Pink
-  },
-  {
-    id: 'polynomial',
-    labelDe: 'Polynom (Grad 2-4)',
-    labelEn: 'Polynomial (deg 2-4)',
-    shortDe: 'Polynom',
-    shortEn: 'Polynom.',
-    descDe: 'Passt eine flexible Bogenkurve an den empirischen Verlauf an. Grad 2 modelliert Beschleunigung oder Verlangsamung (Parabel), höhere Grade (3–4) erfassen auch Wendepunkte. Studierende sollten hierbei das statistische Risiko von „Overfitting“ an den Datenrändern beachten.',
-    descEn: 'Fits a flexible curved trajectory to empirical points. Degree 2 captures simple acceleration or deceleration (parabola), while degrees 3–4 model inflection points. Beware of the statistical risk of "overfitting" near the outer boundaries.',
-    color: '#f43f5e', // Rose
-  },
-  {
-    id: 'loess',
-    labelDe: 'LOESS (Smoothing)',
-    labelEn: 'LOESS (Smoothing)',
-    shortDe: 'LOESS',
-    shortEn: 'LOESS',
-    descDe: 'Ein nicht-parametrisches Verfahren: Statt einer starren mathematischen Formel berechnet LOESS für jeden Abschnitt eine gewichtete Regression aus benachbarten Beobachtungen. Folgt realen Entwicklungswellen besonders naturgetreu, ohne theoretische Vorannahmen aufzuzwingen.',
-    descEn: 'A non-parametric approach: instead of imposing a rigid global formula, LOESS fits weighted regressions locally to neighboring observations. Faithfully tracks empirical innovation waves without forcing preconceived mathematical assumptions.',
-    color: '#f59e0b', // Amber
-  },
-  {
-    id: 'frontier',
-    labelDe: 'Pioniere (Rekorde)',
-    labelEn: 'Pioneers (Records)',
-    shortDe: 'Pioniere',
-    shortEn: 'Pioneers',
-    descDe: 'Keine statistische Ausgleichskurve, sondern die empirische Pareto-Front: Sie verbindet ausschließlich historische Meilensteine, die zum jeweiligen Zeitpunkt einen neuen Rekordwert aller bisherigen Chatbots aufgestellt haben. Zeigt die technologische Speerspitze (State of the Art).',
-    descEn: 'Not a statistical best-fit curve, but the empirical Pareto frontier: connects only those milestone models that broke previous all-time records upon release. Highlights the cutting edge of technological capability (State of the Art).',
-    color: '#d97706', // Gold / Bronze
-  },
-];
-
 const REGRESSION_OPTIONS = TIMELINE_REGRESSION_OPTIONS;
-
-export const DEFAULT_TIMELINE_REGRESSION_INDEX = Math.max(
-  0,
-  TIMELINE_REGRESSION_OPTIONS.findIndex((o) => o.id === 'loess')
-);
 
 export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   allModels,

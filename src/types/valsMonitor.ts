@@ -1,3 +1,5 @@
+import type { ManualRowMapping } from './integrityMonitor';
+
 export type ValsDiffStatus =
   | 'new_unmatched'
   | 'missing'
@@ -65,6 +67,7 @@ export interface ValsCheckReport {
   unchangedCount: number;
   ignoredCount?: number;
   actionableCount: number;
+  manualMappings?: Record<string, ManualRowMapping>;
   summaryDe: string;
   summaryEn: string;
 }

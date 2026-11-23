@@ -235,7 +235,23 @@ export async function fetchSheetGridWithFormatting(
   const greenMask: boolean[][] = [];
   const boldMask: boolean[][] = [];
   const row0Cells = Array.isArray(rowData[0]?.values) ? rowData[0].values : [];
-  const cellO1Links = row0Cells[14] ? extractCellRichLinks(row0Cells[14]) : [];
+  const authorCell =
+    row0Cells.find((cell: any) => {
+      const text = String(cell?.formattedValue || '').toLowerCase();
+      if (
+        text &&
+        (text.includes('app &') ||
+          text.includes('table by') ||
+          text.includes('table from') ||
+          text.includes('tabelle von') ||
+          (text.includes('thomas') && (text.includes('youtube') || text.includes('github') || text.includes('orcid'))))
+      ) {
+        return true;
+      }
+      const links = extractCellRichLinks(cell);
+      return links.some((l) => /orcid\.org|github\.com|youtube\.com|scholar\.google/i.test(l.url));
+    }) ?? row0Cells[14];
+  const cellO1Links = authorCell ? extractCellRichLinks(authorCell) : [];
 
   for (const rowItem of rowData) {
     const cells = Array.isArray(rowItem?.values) ? rowItem.values : [];
@@ -296,9 +312,32 @@ export async function fetchRowFormulas(
   sheetTitle: string,
   rowNumber1Based: number,
   accessToken: string,
-  endColLetter = 'AB'
+  endColLetter = 'AZ'
 ): Promise<string[]> {
-  const range = `${quoteSheetTitle(sheetTitle)}!A${rowNumber1Based}:${endColLetter}${rowNumber1Based}`;
+  const rows = await fetchMultiRowFormulas(
+    spreadsheetId,
+    sheetTitle,
+    rowNumber1Based,
+    rowNumber1Based,
+    accessToken,
+    endColLetter
+  );
+  return rows[0] || [];
+}
+
+/**
+ * Reads raw formulas/values across a contiguous range of 1-based rows (Columns A..endColLetter)
+ * so new row inserts can clone the user's existing composite formulas cleanly without modifying them.
+ */
+export async function fetchMultiRowFormulas(
+  spreadsheetId: string,
+  sheetTitle: string,
+  startRow1Based: number,
+  endRow1Based: number,
+  accessToken: string,
+  endColLetter = 'AZ'
+): Promise<string[][]> {
+  const range = `${quoteSheetTitle(sheetTitle)}!A${startRow1Based}:${endColLetter}${endRow1Based}`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
     spreadsheetId
   )}/values/${encodeURIComponent(range)}?majorDimension=ROWS&valueRenderOption=FORMULA`;
@@ -310,12 +349,19 @@ export async function fetchRowFormulas(
   });
 
   if (!res.ok) {
-    throw await parseApiError(res, `Failed to inspect formulas in row ${rowNumber1Based}`);
+    throw await parseApiError(
+      res,
+      `Failed to inspect formulas in rows ${startRow1Based}:${endRow1Based}`
+    );
   }
 
   const data = await res.json();
-  const row = Array.isArray(data.values) && Array.isArray(data.values[0]) ? data.values[0] : [];
-  return row.map((cell: unknown) => (cell === null || cell === undefined ? '' : String(cell)));
+  const rows: unknown[] = Array.isArray(data.values) ? data.values : [];
+  return rows.map((row) =>
+    Array.isArray(row)
+      ? row.map((cell: unknown) => (cell === null || cell === undefined ? '' : String(cell)))
+      : []
+  );
 }
 
 export interface CellUpdateSpec {
@@ -556,9 +602,15 @@ export async function applyCellsBoldFormatting(
   }
 }
 
+export interface FormulaCopySpec {
+  sourceRow1BasedAfterInsert: number;
+  col0Based: number;
+}
+
 /**
- * Inserts a new row at a 1-based row position, writes only explicit sparse cells (preserving
- * any formula columns or unpopulated benchmark slots), and applies bold/non-bold text & number formatting.
+ * Inserts a new row at a 1-based row position, optionally clones existing Sheet formulas
+ * (such as the user's NEW / OLD / Worst Case formulas) via PASTE_FORMULA with relative row shifts,
+ * writes explicit sparse cells, and applies bold/non-bold text & number formatting.
  */
 export async function insertRowAndWriteSparseCells(
   spreadsheetId: string,
@@ -566,11 +618,46 @@ export async function insertRowAndWriteSparseCells(
   insertAtRow1Based: number,
   cellUpdates: CellUpdateSpec[],
   boldCells: CellBoldSpec[],
-  accessToken: string
+  accessToken: string,
+  formulaCopySpecs: FormulaCopySpec[] = []
 ): Promise<{ totalUpdatedCells: number }> {
   const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
     spreadsheetId
   )}:batchUpdate`;
+
+  const requests: Array<Record<string, unknown>> = [
+    {
+      insertDimension: {
+        range: {
+          sheetId,
+          dimension: 'ROWS',
+          startIndex: insertAtRow1Based - 1,
+          endIndex: insertAtRow1Based,
+        },
+        inheritFromBefore: true,
+      },
+    },
+    ...formulaCopySpecs.map((spec) => ({
+      copyPaste: {
+        source: {
+          sheetId,
+          startRowIndex: spec.sourceRow1BasedAfterInsert - 1,
+          endRowIndex: spec.sourceRow1BasedAfterInsert,
+          startColumnIndex: spec.col0Based,
+          endColumnIndex: spec.col0Based + 1,
+        },
+        destination: {
+          sheetId,
+          startRowIndex: insertAtRow1Based - 1,
+          endRowIndex: insertAtRow1Based,
+          startColumnIndex: spec.col0Based,
+          endColumnIndex: spec.col0Based + 1,
+        },
+        pasteType: 'PASTE_FORMULA',
+        pasteOrientation: 'NORMAL',
+      },
+    })),
+  ];
 
   const insertRes = await fetch(batchUrl, {
     method: 'POST',
@@ -578,21 +665,7 @@ export async function insertRowAndWriteSparseCells(
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      requests: [
-        {
-          insertDimension: {
-            range: {
-              sheetId,
-              dimension: 'ROWS',
-              startIndex: insertAtRow1Based - 1,
-              endIndex: insertAtRow1Based,
-            },
-            inheritFromBefore: true,
-          },
-        },
-      ],
-    }),
+    body: JSON.stringify({ requests }),
   });
 
   if (!insertRes.ok) {

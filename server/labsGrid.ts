@@ -1,3 +1,5 @@
+import { decodeHtmlEntities as decodeHtmlEntitiesShared } from './utils/html.ts';
+
 const PUBHTML_LABS_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vR8QbYqPYx_PnohNVTT-hAU-NkOt9hVh-INeH_SJPwoYJpoRsBUGdmanYRZiz3ll1J0scf5U_vju3nG/pubhtml/sheet?headers=false&gid=355721692';
 
@@ -12,18 +14,7 @@ let cachedAtMs = 0;
 const SHORT_CACHE_MS = 5 * 1000;
 
 function decodeHtmlEntities(input: string): string {
-  return input
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&#(\d+);/g, (_m, dec) => String.fromCharCode(Number(dec)))
-    .replace(/&#x([0-9a-f]+);/gi, (_m, hex) => String.fromCharCode(parseInt(hex, 16)))
-    .trim();
+  return decodeHtmlEntitiesShared(input, true);
 }
 
 function isGreenColor(colorVal: string): boolean {
@@ -210,30 +201,50 @@ export function parseMainO1LinksFromHtml(html: string): MainO1LinksResponse {
   for (const trMatch of tbody.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
     const trContent = trMatch[1];
     let col = 0;
+    let fallbackCell: { cellO1Text: string; links: Array<{ label: string; url: string }> } | null =
+      null;
+
     for (const tdMatch of trContent.matchAll(/<td([^>]*)>([\s\S]*?)<\/td>/g)) {
       const attrs = tdMatch[1] || '';
       if (attrs.includes('freezebar-cell')) continue;
       const colspan = Math.max(1, Number(attrs.match(/colspan="(\d+)"/i)?.[1] || 1));
       const innerHtml = tdMatch[2] || '';
-      if (col <= 14 && col + colspan > 14) {
-        const links: Array<{ label: string; url: string }> = [];
-        for (const aMatch of innerHtml.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
-          const url = unwrapGoogleRedirectUrl(aMatch[1] || '');
-          const label = decodeHtmlEntities(aMatch[2] || '');
-          if (label && /^https?:\/\//i.test(url)) {
-            links.push({ label, url });
-          }
-        }
-        const cellO1Text = decodeHtmlEntities(innerHtml);
-        if (cellO1Text || links.length > 0) {
-          return {
-            cellO1Text,
-            links,
-            fetchedAt: new Date().toISOString(),
-          };
+      const links: Array<{ label: string; url: string }> = [];
+      for (const aMatch of innerHtml.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+        const url = unwrapGoogleRedirectUrl(aMatch[1] || '');
+        const label = decodeHtmlEntities(aMatch[2] || '');
+        if (label && /^https?:\/\//i.test(url)) {
+          links.push({ label, url });
         }
       }
+      const cellO1Text = decodeHtmlEntities(innerHtml);
+      const low = cellO1Text.toLowerCase();
+      const isAuthorMatch =
+        low.includes('app &') ||
+        low.includes('table by') ||
+        low.includes('table from') ||
+        low.includes('tabelle von') ||
+        (low.includes('thomas') && (low.includes('youtube') || low.includes('github') || low.includes('orcid'))) ||
+        links.some((l) => /orcid\.org|github\.com|youtube\.com|scholar\.google/i.test(l.url));
+
+      if (isAuthorMatch && (cellO1Text || links.length > 0)) {
+        return {
+          cellO1Text,
+          links,
+          fetchedAt: new Date().toISOString(),
+        };
+      }
+      if (col <= 14 && col + colspan > 14 && (cellO1Text || links.length > 0)) {
+        fallbackCell = { cellO1Text, links };
+      }
       col += colspan;
+    }
+
+    if (fallbackCell) {
+      return {
+        ...fallbackCell,
+        fetchedAt: new Date().toISOString(),
+      };
     }
   }
 

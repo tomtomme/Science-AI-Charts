@@ -1,4 +1,3 @@
-import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type {
@@ -9,12 +8,19 @@ import type {
   GdpxSheetModelSnapshot,
 } from '../src/types/gdpxMonitor.ts';
 import type { ManualRowMapping } from '../src/types/integrityMonitor.ts';
+import {
+  SCORE_DIFF_THRESHOLD,
+  computeReleaseDateTiebreaker,
+  countDiffStatuses,
+  createMonitorRuntime,
+  fetchTextWithTimeout,
+  formatExactScore,
+  matchCompanyName,
+  reserveManualMappings,
+} from './utils/monitorBase.ts';
 
 const GDPX_URL = 'https://gdpx.semianalysis.com/';
 const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-gdpx-monitor-cache-v3.json');
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const SCORE_DIFF_THRESHOLD = 1e-4;
-const ESTIMATE_EXACT_TOLERANCE = 1e-4;
 
 // The 21 baseline models already present on gdpx.semianalysis.com;
 // any model outside this set is a new leaderboard entry whose existing Column J value is treated as an estimate to overwrite.
@@ -92,103 +98,6 @@ interface RawGdpxPayload {
   results: RawGdpxResult[];
 }
 
-interface PersistedGdpxCache {
-  report: GdpxCheckReport | null;
-  knownSourceIds: string[];
-  ignoredIds: string[];
-  manualMappings: Record<string, ManualRowMapping>;
-  lastError: string | null;
-}
-
-let inMemoryCache: PersistedGdpxCache | null = null;
-let inFlightCheck: Promise<GdpxCheckReport> | null = null;
-
-function sanitizeManualMappings(raw: unknown): Record<string, ManualRowMapping> {
-  const out: Record<string, ManualRowMapping> = {};
-  if (!raw || typeof raw !== 'object') return out;
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (v && typeof v === 'object') {
-      const rec = v as Partial<ManualRowMapping>;
-      if (typeof rec.sheetRowNumber === 'number' && rec.sheetRowNumber >= 36) {
-        out[k] = {
-          sheetRowNumber: rec.sheetRowNumber,
-          ...(typeof rec.matchedModelId === 'string' && rec.matchedModelId
-            ? { matchedModelId: rec.matchedModelId }
-            : {}),
-          ...(typeof rec.matchedDisplayName === 'string' && rec.matchedDisplayName
-            ? { matchedDisplayName: rec.matchedDisplayName }
-            : {}),
-        };
-      }
-    }
-  }
-  return out;
-}
-
-async function readCache(): Promise<PersistedGdpxCache> {
-  if (inMemoryCache) {
-    return inMemoryCache;
-  }
-
-  try {
-    const raw = await fs.readFile(CACHE_FILE_PATH, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<PersistedGdpxCache>;
-    if (parsed && typeof parsed === 'object') {
-      inMemoryCache = {
-        report: parsed.report ?? null,
-        knownSourceIds: Array.isArray(parsed.knownSourceIds)
-          ? parsed.knownSourceIds.map(String)
-          : [],
-        ignoredIds: Array.isArray(parsed.ignoredIds) ? parsed.ignoredIds.map(String) : [],
-        manualMappings: sanitizeManualMappings(parsed.manualMappings),
-        lastError: parsed.lastError ?? null,
-      };
-      return inMemoryCache;
-    }
-  } catch {
-    // Cache file may not exist yet
-  }
-
-  inMemoryCache = {
-    report: null,
-    knownSourceIds: [],
-    ignoredIds: [],
-    manualMappings: {},
-    lastError: null,
-  };
-  return inMemoryCache;
-}
-
-async function writeCache(cache: PersistedGdpxCache): Promise<void> {
-  inMemoryCache = cache;
-  try {
-    await fs.writeFile(CACHE_FILE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Could not persist GDPx monitor cache to temp dir:', err);
-  }
-}
-
-export function isGdpxReportDue(report: GdpxCheckReport | null): boolean {
-  if (!report?.checkedAt) return true;
-  const checkedMs = new Date(report.checkedAt).getTime();
-  if (!Number.isFinite(checkedMs)) return true;
-  return Date.now() - checkedMs >= CHECK_INTERVAL_MS;
-}
-
-export async function getGdpxMonitorStatus(): Promise<GdpxMonitorStatusResponse> {
-  const cache = await readCache();
-  return {
-    report: cache.report,
-    isDue: isGdpxReportDue(cache.report),
-    isRunning: inFlightCheck !== null,
-    checkIntervalHours: 24,
-    lastError: cache.lastError,
-  };
-}
-
-/**
- * Unescapes a JS single- or double-quoted string literal without eval.
- */
 function unescapeJsStringLiteral(inner: string): string {
   let out = '';
   for (let i = 0; i < inner.length; i++) {
@@ -339,20 +248,6 @@ function weightedMean(
   return den > 0 ? num / den : null;
 }
 
-async function fetchTextWithTimeout(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Science-AI-Charts-GDPxMonitor/1.0 (+https://gdpx.semianalysis.com/)',
-      Accept: 'text/html,application/javascript,*/*',
-    },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} while fetching ${url}`);
-  }
-  return res.text();
-}
-
 export async function fetchLiveGdpxLeaderboard(
   previousKnownIds: string[] = []
 ): Promise<{
@@ -360,7 +255,8 @@ export async function fetchLiveGdpxLeaderboard(
   models: GdpxLeaderboardModel[];
   newlyDiscoveredIds: string[];
 }> {
-  const html = await fetchTextWithTimeout(GDPX_URL);
+  const userAgent = 'Science-AI-Charts-GDPxMonitor/1.0 (+https://gdpx.semianalysis.com/)';
+  const html = await fetchTextWithTimeout(GDPX_URL, userAgent, 'text/html,application/javascript,*/*');
   const scriptPaths = Array.from(
     new Set(
       Array.from(html.matchAll(/<script[^>]*src="([^"]+)"/g))
@@ -380,7 +276,7 @@ export async function fetchLiveGdpxLeaderboard(
     const chunkUrl = src.startsWith('http')
       ? src
       : `https://gdpx.semianalysis.com${src.startsWith('/') ? '' : '/'}${src}`;
-    const js = await fetchTextWithTimeout(chunkUrl);
+    const js = await fetchTextWithTimeout(chunkUrl, userAgent, 'application/javascript,*/*');
     const modelsIdx = js.indexOf('"models":[');
     if (modelsIdx === -1) continue;
 
@@ -482,51 +378,25 @@ function normalizeModelBaseAndQualifiers(raw: string): {
   compactFull: string;
   compactBase: string;
   qualifiers: string[];
-  hasDateSuffix: boolean;
 } {
   let s = (raw || '').toLowerCase().trim();
-  // Remove leading flags / badges / symbols
   s = s.replace(/[^\p{L}\p{N}\s()._-]/gu, ' ');
-  // Normalize OpenAI naming: ChatGPT-6 -> GPT 6
   s = s.replace(/\bchatgpt[-\s]*/g, 'gpt ');
-  // Normalize DeepSeek V4.1 -> DeepSeek 4.1
   s = s.replace(/\bdeepseek\s+v(?=\d)/g, 'deepseek ');
-  // Normalize Qwen3.8 -> Qwen 3.8
   s = s.replace(/\bqwen(?=\d)/g, 'qwen ');
-  // Normalize MiniMax-M3.1 -> MiniMax M3.1
   s = s.replace(/\bminimax[-\s]*/g, 'minimax ');
 
   const qualifiers: string[] = [];
-  let hasDateSuffix = false;
   const baseWithoutParens = s.replace(/\(([^)]+)\)/g, (_m, inner: string) => {
-    const cleanQ = inner.trim().toLowerCase();
-    qualifiers.push(cleanQ);
-    if (/^\d{4}$/.test(cleanQ)) {
-      hasDateSuffix = true;
-    }
+    qualifiers.push(inner.trim().toLowerCase());
     return ' ';
   });
 
-  // Check trailing 4-digit release tag like "1017" in "DeepSeek 4.1 Flash 1017"
-  if (/\b\d{4}\b/.test(baseWithoutParens)) {
-    hasDateSuffix = true;
-  }
-
-  const compactFull = s.replace(/[^a-z0-9]/g, '');
-  const compactBase = baseWithoutParens.replace(/[^a-z0-9]/g, '');
-
-  return { compactFull, compactBase, qualifiers, hasDateSuffix };
-}
-
-function companyMatches(lab: string, companyName: string): boolean {
-  const a = (lab || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const b = (companyName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (!a || !b) return false;
-  if (a === b || a.includes(b) || b.includes(a)) return true;
-  if (a === 'zai' && b === 'zai') return true;
-  if (a === 'xai' && (b.includes('xai') || b.includes('spacex'))) return true;
-  if (a === 'moonshotai' && b.includes('kimi')) return true;
-  return false;
+  return {
+    compactFull: s.replace(/[^a-z0-9]/g, ''),
+    compactBase: baseWithoutParens.replace(/[^a-z0-9]/g, ''),
+    qualifiers,
+  };
 }
 
 function scoreSheetCandidate(
@@ -566,8 +436,6 @@ function scoreSheetCandidate(
   if (bestNameScore === 0) return 0;
 
   let totalScore = bestNameScore;
-
-  // Prefer matching reasoning level (GDPx runs Max/Highest/xHigh reasoning)
   const qStr = matchedParsed.qualifiers.join(' ');
   if (/\b(max|xhigh|highest|high)\b/.test(qStr)) totalScore += 35;
   if (/\b(med|medium|low|fast|lite)\b/.test(qStr)) totalScore -= 90;
@@ -575,19 +443,10 @@ function scoreSheetCandidate(
     if (!/\bprev(iew)?\b/i.test(gdpx.name)) totalScore -= 120;
   }
 
-  // Strongly prefer rows that already have a Col J score (e.g., Qwen3.8 Max (0902) vs older Qwen3.8 Max)
-  if (sheet.colJ !== null) totalScore += 60;
-
-  // Company sanity bonus
-  if (companyMatches(gdpx.lab, sheet.companyName)) totalScore += 15;
-
-  // Newer release date tiebreaker (e.g. 2026-09-02 > 2026-08-03)
-  if (/^\d{4}-\d{2}-\d{2}$/.test(sheet.releaseDate || '')) {
-    const ts = Date.parse(sheet.releaseDate);
-    if (Number.isFinite(ts)) {
-      totalScore += Math.max(0, Math.min(10, Math.floor((ts - Date.parse('2025-01-01')) / 31536000000)));
-    }
-  }
+  if (sheet.colJ !== null) totalScore += 40;
+  if (sheet.colJIsBold === true) totalScore += 20;
+  if (matchCompanyName(gdpx.lab, sheet.companyName)) totalScore += 15;
+  totalScore += computeReleaseDateTiebreaker(sheet.releaseDate, 2025);
 
   return totalScore;
 }
@@ -603,28 +462,13 @@ export function buildGdpxDiffs(
   preferences?: GdpxPreferencesInput
 ): GdpxDiffItem[] {
   const ignoredSet = new Set(preferences?.ignoredIds ?? []);
-  const manualMappings = preferences?.manualMappings ?? {};
-  const usedSheetRows = new Set<number>();
-  const resolvedMatches = new Map<string, GdpxSheetModelSnapshot>();
+  const { usedSheetRows, resolvedMatches } = reserveManualMappings(
+    gdpxModels,
+    sheetModels,
+    ignoredSet,
+    preferences?.manualMappings ?? {}
+  );
 
-  // Pass 1: Reserve explicit user manual mappings first
-  for (const gdpx of gdpxModels) {
-    if (ignoredSet.has(gdpx.id)) continue;
-    const mapping = manualMappings[gdpx.id];
-    if (!mapping) continue;
-
-    const found =
-      (mapping.matchedModelId
-        ? sheetModels.find((c) => c.id === mapping.matchedModelId)
-        : undefined) ?? sheetModels.find((c) => c.sheetRowNumber === mapping.sheetRowNumber);
-
-    if (found && !usedSheetRows.has(found.sheetRowNumber)) {
-      usedSheetRows.add(found.sheetRowNumber);
-      resolvedMatches.set(gdpx.id, found);
-    }
-  }
-
-  // Pass 2: Automatic matching for remaining models
   for (const gdpx of gdpxModels) {
     if (ignoredSet.has(gdpx.id) || resolvedMatches.has(gdpx.id)) continue;
 
@@ -646,133 +490,8 @@ export function buildGdpxDiffs(
     }
   }
 
-  const diffs: GdpxDiffItem[] = [];
-
-  const formatExact = (val: number, minDecimals = 1): string => {
-    const str = String(val);
-    const dot = str.indexOf('.');
-    const curDec = dot !== -1 ? str.length - dot - 1 : 0;
-    return curDec < minDecimals ? val.toFixed(minDecimals) : str;
-  };
-
-  for (const gdpx of gdpxModels) {
-    if (ignoredSet.has(gdpx.id)) {
-      diffs.push({
-        gdpxId: gdpx.id,
-        gdpxName: gdpx.name,
-        lab: gdpx.lab,
-        harness: gdpx.harness,
-        reasoning: gdpx.reasoning,
-        openWeights: gdpx.openWeights,
-        rank: gdpx.rank,
-        liveScore: gdpx.score,
-        scoreDecimals: gdpx.scoreDecimals,
-        costPerTask: gdpx.costPerTask,
-        status: 'ignored',
-        matchedModelId: null,
-        matchedDisplayName: null,
-        sheetRowNumber: null,
-        currentColJ: null,
-        reason: 'Vom Benutzer ignoriert.',
-      });
-      continue;
-    }
-
-    const bestMatch = resolvedMatches.get(gdpx.id) ?? null;
-
-    if (!bestMatch) {
-      diffs.push({
-        gdpxId: gdpx.id,
-        gdpxName: gdpx.name,
-        lab: gdpx.lab,
-        harness: gdpx.harness,
-        reasoning: gdpx.reasoning,
-        openWeights: gdpx.openWeights,
-        rank: gdpx.rank,
-        liveScore: gdpx.score,
-        scoreDecimals: gdpx.scoreDecimals,
-        costPerTask: gdpx.costPerTask,
-        status: 'new_unmatched',
-        matchedModelId: null,
-        matchedDisplayName: null,
-        sheetRowNumber: null,
-        currentColJ: null,
-        reason: 'Kein passendes Modell im Sheet gefunden — manuell zuordnen oder Zeile im Sheet anlegen.',
-      });
-      continue;
-    }
-
-    if (bestMatch.colJ === null) {
-      diffs.push({
-        gdpxId: gdpx.id,
-        gdpxName: gdpx.name,
-        lab: gdpx.lab,
-        harness: gdpx.harness,
-        reasoning: gdpx.reasoning,
-        openWeights: gdpx.openWeights,
-        rank: gdpx.rank,
-        liveScore: gdpx.score,
-        scoreDecimals: gdpx.scoreDecimals,
-        costPerTask: gdpx.costPerTask,
-        status: 'missing',
-        matchedModelId: bestMatch.id,
-        matchedDisplayName: bestMatch.displayName,
-        sheetRowNumber: bestMatch.sheetRowNumber,
-        currentColJ: null,
-        reason: 'Spalte J ist in dieser Zeile noch leer.',
-      });
-      continue;
-    }
-
-    const delta = Math.abs(bestMatch.colJ - gdpx.score);
-    const isNewEntrantBeyondBaseline = !INITIAL_BASELINE_GDPX_IDS.has(gdpx.id);
-    const liveFormatted = formatExact(gdpx.score, gdpx.scoreDecimals ?? 1);
-
-    if (isNewEntrantBeyondBaseline && delta >= ESTIMATE_EXACT_TOLERANCE) {
-      diffs.push({
-        gdpxId: gdpx.id,
-        gdpxName: gdpx.name,
-        lab: gdpx.lab,
-        harness: gdpx.harness,
-        reasoning: gdpx.reasoning,
-        openWeights: gdpx.openWeights,
-        rank: gdpx.rank,
-        liveScore: gdpx.score,
-        scoreDecimals: gdpx.scoreDecimals,
-        costPerTask: gdpx.costPerTask,
-        status: 'overwrite_estimate',
-        matchedModelId: bestMatch.id,
-        matchedDisplayName: bestMatch.displayName,
-        sheetRowNumber: bestMatch.sheetRowNumber,
-        currentColJ: bestMatch.colJ,
-        reason: `Neuzugang auf GDPx: Schätzwert in Spalte J (${bestMatch.colJ}) durch offiziellen Score (${liveFormatted}%) ersetzen.`,
-      });
-      continue;
-    }
-
-    if (delta >= SCORE_DIFF_THRESHOLD) {
-      diffs.push({
-        gdpxId: gdpx.id,
-        gdpxName: gdpx.name,
-        lab: gdpx.lab,
-        harness: gdpx.harness,
-        reasoning: gdpx.reasoning,
-        openWeights: gdpx.openWeights,
-        rank: gdpx.rank,
-        liveScore: gdpx.score,
-        scoreDecimals: gdpx.scoreDecimals,
-        costPerTask: gdpx.costPerTask,
-        status: 'changed',
-        matchedModelId: bestMatch.id,
-        matchedDisplayName: bestMatch.displayName,
-        sheetRowNumber: bestMatch.sheetRowNumber,
-        currentColJ: bestMatch.colJ,
-        reason: `Score weicht ab (${bestMatch.colJ} → ${liveFormatted}%).`,
-      });
-      continue;
-    }
-
-    diffs.push({
+  return gdpxModels.map((gdpx): GdpxDiffItem => {
+    const base = {
       gdpxId: gdpx.id,
       gdpxName: gdpx.name,
       lab: gdpx.lab,
@@ -783,16 +502,90 @@ export function buildGdpxDiffs(
       liveScore: gdpx.score,
       scoreDecimals: gdpx.scoreDecimals,
       costPerTask: gdpx.costPerTask,
+    };
+
+    if (ignoredSet.has(gdpx.id)) {
+      return {
+        ...base,
+        status: 'ignored',
+        matchedModelId: null,
+        matchedDisplayName: null,
+        sheetRowNumber: null,
+        currentColJ: null,
+        currentColJIsBold: null,
+        reason: 'Vom Benutzer ignoriert.',
+      };
+    }
+
+    const bestMatch = resolvedMatches.get(gdpx.id) ?? null;
+    if (!bestMatch) {
+      return {
+        ...base,
+        status: 'new_unmatched',
+        matchedModelId: null,
+        matchedDisplayName: null,
+        sheetRowNumber: null,
+        currentColJ: null,
+        currentColJIsBold: null,
+        reason:
+          'Kein passendes Modell im Sheet gefunden — manuell zuordnen oder Zeile im Sheet anlegen.',
+      };
+    }
+
+    if (bestMatch.colJ === null) {
+      return {
+        ...base,
+        status: 'missing',
+        matchedModelId: bestMatch.id,
+        matchedDisplayName: bestMatch.displayName,
+        sheetRowNumber: bestMatch.sheetRowNumber,
+        currentColJ: null,
+        currentColJIsBold: bestMatch.colJIsBold,
+        reason: 'Spalte J ist in dieser Zeile noch leer (wird fett als offizieller Wert eingetragen).',
+      };
+    }
+
+    const isEstimateNonBold = bestMatch.colJIsBold === false;
+    const delta = Math.abs(bestMatch.colJ - gdpx.score);
+    const liveFormatted = formatExactScore(gdpx.score, gdpx.scoreDecimals ?? 1);
+
+    if (isEstimateNonBold) {
+      return {
+        ...base,
+        status: 'overwrite_estimate',
+        matchedModelId: bestMatch.id,
+        matchedDisplayName: bestMatch.displayName,
+        sheetRowNumber: bestMatch.sheetRowNumber,
+        currentColJ: bestMatch.colJ,
+        currentColJIsBold: false,
+        reason: `Nicht-fetter Schätzwert (${bestMatch.colJ}) → offiziellen GDPx-Score (${liveFormatted}, fett) übernehmen.`,
+      };
+    }
+
+    if (delta >= SCORE_DIFF_THRESHOLD) {
+      return {
+        ...base,
+        status: 'changed',
+        matchedModelId: bestMatch.id,
+        matchedDisplayName: bestMatch.displayName,
+        sheetRowNumber: bestMatch.sheetRowNumber,
+        currentColJ: bestMatch.colJ,
+        currentColJIsBold: bestMatch.colJIsBold,
+        reason: `Offizieller Score weicht ab (${bestMatch.colJ} → ${liveFormatted}).`,
+      };
+    }
+
+    return {
+      ...base,
       status: 'unchanged',
       matchedModelId: bestMatch.id,
       matchedDisplayName: bestMatch.displayName,
       sheetRowNumber: bestMatch.sheetRowNumber,
       currentColJ: bestMatch.colJ,
-      reason: 'Synchron.',
-    });
-  }
-
-  return diffs;
+      currentColJIsBold: bestMatch.colJIsBold,
+      reason: 'Synchron (fett/offiziell).',
+    };
+  });
 }
 
 function summarizeGdpxReportCounts(
@@ -801,225 +594,110 @@ function summarizeGdpxReportCounts(
   diffs: GdpxDiffItem[],
   hasSheetModels: boolean
 ) {
-  const unmatchedCount = diffs.filter((d) => d.status === 'new_unmatched').length;
-  const missingCount = diffs.filter((d) => d.status === 'missing').length;
-  const overwriteEstimateCount = diffs.filter((d) => d.status === 'overwrite_estimate').length;
-  const changedCount = diffs.filter((d) => d.status === 'changed').length;
-  const unchangedCount = diffs.filter((d) => d.status === 'unchanged').length;
-  const ignoredCount = diffs.filter((d) => d.status === 'ignored').length;
-  const actionableCount =
-    unmatchedCount + missingCount + overwriteEstimateCount + changedCount;
-
+  const counts = countDiffStatuses(diffs);
   let summaryDe = '';
   let summaryEn = '';
+
   if (!hasSheetModels) {
     summaryDe = `${totalSourceModels} LLMs live auf GDPx geladen (Stand ${sourceUpdatedAt || 'aktuell'}).`;
     summaryEn = `Loaded ${totalSourceModels} live LLMs from GDPx (updated ${sourceUpdatedAt || 'latest'}).`;
-  } else if (actionableCount > 0) {
+  } else if (counts.actionableCount > 0) {
     const partsDe: string[] = [];
     const partsEn: string[] = [];
-    if (unmatchedCount > 0) {
-      partsDe.push(`${unmatchedCount} neues LLM ohne Sheet-Zeile`);
-      partsEn.push(`${unmatchedCount} new LLM(s) without Sheet match`);
+    if (counts.unmatchedCount > 0) {
+      partsDe.push(`${counts.unmatchedCount} neues LLM ohne Sheet-Zeile`);
+      partsEn.push(`${counts.unmatchedCount} new LLM(s) without Sheet match`);
     }
-    if (missingCount > 0) {
-      partsDe.push(`${missingCount} fehlende Spalte-J-Score(s)`);
-      partsEn.push(`${missingCount} missing Col-J score(s)`);
+    if (counts.missingCount > 0) {
+      partsDe.push(`${counts.missingCount} fehlend in J`);
+      partsEn.push(`${counts.missingCount} missing in J`);
     }
-    if (overwriteEstimateCount > 0) {
-      partsDe.push(`${overwriteEstimateCount} Schätzwert(e) zu überschreiben`);
-      partsEn.push(`${overwriteEstimateCount} estimate(s) to overwrite`);
+    if (counts.overwriteEstimateCount > 0) {
+      partsDe.push(`${counts.overwriteEstimateCount} nicht-fette Schätzwerte`);
+      partsEn.push(`${counts.overwriteEstimateCount} non-bold estimate(s)`);
     }
-    if (changedCount > 0) {
-      partsDe.push(`${changedCount} geänderte Score(s)`);
-      partsEn.push(`${changedCount} changed score(s)`);
+    if (counts.changedCount > 0) {
+      partsDe.push(`${counts.changedCount} geänderte Score(s)`);
+      partsEn.push(`${counts.changedCount} changed score(s)`);
     }
     summaryDe = `${partsDe.join(', ')} (${totalSourceModels} LLMs auf GDPx).`;
     summaryEn = `${partsEn.join(', ')} (${totalSourceModels} LLMs on GDPx).`;
   } else {
-    summaryDe = `Alle ${totalSourceModels} GDPx-LLMs sind in Spalte J bereits erfasst.`;
-    summaryEn = `All ${totalSourceModels} GDPx LLMs are already recorded in Column J.`;
+    summaryDe = `Alle ${totalSourceModels} GDPx-LLMs sind in Spalte J aktuell (fett).`;
+    summaryEn = `All ${totalSourceModels} GDPx LLMs are synced & bold in Column J.`;
   }
 
-  return {
-    unmatchedCount,
-    missingCount,
-    overwriteEstimateCount,
-    changedCount,
-    unchangedCount,
-    ignoredCount,
-    actionableCount,
-    summaryDe,
-    summaryEn,
-  };
+  return { ...counts, summaryDe, summaryEn };
+}
+
+const runtime = createMonitorRuntime<
+  GdpxLeaderboardModel,
+  GdpxSheetModelSnapshot,
+  GdpxDiffItem,
+  GdpxCheckReport
+>({
+  label: 'GDPx',
+  cacheFilePath: CACHE_FILE_PATH,
+  sourceUrl: GDPX_URL,
+  initialBaselineIds: INITIAL_BASELINE_GDPX_IDS,
+  checkFailureFallbackMessage: 'GDPx leaderboard check failed.',
+  fetchLiveLeaderboard: fetchLiveGdpxLeaderboard,
+  buildDiffs: buildGdpxDiffs,
+  summarizeCounts: (live, diffs, hasSheetModels) =>
+    summarizeGdpxReportCounts(live.models.length, live.updatedAt, diffs, hasSheetModels),
+  createReport: ({
+    checkedAt,
+    nextCheckDueAt,
+    live,
+    baselineKnownCount,
+    trigger,
+    diffs,
+    counts,
+  }) => ({
+    checkedAt,
+    nextCheckDueAt,
+    sourceUpdatedAt: live.updatedAt,
+    sourceUrl: GDPX_URL,
+    totalSourceModels: live.models.length,
+    baselineKnownCount,
+    newlyDiscoveredSourceIds: live.newlyDiscoveredIds,
+    trigger,
+    models: live.models,
+    diffs,
+    ...counts,
+  }),
+  getDiffSourceId: (d) => d.gdpxId,
+  markDiffIgnored: (d) => ({
+    ...d,
+    status: 'ignored',
+    matchedModelId: null,
+    matchedDisplayName: null,
+    sheetRowNumber: null,
+    currentColJ: null,
+    currentColJIsBold: null,
+    reason: 'Vom Benutzer ignoriert.',
+  }),
+});
+
+export const isGdpxReportDue = runtime.isReportDue;
+
+export async function getGdpxMonitorStatus(): Promise<GdpxMonitorStatusResponse> {
+  return runtime.getStatus();
 }
 
 export async function runGdpxCheck(options?: {
   models?: GdpxSheetModelSnapshot[];
   trigger?: 'manual' | 'daily_auto';
 }): Promise<GdpxCheckReport> {
-  if (inFlightCheck) {
-    return inFlightCheck;
-  }
-
-  const trigger = options?.trigger || 'manual';
-  const sheetModels = Array.isArray(options?.models) ? options.models : [];
-
-  const task = (async () => {
-    const cache = await readCache();
-
-    try {
-      const effectivePreviousIds =
-        cache.knownSourceIds.length > 0
-          ? cache.knownSourceIds
-          : Array.from(INITIAL_BASELINE_GDPX_IDS);
-      const live = await fetchLiveGdpxLeaderboard(effectivePreviousIds);
-      const diffs =
-        sheetModels.length > 0
-          ? buildGdpxDiffs(live.models, sheetModels, {
-              ignoredIds: cache.ignoredIds,
-              manualMappings: cache.manualMappings,
-            })
-          : [];
-
-      const counts = summarizeGdpxReportCounts(
-        live.models.length,
-        live.updatedAt,
-        diffs,
-        sheetModels.length > 0
-      );
-
-      const now = new Date();
-      const nextDue = new Date(now.getTime() + CHECK_INTERVAL_MS);
-
-      const mergedKnownIds = Array.from(
-        new Set([...effectivePreviousIds, ...live.models.map((m) => m.id)])
-      );
-
-      const report: GdpxCheckReport = {
-        checkedAt: now.toISOString(),
-        nextCheckDueAt: nextDue.toISOString(),
-        sourceUpdatedAt: live.updatedAt,
-        sourceUrl: GDPX_URL,
-        totalSourceModels: live.models.length,
-        baselineKnownCount: effectivePreviousIds.length,
-        newlyDiscoveredSourceIds: live.newlyDiscoveredIds,
-        trigger,
-        models: live.models,
-        diffs,
-        ...counts,
-      };
-
-      await writeCache({
-        report,
-        knownSourceIds: mergedKnownIds,
-        ignoredIds: cache.ignoredIds,
-        manualMappings: cache.manualMappings,
-        lastError: null,
-      });
-
-      return report;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'GDPx leaderboard check failed.';
-      await writeCache({
-        report: cache.report,
-        knownSourceIds: cache.knownSourceIds,
-        ignoredIds: cache.ignoredIds,
-        manualMappings: cache.manualMappings,
-        lastError: message,
-      });
-      throw err;
-    }
-  })();
-
-  inFlightCheck = task;
-  try {
-    return await task;
-  } finally {
-    inFlightCheck = null;
-  }
+  return runtime.runCheck(options);
 }
 
 export async function updateGdpxPreferences(options: {
   ignoreIds?: string[];
   unignoreIds?: string[];
   manualMappings?: Record<string, ManualRowMapping>;
+  unmapIds?: string[];
   models?: GdpxSheetModelSnapshot[];
 }): Promise<GdpxCheckReport | null> {
-  const cache = await readCache();
-  const nextIgnored = new Set(cache.ignoredIds);
-  const nextMappings: Record<string, ManualRowMapping> = { ...cache.manualMappings };
-
-  if (Array.isArray(options.ignoreIds)) {
-    for (const id of options.ignoreIds) {
-      const clean = String(id || '').trim();
-      if (clean) {
-        nextIgnored.add(clean);
-        delete nextMappings[clean];
-      }
-    }
-  }
-
-  if (Array.isArray(options.unignoreIds)) {
-    for (const id of options.unignoreIds) {
-      nextIgnored.delete(String(id || '').trim());
-    }
-  }
-
-  if (options.manualMappings && typeof options.manualMappings === 'object') {
-    const cleanNew = sanitizeManualMappings(options.manualMappings);
-    for (const [id, mapping] of Object.entries(cleanNew)) {
-      nextMappings[id] = mapping;
-      nextIgnored.delete(id);
-    }
-  }
-
-  const ignoredIds = Array.from(nextIgnored);
-  const sheetModels = Array.isArray(options.models) ? options.models : [];
-
-  let updatedReport = cache.report;
-  if (updatedReport && updatedReport.models.length > 0) {
-    const nextDiffs =
-      sheetModels.length > 0
-        ? buildGdpxDiffs(updatedReport.models, sheetModels, {
-            ignoredIds,
-            manualMappings: nextMappings,
-          })
-        : updatedReport.diffs.map((d) =>
-            nextIgnored.has(d.gdpxId)
-              ? {
-                  ...d,
-                  status: 'ignored' as const,
-                  matchedModelId: null,
-                  matchedDisplayName: null,
-                  sheetRowNumber: null,
-                  currentColJ: null,
-                  reason: 'Vom Benutzer ignoriert.',
-                }
-              : d
-          );
-
-    const counts = summarizeGdpxReportCounts(
-      updatedReport.totalSourceModels,
-      updatedReport.sourceUpdatedAt,
-      nextDiffs,
-      sheetModels.length > 0 || updatedReport.diffs.length > 0
-    );
-
-    updatedReport = {
-      ...updatedReport,
-      diffs: nextDiffs,
-      ...counts,
-    };
-  }
-
-  await writeCache({
-    report: updatedReport,
-    knownSourceIds: cache.knownSourceIds,
-    ignoredIds,
-    manualMappings: nextMappings,
-    lastError: cache.lastError,
-  });
-
-  return updatedReport;
+  return runtime.updatePreferences(options);
 }

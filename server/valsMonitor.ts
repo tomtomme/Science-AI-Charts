@@ -1,4 +1,3 @@
-import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { ManualRowMapping } from '../src/types/integrityMonitor.ts';
@@ -9,105 +8,19 @@ import type {
   ValsMonitorStatusResponse,
   ValsSheetModelSnapshot,
 } from '../src/types/valsMonitor.ts';
+import {
+  SCORE_DIFF_THRESHOLD,
+  computeReleaseDateTiebreaker,
+  countDiffStatuses,
+  createMonitorRuntime,
+  fetchTextWithTimeout,
+  formatExactScore,
+  matchCompanyName,
+  reserveManualMappings,
+} from './utils/monitorBase.ts';
 
 const VALS_INDEX_URL = 'https://www.vals.ai/benchmarks/vals_index';
 const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-vals-monitor-cache-v2.json');
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const SCORE_DIFF_THRESHOLD = 1e-4;
-
-interface PersistedValsCache {
-  report: ValsCheckReport | null;
-  knownSourceIds: string[];
-  ignoredIds: string[];
-  manualMappings: Record<string, ManualRowMapping>;
-  lastError: string | null;
-}
-
-let inMemoryCache: PersistedValsCache | null = null;
-let inFlightCheck: Promise<ValsCheckReport> | null = null;
-
-function sanitizeManualMappings(raw: unknown): Record<string, ManualRowMapping> {
-  const out: Record<string, ManualRowMapping> = {};
-  if (!raw || typeof raw !== 'object') return out;
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (v && typeof v === 'object') {
-      const rec = v as Partial<ManualRowMapping>;
-      if (typeof rec.sheetRowNumber === 'number' && rec.sheetRowNumber >= 36) {
-        out[k] = {
-          sheetRowNumber: rec.sheetRowNumber,
-          ...(typeof rec.matchedModelId === 'string' && rec.matchedModelId
-            ? { matchedModelId: rec.matchedModelId }
-            : {}),
-          ...(typeof rec.matchedDisplayName === 'string' && rec.matchedDisplayName
-            ? { matchedDisplayName: rec.matchedDisplayName }
-            : {}),
-        };
-      }
-    }
-  }
-  return out;
-}
-
-async function readCache(): Promise<PersistedValsCache> {
-  if (inMemoryCache) {
-    return inMemoryCache;
-  }
-
-  try {
-    const raw = await fs.readFile(CACHE_FILE_PATH, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<PersistedValsCache>;
-    if (parsed && typeof parsed === 'object') {
-      inMemoryCache = {
-        report: parsed.report ?? null,
-        knownSourceIds: Array.isArray(parsed.knownSourceIds)
-          ? parsed.knownSourceIds.map(String)
-          : [],
-        ignoredIds: Array.isArray(parsed.ignoredIds) ? parsed.ignoredIds.map(String) : [],
-        manualMappings: sanitizeManualMappings(parsed.manualMappings),
-        lastError: parsed.lastError ?? null,
-      };
-      return inMemoryCache;
-    }
-  } catch {
-    // Cache file may not exist yet
-  }
-
-  inMemoryCache = {
-    report: null,
-    knownSourceIds: [],
-    ignoredIds: [],
-    manualMappings: {},
-    lastError: null,
-  };
-  return inMemoryCache;
-}
-
-async function writeCache(cache: PersistedValsCache): Promise<void> {
-  inMemoryCache = cache;
-  try {
-    await fs.writeFile(CACHE_FILE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Could not persist Vals monitor cache to temp dir:', err);
-  }
-}
-
-export function isValsReportDue(report: ValsCheckReport | null): boolean {
-  if (!report?.checkedAt) return true;
-  const checkedMs = new Date(report.checkedAt).getTime();
-  if (!Number.isFinite(checkedMs)) return true;
-  return Date.now() - checkedMs >= CHECK_INTERVAL_MS;
-}
-
-export async function getValsMonitorStatus(): Promise<ValsMonitorStatusResponse> {
-  const cache = await readCache();
-  return {
-    report: cache.report,
-    isDue: isValsReportDue(cache.report),
-    isRunning: inFlightCheck !== null,
-    checkIntervalHours: 24,
-    lastError: cache.lastError,
-  };
-}
 
 function decodeHtmlAttr(input: string): string {
   return input
@@ -144,20 +57,6 @@ function decodeAstroValue(val: unknown): unknown {
   return val;
 }
 
-async function fetchValsHtml(): Promise<string> {
-  const res = await fetch(VALS_INDEX_URL, {
-    headers: {
-      'User-Agent': 'Science-AI-Charts-ValsMonitor/1.0 (+https://www.vals.ai/benchmarks/vals_index)',
-      Accept: 'text/html,*/*',
-    },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} while fetching ${VALS_INDEX_URL}`);
-  }
-  return res.text();
-}
-
 interface RawValsAstroItem {
   position?: unknown;
   model?: unknown;
@@ -175,10 +74,12 @@ export async function fetchLiveValsLeaderboard(
   models: ValsLeaderboardModel[];
   newlyDiscoveredIds: string[];
 }> {
-  const html = await fetchValsHtml();
-  const islandMatches = Array.from(
-    html.matchAll(/<astro-island\b([^>]*)>/gi)
+  const html = await fetchTextWithTimeout(
+    VALS_INDEX_URL,
+    'Science-AI-Charts-ValsMonitor/1.0 (+https://www.vals.ai/benchmarks/vals_index)',
+    'text/html,*/*'
   );
+  const islandMatches = Array.from(html.matchAll(/<astro-island\b([^>]*)>/gi));
 
   let rawItems: RawValsAstroItem[] | null = null;
   let graphDate: string | null = null;
@@ -243,12 +144,11 @@ export async function fetchLiveValsLeaderboard(
 
     const company = String(raw.company || '').trim();
     const accRaw = String(raw.accuracy ?? '').replace(/%$/, '').trim();
-    const accNum = Number(accRaw);
-    if (!Number.isFinite(accNum)) continue;
+    const score = Number(accRaw);
+    if (!Number.isFinite(score)) continue;
 
     const dotIdx = accRaw.indexOf('.');
     const scoreDecimals = dotIdx !== -1 ? accRaw.length - dotIdx - 1 : 0;
-    const score = accNum;
     const rankNum = Number(raw.position);
     const rank = Number.isFinite(rankNum) && rankNum > 0 ? rankNum : i + 1;
     const costNum = raw.cost !== null && raw.cost !== undefined ? Number(raw.cost) : null;
@@ -333,7 +233,6 @@ function normalizeValsModelName(raw: string): ParsedValsModelName {
   s = s.replace(/\bpreview\b/g, 'prev');
   s = s.replace(/(\b\d+)\.0\b/g, '$1');
 
-  // Vals uses shortened lab-omitted names for certain models
   if (/^\s*wonder(?:\s+full)?\s*$/i.test(s)) {
     s = `muse ${s}`;
   }
@@ -361,29 +260,14 @@ function normalizeValsModelName(raw: string): ParsedValsModelName {
     }
   }
 
-  const compactFull = s.replace(/[^a-z0-9]/g, '');
-  const compactBase = baseWithoutParens.replace(/[^a-z0-9]/g, '');
-  const compactWithoutParams = withoutParams.replace(/[^a-z0-9]/g, '');
-
   return {
-    compactFull,
-    compactBase,
-    compactWithoutParams,
+    compactFull: s.replace(/[^a-z0-9]/g, ''),
+    compactBase: baseWithoutParens.replace(/[^a-z0-9]/g, ''),
+    compactWithoutParams: withoutParams.replace(/[^a-z0-9]/g, ''),
     paramTokens,
     variantTokens,
     qualifiers,
   };
-}
-
-function companyMatches(sourceCompany: string, sheetCompany: string): boolean {
-  const a = (sourceCompany || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const b = (sheetCompany || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (!a || !b) return false;
-  if (a === b || a.includes(b) || b.includes(a)) return true;
-  if ((a === 'zai' || a === 'zhipu') && (b === 'zai' || b === 'zai')) return true;
-  if (a === 'xai' && (b.includes('xai') || b.includes('spacex'))) return true;
-  if (a === 'moonshot' && b.includes('kimi')) return true;
-  return false;
 }
 
 function haveCompatibleVariants(a: ParsedValsModelName, b: ParsedValsModelName): boolean {
@@ -455,22 +339,14 @@ function scoreValsSheetCandidate(
   if (bestNameScore === 0) return 0;
 
   let totalScore = bestNameScore;
-
-  // Prefer max/xhigh/high reasoning variants over med/low (e.g. Claude Sonnet 5.5 (max) vs (med))
   const qStr = matchedParsed.qualifiers.join(' ');
   if (/\b(max|xhigh|highest|high)\b/.test(qStr)) totalScore += 35;
   if (/\b(med|medium|low|fast|lite)\b/.test(qStr)) totalScore -= 90;
 
   if (sheet.colK !== null) totalScore += 40;
   if (sheet.colKIsBold === true) totalScore += 20;
-  if (companyMatches(src.company, sheet.companyName)) totalScore += 25;
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(sheet.releaseDate || '')) {
-    const ts = Date.parse(sheet.releaseDate);
-    if (Number.isFinite(ts)) {
-      totalScore += Math.max(0, Math.min(10, Math.floor((ts - Date.parse('2025-01-01')) / 31536000000)));
-    }
-  }
+  if (matchCompanyName(src.company, sheet.companyName)) totalScore += 25;
+  totalScore += computeReleaseDateTiebreaker(sheet.releaseDate, 2025);
 
   return totalScore;
 }
@@ -486,28 +362,13 @@ export function buildValsDiffs(
   preferences?: ValsPreferencesInput
 ): ValsDiffItem[] {
   const ignoredSet = new Set(preferences?.ignoredIds ?? []);
-  const manualMappings = preferences?.manualMappings ?? {};
-  const usedSheetRows = new Set<number>();
-  const resolvedMatches = new Map<string, ValsSheetModelSnapshot>();
+  const { usedSheetRows, resolvedMatches } = reserveManualMappings(
+    sourceModels,
+    sheetModels,
+    ignoredSet,
+    preferences?.manualMappings ?? {}
+  );
 
-  // Pass 1: Explicit user manual mappings
-  for (const src of sourceModels) {
-    if (ignoredSet.has(src.id)) continue;
-    const mapping = manualMappings[src.id];
-    if (!mapping) continue;
-
-    const found =
-      (mapping.matchedModelId
-        ? sheetModels.find((c) => c.id === mapping.matchedModelId)
-        : undefined) ?? sheetModels.find((c) => c.sheetRowNumber === mapping.sheetRowNumber);
-
-    if (found && !usedSheetRows.has(found.sheetRowNumber)) {
-      usedSheetRows.add(found.sheetRowNumber);
-      resolvedMatches.set(src.id, found);
-    }
-  }
-
-  // Pass 2: Automatic matching
   for (const src of sourceModels) {
     if (ignoredSet.has(src.id) || resolvedMatches.has(src.id)) continue;
 
@@ -529,128 +390,8 @@ export function buildValsDiffs(
     }
   }
 
-  const diffs: ValsDiffItem[] = [];
-
-  const formatExact = (val: number, minDecimals?: number): string => {
-    const str = String(val);
-    if (typeof minDecimals === 'number' && minDecimals > 0) {
-      const dot = str.indexOf('.');
-      const curDec = dot !== -1 ? str.length - dot - 1 : 0;
-      if (curDec < minDecimals) {
-        return val.toFixed(minDecimals);
-      }
-    }
-    return str;
-  };
-
-  for (const src of sourceModels) {
-    if (ignoredSet.has(src.id)) {
-      diffs.push({
-        valsId: src.id,
-        valsName: src.name,
-        company: src.company,
-        rank: src.rank,
-        liveScore: src.score,
-        scoreDecimals: src.scoreDecimals,
-        writeScore: src.score,
-        status: 'ignored',
-        matchedModelId: null,
-        matchedDisplayName: null,
-        sheetRowNumber: null,
-        currentColK: null,
-        currentColKIsBold: null,
-        reason: 'Vom Benutzer ignoriert.',
-      });
-      continue;
-    }
-
-    const bestMatch = resolvedMatches.get(src.id) ?? null;
-
-    if (!bestMatch) {
-      diffs.push({
-        valsId: src.id,
-        valsName: src.name,
-        company: src.company,
-        rank: src.rank,
-        liveScore: src.score,
-        scoreDecimals: src.scoreDecimals,
-        writeScore: src.score,
-        status: 'new_unmatched',
-        matchedModelId: null,
-        matchedDisplayName: null,
-        sheetRowNumber: null,
-        currentColK: null,
-        currentColKIsBold: null,
-        reason: 'Kein passendes Modell im Sheet gefunden — zuordnen oder als neue Zeile ergänzen.',
-      });
-      continue;
-    }
-
-    if (bestMatch.colK === null) {
-      diffs.push({
-        valsId: src.id,
-        valsName: src.name,
-        company: src.company,
-        rank: src.rank,
-        liveScore: src.score,
-        scoreDecimals: src.scoreDecimals,
-        writeScore: src.score,
-        status: 'missing',
-        matchedModelId: bestMatch.id,
-        matchedDisplayName: bestMatch.displayName,
-        sheetRowNumber: bestMatch.sheetRowNumber,
-        currentColK: null,
-        currentColKIsBold: bestMatch.colKIsBold,
-        reason: 'Spalte K ist in dieser Zeile noch leer (wird fett als offizieller Wert eingetragen).',
-      });
-      continue;
-    }
-
-    const isEstimateNonBold = bestMatch.colKIsBold === false;
-    const delta = Math.abs(bestMatch.colK - src.score);
-    const liveFormatted = formatExact(src.score, src.scoreDecimals);
-
-    if (isEstimateNonBold) {
-      diffs.push({
-        valsId: src.id,
-        valsName: src.name,
-        company: src.company,
-        rank: src.rank,
-        liveScore: src.score,
-        scoreDecimals: src.scoreDecimals,
-        writeScore: src.score,
-        status: 'overwrite_estimate',
-        matchedModelId: bestMatch.id,
-        matchedDisplayName: bestMatch.displayName,
-        sheetRowNumber: bestMatch.sheetRowNumber,
-        currentColK: bestMatch.colK,
-        currentColKIsBold: false,
-        reason: `Nicht-fetter Schätzwert (${bestMatch.colK}) → offiziellen Vals-Score (${liveFormatted}, fett) übernehmen.`,
-      });
-      continue;
-    }
-
-    if (delta >= SCORE_DIFF_THRESHOLD) {
-      diffs.push({
-        valsId: src.id,
-        valsName: src.name,
-        company: src.company,
-        rank: src.rank,
-        liveScore: src.score,
-        scoreDecimals: src.scoreDecimals,
-        writeScore: src.score,
-        status: 'changed',
-        matchedModelId: bestMatch.id,
-        matchedDisplayName: bestMatch.displayName,
-        sheetRowNumber: bestMatch.sheetRowNumber,
-        currentColK: bestMatch.colK,
-        currentColKIsBold: bestMatch.colKIsBold,
-        reason: `Offizieller Score weicht ab (${bestMatch.colK} → ${liveFormatted}).`,
-      });
-      continue;
-    }
-
-    diffs.push({
+  return sourceModels.map((src): ValsDiffItem => {
+    const base = {
       valsId: src.id,
       valsName: src.name,
       company: src.company,
@@ -658,6 +399,81 @@ export function buildValsDiffs(
       liveScore: src.score,
       scoreDecimals: src.scoreDecimals,
       writeScore: src.score,
+    };
+
+    if (ignoredSet.has(src.id)) {
+      return {
+        ...base,
+        status: 'ignored',
+        matchedModelId: null,
+        matchedDisplayName: null,
+        sheetRowNumber: null,
+        currentColK: null,
+        currentColKIsBold: null,
+        reason: 'Vom Benutzer ignoriert.',
+      };
+    }
+
+    const bestMatch = resolvedMatches.get(src.id) ?? null;
+    if (!bestMatch) {
+      return {
+        ...base,
+        status: 'new_unmatched',
+        matchedModelId: null,
+        matchedDisplayName: null,
+        sheetRowNumber: null,
+        currentColK: null,
+        currentColKIsBold: null,
+        reason: 'Kein passendes Modell im Sheet gefunden — zuordnen oder als neue Zeile ergänzen.',
+      };
+    }
+
+    if (bestMatch.colK === null) {
+      return {
+        ...base,
+        status: 'missing',
+        matchedModelId: bestMatch.id,
+        matchedDisplayName: bestMatch.displayName,
+        sheetRowNumber: bestMatch.sheetRowNumber,
+        currentColK: null,
+        currentColKIsBold: bestMatch.colKIsBold,
+        reason:
+          'Spalte K ist in dieser Zeile noch leer (wird fett als offizieller Wert eingetragen).',
+      };
+    }
+
+    const isEstimateNonBold = bestMatch.colKIsBold === false;
+    const delta = Math.abs(bestMatch.colK - src.score);
+    const liveFormatted = formatExactScore(src.score, src.scoreDecimals);
+
+    if (isEstimateNonBold) {
+      return {
+        ...base,
+        status: 'overwrite_estimate',
+        matchedModelId: bestMatch.id,
+        matchedDisplayName: bestMatch.displayName,
+        sheetRowNumber: bestMatch.sheetRowNumber,
+        currentColK: bestMatch.colK,
+        currentColKIsBold: false,
+        reason: `Nicht-fetter Schätzwert (${bestMatch.colK}) → offiziellen Vals-Score (${liveFormatted}, fett) übernehmen.`,
+      };
+    }
+
+    if (delta >= SCORE_DIFF_THRESHOLD) {
+      return {
+        ...base,
+        status: 'changed',
+        matchedModelId: bestMatch.id,
+        matchedDisplayName: bestMatch.displayName,
+        sheetRowNumber: bestMatch.sheetRowNumber,
+        currentColK: bestMatch.colK,
+        currentColKIsBold: bestMatch.colKIsBold,
+        reason: `Offizieller Score weicht ab (${bestMatch.colK} → ${liveFormatted}).`,
+      };
+    }
+
+    return {
+      ...base,
       status: 'unchanged',
       matchedModelId: bestMatch.id,
       matchedDisplayName: bestMatch.displayName,
@@ -665,10 +481,8 @@ export function buildValsDiffs(
       currentColK: bestMatch.colK,
       currentColKIsBold: bestMatch.colKIsBold,
       reason: 'Synchron (fett/offiziell).',
-    });
-  }
-
-  return diffs;
+    };
+  });
 }
 
 function summarizeValsReportCounts(
@@ -677,38 +491,31 @@ function summarizeValsReportCounts(
   diffs: ValsDiffItem[],
   hasSheetModels: boolean
 ) {
-  const unmatchedCount = diffs.filter((d) => d.status === 'new_unmatched').length;
-  const missingCount = diffs.filter((d) => d.status === 'missing').length;
-  const overwriteEstimateCount = diffs.filter((d) => d.status === 'overwrite_estimate').length;
-  const changedCount = diffs.filter((d) => d.status === 'changed').length;
-  const unchangedCount = diffs.filter((d) => d.status === 'unchanged').length;
-  const ignoredCount = diffs.filter((d) => d.status === 'ignored').length;
-  const actionableCount =
-    unmatchedCount + missingCount + overwriteEstimateCount + changedCount;
-
+  const counts = countDiffStatuses(diffs);
   let summaryDe = '';
   let summaryEn = '';
+
   if (!hasSheetModels) {
     summaryDe = `${totalSourceModels} Modelle live auf Vals Index ${versionLabel} geladen.`;
     summaryEn = `Loaded ${totalSourceModels} live models from Vals Index ${versionLabel}.`;
-  } else if (actionableCount > 0) {
+  } else if (counts.actionableCount > 0) {
     const partsDe: string[] = [];
     const partsEn: string[] = [];
-    if (unmatchedCount > 0) {
-      partsDe.push(`${unmatchedCount} neu ohne Zeile`);
-      partsEn.push(`${unmatchedCount} new unmatched`);
+    if (counts.unmatchedCount > 0) {
+      partsDe.push(`${counts.unmatchedCount} neu ohne Zeile`);
+      partsEn.push(`${counts.unmatchedCount} new unmatched`);
     }
-    if (missingCount > 0) {
-      partsDe.push(`${missingCount} fehlend in K`);
-      partsEn.push(`${missingCount} missing in K`);
+    if (counts.missingCount > 0) {
+      partsDe.push(`${counts.missingCount} fehlend in K`);
+      partsEn.push(`${counts.missingCount} missing in K`);
     }
-    if (overwriteEstimateCount > 0) {
-      partsDe.push(`${overwriteEstimateCount} nicht-fette Schätzwerte`);
-      partsEn.push(`${overwriteEstimateCount} non-bold estimate(s)`);
+    if (counts.overwriteEstimateCount > 0) {
+      partsDe.push(`${counts.overwriteEstimateCount} nicht-fette Schätzwerte`);
+      partsEn.push(`${counts.overwriteEstimateCount} non-bold estimate(s)`);
     }
-    if (changedCount > 0) {
-      partsDe.push(`${changedCount} geänderte Score(s)`);
-      partsEn.push(`${changedCount} changed score(s)`);
+    if (counts.changedCount > 0) {
+      partsDe.push(`${counts.changedCount} geänderte Score(s)`);
+      partsEn.push(`${counts.changedCount} changed score(s)`);
     }
     summaryDe = `${partsDe.join(', ')} (${totalSourceModels} Einträge auf Vals ${versionLabel}).`;
     summaryEn = `${partsEn.join(', ')} (${totalSourceModels} entries on Vals ${versionLabel}).`;
@@ -717,184 +524,90 @@ function summarizeValsReportCounts(
     summaryEn = `All ${totalSourceModels} Vals ${versionLabel} entries are synced & bold in Column K.`;
   }
 
-  return {
-    unmatchedCount,
-    missingCount,
-    overwriteEstimateCount,
-    changedCount,
-    unchangedCount,
-    ignoredCount,
-    actionableCount,
-    summaryDe,
-    summaryEn,
-  };
+  return { ...counts, summaryDe, summaryEn };
+}
+
+type ValsLiveResult = {
+  updatedAt: string | null;
+  versionLabel: string;
+  models: ValsLeaderboardModel[];
+  newlyDiscoveredIds: string[];
+};
+
+const runtime = createMonitorRuntime<
+  ValsLeaderboardModel,
+  ValsSheetModelSnapshot,
+  ValsDiffItem,
+  ValsCheckReport,
+  ValsLiveResult
+>({
+  label: 'Vals',
+  cacheFilePath: CACHE_FILE_PATH,
+  sourceUrl: VALS_INDEX_URL,
+  checkFailureFallbackMessage: 'Vals Index v2.2 check failed.',
+  fetchLiveLeaderboard: fetchLiveValsLeaderboard,
+  buildDiffs: buildValsDiffs,
+  summarizeCounts: (live, diffs, hasSheetModels, existingReport) =>
+    summarizeValsReportCounts(
+      live.models.length,
+      live.versionLabel || existingReport?.versionLabel || 'v2.2',
+      diffs,
+      hasSheetModels
+    ),
+  createReport: ({
+    checkedAt,
+    nextCheckDueAt,
+    live,
+    baselineKnownCount,
+    trigger,
+    diffs,
+    counts,
+  }) => ({
+    checkedAt,
+    nextCheckDueAt,
+    sourceUpdatedAt: live.updatedAt,
+    versionLabel: live.versionLabel,
+    sourceUrl: VALS_INDEX_URL,
+    totalSourceModels: live.models.length,
+    baselineKnownCount,
+    newlyDiscoveredSourceIds: live.newlyDiscoveredIds,
+    trigger,
+    models: live.models,
+    diffs,
+    ...counts,
+  }),
+  getDiffSourceId: (d) => d.valsId,
+  markDiffIgnored: (d) => ({
+    ...d,
+    status: 'ignored',
+    matchedModelId: null,
+    matchedDisplayName: null,
+    sheetRowNumber: null,
+    currentColK: null,
+    currentColKIsBold: null,
+    reason: 'Vom Benutzer ignoriert.',
+  }),
+});
+
+export const isValsReportDue = runtime.isReportDue;
+
+export async function getValsMonitorStatus(): Promise<ValsMonitorStatusResponse> {
+  return runtime.getStatus();
 }
 
 export async function runValsCheck(options?: {
   models?: ValsSheetModelSnapshot[];
   trigger?: 'manual' | 'daily_auto';
 }): Promise<ValsCheckReport> {
-  if (inFlightCheck) {
-    return inFlightCheck;
-  }
-
-  const trigger = options?.trigger || 'manual';
-  const sheetModels = Array.isArray(options?.models) ? options.models : [];
-
-  const task = (async () => {
-    const cache = await readCache();
-
-    try {
-      const effectivePreviousIds = cache.knownSourceIds;
-      const live = await fetchLiveValsLeaderboard(effectivePreviousIds);
-      const diffs =
-        sheetModels.length > 0
-          ? buildValsDiffs(live.models, sheetModels, {
-              ignoredIds: cache.ignoredIds,
-              manualMappings: cache.manualMappings,
-            })
-          : [];
-
-      const counts = summarizeValsReportCounts(
-        live.models.length,
-        live.versionLabel,
-        diffs,
-        sheetModels.length > 0
-      );
-
-      const now = new Date();
-      const nextDue = new Date(now.getTime() + CHECK_INTERVAL_MS);
-
-      const mergedKnownIds = Array.from(
-        new Set([...effectivePreviousIds, ...live.models.map((m) => m.id)])
-      );
-
-      const report: ValsCheckReport = {
-        checkedAt: now.toISOString(),
-        nextCheckDueAt: nextDue.toISOString(),
-        sourceUpdatedAt: live.updatedAt,
-        versionLabel: live.versionLabel,
-        sourceUrl: VALS_INDEX_URL,
-        totalSourceModels: live.models.length,
-        baselineKnownCount: effectivePreviousIds.length,
-        newlyDiscoveredSourceIds: live.newlyDiscoveredIds,
-        trigger,
-        models: live.models,
-        diffs,
-        ...counts,
-      };
-
-      await writeCache({
-        report,
-        knownSourceIds: mergedKnownIds,
-        ignoredIds: cache.ignoredIds,
-        manualMappings: cache.manualMappings,
-        lastError: null,
-      });
-
-      return report;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Vals Index v2.2 check failed.';
-      await writeCache({
-        report: cache.report,
-        knownSourceIds: cache.knownSourceIds,
-        ignoredIds: cache.ignoredIds,
-        manualMappings: cache.manualMappings,
-        lastError: message,
-      });
-      throw err;
-    }
-  })();
-
-  inFlightCheck = task;
-  try {
-    return await task;
-  } finally {
-    inFlightCheck = null;
-  }
+  return runtime.runCheck(options);
 }
 
 export async function updateValsPreferences(options: {
   ignoreIds?: string[];
   unignoreIds?: string[];
   manualMappings?: Record<string, ManualRowMapping>;
+  unmapIds?: string[];
   models?: ValsSheetModelSnapshot[];
 }): Promise<ValsCheckReport | null> {
-  const cache = await readCache();
-  const nextIgnored = new Set(cache.ignoredIds);
-  const nextMappings: Record<string, ManualRowMapping> = { ...cache.manualMappings };
-
-  if (Array.isArray(options.ignoreIds)) {
-    for (const id of options.ignoreIds) {
-      const clean = String(id || '').trim();
-      if (clean) {
-        nextIgnored.add(clean);
-        delete nextMappings[clean];
-      }
-    }
-  }
-
-  if (Array.isArray(options.unignoreIds)) {
-    for (const id of options.unignoreIds) {
-      nextIgnored.delete(String(id || '').trim());
-    }
-  }
-
-  if (options.manualMappings && typeof options.manualMappings === 'object') {
-    const cleanNew = sanitizeManualMappings(options.manualMappings);
-    for (const [id, mapping] of Object.entries(cleanNew)) {
-      nextMappings[id] = mapping;
-      nextIgnored.delete(id);
-    }
-  }
-
-  const ignoredIds = Array.from(nextIgnored);
-  const sheetModels = Array.isArray(options.models) ? options.models : [];
-
-  let updatedReport = cache.report;
-  if (updatedReport && updatedReport.models.length > 0) {
-    const nextDiffs =
-      sheetModels.length > 0
-        ? buildValsDiffs(updatedReport.models, sheetModels, {
-            ignoredIds,
-            manualMappings: nextMappings,
-          })
-        : updatedReport.diffs.map((d) =>
-            nextIgnored.has(d.valsId)
-              ? {
-                  ...d,
-                  status: 'ignored' as const,
-                  matchedModelId: null,
-                  matchedDisplayName: null,
-                  sheetRowNumber: null,
-                  currentColK: null,
-                  currentColKIsBold: null,
-                  reason: 'Vom Benutzer ignoriert.',
-                }
-              : d
-          );
-
-    const counts = summarizeValsReportCounts(
-      updatedReport.totalSourceModels,
-      updatedReport.versionLabel,
-      nextDiffs,
-      sheetModels.length > 0 || updatedReport.diffs.length > 0
-    );
-
-    updatedReport = {
-      ...updatedReport,
-      diffs: nextDiffs,
-      ...counts,
-    };
-  }
-
-  await writeCache({
-    report: updatedReport,
-    knownSourceIds: cache.knownSourceIds,
-    ignoredIds,
-    manualMappings: nextMappings,
-    lastError: cache.lastError,
-  });
-
-  return updatedReport;
+  return runtime.updatePreferences(options);
 }

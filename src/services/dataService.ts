@@ -115,6 +115,25 @@ export async function fetchLiveCsv(): Promise<{
     }
   }
 
+  // Weekly server-cached backup snapshot (kept max 7 days old) before static bundle fallback
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const snapRes = await fetch('/api/snapshots/weekly', {
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    clearTimeout(timeoutId);
+    if (snapRes.ok && (snapRes.headers.get('content-type') || '').includes('application/json')) {
+      const snap = (await snapRes.json()) as { mainCsv?: string | null; updatedAt?: string | null };
+      if (snap?.mainCsv && snap.mainCsv.length >= 200) {
+        return { csvText: snap.mainCsv, isLive: false, headerDate: snap.updatedAt ?? null };
+      }
+    }
+  } catch {
+    // Fall through to embedded bundle snapshot
+  }
+
   return { csvText: FALLBACK_CSV_CONTENT, isLive: false, headerDate: null };
 }
 
@@ -195,6 +214,7 @@ export async function loadModelsData(options: LoadModelsOptions = {}): Promise<L
       const notesMeta = extractCsvNotesMetadata(FALLBACK_CSV_CONTENT);
       const fallbackRows = parseCsvRows(FALLBACK_CSV_CONTENT);
       const columnLayout = detectSheetColumns(fallbackRows);
+      const structure = findSheetStructuralRows(fallbackRows);
 
       return {
         models: fallbackNew,
@@ -208,6 +228,10 @@ export async function loadModelsData(options: LoadModelsOptions = {}): Promise<L
         isLive: false,
         dataSource: 'fallback',
         spreadsheetId,
+        historyStartRow: structure.historyStartRow,
+        sourcesNotesRow: structure.sourcesNotesRow,
+        notesRow: structure.notesRow,
+        rawRows: fallbackRows,
         columnLayout,
         error: errMsg,
         authError: isAuthError,
@@ -246,15 +270,16 @@ export async function loadModelsData(options: LoadModelsOptions = {}): Promise<L
     fetchLiveO1Links(),
   ]);
   try {
-    const allModels = parseAllModels(csvText);
-    const newModels = parseModelDataset(csvText, 'new');
-    const oldModels = parseModelDataset(csvText, 'old');
-    const worstCaseModels = parseModelDataset(csvText, 'worstCase');
-    const sheetFileDate = extractSheetDate(csvText);
-    const headerMeta = extractHeaderMetadata(csvText, liveO1Links);
-    const notesMeta = extractCsvNotesMetadata(csvText);
     const parsedRows = parseCsvRows(csvText);
+    const allModels = parseAllModelsFromRows(parsedRows);
+    const newModels = parseModelDatasetFromRows(parsedRows, 'new');
+    const oldModels = parseModelDatasetFromRows(parsedRows, 'old');
+    const worstCaseModels = parseModelDatasetFromRows(parsedRows, 'worstCase');
+    const sheetFileDate = extractSheetDateFromRows(parsedRows);
+    const headerMeta = extractHeaderMetadataFromRows(parsedRows, liveO1Links);
+    const notesMeta = extractCsvNotesMetadataFromRows(parsedRows);
     const columnLayout = detectSheetColumns(parsedRows);
+    const structure = findSheetStructuralRows(parsedRows);
 
     if (newModels.length === 0 && oldModels.length === 0 && worstCaseModels.length === 0 && allModels.length === 0) {
       throw new Error('Keine Datensätze gefunden');
@@ -272,20 +297,26 @@ export async function loadModelsData(options: LoadModelsOptions = {}): Promise<L
       isLive,
       dataSource: isLive ? 'csv' : 'fallback',
       spreadsheetId,
+      historyStartRow: structure.historyStartRow,
+      sourcesNotesRow: structure.sourcesNotesRow,
+      notesRow: structure.notesRow,
+      rawRows: parsedRows,
       columnLayout,
       error: null,
       headerMeta,
       notesMeta,
     };
   } catch (err) {
-    const fallbackAll = parseAllModels(FALLBACK_CSV_CONTENT);
-    const fallbackNew = parseModelDataset(FALLBACK_CSV_CONTENT, 'new');
-    const fallbackOld = parseModelDataset(FALLBACK_CSV_CONTENT, 'old');
-    const fallbackWorstCase = parseModelDataset(FALLBACK_CSV_CONTENT, 'worstCase');
-    const sheetFileDate = extractSheetDate(FALLBACK_CSV_CONTENT);
-    const headerMeta = extractHeaderMetadata(FALLBACK_CSV_CONTENT);
-    const notesMeta = extractCsvNotesMetadata(FALLBACK_CSV_CONTENT);
-    const columnLayout = detectSheetColumns(parseCsvRows(FALLBACK_CSV_CONTENT));
+    const fallbackRows = parseCsvRows(FALLBACK_CSV_CONTENT);
+    const fallbackAll = parseAllModelsFromRows(fallbackRows);
+    const fallbackNew = parseModelDatasetFromRows(fallbackRows, 'new');
+    const fallbackOld = parseModelDatasetFromRows(fallbackRows, 'old');
+    const fallbackWorstCase = parseModelDatasetFromRows(fallbackRows, 'worstCase');
+    const sheetFileDate = extractSheetDateFromRows(fallbackRows);
+    const headerMeta = extractHeaderMetadataFromRows(fallbackRows);
+    const notesMeta = extractCsvNotesMetadataFromRows(fallbackRows);
+    const columnLayout = detectSheetColumns(fallbackRows);
+    const structure = findSheetStructuralRows(fallbackRows);
 
     return {
       models: fallbackNew,
@@ -299,6 +330,10 @@ export async function loadModelsData(options: LoadModelsOptions = {}): Promise<L
       isLive: false,
       dataSource: 'fallback',
       spreadsheetId,
+      historyStartRow: structure.historyStartRow,
+      sourcesNotesRow: structure.sourcesNotesRow,
+      notesRow: structure.notesRow,
+      rawRows: fallbackRows,
       columnLayout,
       error: err instanceof Error ? err.message : 'Parser-Fehler',
       headerMeta,

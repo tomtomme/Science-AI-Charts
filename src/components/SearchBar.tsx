@@ -116,13 +116,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   if (!showAdvanced) return null;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2.5">
-      {/* ZEILE 1: Current/All Switcher + Max Bar Count (links) + Explosions-Schalter + Sortierung (rechts) */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2.5 w-full min-w-0">
+      {/* ZEILE 1: Current/All Switcher + Max Bar Count (links) + Explosions-Schalter (rechts) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 min-w-0 max-w-full">
         {/* Linke Kontroll-Gruppe: Current/All Switcher + Max Bar Count Slider */}
-        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0 max-w-full">
           {/* Current vs All Chatbots */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 max-w-full shrink-0">
             <Tooltip
               title={t.scopeCurrent}
               content={t.scopeCurrentDesc}
@@ -132,32 +132,32 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <button
                 type="button"
                 onClick={() => onModelScopeChange('current')}
-                    className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                      modelScope === 'current'
-                        ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
-                    }`}
-                  >
-                    {t.scopeCurrent}
-                  </button>
-                </Tooltip>
-                <Tooltip
-                  title={t.scopeAll}
-                  content={t.scopeAllDesc}
-                  align="left"
-                  width="w-56"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onModelScopeChange('all')}
-                    className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                      modelScope === 'all'
-                        ? 'bg-indigo-600 text-white shadow-2xs'
-                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
-                    }`}
-                  >
-                    {t.scopeAll}
-                  </button>
+                className={`px-2.5 py-1 sm:py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  modelScope === 'current'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
+                }`}
+              >
+                {t.scopeCurrent}
+              </button>
+            </Tooltip>
+            <Tooltip
+              title={t.scopeAll}
+              content={t.scopeAllDesc}
+              align="left"
+              width="w-56"
+            >
+              <button
+                type="button"
+                onClick={() => onModelScopeChange('all')}
+                className={`px-2.5 py-1 sm:py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  modelScope === 'all'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
+                }`}
+              >
+                {t.scopeAll}
+              </button>
             </Tooltip>
           </div>
 
@@ -167,8 +167,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             const displayVal = Math.min(topCount, maxAvailableModels);
             const sliderMax = Math.max(minVal, maxAvailableModels);
             return (
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
-                <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 flex-1 min-w-[175px] sm:flex-none sm:min-w-0 max-w-full">
+                <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
                   {t.topSliderTop}:
                 </span>
                 <Tooltip content={t.stepMinusChatbots} align="center" width="w-24">
@@ -176,7 +176,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     type="button"
                     onClick={() => handleTopStep(-5)}
                     disabled={displayVal <= minVal || maxAvailableModels <= 0}
-                    className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                    className="p-1 sm:p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
                   >
                     <Minus className="w-3 h-3" />
                   </button>
@@ -189,19 +189,19 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   value={Math.max(minVal, displayVal)}
                   onChange={handleTopSliderChange}
                   disabled={maxAvailableModels <= minVal}
-                  className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 disabled:opacity-40"
+                  className="flex-1 min-w-[48px] sm:flex-none sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 disabled:opacity-40"
                 />
                 <Tooltip content={t.stepPlusChatbots} align="center" width="w-24">
                   <button
                     type="button"
                     onClick={() => handleTopStep(5)}
                     disabled={displayVal >= maxAvailableModels || maxAvailableModels <= 0}
-                    className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                    className="p-1 sm:p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
                 </Tooltip>
-                <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right">
+                <span className="font-mono tabular-nums text-xs font-bold text-slate-800 dark:text-slate-100 min-w-[20px] text-right shrink-0">
                   {displayVal}
                 </span>
               </div>
@@ -209,14 +209,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           })()}
         </div>
 
-        {/* 2. Explosions-Schalter: an / teils / aus (mittig erste Zeile) + Sortierung rechts davon */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* 2. Explosions-Schalter: an / teils / aus */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto min-w-0 max-w-full">
           {explosionMode && onExplosionModeChange && (
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 font-mono text-xs self-center">
+            <div className="flex flex-wrap items-center justify-between sm:justify-start gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 w-full sm:w-auto min-w-0 max-w-full font-mono text-xs self-center">
               <span className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap shrink-0">
                 {t.explosionToggle}:
               </span>
-              <div className="flex items-center bg-slate-200/60 dark:bg-slate-800/60 rounded p-0.5 gap-0.5">
+              <div className="flex flex-wrap items-center bg-slate-200/60 dark:bg-slate-800/60 rounded p-0.5 gap-0.5 min-w-0 max-w-full">
                 {/* an */}
                 <Tooltip
                   title={<span className="text-emerald-400">{lang === 'de' ? 'Explosion: an' : 'Explosion: on'}</span>}
@@ -231,7 +231,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   <button
                     type="button"
                     onClick={() => onExplosionModeChange('on')}
-                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 sm:px-2 py-1 sm:py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       explosionMode === 'on'
                         ? 'bg-emerald-600 text-white shadow-2xs'
                         : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
@@ -255,7 +255,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   <button
                     type="button"
                     onClick={() => onExplosionModeChange('hover')}
-                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 sm:px-2 py-1 sm:py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       explosionMode === 'hover'
                         ? 'bg-blue-600 text-white shadow-2xs'
                         : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
@@ -279,7 +279,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   <button
                     type="button"
                     onClick={() => onExplosionModeChange('off')}
-                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 sm:px-2 py-1 sm:py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       explosionMode === 'off'
                         ? 'bg-slate-600 text-white shadow-2xs'
                         : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
@@ -291,19 +291,19 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               </div>
             </div>
           )}
-
         </div>
       </div>
 
       {/* ZEILE 2: Freitextfilter am Beginn + Modell-Familien */}
-      <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 min-w-0 max-w-full">
         {/* Freitextfilter am Beginn von Zeile 2 */}
-        <div className="relative w-full sm:w-[240px] md:w-[280px] flex items-center shrink-0">
+        <div className="relative w-full sm:w-[240px] md:w-[280px] flex items-center shrink-0 min-w-0">
           <Tooltip
             title={lang === 'de' ? 'Freitextfilter' : 'Free-text Search'}
             content={t.searchPlaceholder}
             align="left"
             width="w-72 sm:w-80"
+            className="w-full min-w-0"
           >
             <div className="relative w-full flex items-center">
               <Search className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 absolute left-2.5 pointer-events-none z-10" />
@@ -312,7 +312,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={t.searchPlaceholder}
-                className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 transition-colors"
+                className="w-full pl-8 pr-7 py-1.5 sm:py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 transition-colors"
               />
               {value && (
                 <button
@@ -331,53 +331,58 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* Trenner zwischen Suchfeld und Modell-Familien */}
         <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block shrink-0 mx-0.5" />
 
-        {/* 'Alle' Button */}
-        <button
-          type="button"
-          onClick={onClearFamilies}
-          className={`text-xs px-2.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
-            selectedFamilies.length === 0
-              ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
-              : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          {t.all}
-        </button>
+        {/* Flexible grid on mobile (no horizontal overflow), wrapping strip on sm+ */}
+        <div className="grid grid-cols-3 min-[420px]:grid-cols-4 sm:flex sm:flex-wrap sm:items-center gap-1.5 w-full sm:w-auto sm:flex-1 min-w-0">
+          {/* 'Alle' Button */}
+          <button
+            type="button"
+            onClick={onClearFamilies}
+            className={`text-xs px-2 sm:px-2.5 py-1.5 sm:py-0.5 rounded font-mono transition-colors cursor-pointer truncate text-center whitespace-nowrap ${
+              selectedFamilies.length === 0
+                ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold shadow-2xs'
+                : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            {t.all}
+          </button>
 
-        {/* Die alphabetischen Hersteller-Buttons */}
-        {ALPHABETICAL_FAMILIES.map((family) => {
-          const isSelected = selectedFamilies.includes(family);
-          return (
-            <button
-              key={family}
-              type="button"
-              onClick={() => onToggleFamily(family)}
-              className={`text-xs px-2.5 py-0.5 rounded font-mono transition-all cursor-pointer ${
-                isSelected
-                  ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
-                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {family}
-            </button>
-          );
-        })}
+          {/* Die alphabetischen Hersteller-Buttons */}
+          {ALPHABETICAL_FAMILIES.map((family) => {
+            const isSelected = selectedFamilies.includes(family);
+            return (
+              <button
+                key={family}
+                type="button"
+                onClick={() => onToggleFamily(family)}
+                className={`text-xs px-2 sm:px-2.5 py-1.5 sm:py-0.5 rounded font-mono transition-all cursor-pointer truncate text-center whitespace-nowrap ${
+                  isSelected
+                    ? 'bg-emerald-600 text-white font-bold shadow-2xs ring-1 ring-emerald-500'
+                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {family}
+              </button>
+            );
+          })}
 
-        {/* Aktiver Hersteller-Filter per Klick auf Firmen-Logo */}
-        {selectedCompany && (
-          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-mono bg-blue-600 text-white font-bold shadow-2xs ring-1 ring-blue-400">
-            <span>{lang === 'de' ? 'Hersteller' : 'Company'}: {selectedCompany}</span>
-            <button
-              type="button"
-              onClick={() => onSelectCompany?.(null)}
-              className="hover:text-blue-200 cursor-pointer ml-0.5 p-0.5 rounded hover:bg-blue-700/80"
-              title={lang === 'de' ? 'Hersteller-Filter aufheben' : 'Clear company filter'}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </span>
-        )}
+          {/* Aktiver Hersteller-Filter per Klick auf Firmen-Logo */}
+          {selectedCompany && (
+            <span className="col-span-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-1 text-xs px-2.5 py-1 sm:py-0.5 rounded font-mono bg-blue-600 text-white font-bold shadow-2xs ring-1 ring-blue-400 max-w-full">
+              <span className="truncate">
+                {lang === 'de' ? 'Hersteller' : 'Company'}: {selectedCompany}
+              </span>
+              <button
+                type="button"
+                onClick={() => onSelectCompany?.(null)}
+                className="hover:text-blue-200 cursor-pointer ml-0.5 p-0.5 rounded hover:bg-blue-700/80 shrink-0"
+                title={lang === 'de' ? 'Hersteller-Filter aufheben' : 'Clear company filter'}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+        </div>
       </div>
-      </div>
+    </div>
   );
 };

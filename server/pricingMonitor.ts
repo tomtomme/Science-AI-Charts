@@ -256,9 +256,9 @@ export async function runPricingCheck(options?: {
         );
       }
 
-      // Strictly enforce Row 36+ and the 4 requested labs; ignore discontinued GPT-4 Turbo in pricing monitor
+      // Enforce valid sheet row numbers (client already scopes to dynamic historyStartRow) and the 4 labs
       const monitoredModels = rawModels
-        .filter((m) => m.sheetRowNumber >= 36 && normalizeLab(m.companyName) !== null)
+        .filter((m) => m.sheetRowNumber >= 2 && normalizeLab(m.companyName) !== null)
         .filter((m) => !/\bgpt[-\s]?4[-\s]?turbo\b/i.test(m.displayName))
         .filter((m) => m.isAvailable && (m.isPaid || m.priceDeMonthly || m.priceUsMonthly));
 
@@ -550,7 +550,9 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
           delayMs: number;
         }> = [
           { model: 'gemini-4-hydrogen', thinkingLevel: ThinkingLevel.LOW, delayMs: 0 },
-          { model: 'gemini-3.1-flash-lite', delayMs: 1200 },
+          { model: 'gemini-4-hydrogen', thinkingLevel: ThinkingLevel.LOW, delayMs: 1800 },
+          { model: 'gemini-3.5-flash-lite', delayMs: 1200 },
+          { model: 'gemini-flash-lite-latest', delayMs: 1500 },
         ];
 
         let lastErr: unknown;
@@ -580,6 +582,8 @@ Return ONLY valid JSON matching this exact TypeScript shape (no markdown comment
               errStr.includes('RESOURCE_EXHAUSTED') ||
               errStr.toLowerCase().includes('quota') ||
               errStr.includes('503') ||
+              errStr.includes('UNAVAILABLE') ||
+              /high demand|overloaded/i.test(errStr) ||
               errStr.includes('500') ||
               errStr.includes('404');
             if (!isRetryable) throw err;
@@ -788,6 +792,9 @@ function formatGeminiError(err: unknown): string {
 
   if (status === 'RESOURCE_EXHAUSTED' || raw.includes('429') || raw.includes('quota')) {
     return 'Gemini API quota/rate limit exceeded (429 RESOURCE_EXHAUSTED). Please try again shortly or select a billing-enabled API key in Settings > Secrets.';
+  }
+  if (status === 'UNAVAILABLE' || raw.includes('503') || /high demand|overloaded/i.test(raw)) {
+    return 'Gemini pricing-check LLM (gemini-4-hydrogen / gemini-3.5-flash-lite / gemini-flash-lite-latest) is temporarily experiencing high demand (503 UNAVAILABLE). All 4 benchmark checkers work without an LLM; please retry "Check Live" shortly.';
   }
   if (status === 'PERMISSION_DENIED' || raw.includes('403') || raw.includes('API_KEY_INVALID')) {
     return 'Gemini API key permission denied or invalid. Please check your key in Settings > Secrets.';

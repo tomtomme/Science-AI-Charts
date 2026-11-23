@@ -299,7 +299,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
   }, [unifiedSliderValue, activeCategoryComp, activeCategoryName, lang, newScoreLabel, oldScoreLabel, worstCaseLabel, row33Meta]);
 
   const sliderControl = (
-    <div className="relative flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0 max-w-full font-mono text-xs cursor-pointer">
+    <div className="relative flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 w-full sm:w-auto min-w-0 max-w-full font-mono text-xs cursor-pointer">
       <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 pl-1.5 whitespace-nowrap shrink-0">
         Score:
       </span>
@@ -311,7 +311,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
         }}
         disabled={unifiedSliderValue <= 0}
         aria-label="Previous score criterion"
-        className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0 transition-colors"
+        className="w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0 transition-colors"
       >
         <Minus className="w-3 h-3" />
       </button>
@@ -323,7 +323,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
         value={unifiedSliderValue}
         onChange={(e) => handleUnifiedSliderChange(Number(e.target.value))}
         aria-label="Score criteria slider"
-        className="w-16 sm:w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 shrink-0"
+        className="flex-1 min-w-[44px] sm:flex-none sm:w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
       />
       <button
         type="button"
@@ -333,13 +333,13 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
         }}
         disabled={unifiedSliderValue >= maxVal}
         aria-label="Next score criterion"
-        className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0 transition-colors"
+        className="w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0 transition-colors"
       >
         <Plus className="w-3 h-3" />
       </button>
 
       {/* Badge button showing active criterion/score mode */}
-      <div className="w-[130px] sm:w-[165px] shrink-0 overflow-hidden flex items-center pr-0.5">
+      <div className="min-w-0 flex-1 max-w-[165px] sm:flex-none sm:w-[165px] sm:max-w-none overflow-hidden flex items-center pr-0.5">
         {unifiedSliderValue === 0 && (
           <button
             type="button"
@@ -411,6 +411,7 @@ export const ScoreSlider: React.FC<ScoreSliderProps> = ({
       position="bottom"
       align="center"
       width="w-[380px]"
+      className="w-full sm:w-auto max-w-full min-w-0"
       content={
         <div className="space-y-1.5">
           <p className="leading-snug">{activeScoreTooltip.desc}</p>

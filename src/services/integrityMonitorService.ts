@@ -3,11 +3,10 @@ import {
   IntegrityCheckReport,
   IntegrityMonitorStatusResponse,
   IntegritySheetModelSnapshot,
-  ManualRowMapping,
 } from '../types/integrityMonitor';
-import { StaticPreviewApiError } from './pricingMonitorService';
+import { createMonitorApiClient } from './monitorApiClient';
 
-export const INTEGRITY_COL_INDEX = 39; // Column AN (0-based index 39)
+export const INTEGRITY_COL_INDEX = 39; // Default Column AN (0-based index 39)
 
 export function parseIntegrityCellNumber(raw: string | undefined): number | null {
   if (!raw) return null;
@@ -21,13 +20,17 @@ export function parseIntegrityCellNumber(raw: string | undefined): number | null
 
 export function extractIntegritySheetSnapshots(
   models: ModelRecord[],
-  rawRows?: string[][]
+  rawRows?: string[][],
+  boldMask?: boolean[][],
+  colIndex: number = INTEGRITY_COL_INDEX,
+  minHistoryRow: number = 36
 ): IntegritySheetModelSnapshot[] {
   return models
-    .filter((m) => typeof m.sheetRowNumber === 'number' && m.sheetRowNumber >= 36)
+    .filter((m) => typeof m.sheetRowNumber === 'number' && m.sheetRowNumber >= minHistoryRow)
     .map((m) => {
       const rowNum = m.sheetRowNumber as number;
-      const rawCell = rawRows?.[rowNum - 1]?.[INTEGRITY_COL_INDEX];
+      const rawCell = rawRows?.[rowNum - 1]?.[colIndex];
+      const maskCell = boldMask?.[rowNum - 1]?.[colIndex];
       return {
         id: m.id,
         name: m.name,
@@ -36,55 +39,17 @@ export function extractIntegritySheetSnapshots(
         releaseDate: m.releaseDate,
         sheetRowNumber: rowNum,
         colAN: parseIntegrityCellNumber(rawCell),
+        colANIsBold: typeof maskCell === 'boolean' ? maskCell : null,
       };
     });
 }
 
-async function parseJsonResponse<T>(res: Response): Promise<T> {
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    throw new StaticPreviewApiError();
-  }
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data?.error || `Request failed (HTTP ${res.status})`);
-  }
-  return data as T;
-}
+export const integrityMonitorApi = createMonitorApiClient<
+  IntegrityMonitorStatusResponse,
+  IntegrityCheckReport,
+  IntegritySheetModelSnapshot
+>('/api/integrity-monitor');
 
-export async function fetchIntegrityMonitorStatus(): Promise<IntegrityMonitorStatusResponse> {
-  const res = await fetch('/api/integrity-monitor/status');
-  return parseJsonResponse<IntegrityMonitorStatusResponse>(res);
-}
-
-export async function triggerIntegrityCheck(
-  models: IntegritySheetModelSnapshot[] = [],
-  trigger: 'manual' | 'daily_auto' = 'manual'
-): Promise<IntegrityCheckReport> {
-  const res = await fetch('/api/integrity-monitor/check', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ models, trigger }),
-  });
-  const data = await parseJsonResponse<{ report: IntegrityCheckReport }>(res);
-  return data.report;
-}
-
-export async function updateIntegrityPreferencesApi(options: {
-  ignoreIds?: string[];
-  unignoreIds?: string[];
-  manualMappings?: Record<string, ManualRowMapping>;
-  models?: IntegritySheetModelSnapshot[];
-}): Promise<IntegrityCheckReport | null> {
-  const res = await fetch('/api/integrity-monitor/preferences', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(options),
-  });
-  const data = await parseJsonResponse<{ report: IntegrityCheckReport | null }>(res);
-  return data.report;
-}
+export const fetchIntegrityMonitorStatus = integrityMonitorApi.fetchStatus;
+export const triggerIntegrityCheck = integrityMonitorApi.triggerCheck;
+export const updateIntegrityPreferencesApi = integrityMonitorApi.updatePreferences;

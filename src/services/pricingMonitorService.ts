@@ -16,12 +16,15 @@ export function isMonitoredLabCompany(companyName: string): boolean {
   return MONITORED_LAB_KEYWORDS.some((kw) => low.includes(kw));
 }
 
-export function extractMonitoredModelSnapshots(models: ModelRecord[]): ModelPricingSnapshot[] {
+export function extractMonitoredModelSnapshots(
+  models: ModelRecord[],
+  minHistoryRow: number = 36
+): ModelPricingSnapshot[] {
   return models
     .filter(
       (m) =>
         typeof m.sheetRowNumber === 'number' &&
-        m.sheetRowNumber >= 36 &&
+        m.sheetRowNumber >= minHistoryRow &&
         isMonitoredLabCompany(m.companyName) &&
         !isIgnoredPricingMonitorModel(m.displayName) &&
         m.isAvailable &&

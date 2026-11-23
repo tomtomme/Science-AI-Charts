@@ -28,6 +28,10 @@ import {
 } from './server/simpleBenchMonitor.ts';
 import { getOrRefreshWeeklyTranslation } from './server/sheetTranslator.ts';
 import { fetchLabsGridFromPublishedHtml, fetchMainO1LinksFromPublishedHtml } from './server/labsGrid.ts';
+import {
+  getWeeklyFallbackSnapshot,
+  startWeeklySnapshotMaintenance,
+} from './server/weeklySnapshot.ts';
 
 async function createAppServer() {
   const app = express();
@@ -67,6 +71,21 @@ async function createAppServer() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch sheet cell O1 links.';
       res.status(502).json({ error: message });
+    }
+  });
+
+  app.get('/api/snapshots/weekly', async (req, res) => {
+    try {
+      const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true';
+      const snapshot = await getWeeklyFallbackSnapshot(forceRefresh);
+      if (!snapshot) {
+        return res.status(404).json({ error: 'Weekly fallback snapshot not yet available.' });
+      }
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.json(snapshot);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load weekly fallback snapshot.';
+      res.status(500).json({ error: message });
     }
   });
 
@@ -152,6 +171,7 @@ async function createAppServer() {
           req.body?.manualMappings && typeof req.body.manualMappings === 'object'
             ? req.body.manualMappings
             : undefined,
+        unmapIds: Array.isArray(req.body?.unmapIds) ? req.body.unmapIds : undefined,
         models: Array.isArray(req.body?.models) ? req.body.models : undefined,
       });
       res.json({ report });
@@ -193,6 +213,7 @@ async function createAppServer() {
           req.body?.manualMappings && typeof req.body.manualMappings === 'object'
             ? req.body.manualMappings
             : undefined,
+        unmapIds: Array.isArray(req.body?.unmapIds) ? req.body.unmapIds : undefined,
         models: Array.isArray(req.body?.models) ? req.body.models : undefined,
       });
       res.json({ report });
@@ -235,6 +256,7 @@ async function createAppServer() {
           req.body?.manualMappings && typeof req.body.manualMappings === 'object'
             ? req.body.manualMappings
             : undefined,
+        unmapIds: Array.isArray(req.body?.unmapIds) ? req.body.unmapIds : undefined,
         models: Array.isArray(req.body?.models) ? req.body.models : undefined,
       });
       res.json({ report });
@@ -277,6 +299,7 @@ async function createAppServer() {
           req.body?.manualMappings && typeof req.body.manualMappings === 'object'
             ? req.body.manualMappings
             : undefined,
+        unmapIds: Array.isArray(req.body?.unmapIds) ? req.body.unmapIds : undefined,
         models: Array.isArray(req.body?.models) ? req.body.models : undefined,
       });
       res.json({ report });
@@ -339,6 +362,7 @@ async function createAppServer() {
 
   httpServer.listen(port, '0.0.0.0', () => {
     console.log(`Server listening on http://0.0.0.0:${port}`);
+    startWeeklySnapshotMaintenance();
   });
 }
 

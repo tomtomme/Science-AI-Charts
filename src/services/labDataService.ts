@@ -586,5 +586,27 @@ export async function fetchLiveLabEntries(options?: {
     }
   }
 
+  // 4. Weekly server-cached backup snapshot before static bundle fallback
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const snapRes = await fetch('/api/snapshots/weekly', {
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    clearTimeout(timeoutId);
+    if (snapRes.ok && (snapRes.headers.get('content-type') || '').includes('application/json')) {
+      const snap = (await snapRes.json()) as { labRows?: string[][] | null; labGreenMask?: boolean[][] | null };
+      if (Array.isArray(snap?.labRows) && snap.labRows.length >= 17) {
+        const parsed = parseLabRows(snap.labRows, snap.labGreenMask ?? undefined);
+        if (parsed.length > 0) {
+          return { entries: parsed, isLive: false, dataSource: 'fallback' };
+        }
+      }
+    }
+  } catch {
+    // Fall through to embedded bundle fallback
+  }
+
   return { entries: FALLBACK_LAB_ENTRIES, isLive: false, dataSource: 'fallback' };
 }

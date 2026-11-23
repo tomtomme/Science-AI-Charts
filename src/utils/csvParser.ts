@@ -1,6 +1,5 @@
 import { BENCHMARK_COMPONENTS } from '../data/benchmarks';
 import { getCompanyMeta, getFaviconUrl, normalizeCompanyLookupKey } from '../data/companies';
-import { lookupResearchedUsPrice } from '../data/usPricingData';
 import { AuthorHeadlineSegment, AuthorSocialLink, BenchmarkWeights, ComponentBreakdown, ModelRecord, RawBenchmarkScores, ScoreMode, CsvNotesMetadata, Row33Metadata, SheetAuthorMeta, SheetColumnLayout } from '../types';
 import { computeWeightedBreakdown, isCustomWeighted } from './weighting';
 
@@ -406,20 +405,188 @@ export function translateHeaderToDe(titleEn: string, subtitleEn: string): { titl
   return { titleDe, subtitleDe };
 }
 
+function findSourcesHeaderRowIndex(rows: string[][]): number {
+  for (let r = 0; r < Math.min(120, rows.length); r++) {
+    const row = rows[r];
+    if (!row) continue;
+    let rowText = '';
+    for (let c = 0; c < Math.min(6, row.length); c++) {
+      rowText += ` ${row[c] || ''}`;
+    }
+    const low = rowText.toLowerCase();
+    if (
+      low.includes('sources & notes') ||
+      (low.includes('current') && low.includes('history'))
+    ) {
+      return r;
+    }
+  }
+  return rows.length > 32 ? 32 : -1;
+}
+
 /**
- * Dynamically detects column indices across both pre-shift (without Col U US pricing)
- * and post-shift (with Col U US pricing inserted after Col T DE pricing) sheet layouts.
+ * Dynamically detects all column indices and structural rows across arbitrary
+ * column insertions, deletions, and moves in the Google Sheet.
  */
 export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
+  const structure = findSheetStructuralRows(rows);
+  const sourcesIdx = findSourcesHeaderRowIndex(rows);
   const row0 = rows[0] || [];
   const row1 = rows[1] || [];
-  const row32 = rows[32] || [];
-  const maxCols = Math.max(row0.length, row1.length, row32.length, 38);
+  const row2 = rows[2] || [];
+  const sourcesRow = (sourcesIdx >= 0 ? rows[sourcesIdx] : rows[32]) || [];
+  const maxCols = Math.max(row0.length, row1.length, row2.length, sourcesRow.length, 42);
 
-  const getHeader = (c: number) =>
-    `${row0[c] || ''} ${row1[c] || ''} ${row32[c] || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
+  const norm = (s: string | undefined) => (s || '').replace(/\s+/g, ' ').trim();
+  const getCombined = (c: number) =>
+    `${norm(row0[c])} ${norm(row1[c])} ${norm(sourcesRow[c])}`.trim().toLowerCase();
 
-  let colDePrice = 19; // Default Col T
+  // 1. Detect core structural anchor columns across the entire header row
+  let colNameLabel: number | null = null;
+  let colCreatorYear: number | null = null;
+  let colOldScore: number | null = null;
+  let colNewScore: number | null = null;
+  let colWorstCaseScore: number | null = null;
+  let colStoryline: number | null = null;
+  let colChatLink: number | null = null;
+  let colApiLink: number | null = null;
+  let colModelName: number | null = null;
+  let colAuthorMeta: number | null = null;
+
+  for (let c = 0; c < maxCols; c++) {
+    const h0 = norm(row0[c]).toLowerCase();
+    const h1 = norm(row1[c]).toLowerCase();
+
+    if (
+      colAuthorMeta === null &&
+      h0 &&
+      (h0.includes('app &') ||
+        h0.includes('table by') ||
+        h0.includes('table from') ||
+        h0.includes('tabelle von') ||
+        (h0.includes('thomas') && (h0.includes('youtube') || h0.includes('github') || h0.includes('orcid'))))
+    ) {
+      colAuthorMeta = c;
+    }
+
+    if (
+      colNameLabel === null &&
+      h1.includes('free') &&
+      (h1.includes('paid') || h1.includes('api') || h1.includes('chat'))
+    ) {
+      colNameLabel = c;
+    } else if (
+      colCreatorYear === null &&
+      ((h1.includes('creator') && h1.includes('release')) || h1.includes('creator |'))
+    ) {
+      colCreatorYear = c;
+    } else if (colOldScore === null && h1 === 'old') {
+      colOldScore = c;
+    } else if (colNewScore === null && h1 === 'new') {
+      colNewScore = c;
+    } else if (colWorstCaseScore === null && /^worst\s*case$/.test(h1)) {
+      colWorstCaseScore = c;
+    } else if (colStoryline === null && h1 === 'storyline') {
+      colStoryline = c;
+    } else if (colChatLink === null && h1.includes('link to chat')) {
+      colChatLink = c;
+    } else if (colApiLink === null && h1.includes('link to api')) {
+      colApiLink = c;
+    } else if (colModelName === null && h1.includes('model name')) {
+      colModelName = c;
+    }
+  }
+
+  const resolvedNameLabel = colNameLabel ?? 1;
+  const resolvedCreatorYear = colCreatorYear ?? 2;
+  const resolvedOldScore = colOldScore ?? 11;
+  const resolvedNewScore = colNewScore ?? 12;
+  const resolvedWorstCaseScore = colWorstCaseScore ?? 13;
+  const resolvedStoryline = colStoryline ?? 14;
+  const resolvedChatLink = colChatLink ?? 15;
+  const resolvedApiLink = colApiLink ?? 16;
+  const resolvedModelName = colModelName ?? 18;
+  const resolvedAuthorMeta = colAuthorMeta ?? resolvedStoryline;
+
+  const reservedAnchorCols = new Set<number>([
+    resolvedNameLabel,
+    resolvedCreatorYear,
+    resolvedOldScore,
+    resolvedNewScore,
+    resolvedWorstCaseScore,
+    resolvedStoryline,
+    resolvedChatLink,
+    resolvedApiLink,
+    resolvedModelName,
+  ]);
+
+  // 2. Detect the 8 active benchmark columns in the left-side section (before Model Name & Version)
+  let colActCodeReason: number | null = null;
+  let colNonHallucination: number | null = null;
+  let colScienceKnowledge: number | null = null;
+  let colVisionPlot: number | null = null;
+  let colMedReasoning: number | null = null;
+  let colExcelAgent: number | null = null;
+  let colTrickQuestions: number | null = null;
+  let colEconLegal: number | null = null;
+
+  const activeScanLimit = Math.max(resolvedModelName, resolvedWorstCaseScore + 1);
+  for (let c = 0; c < activeScanLimit; c++) {
+    if (reservedAnchorCols.has(c)) continue;
+    const h0 = norm(row0[c]).toLowerCase();
+    if (h0.includes('used for old score')) continue;
+    const h1 = norm(row1[c]).toLowerCase();
+    const hAll = getCombined(c);
+    if (!h1 && !hAll) continue;
+
+    if (
+      colActCodeReason === null &&
+      (h1 === 'iq' || hAll.includes('aa-intel') || hAll.includes('aa-int-index'))
+    ) {
+      colActCodeReason = c;
+    } else if (
+      colNonHallucination === null &&
+      (h1.includes('non-hallu') || hAll.includes('non-hallu'))
+    ) {
+      colNonHallucination = c;
+    } else if (
+      colScienceKnowledge === null &&
+      (h1.includes('scientific knowledge') ||
+        hAll.includes('accuracy v1') ||
+        (hAll.includes('omniscience') && !hAll.includes('hallu')))
+    ) {
+      colScienceKnowledge = c;
+    } else if (colVisionPlot === null && (h1.includes('plot') || hAll.includes('mmmu'))) {
+      colVisionPlot = c;
+    } else if (colMedReasoning === null && (h1.includes('diagnostics') || hAll.includes('mlcr'))) {
+      colMedReasoning = c;
+    } else if (colExcelAgent === null && (h1.includes('excel') || hAll.includes('analyst'))) {
+      colExcelAgent = c;
+    } else if (
+      colTrickQuestions === null &&
+      (h1.includes('experiment') || h1.includes('gdpx') || hAll.includes('gdpx'))
+    ) {
+      colTrickQuestions = c;
+    } else if (
+      colEconLegal === null &&
+      (h1.includes('econ') || h1.includes('legal') || hAll.includes('vals'))
+    ) {
+      colEconLegal = c;
+    }
+  }
+
+  const benchBase = resolvedCreatorYear;
+  const resolvedActCodeReason = colActCodeReason ?? benchBase + 1;
+  const resolvedNonHallucination = colNonHallucination ?? benchBase + 2;
+  const resolvedScienceKnowledge = colScienceKnowledge ?? benchBase + 3;
+  const resolvedVisionPlot = colVisionPlot ?? benchBase + 4;
+  const resolvedMedReasoning = colMedReasoning ?? benchBase + 5;
+  const resolvedExcelAgent = colExcelAgent ?? benchBase + 6;
+  const resolvedTrickQuestions = colTrickQuestions ?? benchBase + 7;
+  const resolvedEconLegal = colEconLegal ?? benchBase + 8;
+
+  // 3. Detect post-Model-Name columns (pricing, retired benchmarks, release date, creator)
+  let colDePrice: number | null = null;
   let colUsPrice: number | null = null;
   let colIqOld: number | null = null;
   let colNonHalluOld: number | null = null;
@@ -431,22 +598,22 @@ export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
   let carriedRow0 = '';
   let carriedRow0Age = 0;
 
-  for (let c = 19; c < maxCols; c++) {
-    const rawRow0 = (row0[c] || '').replace(/\s+/g, ' ').trim();
+  const postScanStart = Math.max(resolvedModelName + 1, resolvedApiLink + 1, 17);
+  for (let c = postScanStart; c < maxCols; c++) {
+    const rawRow0 = norm(row0[c]);
     if (rawRow0) {
       carriedRow0 = rawRow0;
       carriedRow0Age = 0;
-    } else if (carriedRow0 && carriedRow0Age < 2) {
-      // Handle horizontal merges like T1:U1 where Row 1 text sits in the leftmost cell (T1) and U1 is blank
+    } else if (carriedRow0 && carriedRow0Age < 3) {
       carriedRow0Age += 1;
     } else {
       carriedRow0 = '';
     }
 
     const effectiveRow0 = rawRow0 || carriedRow0;
-    const h01 = `${effectiveRow0} ${row1[c] || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
-    const hAll = getHeader(c);
-    const h1 = (row1[c] || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const h01 = `${effectiveRow0} ${norm(row1[c])}`.trim().toLowerCase();
+    const hAll = getCombined(c);
+    const h1 = norm(row1[c]).toLowerCase();
     const hasPricingContext =
       h01.includes('cost') ||
       h01.includes('abokosten') ||
@@ -471,11 +638,14 @@ export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
         /\bin de\b/.test(h01) ||
         h01.includes('abokosten'))
     ) {
-      colDePrice = c;
+      if (colDePrice === null) colDePrice = c;
       continue;
     }
 
-    if (colIqOld === null && (h1 === 'iq' || (h01.includes('old score') && h01.includes('iq')) || hAll.includes('aa-int-index in % v4'))) {
+    if (
+      colIqOld === null &&
+      (h1 === 'iq' || (h01.includes('old score') && h01.includes('iq')) || hAll.includes('aa-int-index in % v4'))
+    ) {
       colIqOld = c;
       continue;
     }
@@ -487,7 +657,7 @@ export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
       colScienceOld = c;
       continue;
     }
-    if (colTrickOld === null && (h01.includes('trick questions') || hAll.includes('simple-bench in %'))) {
+    if (colTrickOld === null && (h01.includes('trick questions') || hAll.includes('simple-bench in %') || hAll.includes('simplebench'))) {
       colTrickOld = c;
       continue;
     }
@@ -508,64 +678,85 @@ export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
   }
 
   const hasUsPriceCol = colUsPrice !== null;
-  const shift = hasUsPriceCol ? 1 : 0;
+  const priceShift = hasUsPriceCol ? 1 : 0;
+  const modelColShift = resolvedModelName - 18;
+  const resolvedDePrice = colDePrice ?? resolvedModelName + 1;
 
-  let colCompany = 34 + shift;
-  let colDomain = 35 + shift;
-  let colFlag = 36 + shift;
+  // 4. Detect Lookup Table (Company, Domain, Flag) & Integrity-Bench column across ALL columns
+  let colCompany = 34 + priceShift + modelColShift;
+  let colDomain = 35 + priceShift + modelColShift;
+  let colFlag = 36 + priceShift + modelColShift;
+  let colIntegrity: number | null = null;
 
   for (let r = 0; r < Math.min(5, rows.length); r++) {
     const headerRow = rows[r];
     if (!headerRow) continue;
     for (let c = 0; c < headerRow.length; c++) {
-      const cell = (headerRow[c] || '').trim().toLowerCase();
+      const cell = norm(headerRow[c]).toLowerCase();
       if (cell === 'company') colCompany = c;
       else if (cell === 'domain') colDomain = c;
       else if (cell === 'flag') colFlag = c;
     }
   }
 
-  return {
-    hasUsPriceCol,
-    colDePrice,
-    colUsPrice,
-    colIqOld: colIqOld ?? (20 + shift),
-    colNonHalluOld: colNonHalluOld ?? (21 + shift),
-    colScienceOld: colScienceOld ?? (22 + shift),
-    colTrickOld: colTrickOld ?? (23 + shift),
-    colReleaseDate: colReleaseDate ?? (24 + shift),
-    colModelCreator: colModelCreator ?? (25 + shift),
-    colCompany,
-    colDomain,
-    colFlag,
-  };
-}
-
-/**
- * Extracts Row 33 synced text and source URLs from the CSV.
- * Row 33 in the Google Sheet contains the benchmark acronyms/subtitles and sources.
- */
-export function extractRow33Metadata(rows: string[][]): Row33Metadata {
-  const layout = detectSheetColumns(rows);
-  let targetRow: string[] | null = null;
-
-  for (let r = 0; r < Math.min(60, rows.length); r++) {
-    const row = rows[r];
-    if (!row) continue;
-    const col1 = (row[1] || '').toLowerCase();
-    const col2 = (row[2] || '').toLowerCase();
+  for (let c = 0; c < maxCols; c++) {
+    const headerText = `${norm(row0[c])} ${norm(row1[c])} ${norm(row2[c])} ${norm(sourcesRow[c])}`.toLowerCase();
     if (
-      col2.includes('sources & notes') ||
-      (col1.includes('current') && col1.includes('history')) ||
-      (r === 32 && row.length > 10)
+      headerText.includes('integrity-bench') ||
+      headerText.includes('integrity_bench') ||
+      /\bintegrity\b/.test(headerText)
     ) {
-      targetRow = row;
+      colIntegrity = c;
       break;
     }
   }
 
+  return {
+    historyStartRow: structure.historyStartRow,
+    colNameLabel: resolvedNameLabel,
+    colCreatorYear: resolvedCreatorYear,
+    colActCodeReason: resolvedActCodeReason,
+    colNonHallucination: resolvedNonHallucination,
+    colScienceKnowledge: resolvedScienceKnowledge,
+    colVisionPlot: resolvedVisionPlot,
+    colMedReasoning: resolvedMedReasoning,
+    colExcelAgent: resolvedExcelAgent,
+    colTrickQuestions: resolvedTrickQuestions,
+    colEconLegal: resolvedEconLegal,
+    colOldScore: resolvedOldScore,
+    colNewScore: resolvedNewScore,
+    colWorstCaseScore: resolvedWorstCaseScore,
+    colStoryline: resolvedStoryline,
+    colChatLink: resolvedChatLink,
+    colApiLink: resolvedApiLink,
+    colModelName: resolvedModelName,
+    colAuthorMeta: resolvedAuthorMeta,
+    hasUsPriceCol,
+    colDePrice: resolvedDePrice,
+    colUsPrice,
+    colIqOld: colIqOld ?? (resolvedDePrice + 1 + priceShift),
+    colNonHalluOld: colNonHalluOld ?? (resolvedDePrice + 2 + priceShift),
+    colScienceOld: colScienceOld ?? (resolvedDePrice + 3 + priceShift),
+    colTrickOld: colTrickOld ?? (resolvedDePrice + 4 + priceShift),
+    colReleaseDate: colReleaseDate ?? (resolvedDePrice + 5 + priceShift),
+    colModelCreator: colModelCreator ?? (resolvedDePrice + 6 + priceShift),
+    colCompany,
+    colDomain,
+    colFlag,
+    colIntegrity: colIntegrity ?? Math.max(39 + modelColShift, colFlag + 2),
+  };
+}
+
+/**
+ * Extracts Row 33 (Sources & Notes) synced text and source URLs from the CSV dynamically.
+ */
+export function extractRow33Metadata(rows: string[][]): Row33Metadata {
+  const layout = detectSheetColumns(rows);
+  const sourcesIdx = findSourcesHeaderRowIndex(rows);
+  const targetRow = sourcesIdx >= 0 ? rows[sourcesIdx] : null;
+
   const getCell = (colIdx: number, fallback: string) => {
-    if (!targetRow || !targetRow[colIdx]) return fallback;
+    if (!targetRow || colIdx < 0 || !targetRow[colIdx]) return fallback;
     const text = targetRow[colIdx].trim();
     return text || fallback;
   };
@@ -581,21 +772,21 @@ export function extractRow33Metadata(rows: string[][]): Row33Metadata {
     return defaultUrl;
   };
 
-  const moreSourcesText = targetRow?.[14]?.trim() || '';
+  const moreSourcesText = targetRow?.[layout.colStoryline]?.trim() || '';
   const urlMatches = moreSourcesText.match(/https?:\/\/[^\s]+/g) || [];
 
-  const colD = getCell(3, 'AA-Int-Index in % v5');
-  const colE = getCell(4, 'Non-Hallu-Rate v1.1 in %');
-  const colF = getCell(5, 'Accuracy v1.1 in %');
-  const colG = getCell(6, 'MMMU-Pro in %');
-  const colH = getCell(7, 'MLCR-AA in %');
-  const colI = getCell(8, 'ExcelAgent in %');
-  const colJ = getCell(9, 'gdpx.semianalysis.com');
-  const colK = getCell(10, 'Vals Econ Index 2.2 in %');
+  const colD = getCell(layout.colActCodeReason, 'AA-Int-Index in % v5');
+  const colE = getCell(layout.colNonHallucination, 'Non-Hallu-Rate v1.1 in %');
+  const colF = getCell(layout.colScienceKnowledge, 'Accuracy v1.1 in %');
+  const colG = getCell(layout.colVisionPlot, 'MMMU-Pro in %');
+  const colH = getCell(layout.colMedReasoning, 'MLCR-AA in %');
+  const colI = getCell(layout.colExcelAgent, 'ExcelAgent in %');
+  const colJ = getCell(layout.colTrickQuestions, 'gdpx.semianalysis.com');
+  const colK = getCell(layout.colEconLegal, 'Vals Econ Index 2.2 in %');
 
-  const colL = getCell(11, 'historic persp.');
-  const colM = getCell(12, 'if hallus are a small problem');
-  const colN = getCell(13, 'times non hallu-rate');
+  const colL = getCell(layout.colOldScore, 'historic persp.');
+  const colM = getCell(layout.colNewScore, 'if hallus are a small problem');
+  const colN = getCell(layout.colWorstCaseScore, 'times non hallu-rate');
 
   const colU = getCell(layout.colIqOld, 'AA-Int-Index in % v4.3');
   const colV = getCell(layout.colNonHalluOld, 'Non-Hallu-Rate v1 in %');
@@ -673,42 +864,48 @@ export function extractRow33Metadata(rows: string[][]): Row33Metadata {
 }
 
 /**
- * Extracts Title (A1), Subtitle (C1), Author & Social Links (O1), Category Names (D2:K2),
- * and Row 33 synced benchmark metadata directly from a 2D row matrix.
+ * Extracts Title, Subtitle, Author & Social Links, Category Names,
+ * and Sources & Notes synced benchmark metadata dynamically from a 2D row matrix.
  */
 export function extractHeaderMetadataFromRows(
   rows: string[][],
   authorLinks?: AuthorSocialLink[]
 ): CsvHeaderMetadata {
+  const layout = detectSheetColumns(rows);
   const cellA1 = (rows[0]?.[0] || 'Science-IQ of ChatBots').trim();
-  const cellC1 = (rows[0]?.[2] || '').trim();
-  const cellO1 = (rows[0]?.[14] || '').trim();
+  const cellC1 = (rows[0]?.[layout.colCreatorYear] || rows[0]?.[2] || '').trim();
+  const cellO1 = (rows[0]?.[layout.colAuthorMeta] || '').trim();
   const authorMeta = parseCellO1(cellO1, authorLinks);
   const combinedTitle = cellA1;
 
-  const categoryNames: string[] = [];
   const row1 = rows[1] || [];
-  for (let c = 3; c <= 10; c++) {
-    const raw = (row1[c] || '').replace(/\s+/g, ' ').trim();
-    if (raw) {
-      categoryNames.push(raw);
-    }
-  }
-
-  const layout = detectSheetColumns(rows);
   const cleanHeader = (colIdx: number, fallback: string) => {
     const val = (row1[colIdx] || '').replace(/\s+/g, ' ').trim();
     return val || fallback;
   };
 
-  // Slider indices 0, 1, 2 map to Col M (NEW), Col L (OLD), Col N (Worst Case)
+  const activeCols = [
+    layout.colActCodeReason,
+    layout.colNonHallucination,
+    layout.colScienceKnowledge,
+    layout.colVisionPlot,
+    layout.colMedReasoning,
+    layout.colExcelAgent,
+    layout.colTrickQuestions,
+    layout.colEconLegal,
+  ];
+  const categoryNames = activeCols
+    .map((colIdx) => (row1[colIdx] || '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  // Slider indices 0, 1, 2 map to NEW, OLD, Worst Case
   const compositeScoreNames = [
-    cleanHeader(12, 'NEW'),
-    cleanHeader(11, 'OLD'),
-    cleanHeader(13, 'Worst Case'),
+    cleanHeader(layout.colNewScore, 'NEW'),
+    cleanHeader(layout.colOldScore, 'OLD'),
+    cleanHeader(layout.colWorstCaseScore, 'Worst Case'),
   ];
 
-  // Retired historical benchmarks (Cols V-Y in current sheet, or U-X in legacy layout)
+  // Retired historical benchmarks
   const retiredCategoryNames = [
     cleanHeader(layout.colIqOld, 'IQ old'),
     cleanHeader(layout.colNonHalluOld, 'Non-Hallu-Rate old'),
@@ -737,8 +934,7 @@ export function extractHeaderMetadataFromRows(
 }
 
 /**
- * Extracts Title (combined A1 and B2), Subtitle (cell C1), Author (cell O1), Category Names (cells D2 to K2),
- * and Row 33 synced benchmark metadata directly from CSV.
+ * Extracts Title, Subtitle, Author, Category Names, and Sources metadata directly from CSV.
  */
 export function extractHeaderMetadata(
   csvText: string,
@@ -748,65 +944,80 @@ export function extractHeaderMetadata(
 }
 
 /**
- * Extracts Section 1 (Cell A34 title & Cell C34 content) and Section 2 (Cell N34 title & Cell O34 content)
- * directly from a 2D row matrix.
+ * Extracts documentation notes sections ("How to read this" & "What Bots can & can't do")
+ * dynamically even if rows or columns are shifted.
  */
 export function extractCsvNotesMetadataFromRows(rows: string[][]): CsvNotesMetadata {
+  const layout = detectSheetColumns(rows);
   let notesRow: string[] | null = null;
 
-  // 1. Direct check at Row 34 (row index 33 in 0-based indexing)
-  if (rows.length > 33) {
-    const cand = rows[33];
-    if (cand && cand[2] && cand[2].length > 500) {
-      notesRow = cand;
+  // 1. Scan rows from index 10 onward (skipping top header rows) for documentation cues
+  for (let i = 10; i < Math.min(140, rows.length); i++) {
+    const r = rows[i] || [];
+    let rowIntro = '';
+    for (let c = 0; c < Math.min(6, r.length); c++) {
+      rowIntro += ` ${r[c] || ''}`;
+    }
+    const low = rowIntro.toLowerCase();
+    const longCellIdx = r.findIndex((cell, cIdx) => cIdx <= 6 && (cell || '').length > 400);
+    if (
+      low.includes('how to read') ||
+      low.includes('what bot') ||
+      longCellIdx !== -1
+    ) {
+      notesRow = r;
+      break;
     }
   }
 
-  // 2. Scan rows from index 10 onward (skipping header rows 0-9 to avoid picking cell C1 subtitle)
+  // 2. Fallback scan between row 20 and 140 for any cell with long documentation text
   if (!notesRow) {
-    for (let i = 10; i < Math.min(120, rows.length); i++) {
-      const r = rows[i] || [];
-      const col0 = (r[0] || '').toLowerCase();
-      const col1 = (r[1] || '').toLowerCase();
-      const col2 = r[2] || '';
-      const col13 = (r[13] || '').toLowerCase();
-      if (
-        col0.includes('how to read') ||
-        col1.includes('how to read') ||
-        col0.includes('sources & notes') ||
-        col1.includes('sources & notes') ||
-        col13.includes('what bot') ||
-        (col2.length > 500 && (col0.length > 0 || (r[13] && r[13].length > 0)))
-      ) {
-        notesRow = r;
-        break;
-      }
-    }
-  }
-
-  // 3. Fallback scan between row 20 and 100 for any row with long documentation text
-  if (!notesRow) {
-    for (let i = 20; i < Math.min(100, rows.length); i++) {
-      const cand = rows[i];
-      if (cand && cand[2] && cand[2].length > 300) {
+    for (let i = 20; i < Math.min(140, rows.length); i++) {
+      const cand = rows[i] || [];
+      if (cand.some((cell) => (cell || '').length > 300)) {
         notesRow = cand;
         break;
       }
     }
   }
 
-  let section1Title = (notesRow?.[1] || notesRow?.[0] || 'How to read this').trim();
-  let section1Content = (notesRow?.[2] || '').trim();
-  if (!section1Content && notesRow?.[1] && notesRow[1].length > 100) {
-    section1Content = notesRow[1].trim();
+  let section1Title = (
+    notesRow?.[layout.colNameLabel] ||
+    notesRow?.[layout.colNameLabel - 1] ||
+    notesRow?.[1] ||
+    notesRow?.[0] ||
+    'How to read this'
+  ).trim();
+  let section1Content = (
+    notesRow?.[layout.colCreatorYear] ||
+    notesRow?.[2] ||
+    ''
+  ).trim();
+
+  if (notesRow && section1Content.length < 150) {
+    const longColIdx = notesRow.findIndex(
+      (cell, idx) => idx < layout.colWorstCaseScore && (cell || '').length > 150
+    );
+    if (longColIdx !== -1) {
+      section1Content = notesRow[longColIdx].trim();
+      if (longColIdx > 0 && notesRow[longColIdx - 1] && notesRow[longColIdx - 1].length < 80) {
+        section1Title = notesRow[longColIdx - 1].trim();
+      }
+    }
   }
 
-  let section2Title = (notesRow?.[13] || "What Bots can & can't do for you").trim();
-  let section2Content = (notesRow?.[14] || '').trim();
+  let section2Title = (
+    notesRow?.[layout.colWorstCaseScore] ||
+    notesRow?.[13] ||
+    "What Bots can & can't do for you"
+  ).trim();
+  let section2Content = (notesRow?.[layout.colStoryline] || notesRow?.[14] || '').trim();
 
-  // If section 2 content is empty at col 14 (O), scan adjacent columns in notesRow for long text
+  // If section 2 content is empty at detected colStoryline, scan adjacent columns in notesRow
   if (notesRow && section2Content.length < 50) {
-    for (let c = 12; c < Math.min(notesRow.length, 20); c++) {
+    const minSearch = Math.max(layout.colOldScore, 8);
+    const maxSearch = Math.min(notesRow.length, Math.max(layout.colModelName + 2, 24));
+    for (let c = minSearch; c < maxSearch; c++) {
       if (notesRow[c] && notesRow[c].length > 150) {
         section2Content = notesRow[c].trim();
         if (c > 0 && notesRow[c - 1] && notesRow[c - 1].length < 80) {
@@ -830,7 +1041,7 @@ export function extractCsvNotesMetadata(csvText: string): CsvNotesMetadata {
 }
 
 /**
- * Locates key 1-based structural row numbers in the main sheet for safe row insertion & notes updates.
+ * Locates key 1-based structural row numbers in the main sheet dynamically.
  */
 export function findSheetStructuralRows(rows: string[][]): {
   historyStartRow: number;
@@ -839,46 +1050,65 @@ export function findSheetStructuralRows(rows: string[][]): {
 } {
   let historyStartIndex = 35;
   let matchedHistoryLabel = false;
-  for (let r = 0; r < Math.min(45, rows.length); r++) {
-    const b = (rows[r]?.[1] || '').trim().toLowerCase();
-    if (b === 'history') {
-      historyStartIndex = r + 1;
-      matchedHistoryLabel = true;
-      break;
-    }
-  }
-  if (!matchedHistoryLabel) {
-    for (let r = 0; r < Math.min(45, rows.length); r++) {
-      const c = (rows[r]?.[2] || '').trim().toLowerCase();
-      if (c.includes('full timeline') && c.length < 200) {
+  for (let r = 0; r < Math.min(100, rows.length); r++) {
+    const row = rows[r];
+    if (!row) continue;
+    for (let c = 0; c < Math.min(5, row.length); c++) {
+      const val = (row[c] || '').trim().toLowerCase();
+      if (val === 'history') {
         historyStartIndex = r + 1;
+        matchedHistoryLabel = true;
         break;
       }
+    }
+    if (matchedHistoryLabel) break;
+  }
+  if (!matchedHistoryLabel) {
+    for (let r = 0; r < Math.min(100, rows.length); r++) {
+      const row = rows[r];
+      if (!row) continue;
+      for (let c = 0; c < Math.min(5, row.length); c++) {
+        const val = (row[c] || '').trim().toLowerCase();
+        if (val.includes('full timeline') && val.length < 200) {
+          historyStartIndex = r + 1;
+          matchedHistoryLabel = true;
+          break;
+        }
+      }
+      if (matchedHistoryLabel) break;
     }
   }
 
   let sourcesNotesRow: number | null = null;
   for (let r = historyStartIndex; r < rows.length; r++) {
-    const rawNameCell = (rows[r]?.[1] || '').trim();
-    const rawCreatorCell = (rows[r]?.[2] || '').trim();
-    if (
-      rawNameCell.includes('Sources & Notes') ||
-      rawCreatorCell.includes('Sources & Notes') ||
-      rawCreatorCell === 'min' ||
-      rawNameCell === 'min'
-    ) {
+    const row = rows[r];
+    if (!row) continue;
+    let hit = false;
+    for (let c = 0; c < Math.min(5, row.length); c++) {
+      const val = (row[c] || '').trim();
+      if (val.includes('Sources & Notes') || val === 'min') {
+        hit = true;
+        break;
+      }
+    }
+    if (hit) {
       sourcesNotesRow = r + 1;
       break;
     }
   }
 
   let notesRow = 34;
-  for (let i = 10; i < Math.min(120, rows.length); i++) {
+  for (let i = 10; i < Math.min(140, rows.length); i++) {
     const r = rows[i] || [];
-    const col0 = (r[0] || '').toLowerCase();
-    const col1 = (r[1] || '').toLowerCase();
-    const col2 = r[2] || '';
-    if (col0.includes('how to read') || col1.includes('how to read') || col2.length > 500) {
+    let hasCue = false;
+    for (let c = 0; c < Math.min(6, r.length); c++) {
+      const cell = r[c] || '';
+      if (cell.toLowerCase().includes('how to read') || cell.length > 450) {
+        hasCue = true;
+        break;
+      }
+    }
+    if (hasCue) {
       notesRow = i + 1;
       break;
     }
@@ -936,18 +1166,19 @@ function extractFlag(text: string): { flag: string; cleanText: string } {
 export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
   if (rows.length < 3) return [];
 
-  // 1. Current bot names from top table (rows 2 to 31)
+  const layout = detectSheetColumns(rows);
+  const startIndex = Math.max(2, layout.historyStartRow - 1);
+
+  // 1. Current bot names from top table (above History start)
   const currentBotNames = new Set<string>();
-  for (let r = 1; r < Math.min(32, rows.length); r++) {
+  for (let r = 1; r < Math.min(startIndex - 1, rows.length); r++) {
     const row = rows[r];
     if (!row) continue;
-    const s = (row[18] || '').trim().toLowerCase();
-    const b = (row[1] || '').trim().toLowerCase();
+    const s = (row[layout.colModelName] || '').trim().toLowerCase();
+    const b = (row[layout.colNameLabel] || '').trim().toLowerCase();
     if (s) currentBotNames.add(s);
     if (b) currentBotNames.add(b);
   }
-
-  const layout = detectSheetColumns(rows);
 
   // 2. Parse dynamic company lookup table (Company, Domain, Flag)
   const colCompany = layout.colCompany;
@@ -978,11 +1209,9 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
     }
   }
 
-  // 3. Pre-collect DE pricing (Col T) and US pricing (Col U when present) across top & history tables
+  // 3. Pre-collect DE pricing and US pricing (when present) across top & history tables
   const colDeHeader = `${rows[0]?.[layout.colDePrice] || ''} ${rows[1]?.[layout.colDePrice] || ''}`.toLowerCase();
-  const colALHeader = `${rows[0]?.[37] || ''} ${rows[1]?.[37] || ''}`.toLowerCase();
   const useColDePricing = colDeHeader.includes('cost') || colDeHeader.includes('abokosten') || colDeHeader.includes('paid') || !colDeHeader.includes('creator');
-  const useColALPricing = !layout.hasUsPriceCol && !useColDePricing && (colALHeader.includes('abokosten') || colALHeader.includes('cost'));
 
   const isPriceHeaderText = (v: string) => {
     const low = v.toLowerCase();
@@ -996,17 +1225,12 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
     const row = rows[r];
     if (!row) continue;
 
-    const s = (row[18] || '').trim().toLowerCase();
-    const b = (row[1] || '').trim().toLowerCase();
+    const s = (row[layout.colModelName] || '').trim().toLowerCase();
+    const b = (row[layout.colNameLabel] || '').trim().toLowerCase();
     const { cleanText: cleanB } = extractFlag(b);
 
     const valDePrimary = useColDePricing ? (row[layout.colDePrice] || '').trim() : '';
-    const valDeLegacy = useColALPricing ? (row[37] || '').trim() : '';
-    const valDe = (valDePrimary && !isPriceHeaderText(valDePrimary))
-      ? valDePrimary
-      : (valDeLegacy && !isPriceHeaderText(valDeLegacy))
-        ? valDeLegacy
-        : '';
+    const valDe = (valDePrimary && !isPriceHeaderText(valDePrimary)) ? valDePrimary : '';
     if (valDe) {
       if (s) colDePriceMap.set(s, valDe);
       if (cleanB) colDePriceMap.set(cleanB.toLowerCase(), valDe);
@@ -1021,36 +1245,16 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
     }
   }
 
-  // 4. Locate start of history table: Row 36 (index 35) or row after "History"
-  let startIndex = 35; // Row 36 in 1-based indexing
-  let matchedHistoryStart = false;
-  for (let r = 0; r < Math.min(45, rows.length); r++) {
-    const b = (rows[r]?.[1] || '').trim().toLowerCase();
-    if (b === 'history') {
-      startIndex = r + 1;
-      matchedHistoryStart = true;
-      break;
-    }
-  }
-  if (!matchedHistoryStart) {
-    for (let r = 0; r < Math.min(45, rows.length); r++) {
-      const c = (rows[r]?.[2] || '').trim().toLowerCase();
-      if (c.includes('full timeline') && c.length < 200) {
-        startIndex = r + 1;
-        break;
-      }
-    }
-  }
-
   const allModels: ModelRecord[] = [];
+  const seenModelIds = new Map<string, number>();
 
   for (let r = startIndex; r < rows.length; r++) {
     const row = rows[r];
     if (!row || row.length < 5) continue;
 
-    const rawNameCell = (row[1] || '').trim();
-    const rawCreatorCell = (row[2] || '').trim();
-    const colS = (row[18] || '').trim();
+    const rawNameCell = (row[layout.colNameLabel] || '').trim();
+    const rawCreatorCell = (row[layout.colCreatorYear] || '').trim();
+    const colS = (row[layout.colModelName] || '').trim();
 
     // Termination: when hitting summary rows, min/mean/median/max/count, or notes
     if (
@@ -1070,7 +1274,7 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
       break;
     }
 
-    // Skip section placeholders / rumors where Column S is empty
+    // Skip section placeholders / rumors where canonical Model Name column is empty
     if (!colS || rawNameCell.toLowerCase().includes('expectations') || rawNameCell.toLowerCase().includes('rumors')) {
       continue;
     }
@@ -1141,15 +1345,15 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
     // Canonical display name from Column S
     const displayName = colS;
 
-    // Parse Benchmark Columns (D through K) - Empty cells remain null (missing)
-    const valD = parseNum(row[3]);
-    const valE = parseNum(row[4]);
-    const valF = parseNum(row[5]);
-    const valG = parseNum(row[6]);
-    const valH = parseNum(row[7]);
-    const valI = parseNum(row[8]);
-    const valJ = parseNum(row[9]);
-    const valK = parseNum(row[10]);
+    // Parse Active Benchmark Columns dynamically - Empty cells remain null (missing)
+    const valD = parseNum(row[layout.colActCodeReason]);
+    const valE = parseNum(row[layout.colNonHallucination]);
+    const valF = parseNum(row[layout.colScienceKnowledge]);
+    const valG = parseNum(row[layout.colVisionPlot]);
+    const valH = parseNum(row[layout.colMedReasoning]);
+    const valI = parseNum(row[layout.colExcelAgent]);
+    const valJ = parseNum(row[layout.colTrickQuestions]);
+    const valK = parseNum(row[layout.colEconLegal]);
 
     // Parse Retired Benchmark Columns dynamically (IQ_old, Non-Hallu-Rate_old, Science Knowledge_old, Trick Questions_old)
     const valU = parseNum(row[layout.colIqOld]);
@@ -1205,9 +1409,9 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
       ? Math.round((((tD! + tF! + tG! + tH! + tI! + tJ! + tK!) / 7) * tE!) / 100)
       : null;
 
-    const scoreOldReported = parseNum(row[11]);         // Col L
-    const scoreNewReported = parseNum(row[12]); // Col M
-    const scoreWorstCaseReported = parseNum(row[13]);   // Col N
+    const scoreOldReported = parseNum(row[layout.colOldScore]);
+    const scoreNewReported = parseNum(row[layout.colNewScore]);
+    const scoreWorstCaseReported = parseNum(row[layout.colWorstCaseScore]);
 
     // When score cells in the CSV are emptied (e.g. updating AA-Intelligence-Index to v5),
     // empty cells must strictly remain empty / null rather than falling back to synthetic calculations:
@@ -1220,9 +1424,9 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
 
     const breakdown = createModelBreakdown(rawScores, activeScore, activeMode);
 
-    const storyline = (row[14] || '').trim();
-    const chatLinkRaw = (row[15] || '').trim();
-    const apiLinkRaw = (row[16] || '').trim();
+    const storyline = (row[layout.colStoryline] || '').trim();
+    const chatLinkRaw = (row[layout.colChatLink] || '').trim();
+    const apiLinkRaw = (row[layout.colApiLink] || '').trim();
 
     // Helper to extract first valid http URL from a cell string
     const extractHttpUrl = (str: string): string | undefined => {
@@ -1281,12 +1485,9 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
       (!isSupersededOrDiscontinued && (chatLinkLow.startsWith('http') || chatLinkLow.includes('paid') || chatLinkLow.includes('api') || !!parsedApiLink));
 
     const rawColDe = useColDePricing ? (row[layout.colDePrice] || '').trim() : '';
-    const rawColAL = useColALPricing ? (row[37] || '').trim() : '';
     const priceDeMonthly = (rawColDe && !isPriceHeaderText(rawColDe))
       ? rawColDe
-      : (rawColAL && !isPriceHeaderText(rawColAL))
-        ? rawColAL
-        : colDePriceMap.get(displayName.toLowerCase()) || colDePriceMap.get(cleanedName.toLowerCase()) || undefined;
+      : colDePriceMap.get(displayName.toLowerCase()) || colDePriceMap.get(cleanedName.toLowerCase()) || undefined;
 
     let priceUsMonthly: string | undefined;
     if (layout.colUsPrice !== null) {
@@ -1294,12 +1495,19 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
       priceUsMonthly = (rawColUs && !isPriceHeaderText(rawColUs))
         ? rawColUs
         : colUsPriceMap.get(displayName.toLowerCase()) || colUsPriceMap.get(cleanedName.toLowerCase()) || undefined;
-    } else {
-      priceUsMonthly = lookupResearchedUsPrice(displayName, rawNameCell);
     }
 
+    const baseSlug =
+      displayName
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/^_+|_+$/g, '') || `row_${r + 1}`;
+    const baseId = `model-${baseSlug}`;
+    const dupIdx = seenModelIds.get(baseId) ?? 0;
+    seenModelIds.set(baseId, dupIdx + 1);
+    const stableId = dupIdx === 0 ? baseId : `${baseId}__${dupIdx + 1}`;
+
     allModels.push({
-      id: `model-${r}-${displayName.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+      id: stableId,
       rank: 0,
       flag,
       name: rawNameCell,

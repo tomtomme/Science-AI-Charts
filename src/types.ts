@@ -103,6 +103,25 @@ export interface ModelRecord {
 }
 
 export interface SheetColumnLayout {
+  historyStartRow: number; // 1-based row where history models start (default 36)
+  colNameLabel: number; // default 1 (Col B: Flag + Model + Free/Paid badges)
+  colCreatorYear: number; // default 2 (Col C: Creator | Release)
+  colActCodeReason: number; // default 3 (Col D: IQ)
+  colNonHallucination: number; // default 4 (Col E)
+  colScienceKnowledge: number; // default 5 (Col F)
+  colVisionPlot: number; // default 6 (Col G: MMMU-Pro)
+  colMedReasoning: number; // default 7 (Col H: MLCR-AA)
+  colExcelAgent: number; // default 8 (Col I: ExcelAgent)
+  colTrickQuestions: number; // default 9 (Col J: GDPx / Exp & Eng)
+  colEconLegal: number; // default 10 (Col K: Vals.ai)
+  colOldScore: number; // default 11 (Col L)
+  colNewScore: number; // default 12 (Col M)
+  colWorstCaseScore: number; // default 13 (Col N)
+  colStoryline: number; // default 14 (Col O)
+  colChatLink: number; // default 15 (Col P)
+  colApiLink: number; // default 16 (Col Q)
+  colModelName: number; // default 18 (Col S: Canonical Model Name & Version)
+  colAuthorMeta: number; // default 14 (Row 1 O1 author cell)
   hasUsPriceCol: boolean;
   colDePrice: number;
   colUsPrice: number | null;
@@ -115,6 +134,7 @@ export interface SheetColumnLayout {
   colCompany: number;
   colDomain: number;
   colFlag: number;
+  colIntegrity: number; // default 39 (Col AN: Integrity-Bench)
 }
 
 export interface CompanyInfo {

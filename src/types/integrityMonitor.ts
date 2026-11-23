@@ -33,6 +33,7 @@ export interface IntegritySheetModelSnapshot {
   releaseDate: string;
   sheetRowNumber: number;
   colAN: number | null;
+  colANIsBold: boolean | null;
 }
 
 export interface IntegrityDiffItem {
@@ -50,6 +51,7 @@ export interface IntegrityDiffItem {
   matchedDisplayName: string | null;
   sheetRowNumber: number | null;
   currentColAN: number | null;
+  currentColANIsBold: boolean | null;
   reason: string;
 }
 
@@ -71,6 +73,7 @@ export interface IntegrityCheckReport {
   unchangedCount: number;
   ignoredCount?: number;
   actionableCount: number;
+  manualMappings?: Record<string, ManualRowMapping>;
   summaryDe: string;
   summaryEn: string;
 }

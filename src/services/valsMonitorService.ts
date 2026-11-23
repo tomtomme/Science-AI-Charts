@@ -1,23 +1,24 @@
 import { ModelRecord } from '../types';
-import { ManualRowMapping } from '../types/integrityMonitor';
 import {
   ValsCheckReport,
   ValsMonitorStatusResponse,
   ValsSheetModelSnapshot,
 } from '../types/valsMonitor';
-import { StaticPreviewApiError } from './pricingMonitorService';
+import { createMonitorApiClient } from './monitorApiClient';
 
-export const VALS_COL_INDEX = 10; // Column K (0-based index 10)
+export const VALS_COL_INDEX = 10; // Default Column K (0-based index 10)
 
 export function extractValsSheetSnapshots(
   models: ModelRecord[],
-  boldMask?: boolean[][]
+  boldMask?: boolean[][],
+  colIndex: number = VALS_COL_INDEX,
+  minHistoryRow: number = 36
 ): ValsSheetModelSnapshot[] {
   return models
-    .filter((m) => typeof m.sheetRowNumber === 'number' && m.sheetRowNumber >= 36)
+    .filter((m) => typeof m.sheetRowNumber === 'number' && m.sheetRowNumber >= minHistoryRow)
     .map((m) => {
       const rowNum = m.sheetRowNumber as number;
-      const maskCell = boldMask?.[rowNum - 1]?.[VALS_COL_INDEX];
+      const maskCell = boldMask?.[rowNum - 1]?.[colIndex];
       return {
         id: m.id,
         name: m.name,
@@ -31,51 +32,12 @@ export function extractValsSheetSnapshots(
     });
 }
 
-async function parseJsonResponse<T>(res: Response): Promise<T> {
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    throw new StaticPreviewApiError();
-  }
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data?.error || `Request failed (HTTP ${res.status})`);
-  }
-  return data as T;
-}
+export const valsMonitorApi = createMonitorApiClient<
+  ValsMonitorStatusResponse,
+  ValsCheckReport,
+  ValsSheetModelSnapshot
+>('/api/vals-monitor');
 
-export async function fetchValsMonitorStatus(): Promise<ValsMonitorStatusResponse> {
-  const res = await fetch('/api/vals-monitor/status');
-  return parseJsonResponse<ValsMonitorStatusResponse>(res);
-}
-
-export async function triggerValsCheck(
-  models: ValsSheetModelSnapshot[] = [],
-  trigger: 'manual' | 'daily_auto' = 'manual'
-): Promise<ValsCheckReport> {
-  const res = await fetch('/api/vals-monitor/check', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ models, trigger }),
-  });
-  const data = await parseJsonResponse<{ report: ValsCheckReport }>(res);
-  return data.report;
-}
-
-export async function updateValsPreferencesApi(options: {
-  ignoreIds?: string[];
-  unignoreIds?: string[];
-  manualMappings?: Record<string, ManualRowMapping>;
-  models?: ValsSheetModelSnapshot[];
-}): Promise<ValsCheckReport | null> {
-  const res = await fetch('/api/vals-monitor/preferences', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(options),
-  });
-  const data = await parseJsonResponse<{ report: ValsCheckReport | null }>(res);
-  return data.report;
-}
+export const fetchValsMonitorStatus = valsMonitorApi.fetchStatus;
+export const triggerValsCheck = valsMonitorApi.triggerCheck;
+export const updateValsPreferencesApi = valsMonitorApi.updatePreferences;

@@ -1,3 +1,5 @@
+import type { ManualRowMapping } from './integrityMonitor';
+
 export type GdpxDiffStatus =
   | 'new_unmatched'
   | 'missing'
@@ -29,6 +31,7 @@ export interface GdpxSheetModelSnapshot {
   releaseDate: string;
   sheetRowNumber: number;
   colJ: number | null;
+  colJIsBold: boolean | null;
 }
 
 export interface GdpxDiffItem {
@@ -47,6 +50,7 @@ export interface GdpxDiffItem {
   matchedDisplayName: string | null;
   sheetRowNumber: number | null;
   currentColJ: number | null;
+  currentColJIsBold: boolean | null;
   reason: string;
 }
 
@@ -68,6 +72,7 @@ export interface GdpxCheckReport {
   unchangedCount: number;
   ignoredCount?: number;
   actionableCount: number;
+  manualMappings?: Record<string, ManualRowMapping>;
   summaryDe: string;
   summaryEn: string;
 }

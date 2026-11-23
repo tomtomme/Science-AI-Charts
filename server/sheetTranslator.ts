@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,6 +34,7 @@ export interface TranslatedSheetContent {
 
 interface PersistedTranslationCache {
   translatedAt: string;
+  sourceHash?: string;
   translated: TranslatedSheetContent;
 }
 
@@ -80,8 +82,17 @@ async function writeCache(cache: PersistedTranslationCache): Promise<void> {
   }
 }
 
-function isCacheFreshWeekly(cache: PersistedTranslationCache | null): boolean {
+function computePayloadHash(payload: SheetTranslationPayload): string {
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify(payload))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+function isCacheFreshWeekly(cache: PersistedTranslationCache | null, sourceHash: string): boolean {
   if (!cache?.translatedAt) return false;
+  if (cache.sourceHash && cache.sourceHash !== sourceHash) return false;
   const ts = new Date(cache.translatedAt).getTime();
   if (!Number.isFinite(ts)) return false;
   return Date.now() - ts < WEEKLY_INTERVAL_MS;
@@ -95,8 +106,9 @@ export async function getOrRefreshWeeklyTranslation(
   translatedAt: string | null;
   translation: TranslatedSheetContent | null;
 }> {
+  const sourceHash = computePayloadHash(payload);
   const cached = await readCache();
-  if (!force && isCacheFreshWeekly(cached)) {
+  if (!force && isCacheFreshWeekly(cached, sourceHash)) {
     return {
       available: true,
       translatedAt: cached!.translatedAt,
@@ -138,50 +150,78 @@ RULES:
 INPUT DATA (JSON):
 ${JSON.stringify(payload, null, 2)}`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: prompt,
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              titleDe: { type: Type.STRING },
-              subtitleDe: { type: Type.STRING },
-              categoryNamesDe: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
+      const runTranslationModel = async (model: string, useThinking: boolean) =>
+        ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            ...(useThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                titleDe: { type: Type.STRING },
+                subtitleDe: { type: Type.STRING },
+                categoryNamesDe: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                },
+                compositeScoreNamesDe: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                },
+                retiredCategoryNamesDe: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                },
+                section1TitleDe: { type: Type.STRING },
+                section1ContentDe: { type: Type.STRING },
+                section2TitleDe: { type: Type.STRING },
+                section2ContentDe: { type: Type.STRING },
+                section2ContentEn: { type: Type.STRING },
               },
-              compositeScoreNamesDe: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-              retiredCategoryNamesDe: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-              section1TitleDe: { type: Type.STRING },
-              section1ContentDe: { type: Type.STRING },
-              section2TitleDe: { type: Type.STRING },
-              section2ContentDe: { type: Type.STRING },
-              section2ContentEn: { type: Type.STRING },
+              required: [
+                'titleDe',
+                'subtitleDe',
+                'categoryNamesDe',
+                'compositeScoreNamesDe',
+                'retiredCategoryNamesDe',
+                'section1TitleDe',
+                'section1ContentDe',
+                'section2TitleDe',
+                'section2ContentDe',
+                'section2ContentEn',
+              ],
             },
-            required: [
-              'titleDe',
-              'subtitleDe',
-              'categoryNamesDe',
-              'compositeScoreNamesDe',
-              'retiredCategoryNamesDe',
-              'section1TitleDe',
-              'section1ContentDe',
-              'section2TitleDe',
-              'section2ContentDe',
-              'section2ContentEn',
-            ],
           },
-        },
-      });
+        });
+
+      const translationAttempts: Array<{ model: string; useThinking: boolean; delayMs: number }> = [
+        { model: 'gemini-4-hydrogen', useThinking: true, delayMs: 0 },
+        { model: 'gemini-3.5-flash-lite', useThinking: false, delayMs: 1200 },
+        { model: 'gemini-flash-lite-latest', useThinking: false, delayMs: 1500 },
+      ];
+
+      let response;
+      let lastTranslationErr: unknown;
+      for (const attempt of translationAttempts) {
+        if (attempt.delayMs > 0) {
+          await new Promise((r) => setTimeout(r, attempt.delayMs));
+        }
+        try {
+          response = await runTranslationModel(attempt.model, attempt.useThinking);
+          break;
+        } catch (err) {
+          lastTranslationErr = err;
+          const msg = err instanceof Error ? err.message : String(err || '');
+          if (!/503|UNAVAILABLE|high demand|overloaded|429|RESOURCE_EXHAUSTED|500|404/i.test(msg)) {
+            throw err;
+          }
+        }
+      }
+      if (!response) {
+        throw lastTranslationErr;
+      }
 
       const rawJson = (response.text || '').trim();
       if (!rawJson) return cached;
@@ -197,6 +237,7 @@ ${JSON.stringify(payload, null, 2)}`;
 
       const nextCache: PersistedTranslationCache = {
         translatedAt: new Date().toISOString(),
+        sourceHash,
         translated: parsed,
       };
       await writeCache(nextCache);
