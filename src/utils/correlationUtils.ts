@@ -211,11 +211,12 @@ export function calculateSpearman(points: Array<{ x: number; y: number }>): Corr
   return formatCorrelationResult(pearsonOnRanks.value, 'spearman');
 }
 
-export function formatCorrelationDecimal(val: number): string {
-  const rounded = Math.round(val * 10) / 10;
+export function formatCorrelationDecimal(val: number, decimals = 1): string {
+  const factor = Math.pow(10, decimals);
+  const rounded = Math.round(val * factor) / factor;
   const normalized = Object.is(rounded, -0) ? 0 : rounded;
   const prefix = normalized > 0 ? '+' : '';
-  return `${prefix}${normalized.toFixed(1)}`;
+  return `${prefix}${normalized.toFixed(decimals)}`;
 }
 
 function formatCorrelationResult(val: number, type: 'pearson' | 'spearman'): CorrelationMetricResult {

@@ -13,7 +13,7 @@ export interface RegressionOption {
 
 export type CorrelationRegressionOption = RegressionOption;
 
-export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
+const BASE_REGRESSION_OPTIONS: RegressionOption[] = [
   {
     id: 'linear',
     labelDe: 'Linear (Trendlinie)',
@@ -64,16 +64,47 @@ export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
     descEn: 'A non-parametric approach: instead of imposing a rigid global formula, LOESS fits weighted regressions locally to neighboring observations. Faithfully tracks empirical innovation waves without forcing preconceived mathematical assumptions.',
     color: '#f59e0b', // Amber
   },
-  {
-    id: 'frontier',
-    labelDe: 'Pioniere (Rekorde)',
-    labelEn: 'Pioneers (Records)',
-    shortDe: 'Pioniere',
-    shortEn: 'Pioneers',
-    descDe: 'Keine statistische Ausgleichskurve, sondern die empirische Pareto-Front: Sie verbindet ausschließlich historische Meilensteine, die zum jeweiligen Zeitpunkt einen neuen Rekordwert aller bisherigen Chatbots aufgestellt haben. Zeigt die technologische Speerspitze (State of the Art).',
-    descEn: 'Not a statistical best-fit curve, but the empirical Pareto frontier: connects only those milestone models that broke previous all-time records upon release. Highlights the cutting edge of technological capability (State of the Art).',
-    color: '#d97706', // Gold / Bronze
+];
+
+const FRONTIER_REGRESSION_OPTION: RegressionOption = {
+  id: 'frontier',
+  labelDe: 'Pioniere (Rekorde)',
+  labelEn: 'Pioneers (Records)',
+  shortDe: 'Pioniere',
+  shortEn: 'Pioneers',
+  descDe: 'Keine statistische Ausgleichskurve, sondern die empirische Pareto-Front: Sie verbindet ausschließlich historische Meilensteine, die zum jeweiligen Zeitpunkt einen neuen Rekordwert aller bisherigen Chatbots aufgestellt haben. Zeigt die technologische Speerspitze (State of the Art).',
+  descEn: 'Not a statistical best-fit curve, but the empirical Pareto frontier: connects only those milestone models that broke previous all-time records upon release. Highlights the cutting edge of technological capability (State of the Art).',
+  color: '#d97706', // Gold / Bronze
+};
+
+const CORRELATION_DESCRIPTION_OVERRIDES: Partial<
+  Record<RegressionType, { descDe: string; descEn: string }>
+> = {
+  linear: {
+    descDe: 'Klassische Pearson-Regressionsgerade: Zeigt den proportionalen Zusammenhang zwischen zwei Benchmarks. Die Steigung quantifiziert, wie viele Punkte Benchmark Y durchschnittlich pro Punkt in Benchmark X hinzugewinnt.',
+    descEn: 'Standard Pearson regression line: shows the proportional relationship between two benchmarks. The slope quantifies expected gains on benchmark Y per point increase in benchmark X.',
   },
+  exponential: {
+    descDe: 'Exponentielle Kopplung: Modelliert Szenarien, in denen hohe Punktzahlen in Benchmark X einen überproportionalen, sprunghaften Durchbruch in Benchmark Y auslösen.',
+    descEn: 'Exponential coupling: models scenarios where high mastery in benchmark X triggers disproportionate breakthrough jumps in benchmark Y.',
+  },
+  power: {
+    descDe: 'Potenzbeziehung (Power Law, y ∝ xᵇ): Untersucht, ob Fähigkeiten als multiplikativer Hebel wirken, wobei Zuwächse in der Spitze häufig abnehmenden Grenzerträgen unterliegen.',
+    descEn: 'Power-law scaling (y ∝ xᵇ): tests whether one capability acts as a compounding multiplier for another, often showing diminishing returns at the top tier.',
+  },
+  polynomial: {
+    descDe: 'Kurvenförmiger Zusammenhang: Prüft, ob der Fähigkeitstransfer zwischen beiden Benchmarks bei höherer Leistung ansteigt (progressive Synergien) oder abflacht (Sättigungseffekt). Vorsicht vor Überanpassung (Overfitting) an den Rändern.',
+    descEn: 'Curvilinear relationship: tests whether cross-domain transfer accelerates at higher skill tiers (progressive synergies) or tapers off (saturation effect). Beware of boundary overfitting.',
+  },
+  loess: {
+    descDe: 'Lokale Glättung: Bildet den realen Zusammenhang empirisch ab, ohne eine lineare oder quadratische Form zu erzwingen. Deckt auch lokale Schwelleneffekte oder Stagnationsplateaus auf.',
+    descEn: 'Local scatterplot smoothing: maps empirical dependencies without forcing linear or quadratic shapes, revealing local threshold effects or performance plateaus.',
+  },
+};
+
+export const TIMELINE_REGRESSION_OPTIONS: RegressionOption[] = [
+  ...BASE_REGRESSION_OPTIONS,
+  FRONTIER_REGRESSION_OPTION,
 ];
 
 export const DEFAULT_TIMELINE_REGRESSION_INDEX = Math.max(
@@ -81,58 +112,13 @@ export const DEFAULT_TIMELINE_REGRESSION_INDEX = Math.max(
   TIMELINE_REGRESSION_OPTIONS.findIndex((o) => o.id === 'loess')
 );
 
-export const CORRELATION_REGRESSION_OPTIONS: CorrelationRegressionOption[] = [
-  {
-    id: 'linear',
-    labelDe: 'Linear (Trendlinie)',
-    labelEn: 'Linear (Trendline)',
-    shortDe: 'Linear',
-    shortEn: 'Linear',
-    descDe: 'Klassische Pearson-Regressionsgerade: Zeigt den proportionalen Zusammenhang zwischen zwei Benchmarks. Die Steigung quantifiziert, wie viele Punkte Benchmark Y durchschnittlich pro Punkt in Benchmark X hinzugewinnt.',
-    descEn: 'Standard Pearson regression line: shows the proportional relationship between two benchmarks. The slope quantifies expected gains on benchmark Y per point increase in benchmark X.',
-    color: '#6366f1', // Indigo
-  },
-  {
-    id: 'polynomial',
-    labelDe: 'Polynom (Grad 2-4)',
-    labelEn: 'Polynomial (deg 2-4)',
-    shortDe: 'Polynom',
-    shortEn: 'Polynom.',
-    descDe: 'Kurvenförmiger Zusammenhang: Prüft, ob der Fähigkeitstransfer zwischen beiden Benchmarks bei höherer Leistung ansteigt (progressive Synergien) oder abflacht (Sättigungseffekt). Vorsicht vor Überanpassung (Overfitting) an den Rändern.',
-    descEn: 'Curvilinear relationship: tests whether cross-domain transfer accelerates at higher skill tiers (progressive synergies) or tapers off (saturation effect). Beware of boundary overfitting.',
-    color: '#f43f5e', // Rose
-  },
-  {
-    id: 'power',
-    labelDe: 'Power (Potenzkurve)',
-    labelEn: 'Power (Scaling)',
-    shortDe: 'Power',
-    shortEn: 'Power',
-    descDe: 'Potenzbeziehung (Power Law, y ∝ xᵇ): Untersucht, ob Fähigkeiten als multiplikativer Hebel wirken, wobei Zuwächse in der Spitze häufig abnehmenden Grenzerträgen unterliegen.',
-    descEn: 'Power-law scaling (y ∝ xᵇ): tests whether one capability acts as a compounding multiplier for another, often showing diminishing returns at the top tier.',
-    color: '#ec4899', // Pink
-  },
-  {
-    id: 'exponential',
-    labelDe: 'Exponential (Wachstum)',
-    labelEn: 'Exponential (Growth)',
-    shortDe: 'Expon.',
-    shortEn: 'Expon.',
-    descDe: 'Exponentielle Kopplung: Modelliert Szenarien, in denen hohe Punktzahlen in Benchmark X einen überproportionalen, sprunghaften Durchbruch in Benchmark Y auslösen.',
-    descEn: 'Exponential coupling: models scenarios where high mastery in benchmark X triggers disproportionate breakthrough jumps in benchmark Y.',
-    color: '#8b5cf6', // Violet
-  },
-  {
-    id: 'loess',
-    labelDe: 'LOESS (Smoothing)',
-    labelEn: 'LOESS (Smoothing)',
-    shortDe: 'LOESS',
-    shortEn: 'LOESS',
-    descDe: 'Lokale Glättung: Bildet den realen Zusammenhang empirisch ab, ohne eine lineare oder quadratische Form zu erzwingen. Deckt auch lokale Schwelleneffekte oder Stagnationsplateaus auf.',
-    descEn: 'Local scatterplot smoothing: maps empirical dependencies without forcing linear or quadratic shapes, revealing local threshold effects or performance plateaus.',
-    color: '#f59e0b', // Amber
-  },
-];
+// Guarantee identical slider ordering as TIMELINE_REGRESSION_OPTIONS (linear -> exponential -> power -> polynomial -> loess)
+export const CORRELATION_REGRESSION_OPTIONS: CorrelationRegressionOption[] = BASE_REGRESSION_OPTIONS.map(
+  (opt) => ({
+    ...opt,
+    ...(CORRELATION_DESCRIPTION_OVERRIDES[opt.id] ?? {}),
+  })
+);
 
 export const DEFAULT_CORRELATION_REGRESSION_INDEX = Math.max(
   0,

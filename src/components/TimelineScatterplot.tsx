@@ -6,6 +6,7 @@ import { calculateMultiLevelRegression, calculateRegression, extractFrontierPoin
 import { DEFAULT_TIMELINE_LAB_LEVELS, TIMELINE_MAIN_LAB_LEVELS, TimelineLabLevel } from '../data/labLevels';
 import { calculatePearson, calculateSpearman, formatCorrelationDecimal } from '../utils/correlationUtils';
 import { Tooltip } from './Tooltip';
+import { RegressionModelControls } from './RegressionModelControls';
 import { TRANSLATIONS } from '../utils/i18n';
 import {
   TIMELINE_REGRESSION_OPTIONS,
@@ -989,174 +990,19 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
-              {/* Regression Model Slider */}
-              <Tooltip
-                title={lang === 'de' ? activeRegression.labelDe : activeRegression.labelEn}
-                badge={lang === 'de' ? 'Modell' : 'Model'}
-                position="bottom"
-                align="center"
-                width="w-96"
-                content={
-                  <div className="space-y-2">
-                    <p className="leading-relaxed text-slate-200">
-                      {lang === 'de' ? activeRegression.descDe : activeRegression.descEn}
-                    </p>
-                    {regression.formula && (
-                      <div className="pt-1.5 border-t border-slate-700/60 font-mono text-xs text-amber-300">
-                        {regression.formula}
-                      </div>
-                    )}
-                    {activeRegression.id === 'polynomial' && (
-                      <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
-                        <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
-                        <span className="font-bold">
-                          {lang === 'de'
-                            ? `Grad ${polyDegree} (${polyDegree === 2 ? 'Parabel' : polyDegree === 3 ? 'Wendepunkt' : 'Höhere Ordnung'})`
-                            : `Degree ${polyDegree} (${polyDegree === 2 ? 'Parabola' : polyDegree === 3 ? 'Inflection' : 'Higher order'})`}
-                        </span>
-                      </div>
-                    )}
-                    {activeRegression.id === 'loess' && (
-                      <div className="pt-1.5 border-t border-slate-700/60 flex items-center justify-between font-mono text-xs text-amber-300">
-                        <span className="text-slate-300">{lang === 'de' ? 'Aktiver Parameter:' : 'Active parameter:'}</span>
-                        <span className="font-bold">
-                          {lang === 'de' ? `Span = ${loessSpan}% (Fensterbreite)` : `Span = ${loessSpan}% (Window width)`}
-                        </span>
-                      </div>
-                    )}
-                    {activeRegression.id !== 'frontier' && (
-                      <div className="pt-1.5 border-t border-slate-700/60 text-xs text-slate-300 leading-snug">
-                        <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                          <span>{lang === 'de' ? '95%-Konfidenzband' : '95% Confidence Band'}</span>
-                        </div>
-                        <p className="text-xs text-slate-300 leading-normal">
-                          {lang === 'de'
-                            ? 'Das schattierte Band zeigt den statistischen Unsicherheitsbereich der Schätzung: Bei dichter Datenlage ist es schmal, bei wenigen oder streuenden Punkten weitet es sich.'
-                            : 'The shaded ribbon reflects estimation uncertainty: narrow where data is abundant, wider where observations are scarce or dispersed.'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                }
-              >
-                <div className="relative z-30 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 cursor-pointer">
-                  <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
-                    <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-                    <span>{lang === 'de' ? 'Modell:' : 'Model:'}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRegressionIndex((prev) => Math.max(0, prev - 1));
-                    }}
-                    disabled={regressionIndex <= 0}
-                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={REGRESSION_OPTIONS.length - 1}
-                    step={1}
-                    value={regressionIndex}
-                    onChange={(e) => setRegressionIndex(Number(e.target.value))}
-                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-rose-500 shrink-0"
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRegressionIndex((prev) => Math.min(REGRESSION_OPTIONS.length - 1, prev + 1));
-                    }}
-                    disabled={regressionIndex >= REGRESSION_OPTIONS.length - 1}
-                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 cursor-pointer shrink-0"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-
-                  {/* Regression Badge */}
-                  <div className="w-[105px] sm:w-[125px] shrink-0 flex items-center">
-                    <span
-                      className="text-xs font-mono font-bold px-2 py-0.5 rounded text-white shadow-2xs flex items-center gap-1.5 truncate w-full hover:opacity-95 transition-opacity"
-                      style={{ backgroundColor: activeRegression.color }}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                      <span className="truncate">
-                        {lang === 'de' ? activeRegression.shortDe : activeRegression.shortEn}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </Tooltip>
-
-              {/* Contextual Parameter Input (Fixed width, Active for Polynomial & LOESS, otherwise grayed-out) */}
-              <Tooltip
-                content={
-                  activeRegression.id === 'polynomial'
-                    ? lang === 'de'
-                      ? 'Polynom-Grad (2, 3 oder 4)'
-                      : 'Polynomial degree (2, 3 or 4)'
-                    : activeRegression.id === 'loess'
-                    ? lang === 'de'
-                      ? 'Bandbreite / Glättungs-Span (15–80%)'
-                      : 'Bandwidth smoothing span (15–80%)'
-                    : lang === 'de'
-                    ? 'Kein variabler Parameter für dieses Modell'
-                    : 'No variable parameter for this model'
-                }
-                align="right"
-                width="w-56"
-              >
-                <div
-                  className={`w-[142px] flex items-center justify-between bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 shrink-0 ${
-                    activeRegression.id !== 'polynomial' && activeRegression.id !== 'loess'
-                      ? 'opacity-40 cursor-not-allowed'
-                      : ''
-                  }`}
-                >
-                  <span className="text-xs font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
-                    Param:
-                  </span>
-                  <div className="w-[76px] shrink-0 flex items-center justify-end">
-                    {activeRegression.id === 'polynomial' ? (
-                      <select
-                        value={polyDegree}
-                        onChange={(e) => setPolyDegree(Number(e.target.value))}
-                        className="w-[76px] h-6 px-1.5 font-mono text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-hidden focus:border-rose-500 text-center"
-                      >
-                        <option value={2}>{lang === 'de' ? 'Grad 2' : 'Deg 2'}</option>
-                        <option value={3}>{lang === 'de' ? 'Grad 3' : 'Deg 3'}</option>
-                        <option value={4}>{lang === 'de' ? 'Grad 4' : 'Deg 4'}</option>
-                      </select>
-                    ) : activeRegression.id === 'loess' ? (
-                      <div className="w-[76px] h-6 flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-1.5 focus-within:border-amber-500">
-                        <input
-                          type="number"
-                          min={15}
-                          max={80}
-                          step={5}
-                          value={loessSpan}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            if (!isNaN(val) && val >= 15 && val <= 80) setLoessSpan(val);
-                          }}
-                          className="w-[44px] font-mono text-xs font-bold text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none text-center p-0"
-                        />
-                        <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 select-none">
-                          %
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="w-[76px] h-6 flex items-center justify-center font-mono text-xs text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/40 rounded border border-transparent select-none">
-                        —
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Tooltip>
+              <RegressionModelControls
+                lang={lang}
+                options={REGRESSION_OPTIONS}
+                regressionIndex={regressionIndex}
+                onRegressionIndexChange={setRegressionIndex}
+                polyDegree={polyDegree}
+                onPolyDegreeChange={setPolyDegree}
+                loessSpan={loessSpan}
+                onLoessSpanChange={setLoessSpan}
+                iconColorClass="text-blue-500"
+                sliderAccentClass="accent-blue-600"
+                formula={regression.formula}
+              />
 
               {/* Multi-Level Model Switch */}
               <Tooltip

@@ -344,14 +344,14 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                     <div className={`flex items-center justify-between gap-4 ${metric === 'pearson' ? 'text-blue-300 font-bold' : 'text-slate-300'}`}>
                       <span>Pearson r:</span>
                       <span>
-                        {formatCorrelationDecimal(hoveredData.pearson)}
+                        {formatCorrelationDecimal(hoveredData.pearson, 2)}
                         {hoveredData.pearsonRes && ` (${lang === 'de' ? hoveredData.pearsonRes.strengthDe : hoveredData.pearsonRes.strengthEn})`}
                       </span>
                     </div>
                     <div className={`flex items-center justify-between gap-4 ${metric === 'spearman' ? 'text-rose-300 font-bold' : 'text-slate-300'}`}>
                       <span>Spearman Rho:</span>
                       <span>
-                        {formatCorrelationDecimal(hoveredData.spearman)}
+                        {formatCorrelationDecimal(hoveredData.spearman, 2)}
                         {hoveredData.spearmanRes && ` (${lang === 'de' ? hoveredData.spearmanRes.strengthDe : hoveredData.spearmanRes.strengthEn})`}
                       </span>
                     </div>
