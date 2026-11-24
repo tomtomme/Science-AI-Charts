@@ -14,6 +14,7 @@ import {
   IGNORE_OPTION_VALUE,
   INSERT_NEW_ROW_OPTION_VALUE,
   formatExactScore,
+  formatScoreDiff,
 } from './monitorTypes';
 
 export type BenchmarkAccentColor = 'indigo' | 'cyan' | 'amber' | 'teal';
@@ -127,7 +128,6 @@ export interface BenchmarkDiffSectionProps<TRaw = unknown> {
   supportsInsertNewRow?: boolean;
   showSelectAllToggle?: boolean;
   showRankInRow?: boolean;
-  firstReleasedHistoryRow: number;
   minHistoryRow?: number;
   assignPlaceholder: string;
   isChecking: boolean;
@@ -300,7 +300,6 @@ export function BenchmarkDiffSection<TRaw>({
   supportsInsertNewRow = false,
   showSelectAllToggle = true,
   showRankInRow = true,
-  firstReleasedHistoryRow,
   minHistoryRow = 36,
   assignPlaceholder,
   isChecking,
@@ -361,21 +360,23 @@ export function BenchmarkDiffSection<TRaw>({
 
   return (
     <div className="space-y-2 pt-1 border-t border-slate-200/80 dark:border-slate-800/80">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           {icon}
-          <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
+          <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100 whitespace-nowrap truncate">
+            {title}
+          </h3>
           <a
             href={sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={`inline-flex items-center gap-1 text-xs font-mono ${styles.linkText} hover:underline`}
+            className={`inline-flex items-center gap-1 text-xs font-mono ${styles.linkText} hover:underline whitespace-nowrap shrink-0`}
           >
             <span>{sourceDomainLabel}</span>
             <ExternalLink className="w-2.5 h-2.5" />
           </a>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {showSelectAllToggle && actionableRows.length > 1 && (
             <div className="flex items-center gap-1.5 text-xs font-mono">
               <button
@@ -396,7 +397,7 @@ export function BenchmarkDiffSection<TRaw>({
             </div>
           )}
           {rawReport && headerCountText && (
-            <span className="text-xs font-mono text-slate-700 dark:text-slate-300">
+            <span className="text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">
               {headerCountText}
             </span>
           )}
@@ -405,18 +406,19 @@ export function BenchmarkDiffSection<TRaw>({
 
       {isChecking && !effectiveReport && (
         <div
-          className={`px-3.5 py-2.5 rounded-xl border ${styles.spinnerBox} flex items-center gap-2.5 text-xs`}
+          className={`px-3.5 py-2 rounded-xl border ${styles.spinnerBox} flex items-center gap-2.5 text-xs`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${styles.spinnerIcon} animate-spin shrink-0`} />
-          <span className="font-medium text-slate-800 dark:text-slate-200">{checkingText}</span>
+          <span className="font-medium text-slate-800 dark:text-slate-200 truncate">
+            {checkingText}
+          </span>
         </div>
       )}
 
       {!isSheetsConnected && rawReport && (
-        <div className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 text-xs text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2">
-          <span>{lang === 'de' ? rawReport.summaryDe : rawReport.summaryEn}</span>
-          <span className="font-mono text-xs text-slate-700 dark:text-slate-300 shrink-0">
-            {rawReport.totalSourceModels} LLMs
+        <div className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 text-xs text-slate-700 dark:text-slate-300 flex items-center gap-2">
+          <span className="truncate">
+            {lang === 'de' ? rawReport.summaryDe : rawReport.summaryEn}
           </span>
         </div>
       )}
@@ -424,7 +426,7 @@ export function BenchmarkDiffSection<TRaw>({
       {effectiveReport && (
         <>
           <div
-            className={`px-3.5 py-2 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
+            className={`px-3.5 py-2 rounded-xl border flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 ${
               effectiveReport.actionableCount > 0
                 ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
                 : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/25'
@@ -436,7 +438,7 @@ export function BenchmarkDiffSection<TRaw>({
               ) : (
                 <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               )}
-              <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug">
+              <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug truncate">
                 <strong className="font-bold text-slate-900 dark:text-white">
                   {effectiveReport.actionableCount > 0 ? bannerPrefixActionable : bannerPrefixOk}
                 </strong>{' '}
@@ -444,7 +446,7 @@ export function BenchmarkDiffSection<TRaw>({
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 font-mono tabular-nums text-xs shrink-0 flex-wrap">
+            <div className="flex items-center gap-1.5 font-mono tabular-nums text-xs shrink-0 whitespace-nowrap">
               {effectiveReport.unmatchedCount > 0 && (
                 <span className="px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-bold">
                   {effectiveReport.unmatchedCount} {unmatchedPillLabel}
@@ -473,8 +475,8 @@ export function BenchmarkDiffSection<TRaw>({
                   className="px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold hover:bg-slate-300/80 dark:hover:bg-slate-700 cursor-pointer"
                   title={
                     lang === 'de'
-                      ? 'Gespeicherte Zeilenzuordnungen anzeigen / verwalten'
-                      : 'Show / manage saved row mappings'
+                      ? 'Gespeicherte Zuordnungen anzeigen / verwalten'
+                      : 'Show / manage saved mappings'
                   }
                 >
                   {mappedRows.length} {lang === 'de' ? 'zugeordnet' : 'mapped'}
@@ -512,12 +514,11 @@ export function BenchmarkDiffSection<TRaw>({
                   onClick={() => void onRemoveManualMapping?.(m.id)}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 ${styles.restoreHover} cursor-pointer`}
                   title={
-                    lang === 'de' ? 'Zuordnung aufheben' : 'Remove manual row mapping'
+                    lang === 'de' ? 'Zuordnung aufheben' : 'Remove manual mapping'
                   }
                 >
                   <span>
-                    {m.sourceName} → #{m.sheetRowNumber}{' '}
-                    {m.matchedDisplayName || ''}
+                    {m.sourceName} → {m.matchedDisplayName || m.id}
                   </span>
                   <X className="w-2.5 h-2.5 shrink-0" />
                 </button>
@@ -554,9 +555,12 @@ export function BenchmarkDiffSection<TRaw>({
                       <th className="py-1.5 px-2.5 w-8"></th>
                       <th className="py-1.5 px-3">{modelColumnHeader}</th>
                       <th className="py-1.5 px-3">
-                        {lang === 'de' ? 'Sheet-Zeile' : 'Sheet Row'}
+                        {lang === 'de' ? 'Zugeordnetes Modell' : 'Target Model'}
                       </th>
                       <th className="py-1.5 px-3">{scoreColumnHeader}</th>
+                      <th className="py-1.5 px-3">
+                        {lang === 'de' ? 'Score-Diff' : 'Score Diff'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80">
@@ -586,8 +590,8 @@ export function BenchmarkDiffSection<TRaw>({
                               className={`rounded border-slate-300 ${styles.checkbox} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed`}
                             />
                           </td>
-                          <td className="py-1.5 px-3 align-middle">
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                          <td className="py-1.5 px-3 align-middle whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
                               {showRankInRow && (
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
                                   #{item.rank}
@@ -604,7 +608,7 @@ export function BenchmarkDiffSection<TRaw>({
                               {renderStatusBadge(item.status)}
                             </div>
                           </td>
-                          <td className="py-1.5 px-3 align-middle">
+                          <td className="py-1.5 px-3 align-middle whitespace-nowrap">
                             {item.status === 'new_unmatched' ? (
                               <select
                                 value={manualRowOverrides[item.id] ?? ''}
@@ -617,8 +621,8 @@ export function BenchmarkDiffSection<TRaw>({
                                 {supportsInsertNewRow && (
                                   <option value={INSERT_NEW_ROW_OPTION_VALUE}>
                                     {lang === 'de'
-                                      ? `➕ Neue Zeile in Tabelle ergänzen (Z. ${firstReleasedHistoryRow})`
-                                      : `➕ Insert new row in table (Row ${firstReleasedHistoryRow})`}
+                                      ? '➕ Als neues Modell ergänzen'
+                                      : '➕ Add as new model'}
                                   </option>
                                 )}
                                 <option value={IGNORE_OPTION_VALUE}>
@@ -628,15 +632,12 @@ export function BenchmarkDiffSection<TRaw>({
                                 </option>
                                 {getPickerOptionsForRow(item).map((opt) => (
                                   <option key={opt.id} value={opt.sheetRowNumber}>
-                                    #{opt.sheetRowNumber} · {opt.displayName} ({opt.labelSuffix})
+                                    {opt.displayName} ({opt.labelSuffix})
                                   </option>
                                 ))}
                               </select>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 text-xs text-slate-800 dark:text-slate-200">
-                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
-                                  #{target.sheetRowNumber}
-                                </span>
                                 <span>{target.matchedDisplayName}</span>
                                 {isManuallyMapped && onRemoveManualMapping && (
                                   <button
@@ -645,13 +646,13 @@ export function BenchmarkDiffSection<TRaw>({
                                     className="inline-flex items-center justify-center p-0.5 rounded text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 cursor-pointer"
                                     title={
                                       lang === 'de'
-                                        ? 'Manuelle Zeilenzuordnung aufheben'
-                                        : 'Unlink manual row mapping'
+                                        ? 'Manuelle Zuordnung aufheben'
+                                        : 'Unlink manual mapping'
                                     }
                                     aria-label={
                                       lang === 'de'
-                                        ? 'Manuelle Zeilenzuordnung aufheben'
-                                        : 'Unlink manual row mapping'
+                                        ? 'Manuelle Zuordnung aufheben'
+                                        : 'Unlink manual mapping'
                                     }
                                   >
                                     <X className="w-3 h-3" />
@@ -673,19 +674,14 @@ export function BenchmarkDiffSection<TRaw>({
                                     title={
                                       target.currentIsBold === false
                                         ? lang === 'de'
-                                          ? 'Bestehender Schätzwert (nicht-fett)'
-                                          : 'Existing estimate (non-bold)'
+                                          ? 'Bestehender Schätzwert'
+                                          : 'Existing estimate'
                                         : lang === 'de'
-                                        ? 'Offizieller Wert (fett)'
-                                        : 'Official value (bold)'
+                                        ? 'Offizieller Wert'
+                                        : 'Official value'
                                     }
                                   >
                                     {formatExactScore(target.currentScore, lang)}
-                                    {target.currentIsBold === false && (
-                                      <span className="ml-1 text-slate-600 dark:text-slate-400">
-                                        (nicht-fett)
-                                      </span>
-                                    )}
                                   </span>
                                 ) : (
                                   <span className="text-slate-600 dark:text-slate-400">—</span>
@@ -706,6 +702,58 @@ export function BenchmarkDiffSection<TRaw>({
                                 )}
                               </span>
                             </div>
+                          </td>
+                          <td className="py-1.5 px-3 align-middle font-mono tabular-nums whitespace-nowrap">
+                            {target.currentScore !== null &&
+                            typeof target.currentScore === 'number' &&
+                            Number.isFinite(target.currentScore) ? (
+                              (() => {
+                                const {
+                                  pointDiff,
+                                  pointFormatted,
+                                  pctFormatted,
+                                  isLargeDiff,
+                                } = formatScoreDiff(target.currentScore, item.liveScore, lang);
+                                const largeDiffLabel =
+                                  lang === 'de'
+                                    ? `Abweichung größer als 5% (${pctFormatted}, ${pointFormatted} Pkt.)`
+                                    : `Difference greater than 5% (${pctFormatted}, ${pointFormatted} pts)`;
+                                const normalTooltip =
+                                  lang === 'de'
+                                    ? `${pctFormatted} (${pointFormatted} Pkt.)`
+                                    : `${pctFormatted} (${pointFormatted} pts)`;
+                                return (
+                                  <div
+                                    className="inline-flex items-center gap-1.5"
+                                    title={isLargeDiff ? largeDiffLabel : normalTooltip}
+                                  >
+                                    <span
+                                      className={
+                                        isLargeDiff
+                                          ? 'font-bold text-rose-700 dark:text-rose-300'
+                                          : pointDiff > 0
+                                          ? 'font-semibold text-emerald-700 dark:text-emerald-300'
+                                          : pointDiff < 0
+                                          ? 'font-semibold text-amber-700 dark:text-amber-300'
+                                          : 'text-slate-600 dark:text-slate-400'
+                                      }
+                                    >
+                                      {pctFormatted}
+                                    </span>
+                                    {isLargeDiff && (
+                                      <span
+                                        className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 shrink-0"
+                                        aria-label={largeDiffLabel}
+                                      >
+                                        !
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <span className="text-slate-600 dark:text-slate-400">—</span>
+                            )}
                           </td>
                         </tr>
                       );

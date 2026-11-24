@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { ExternalLink, Info, BookOpen, X, Eye, EyeOff } from 'lucide-react';
-import { ModelRecord } from '../../types';
+import { ModelRecord, ScoreMode } from '../../types';
 import { Language } from '../../utils/i18n';
 import {
   BENCHMARK_ANCHOR_MAP,
   CompareSlot,
+  CompareSummaryStats,
   SLOT_THEME,
   CategoryComparisonRow,
   formatNumber,
@@ -37,6 +38,9 @@ export interface CompareRadarChartProps {
   categoryComparisons: CategoryComparisonRow[];
   activeSlots: { slot: CompareSlot; model: ModelRecord }[];
   primaryScores: { slot: CompareSlot; model: ModelRecord; score: number | null }[];
+  summaryStats: CompareSummaryStats;
+  scoreMode: ScoreMode;
+  scoreModeOldLabel: string;
   rankMap: Map<string, number>;
   lang: Language;
   expandedCategoryId: string | null;
@@ -49,6 +53,9 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
   categoryComparisons,
   activeSlots,
   primaryScores,
+  summaryStats,
+  scoreMode,
+  scoreModeOldLabel,
   rankMap,
   lang,
   expandedCategoryId,
@@ -71,6 +78,17 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
   const visibleSlots = useMemo(
     () => activeSlots.filter((s) => !hiddenSlots.has(s.slot)),
     [activeSlots, hiddenSlots]
+  );
+
+  const sortedPrimaryScores = useMemo(
+    () =>
+      [...primaryScores].sort((a, b) => {
+        if (a.score === null && b.score === null) return 0;
+        if (a.score === null) return 1;
+        if (b.score === null) return -1;
+        return b.score - a.score;
+      }),
+    [primaryScores]
   );
 
   const effectivePinnedSlot =
@@ -586,7 +604,7 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
             </div>
 
             <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-              {primaryScores.map(({ slot, model, score }) => {
+              {sortedPrimaryScores.map(({ slot, model, score }) => {
                 const theme = SLOT_THEME[slot];
                 const isHidden = hiddenSlots.has(slot);
                 const isPinned = effectivePinnedSlot === slot;
@@ -683,6 +701,100 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
                   </div>
                 );
               })}
+            </div>
+
+            {/* Integrated Category Wins inside "Modelle im Netz" */}
+            <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/35 space-y-1.5">
+              <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
+                {scoreMode === 'old'
+                  ? lang === 'de'
+                    ? `Kategorie-Siege (${scoreModeOldLabel} · 5 Benchmarks)`
+                    : `Category Wins (${scoreModeOldLabel} · 5 Benchmarks)`
+                  : lang === 'de'
+                  ? 'Kategorie-Siege (D–K)'
+                  : 'Category Wins (D–K)'}
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono tabular-nums text-xs font-bold">
+                {sortedPrimaryScores.map(({ slot }, i) => (
+                  <React.Fragment key={slot}>
+                    {i > 0 && <span className="text-slate-400 dark:text-slate-700">·</span>}
+                    <span className={SLOT_THEME[slot].text}>
+                      {slot}: {summaryStats.wins[slot]}
+                    </span>
+                  </React.Fragment>
+                ))}
+                <span className="text-slate-400 dark:text-slate-700">·</span>
+                <span className="text-slate-600 dark:text-slate-400">
+                  {lang === 'de' ? 'Patt' : 'Tie'}: {summaryStats.ties}
+                </span>
+              </div>
+              {summaryStats.comparableCount > 0 && (
+                <div className="h-1.5 w-full rounded-full overflow-hidden bg-slate-200/80 dark:bg-slate-800 flex">
+                  {sortedPrimaryScores.map(({ slot }) =>
+                    summaryStats.wins[slot] > 0 ? (
+                      <div
+                        key={slot}
+                        className={`${SLOT_THEME[slot].barActive} h-full`}
+                        style={{
+                          width: `${(summaryStats.wins[slot] / summaryStats.comparableCount) * 100}%`,
+                        }}
+                      />
+                    ) : null
+                  )}
+                  {summaryStats.ties > 0 && (
+                    <div
+                      className="bg-slate-400 dark:bg-slate-600 h-full"
+                      style={{
+                        width: `${(summaryStats.ties / summaryStats.comparableCount) * 100}%`,
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Integrated Biggest Category Edge inside "Modelle im Netz" */}
+            <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/20 space-y-1">
+              <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
+                {lang === 'de' ? 'Größte Einzelstärke' : 'Biggest Category Edge'}
+              </div>
+              <div className="space-y-0.5 text-xs">
+                {sortedPrimaryScores.map(({ slot }) => {
+                  const edge = summaryStats.bestEdge[slot];
+                  const theme = SLOT_THEME[slot];
+                  const isHidden = hiddenSlots.has(slot);
+                  return (
+                    <div
+                      key={slot}
+                      onMouseEnter={() => {
+                        if (!isHidden) setHoveredSlot(slot);
+                      }}
+                      onMouseLeave={() => setHoveredSlot(null)}
+                      className={`flex items-center justify-between gap-2 min-w-0 transition-opacity ${
+                        isHidden ? 'opacity-45' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`font-mono font-bold shrink-0 ${theme.text}`}>{slot}:</span>
+                        {edge ? (
+                          <span className="truncate font-semibold text-slate-800 dark:text-slate-200">
+                            {edge.label}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600 dark:text-slate-400">
+                            {lang === 'de' ? 'kein Vorsprung' : 'no lead'}
+                          </span>
+                        )}
+                      </div>
+                      {edge && (
+                        <span className={`font-mono tabular-nums font-bold shrink-0 ${theme.text}`}>
+                          +{edge.margin.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

@@ -151,7 +151,7 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
           <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
             <span className="text-xs font-bold text-red-700 dark:text-red-400">-0.2</span>
             <div
-              className="w-20 sm:w-24 h-2.5 rounded-xs border border-slate-300/70 dark:border-slate-700 overflow-hidden flex"
+              className="w-20 sm:w-24 h-2.5 rounded-xs border border-slate-300/80 dark:border-slate-600 overflow-hidden flex"
               title={
                 lang === 'de'
                   ? 'Kontrastmaximierte 13-stufige Farbskala (-0,2 bis +1,0 in 0,1-Schritten)'
@@ -166,7 +166,7 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                 />
               ))}
             </div>
-            <span className="text-xs font-bold text-blue-800 dark:text-blue-400">+1</span>
+            <span className="text-xs font-bold text-slate-950 dark:text-white">+1</span>
           </div>
         </div>
       </div>

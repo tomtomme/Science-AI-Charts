@@ -190,35 +190,42 @@ export function getHeatmapColorFromUnit(u: number): { bg: string; text: string }
   const rgbStr = (r: number, g: number, b: number) => `rgb(${r}, ${g}, ${b})`;
 
   if (clampedU >= 0.5) {
-    // 0.5 -> white (#ffffff), 0.75 -> blue-300 (#93c5fd), 1.0 -> blue-900 (#1e3a8a)
+    // High-contrast positive scale: 0.5 (+0.4) -> white, 0.67 (+0.6) -> sky blue, 0.84 (+0.8) -> royal blue, 1.0 (+1.0) -> true black (#000000)
     const s = (clampedU - 0.5) / 0.5;
-    if (s <= 0.5) {
-      const t = s / 0.5;
+    if (s <= 0.34) {
+      const t = s / 0.34;
       return {
-        bg: rgbStr(lerp(255, 147, t), lerp(255, 197, t), lerp(255, 253, t)),
+        bg: rgbStr(lerp(255, 110, t), lerp(255, 175, t), lerp(255, 252, t)),
         text: '#0f172a',
       };
     }
-    const t = (s - 0.5) / 0.5;
+    if (s <= 0.68) {
+      const t = (s - 0.34) / 0.34;
+      return {
+        bg: rgbStr(lerp(110, 29, t), lerp(175, 78, t), lerp(252, 216, t)),
+        text: s >= 0.58 ? '#ffffff' : '#0f172a',
+      };
+    }
+    const t = (s - 0.68) / 0.32;
     return {
-      bg: rgbStr(lerp(147, 30, t), lerp(197, 58, t), lerp(253, 138, t)),
-      text: clampedU >= 0.78 ? '#ffffff' : '#0f172a',
+      bg: rgbStr(lerp(29, 0, t), lerp(78, 0, t), lerp(216, 0, t)),
+      text: '#ffffff',
     };
   }
 
-  // 0.5 -> white (#ffffff), 0.25 -> red-300 (#fca5a5), 0.0 -> red-900 (#7f1d1d)
+  // High-contrast negative scale: 0.5 (+0.4) -> white, 0.25 (+0.1) -> red-400, 0.0 (-0.2) -> red-950 (#450a0a)
   const s = (0.5 - clampedU) / 0.5;
   if (s <= 0.5) {
     const t = s / 0.5;
     return {
-      bg: rgbStr(lerp(255, 252, t), lerp(255, 165, t), lerp(255, 165, t)),
+      bg: rgbStr(lerp(255, 248, t), lerp(255, 113, t), lerp(255, 113, t)),
       text: '#0f172a',
     };
   }
   const t = (s - 0.5) / 0.5;
   return {
-    bg: rgbStr(lerp(252, 127, t), lerp(165, 29, t), lerp(165, 29, t)),
-    text: clampedU <= 0.12 ? '#ffffff' : '#0f172a',
+    bg: rgbStr(lerp(248, 69, t), lerp(113, 10, t), lerp(113, 10, t)),
+    text: clampedU <= 0.2 ? '#ffffff' : '#0f172a',
   };
 }
 

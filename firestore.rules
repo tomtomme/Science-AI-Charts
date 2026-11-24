@@ -1,0 +1,115 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidMonitorKey(key) {
+      return key in ['gdpx', 'vals', 'simplebench', 'integrity'];
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.uid == userId;
+    }
+
+    function isValidIgnoredIds(listVal) {
+      return listVal is list
+        && listVal.size() <= 500
+        && (listVal.size() == 0
+          || (listVal[0] is string && listVal[0].size() >= 1 && listVal[0].size() <= 160));
+    }
+
+    function isValidManualMappings(mapVal) {
+      return mapVal is map && mapVal.size() <= 500;
+    }
+
+    function isValidMonitorPreferences(data, userId, monitorKey) {
+      return data.keys().hasAll([
+          'userId',
+          'monitorKey',
+          'ignoredIds',
+          'manualMappings',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'monitorKey',
+          'ignoredIds',
+          'manualMappings',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.userId is string
+        && data.userId.size() <= 128
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && data.monitorKey is string
+        && data.monitorKey.size() <= 32
+        && data.monitorKey == monitorKey
+        && isValidMonitorKey(data.monitorKey)
+        && isValidIgnoredIds(data.ignoredIds)
+        && isValidManualMappings(data.manualMappings)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId}/monitorPreferences/{monitorKey} {
+      allow get: if isValidId(userId)
+        && isValidMonitorKey(monitorKey)
+        && isVerifiedOwner(userId);
+
+      allow list: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && resource.data.userId == request.auth.uid;
+
+      allow create: if isValidId(userId)
+        && isValidMonitorKey(monitorKey)
+        && isVerifiedOwner(userId)
+        && isValidMonitorPreferences(incoming(), userId, monitorKey)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(userId)
+        && isValidMonitorKey(monitorKey)
+        && isVerifiedOwner(userId)
+        && isValidMonitorPreferences(incoming(), userId, monitorKey)
+        && (
+          // Action: Update ignoredIds and/or manualMappings
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'ignoredIds',
+            'manualMappings',
+            'updatedAt'
+          ])
+        )
+        && incoming().userId == existing().userId
+        && incoming().monitorKey == existing().monitorKey
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+
+      allow delete: if isValidId(userId)
+        && isValidMonitorKey(monitorKey)
+        && isVerifiedOwner(userId);
+    }
+  }
+}

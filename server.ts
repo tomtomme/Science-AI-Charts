@@ -154,7 +154,13 @@ async function createAppServer() {
     try {
       const models = Array.isArray(req.body?.models) ? req.body.models : undefined;
       const trigger = req.body?.trigger === 'daily_auto' ? 'daily_auto' : 'manual';
-      const report = await runGdpxCheck({ models, trigger });
+      const replaceAll = req.body?.replaceAll === true;
+      const ignoredIds = Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined;
+      const manualMappings =
+        req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+          ? req.body.manualMappings
+          : undefined;
+      const report = await runGdpxCheck({ models, trigger, replaceAll, ignoredIds, manualMappings });
       res.json({ report });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'GDPx check failed.';
@@ -165,6 +171,8 @@ async function createAppServer() {
   app.post('/api/gdpx-monitor/preferences', async (req, res) => {
     try {
       const report = await updateGdpxPreferences({
+        replaceAll: req.body?.replaceAll === true,
+        ignoredIds: Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined,
         ignoreIds: Array.isArray(req.body?.ignoreIds) ? req.body.ignoreIds : undefined,
         unignoreIds: Array.isArray(req.body?.unignoreIds) ? req.body.unignoreIds : undefined,
         manualMappings:
@@ -196,7 +204,13 @@ async function createAppServer() {
     try {
       const models = Array.isArray(req.body?.models) ? req.body.models : undefined;
       const trigger = req.body?.trigger === 'daily_auto' ? 'daily_auto' : 'manual';
-      const report = await runIntegrityCheck({ models, trigger });
+      const replaceAll = req.body?.replaceAll === true;
+      const ignoredIds = Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined;
+      const manualMappings =
+        req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+          ? req.body.manualMappings
+          : undefined;
+      const report = await runIntegrityCheck({ models, trigger, replaceAll, ignoredIds, manualMappings });
       res.json({ report });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Integrity-Bench check failed.';
@@ -207,6 +221,8 @@ async function createAppServer() {
   app.post('/api/integrity-monitor/preferences', async (req, res) => {
     try {
       const report = await updateIntegrityPreferences({
+        replaceAll: req.body?.replaceAll === true,
+        ignoredIds: Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined,
         ignoreIds: Array.isArray(req.body?.ignoreIds) ? req.body.ignoreIds : undefined,
         unignoreIds: Array.isArray(req.body?.unignoreIds) ? req.body.unignoreIds : undefined,
         manualMappings:
@@ -239,7 +255,13 @@ async function createAppServer() {
     try {
       const models = Array.isArray(req.body?.models) ? req.body.models : undefined;
       const trigger = req.body?.trigger === 'daily_auto' ? 'daily_auto' : 'manual';
-      const report = await runValsCheck({ models, trigger });
+      const replaceAll = req.body?.replaceAll === true;
+      const ignoredIds = Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined;
+      const manualMappings =
+        req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+          ? req.body.manualMappings
+          : undefined;
+      const report = await runValsCheck({ models, trigger, replaceAll, ignoredIds, manualMappings });
       res.json({ report });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Vals Index check failed.';
@@ -250,6 +272,8 @@ async function createAppServer() {
   app.post('/api/vals-monitor/preferences', async (req, res) => {
     try {
       const report = await updateValsPreferences({
+        replaceAll: req.body?.replaceAll === true,
+        ignoredIds: Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined,
         ignoreIds: Array.isArray(req.body?.ignoreIds) ? req.body.ignoreIds : undefined,
         unignoreIds: Array.isArray(req.body?.unignoreIds) ? req.body.unignoreIds : undefined,
         manualMappings:
@@ -282,7 +306,13 @@ async function createAppServer() {
     try {
       const models = Array.isArray(req.body?.models) ? req.body.models : undefined;
       const trigger = req.body?.trigger === 'daily_auto' ? 'daily_auto' : 'manual';
-      const report = await runSimpleBenchCheck({ models, trigger });
+      const replaceAll = req.body?.replaceAll === true;
+      const ignoredIds = Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined;
+      const manualMappings =
+        req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+          ? req.body.manualMappings
+          : undefined;
+      const report = await runSimpleBenchCheck({ models, trigger, replaceAll, ignoredIds, manualMappings });
       res.json({ report });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'SimpleBench check failed.';
@@ -293,6 +323,8 @@ async function createAppServer() {
   app.post('/api/simplebench-monitor/preferences', async (req, res) => {
     try {
       const report = await updateSimpleBenchPreferences({
+        replaceAll: req.body?.replaceAll === true,
+        ignoredIds: Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined,
         ignoreIds: Array.isArray(req.body?.ignoreIds) ? req.body.ignoreIds : undefined,
         unignoreIds: Array.isArray(req.body?.unignoreIds) ? req.body.unignoreIds : undefined,
         manualMappings:

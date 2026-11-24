@@ -424,7 +424,7 @@ export function buildValsDiffs(
         sheetRowNumber: null,
         currentColK: null,
         currentColKIsBold: null,
-        reason: 'Kein passendes Modell im Sheet gefunden — zuordnen oder als neue Zeile ergänzen.',
+        reason: 'Kein passendes Modell gefunden — zuordnen oder neu ergänzen.',
       };
     }
 
@@ -437,8 +437,7 @@ export function buildValsDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColK: null,
         currentColKIsBold: bestMatch.colKIsBold,
-        reason:
-          'Spalte K ist in dieser Zeile noch leer (wird fett als offizieller Wert eingetragen).',
+        reason: 'Wert fehlt noch (wird offiziell übernommen).',
       };
     }
 
@@ -455,7 +454,7 @@ export function buildValsDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColK: bestMatch.colK,
         currentColKIsBold: false,
-        reason: `Nicht-fetter Schätzwert (${bestMatch.colK}) → offiziellen Vals-Score (${liveFormatted}, fett) übernehmen.`,
+        reason: `Schätzwert (${bestMatch.colK}) → offiziellen Wert (${liveFormatted}) übernehmen.`,
       };
     }
 
@@ -468,7 +467,7 @@ export function buildValsDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColK: bestMatch.colK,
         currentColKIsBold: bestMatch.colKIsBold,
-        reason: `Offizieller Score weicht ab (${bestMatch.colK} → ${liveFormatted}).`,
+        reason: `Offizieller Wert weicht ab (${bestMatch.colK} → ${liveFormatted}).`,
       };
     }
 
@@ -480,13 +479,13 @@ export function buildValsDiffs(
       sheetRowNumber: bestMatch.sheetRowNumber,
       currentColK: bestMatch.colK,
       currentColKIsBold: bestMatch.colKIsBold,
-      reason: 'Synchron (fett/offiziell).',
+      reason: 'Synchron.',
     };
   });
 }
 
 function summarizeValsReportCounts(
-  totalSourceModels: number,
+  _totalSourceModels: number,
   versionLabel: string,
   diffs: ValsDiffItem[],
   hasSheetModels: boolean
@@ -496,32 +495,34 @@ function summarizeValsReportCounts(
   let summaryEn = '';
 
   if (!hasSheetModels) {
-    summaryDe = `${totalSourceModels} Modelle live auf Vals Index ${versionLabel} geladen.`;
-    summaryEn = `Loaded ${totalSourceModels} live models from Vals Index ${versionLabel}.`;
+    summaryDe = `Live-Daten für Vals Index ${versionLabel} geladen.`;
+    summaryEn = `Live data loaded for Vals Index ${versionLabel}.`;
   } else if (counts.actionableCount > 0) {
     const partsDe: string[] = [];
     const partsEn: string[] = [];
     if (counts.unmatchedCount > 0) {
-      partsDe.push(`${counts.unmatchedCount} neu ohne Zeile`);
-      partsEn.push(`${counts.unmatchedCount} new unmatched`);
+      partsDe.push(`${counts.unmatchedCount} nicht zugeordnet`);
+      partsEn.push(`${counts.unmatchedCount} unmatched`);
     }
     if (counts.missingCount > 0) {
-      partsDe.push(`${counts.missingCount} fehlend in K`);
-      partsEn.push(`${counts.missingCount} missing in K`);
+      partsDe.push(`${counts.missingCount} fehlend`);
+      partsEn.push(`${counts.missingCount} missing`);
     }
     if (counts.overwriteEstimateCount > 0) {
-      partsDe.push(`${counts.overwriteEstimateCount} nicht-fette Schätzwerte`);
-      partsEn.push(`${counts.overwriteEstimateCount} non-bold estimate(s)`);
+      partsDe.push(
+        counts.overwriteEstimateCount === 1 ? '1 Schätzwert' : `${counts.overwriteEstimateCount} Schätzwerte`
+      );
+      partsEn.push(`${counts.overwriteEstimateCount} estimate(s)`);
     }
     if (counts.changedCount > 0) {
-      partsDe.push(`${counts.changedCount} geänderte Score(s)`);
-      partsEn.push(`${counts.changedCount} changed score(s)`);
+      partsDe.push(`${counts.changedCount} geändert`);
+      partsEn.push(`${counts.changedCount} changed`);
     }
-    summaryDe = `${partsDe.join(', ')} (${totalSourceModels} Einträge auf Vals ${versionLabel}).`;
-    summaryEn = `${partsEn.join(', ')} (${totalSourceModels} entries on Vals ${versionLabel}).`;
+    summaryDe = `${partsDe.join(', ')}.`;
+    summaryEn = `${partsEn.join(', ')}.`;
   } else {
-    summaryDe = `Alle ${totalSourceModels} Vals ${versionLabel}-Einträge sind in Spalte K aktuell (fett).`;
-    summaryEn = `All ${totalSourceModels} Vals ${versionLabel} entries are synced & bold in Column K.`;
+    summaryDe = 'Alle Einträge sind aktuell.';
+    summaryEn = 'All entries are up to date.';
   }
 
   return { ...counts, summaryDe, summaryEn };
@@ -598,11 +599,16 @@ export async function getValsMonitorStatus(): Promise<ValsMonitorStatusResponse>
 export async function runValsCheck(options?: {
   models?: ValsSheetModelSnapshot[];
   trigger?: 'manual' | 'daily_auto';
+  replaceAll?: boolean;
+  ignoredIds?: string[];
+  manualMappings?: Record<string, ManualRowMapping>;
 }): Promise<ValsCheckReport> {
   return runtime.runCheck(options);
 }
 
 export async function updateValsPreferences(options: {
+  replaceAll?: boolean;
+  ignoredIds?: string[];
   ignoreIds?: string[];
   unignoreIds?: string[];
   manualMappings?: Record<string, ManualRowMapping>;

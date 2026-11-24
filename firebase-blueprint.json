@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "MonitorPreferences": {
+      "title": "MonitorPreferences",
+      "description": "Persisted per-user ignored model IDs and manual Sheet row mappings for a benchmark monitor.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "monitorKey": {
+          "type": "string",
+          "description": "Benchmark monitor identifier.",
+          "enum": ["gdpx", "vals", "simplebench", "integrity"]
+        },
+        "ignoredIds": {
+          "type": "array",
+          "description": "Bounded list of ignored benchmark source model IDs."
+        },
+        "manualMappings": {
+          "type": "object",
+          "description": "Map of benchmark source model ID to ManualRowMapping object."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the preferences document was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the preferences document was last updated."
+        }
+      },
+      "required": [
+        "userId",
+        "monitorKey",
+        "ignoredIds",
+        "manualMappings",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/monitorPreferences/{monitorKey}": {
+      "schema": "MonitorPreferences",
+      "description": "Per-user benchmark monitor preferences (ignored models and manual row mappings) persisted across devices and sessions."
+    }
+  }
+}

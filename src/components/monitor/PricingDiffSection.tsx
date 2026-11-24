@@ -11,8 +11,6 @@ interface PricingDiffSectionProps {
   actionableDiffs: PricingDiffItem[];
   selectedPriceIds: Record<string, boolean>;
   onTogglePriceItem: (modelId: string) => void;
-  colDeLetter: string;
-  colUsLetter: string | null;
 }
 
 export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
@@ -21,8 +19,6 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
   actionableDiffs,
   selectedPriceIds,
   onTogglePriceItem,
-  colDeLetter,
-  colUsLetter,
 }) => {
   const renderPriceStatusLabel = (status: PricingDiffItem['deStatus']) => {
     if (status === 'changed') {
@@ -45,7 +41,7 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
   return (
     <div className="space-y-2">
       <div
-        className={`px-3.5 py-2 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
+        className={`px-3.5 py-2 rounded-xl border flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 ${
           report.changedCount > 0
             ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
             : actionableDiffs.length > 0
@@ -59,7 +55,7 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
           ) : (
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           )}
-          <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug">
+          <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug truncate">
             <strong className="font-bold text-slate-900 dark:text-white">
               {report.changedCount > 0
                 ? lang === 'de'
@@ -103,8 +99,8 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
                   <th className="py-1.5 px-2.5 w-7"></th>
                   <th className="py-1.5 px-3">{lang === 'de' ? 'Modell' : 'Model'}</th>
                   <th className="py-1.5 px-3">{lang === 'de' ? 'Lab · Tarif' : 'Lab · Plan'}</th>
-                  <th className="py-1.5 px-3">DE ({colDeLetter})</th>
-                  <th className="py-1.5 px-3">US ({colUsLetter || 'EN'})</th>
+                  <th className="py-1.5 px-3">DE</th>
+                  <th className="py-1.5 px-3">US</th>
                   <th className="py-1.5 px-3">{lang === 'de' ? 'Notiz' : 'Note'}</th>
                 </tr>
               </thead>
@@ -131,9 +127,6 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
                       <td className="py-1.5 px-3 align-middle whitespace-nowrap">
                         <span className="font-semibold text-slate-900 dark:text-white">
                           {item.displayName}
-                        </span>
-                        <span className="ml-1.5 text-xs font-mono tabular-nums text-slate-600 dark:text-slate-400">
-                          #{item.sheetRowNumber}
                         </span>
                       </td>
                       <td className="py-1.5 px-3 align-middle whitespace-nowrap">

@@ -8,7 +8,6 @@ import { ValsCheckReport } from '../types/valsMonitor';
 import { SimpleBenchCheckReport } from '../types/simpleBenchMonitor';
 import { IntegrityCheckReport } from '../types/integrityMonitor';
 import { Language, TRANSLATIONS } from '../utils/i18n';
-import { columnIndexToA1 } from '../services/googleSheetsService';
 import { AuthorSocialSubtitle } from './AuthorSocialIcons';
 import { Tooltip } from './Tooltip';
 
@@ -58,10 +57,6 @@ export const AppFooter: React.FC<AppFooterProps> = ({
   isIntegrityDiffValidForSheet,
 }) => {
   const t = TRANSLATIONS[lang];
-  const gdpxColLetter = columnIndexToA1(loadedData.columnLayout?.colTrickQuestions ?? 9);
-  const valsColLetter = columnIndexToA1(loadedData.columnLayout?.colEconLegal ?? 10);
-  const simpleBenchColLetter = columnIndexToA1(loadedData.columnLayout?.colTrickOld ?? 24);
-  const integrityColLetter = columnIndexToA1(loadedData.columnLayout?.colIntegrity ?? 39);
 
   const formatSyncDate = (d: Date | null) => {
     if (!d) return '';
@@ -215,8 +210,8 @@ export const AppFooter: React.FC<AppFooterProps> = ({
                       ? gdpxReport.summaryDe
                       : gdpxReport.summaryEn
                     : lang === 'de'
-                    ? `Überwacht gdpx.semianalysis.com auf Neuzugänge (Spalte ${gdpxColLetter}).`
-                    : `Monitors gdpx.semianalysis.com for new LLMs (Column ${gdpxColLetter}).`}
+                    ? 'Überwacht gdpx.semianalysis.com auf Neuzugänge.'
+                    : 'Monitors gdpx.semianalysis.com for new LLMs.'}
                 </div>
                 <div className="border-t border-slate-700/50 pt-1">
                   {isValsDiffValidForSheet && valsReport
@@ -224,8 +219,8 @@ export const AppFooter: React.FC<AppFooterProps> = ({
                       ? valsReport.summaryDe
                       : valsReport.summaryEn
                     : lang === 'de'
-                    ? `Prüft Vals Index v2.2 (43 Modelle) in Spalte ${valsColLetter}.`
-                    : `Checks Vals Index v2.2 (43 models) in Column ${valsColLetter}.`}
+                    ? 'Prüft Vals Index v2.2 auf Abweichungen.'
+                    : 'Checks Vals Index v2.2 for updates.'}
                 </div>
                 <div className="border-t border-slate-700/50 pt-1">
                   {isSimpleBenchDiffValidForSheet && simpleBenchReport
@@ -233,8 +228,8 @@ export const AppFooter: React.FC<AppFooterProps> = ({
                       ? simpleBenchReport.summaryDe
                       : simpleBenchReport.summaryEn
                     : lang === 'de'
-                    ? `Prüft simple-bench.com in Spalte ${simpleBenchColLetter}.`
-                    : `Checks simple-bench.com in Column ${simpleBenchColLetter}.`}
+                    ? 'Prüft simple-bench.com auf Abweichungen.'
+                    : 'Checks simple-bench.com for updates.'}
                 </div>
                 <div className="border-t border-slate-700/50 pt-1">
                   {isIntegrityDiffValidForSheet && integrityReport
@@ -242,8 +237,8 @@ export const AppFooter: React.FC<AppFooterProps> = ({
                       ? integrityReport.summaryDe
                       : integrityReport.summaryEn
                     : lang === 'de'
-                    ? `Überwacht integrity-bench.com ("Table") für Spalte ${integrityColLetter}.`
-                    : `Monitors integrity-bench.com ("Table") for Column ${integrityColLetter}.`}
+                    ? 'Überwacht integrity-bench.com ("Table") auf Abweichungen.'
+                    : 'Monitors integrity-bench.com ("Table") for updates.'}
                 </div>
               </div>
             }

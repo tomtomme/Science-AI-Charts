@@ -528,7 +528,7 @@ export function buildGdpxDiffs(
         currentColJ: null,
         currentColJIsBold: null,
         reason:
-          'Kein passendes Modell im Sheet gefunden — manuell zuordnen oder Zeile im Sheet anlegen.',
+          'Kein passendes Modell gefunden — manuell zuordnen.',
       };
     }
 
@@ -541,7 +541,7 @@ export function buildGdpxDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColJ: null,
         currentColJIsBold: bestMatch.colJIsBold,
-        reason: 'Spalte J ist in dieser Zeile noch leer (wird fett als offizieller Wert eingetragen).',
+        reason: 'Wert fehlt noch (wird offiziell übernommen).',
       };
     }
 
@@ -558,7 +558,7 @@ export function buildGdpxDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColJ: bestMatch.colJ,
         currentColJIsBold: false,
-        reason: `Nicht-fetter Schätzwert (${bestMatch.colJ}) → offiziellen GDPx-Score (${liveFormatted}, fett) übernehmen.`,
+        reason: `Schätzwert (${bestMatch.colJ}) → offiziellen Wert (${liveFormatted}) übernehmen.`,
       };
     }
 
@@ -571,7 +571,7 @@ export function buildGdpxDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColJ: bestMatch.colJ,
         currentColJIsBold: bestMatch.colJIsBold,
-        reason: `Offizieller Score weicht ab (${bestMatch.colJ} → ${liveFormatted}).`,
+        reason: `Offizieller Wert weicht ab (${bestMatch.colJ} → ${liveFormatted}).`,
       };
     }
 
@@ -583,13 +583,13 @@ export function buildGdpxDiffs(
       sheetRowNumber: bestMatch.sheetRowNumber,
       currentColJ: bestMatch.colJ,
       currentColJIsBold: bestMatch.colJIsBold,
-      reason: 'Synchron (fett/offiziell).',
+      reason: 'Synchron.',
     };
   });
 }
 
 function summarizeGdpxReportCounts(
-  totalSourceModels: number,
+  _totalSourceModels: number,
   sourceUpdatedAt: string | null,
   diffs: GdpxDiffItem[],
   hasSheetModels: boolean
@@ -599,32 +599,38 @@ function summarizeGdpxReportCounts(
   let summaryEn = '';
 
   if (!hasSheetModels) {
-    summaryDe = `${totalSourceModels} LLMs live auf GDPx geladen (Stand ${sourceUpdatedAt || 'aktuell'}).`;
-    summaryEn = `Loaded ${totalSourceModels} live LLMs from GDPx (updated ${sourceUpdatedAt || 'latest'}).`;
+    summaryDe = sourceUpdatedAt
+      ? `Live-Daten geladen (Stand ${sourceUpdatedAt}).`
+      : 'Live-Daten geladen.';
+    summaryEn = sourceUpdatedAt
+      ? `Live data loaded (updated ${sourceUpdatedAt}).`
+      : 'Live data loaded.';
   } else if (counts.actionableCount > 0) {
     const partsDe: string[] = [];
     const partsEn: string[] = [];
     if (counts.unmatchedCount > 0) {
-      partsDe.push(`${counts.unmatchedCount} neues LLM ohne Sheet-Zeile`);
-      partsEn.push(`${counts.unmatchedCount} new LLM(s) without Sheet match`);
+      partsDe.push(`${counts.unmatchedCount} nicht zugeordnet`);
+      partsEn.push(`${counts.unmatchedCount} unmatched`);
     }
     if (counts.missingCount > 0) {
-      partsDe.push(`${counts.missingCount} fehlend in J`);
-      partsEn.push(`${counts.missingCount} missing in J`);
+      partsDe.push(`${counts.missingCount} fehlend`);
+      partsEn.push(`${counts.missingCount} missing`);
     }
     if (counts.overwriteEstimateCount > 0) {
-      partsDe.push(`${counts.overwriteEstimateCount} nicht-fette Schätzwerte`);
-      partsEn.push(`${counts.overwriteEstimateCount} non-bold estimate(s)`);
+      partsDe.push(
+        counts.overwriteEstimateCount === 1 ? '1 Schätzwert' : `${counts.overwriteEstimateCount} Schätzwerte`
+      );
+      partsEn.push(`${counts.overwriteEstimateCount} estimate(s)`);
     }
     if (counts.changedCount > 0) {
-      partsDe.push(`${counts.changedCount} geänderte Score(s)`);
-      partsEn.push(`${counts.changedCount} changed score(s)`);
+      partsDe.push(`${counts.changedCount} geändert`);
+      partsEn.push(`${counts.changedCount} changed`);
     }
-    summaryDe = `${partsDe.join(', ')} (${totalSourceModels} LLMs auf GDPx).`;
-    summaryEn = `${partsEn.join(', ')} (${totalSourceModels} LLMs on GDPx).`;
+    summaryDe = `${partsDe.join(', ')}.`;
+    summaryEn = `${partsEn.join(', ')}.`;
   } else {
-    summaryDe = `Alle ${totalSourceModels} GDPx-LLMs sind in Spalte J aktuell (fett).`;
-    summaryEn = `All ${totalSourceModels} GDPx LLMs are synced & bold in Column J.`;
+    summaryDe = 'Alle Einträge sind aktuell.';
+    summaryEn = 'All entries are up to date.';
   }
 
   return { ...counts, summaryDe, summaryEn };
@@ -688,11 +694,16 @@ export async function getGdpxMonitorStatus(): Promise<GdpxMonitorStatusResponse>
 export async function runGdpxCheck(options?: {
   models?: GdpxSheetModelSnapshot[];
   trigger?: 'manual' | 'daily_auto';
+  replaceAll?: boolean;
+  ignoredIds?: string[];
+  manualMappings?: Record<string, ManualRowMapping>;
 }): Promise<GdpxCheckReport> {
   return runtime.runCheck(options);
 }
 
 export async function updateGdpxPreferences(options: {
+  replaceAll?: boolean;
+  ignoredIds?: string[];
   ignoreIds?: string[];
   unignoreIds?: string[];
   manualMappings?: Record<string, ManualRowMapping>;

@@ -191,6 +191,7 @@ export default function App() {
 
   const monitors = useAllMonitors({
     loadedData: syncAuth.loadedData,
+    authUser: syncAuth.authUser,
     oauthAccessToken: syncAuth.oauthAccessToken,
     isSheetsConnected: syncAuth.isSheetsConnected,
     isModalOpen: isPricingModalOpen,

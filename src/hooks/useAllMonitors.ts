@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import type { User } from 'firebase/auth';
 import { ModelRecord } from '../types';
 import { LoadedDatasets } from '../services/dataService';
 import { PricingCheckReport } from '../types/pricingMonitor';
@@ -36,6 +37,7 @@ import { useBenchmarkMonitor } from './useBenchmarkMonitor';
 
 interface UseAllMonitorsParams {
   loadedData: LoadedDatasets;
+  authUser: User | null;
   oauthAccessToken: string | null;
   isSheetsConnected: boolean;
   isModalOpen: boolean;
@@ -43,6 +45,7 @@ interface UseAllMonitorsParams {
 
 export function useAllMonitors({
   loadedData,
+  authUser,
   oauthAccessToken,
   isSheetsConnected,
   isModalOpen,
@@ -244,6 +247,7 @@ export function useAllMonitors({
     api: gdpxMonitorApi,
     extractSnapshots: extractGdpx,
     doesReportMatchLiveSheet: doesGdpxMatch,
+    authUser,
     isSheetsConnected,
     hasLoadedModels,
     isModalOpen,
@@ -296,6 +300,7 @@ export function useAllMonitors({
     api: integrityMonitorApi,
     extractSnapshots: extractIntegrity,
     doesReportMatchLiveSheet: doesIntegrityMatch,
+    authUser,
     isSheetsConnected,
     hasLoadedModels,
     isModalOpen,
@@ -341,6 +346,7 @@ export function useAllMonitors({
     api: valsMonitorApi,
     extractSnapshots: extractVals,
     doesReportMatchLiveSheet: doesValsMatch,
+    authUser,
     isSheetsConnected,
     hasLoadedModels,
     isModalOpen,
@@ -386,6 +392,7 @@ export function useAllMonitors({
     api: simpleBenchMonitorApi,
     extractSnapshots: extractSimpleBench,
     doesReportMatchLiveSheet: doesSimpleBenchMatch,
+    authUser,
     isSheetsConnected,
     hasLoadedModels,
     isModalOpen,

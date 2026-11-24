@@ -21,6 +21,8 @@ export interface MonitorStatusPayload<TReport> {
 }
 
 export interface MonitorPreferencesOptions<TSheet> {
+  replaceAll?: boolean;
+  ignoredIds?: string[];
   ignoreIds?: string[];
   unignoreIds?: string[];
   manualMappings?: Record<string, ManualRowMapping>;
@@ -40,10 +42,27 @@ export interface MonitorDiffCounts {
   summaryEn: string;
 }
 
+export function sanitizeIgnoredIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const clean = String(item || '').trim();
+    if (clean && clean.length <= 160 && !seen.has(clean)) {
+      seen.add(clean);
+      out.push(clean);
+      if (out.length >= 500) break;
+    }
+  }
+  return out;
+}
+
 export function sanitizeManualMappings(raw: unknown): Record<string, ManualRowMapping> {
   const out: Record<string, ManualRowMapping> = {};
   if (!raw || typeof raw !== 'object') return out;
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+  for (const [rawKey, v] of Object.entries(raw as Record<string, unknown>)) {
+    const k = String(rawKey || '').trim();
+    if (!k) continue;
     if (v && typeof v === 'object') {
       const rec = v as Partial<ManualRowMapping>;
       if (
@@ -60,6 +79,7 @@ export function sanitizeManualMappings(raw: unknown): Record<string, ManualRowMa
             ? { matchedDisplayName: rec.matchedDisplayName }
             : {}),
         };
+        if (Object.keys(out).length >= 500) break;
       }
     }
   }
@@ -297,6 +317,7 @@ export function createMonitorRuntime<
     totalSourceModels: number;
     models: TSource[];
     diffs: TDiff[];
+    ignoredIds?: string[];
     manualMappings?: Record<string, ManualRowMapping>;
   },
   TLiveResult extends {
@@ -322,16 +343,40 @@ export function createMonitorRuntime<
       const raw = await fs.readFile(config.cacheFilePath, 'utf-8');
       const parsed = JSON.parse(raw) as Partial<PersistedMonitorCache<TReport>>;
       if (parsed && typeof parsed === 'object') {
+        const sanitizedIgnored = sanitizeIgnoredIds(parsed.ignoredIds);
         const sanitizedMappings = sanitizeManualMappings(parsed.manualMappings);
-        const loadedReport = parsed.report
-          ? ({ ...parsed.report, manualMappings: sanitizedMappings } as TReport)
+        let loadedReport = parsed.report
+          ? ({
+              ...parsed.report,
+              ignoredIds: sanitizedIgnored,
+              manualMappings: sanitizedMappings,
+            } as TReport)
           : null;
+        if (loadedReport) {
+          const syntheticLive = {
+            updatedAt: loadedReport.sourceUpdatedAt,
+            models: Array.isArray(loadedReport.models) ? loadedReport.models : [],
+            newlyDiscoveredIds: [],
+          } as unknown as TLiveResult;
+          const hasSheetModels =
+            Array.isArray(loadedReport.diffs) && loadedReport.diffs.length > 0;
+          const freshCounts = config.summarizeCounts(
+            syntheticLive,
+            Array.isArray(loadedReport.diffs) ? loadedReport.diffs : [],
+            hasSheetModels,
+            loadedReport
+          );
+          loadedReport = {
+            ...loadedReport,
+            ...freshCounts,
+          };
+        }
         inMemoryCache = {
           report: loadedReport,
           knownSourceIds: Array.isArray(parsed.knownSourceIds)
             ? parsed.knownSourceIds.map(String)
             : [],
-          ignoredIds: Array.isArray(parsed.ignoredIds) ? parsed.ignoredIds.map(String) : [],
+          ignoredIds: sanitizedIgnored,
           manualMappings: sanitizedMappings,
           lastError: parsed.lastError ?? null,
         };
@@ -378,6 +423,9 @@ export function createMonitorRuntime<
   async function runCheck(options?: {
     models?: TSheet[];
     trigger?: 'manual' | 'daily_auto';
+    replaceAll?: boolean;
+    ignoredIds?: string[];
+    manualMappings?: Record<string, ManualRowMapping>;
   }): Promise<TReport> {
     if (inFlightCheck) {
       return inFlightCheck;
@@ -388,6 +436,16 @@ export function createMonitorRuntime<
 
     const task = (async () => {
       const cache = await readCache();
+      const effectiveIgnoredIds = options?.replaceAll
+        ? sanitizeIgnoredIds(options.ignoredIds ?? [])
+        : cache.ignoredIds;
+      const effectiveIgnoredSet = new Set(effectiveIgnoredIds);
+      const effectiveBaseMappings = options?.replaceAll
+        ? sanitizeManualMappings(options.manualMappings ?? {})
+        : { ...cache.manualMappings };
+      for (const ignoredId of effectiveIgnoredSet) {
+        delete effectiveBaseMappings[ignoredId];
+      }
 
       try {
         const effectivePreviousIds =
@@ -400,15 +458,15 @@ export function createMonitorRuntime<
             ? reserveManualMappings(
                 live.models,
                 sheetModels,
-                new Set(cache.ignoredIds),
-                cache.manualMappings
+                effectiveIgnoredSet,
+                effectiveBaseMappings
               ).healedMappings
-            : cache.manualMappings;
+            : effectiveBaseMappings;
 
         const diffs =
           sheetModels.length > 0
             ? config.buildDiffs(live.models, sheetModels, {
-                ignoredIds: cache.ignoredIds,
+                ignoredIds: effectiveIgnoredIds,
                 manualMappings: activeMappings,
               })
             : [];
@@ -430,13 +488,14 @@ export function createMonitorRuntime<
             diffs,
             counts,
           }),
+          ignoredIds: effectiveIgnoredIds,
           manualMappings: activeMappings,
         } as TReport;
 
         await writeCache({
           report,
           knownSourceIds: mergedKnownIds,
-          ignoredIds: cache.ignoredIds,
+          ignoredIds: effectiveIgnoredIds,
           manualMappings: activeMappings,
           lastError: null,
         });
@@ -448,8 +507,8 @@ export function createMonitorRuntime<
         await writeCache({
           report: cache.report,
           knownSourceIds: cache.knownSourceIds,
-          ignoredIds: cache.ignoredIds,
-          manualMappings: cache.manualMappings,
+          ignoredIds: effectiveIgnoredIds,
+          manualMappings: effectiveBaseMappings,
           lastError: message,
         });
         throw err;
@@ -468,13 +527,23 @@ export function createMonitorRuntime<
     options: MonitorPreferencesOptions<TSheet>
   ): Promise<TReport | null> {
     const cache = await readCache();
-    const nextIgnored = new Set(cache.ignoredIds);
-    const nextMappings: Record<string, ManualRowMapping> = { ...cache.manualMappings };
+    const nextIgnored = new Set(
+      options.replaceAll
+        ? sanitizeIgnoredIds(options.ignoredIds ?? [])
+        : cache.ignoredIds
+    );
+    const nextMappings: Record<string, ManualRowMapping> = options.replaceAll
+      ? sanitizeManualMappings(options.manualMappings ?? {})
+      : { ...cache.manualMappings };
+
+    for (const id of nextIgnored) {
+      delete nextMappings[id];
+    }
 
     if (Array.isArray(options.ignoreIds)) {
       for (const id of options.ignoreIds) {
         const clean = String(id || '').trim();
-        if (clean) {
+        if (clean && clean.length <= 160) {
           nextIgnored.add(clean);
           delete nextMappings[clean];
         }
@@ -487,7 +556,7 @@ export function createMonitorRuntime<
       }
     }
 
-    if (options.manualMappings && typeof options.manualMappings === 'object') {
+    if (!options.replaceAll && options.manualMappings && typeof options.manualMappings === 'object') {
       const cleanNew = sanitizeManualMappings(options.manualMappings);
       for (const [id, mapping] of Object.entries(cleanNew)) {
         nextMappings[id] = mapping;
@@ -504,7 +573,7 @@ export function createMonitorRuntime<
       }
     }
 
-    const ignoredIds = Array.from(nextIgnored);
+    const ignoredIds = Array.from(nextIgnored).slice(0, 500);
     const sheetModels = Array.isArray(options.models) ? options.models : [];
 
     const effectiveMappings =
@@ -525,9 +594,20 @@ export function createMonitorRuntime<
               ignoredIds,
               manualMappings: effectiveMappings,
             })
-          : updatedReport.diffs.map((d) =>
-              nextIgnored.has(config.getDiffSourceId(d)) ? config.markDiffIgnored(d) : d
-            );
+          : updatedReport.diffs.map((d) => {
+              const id = config.getDiffSourceId(d);
+              if (nextIgnored.has(id)) {
+                return config.markDiffIgnored(d);
+              }
+              if (d.status === 'ignored') {
+                return {
+                  ...d,
+                  status: 'new_unmatched',
+                  reason: 'Nach Abgleich mit dem Google Sheet aktualisiert.',
+                };
+              }
+              return d;
+            });
 
       const syntheticLive = {
         updatedAt: updatedReport.sourceUpdatedAt,
@@ -545,6 +625,7 @@ export function createMonitorRuntime<
       updatedReport = {
         ...updatedReport,
         diffs: nextDiffs,
+        ignoredIds,
         manualMappings: effectiveMappings,
         ...counts,
       };

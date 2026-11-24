@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   ArrowLeftRight,
-  ChevronDown,
   ChevronUp,
   ExternalLink,
   Info,
@@ -40,6 +39,7 @@ import {
   BENCHMARK_ANCHOR_MAP,
   COMPARE_SLOTS,
   CompareSlot,
+  CompareSummaryStats,
   MAX_COMPARE_MODELS,
   PresetKind,
   SLOT_THEME,
@@ -165,7 +165,6 @@ export const CompareView: React.FC<CompareViewProps> = ({
 
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
   const [benchmarkChartMode, setBenchmarkChartMode] = useState<'bars' | 'radar'>('radar');
-  const [showHistoricalBenchmarks, setShowHistoricalBenchmarks] = useState<boolean>(true);
 
   // Keep selections valid & mutually distinct across all slots whenever live Sheet updates reload models
   useEffect(() => {
@@ -576,39 +575,8 @@ export const CompareView: React.FC<CompareViewProps> = ({
     normalizedWeights,
   ]);
 
-  // Historical sub-benchmarks from Columns V-Y (Synced Row-2 Labels) — only rows with available data
-  const historicalComparisons = useMemo(() => {
-    return RETIRED_TIMELINE_BENCHMARKS.map((comp, idx) => {
-      const entries = activeSlots.map(({ slot, model }) => {
-        const raw = model.rawScores[comp.key] ?? null;
-        const val = typeof raw === 'number' && raw !== null ? comp.transform(raw) : null;
-        return { slot, model, raw, val };
-      });
-      const valid = entries.filter((e) => e.val !== null);
-      let winners: CompareSlot[] = [];
-      if (valid.length >= 1) {
-        const topVal = Math.max(...valid.map((e) => e.val as number));
-        winners = valid.filter((e) => topVal - (e.val as number) < 0.05).map((e) => e.slot);
-      }
-      return {
-        comp,
-        label: getBenchmarkCategoryLabel(
-          retiredCategoryNames?.[idx],
-          lang,
-          comp,
-          isPreTranslatedRetiredCategoryNames
-        ),
-        entries,
-        winners,
-        isTie: valid.length >= 2 && winners.length === valid.length,
-      };
-    }).filter((row) => row.entries.some((e) => e.val !== null));
-  }, [activeSlots, retiredCategoryNames, lang, isPreTranslatedRetiredCategoryNames]);
-
-  const hasAnyHistorical = historicalComparisons.length > 0;
-
   // Aggregate summary metrics across 2 to 8 active models
-  const summaryStats = useMemo(() => {
+  const summaryStats: CompareSummaryStats = useMemo(() => {
     const wins: Record<CompareSlot, number> = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0, H: 0 };
     const bestEdge: Record<CompareSlot, { label: string; margin: number; color: string } | null> = {
       A: null,
@@ -852,352 +820,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
         </div>
       </section>
 
-      {/* Split Overview Cards (2 to 8 Responsive Cards) */}
-      <section
-        aria-label={lang === 'de' ? 'Modellauswahl und Übersicht' : 'Model Selection and Overview'}
-        className={`grid gap-2 overflow-visible ${
-          effectiveCount === 2
-            ? 'grid-cols-1 md:grid-cols-2'
-            : effectiveCount === 3
-            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            : effectiveCount === 4
-            ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'
-            : effectiveCount === 5
-            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
-            : effectiveCount === 6
-            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-        }`}
-      >
-        {activeSlots.map(({ slot, model }, idx) => {
-          const theme = SLOT_THEME[slot];
-          const primaryScore = getScoreForMode(model, scoreMode);
-          const rank = rankMap.get(model.id);
-          const priceText = formatCompactPrice(model, lang);
-          const storylineText = translateStoryline(model.storyline, lang)
-            .replace(/^["„“'»«\s]+/, '')
-            .replace(/["„“'»«\s]+$/, '')
-            .trim();
-          const chatUrl = model.chatLink || model.modelUrl;
-
-          const scoreNewVal =
-            model.scoreNew ?? model.scoreNewReported ?? (model.hasAll8Benchmarks ? model.scoreNewCalculated : null);
-          const scoreOldVal = model.scoreOld ?? model.scoreOldReported ?? null;
-          const scoreWorstVal = model.scoreWorstCase ?? model.scoreWorstCaseReported ?? null;
-
-          const deltaVsTop =
-            primaryScore !== null && topPrimaryScore !== null ? primaryScore - topPrimaryScore : null;
-          const isLeader =
-            primaryScore !== null &&
-            topPrimaryScore !== null &&
-            topPrimaryScore - primaryScore < 0.05 &&
-            validPrimaries.length >= 2 &&
-            overallLeaders.length < validPrimaries.length;
-          const isAllTied =
-            validPrimaries.length >= 2 && overallLeaders.length === validPrimaries.length;
-
-          const otherMap = new Map<string, CompareSlot>();
-          for (const s of activeSlots) {
-            if (s.slot !== slot) otherMap.set(s.model.id, s.slot);
-          }
-
-          const isRightEdge =
-            effectiveCount >= 2 &&
-            ((effectiveCount === 2 && idx === 1) ||
-              (effectiveCount === 3 && idx === 2) ||
-              (effectiveCount === 4 && idx === 3) ||
-              (effectiveCount === 5 && idx === 4) ||
-              (effectiveCount === 6 && (idx === 2 || idx === 5)) ||
-              (effectiveCount === 7 && (idx === 3 || idx === 6)) ||
-              (effectiveCount === 8 && (idx === 3 || idx === 7)));
-
-          return (
-            <div
-              key={slot}
-              className={`p-2.5 flex flex-col gap-1.5 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs border-t-2 ${theme.borderTop}`}
-            >
-              {/* Selector + Compact Direct Links */}
-              <div className="flex items-center gap-1">
-                <div className="flex-1 min-w-0">
-                  <CompareModelSelector
-                    slot={slot}
-                    selectedModel={model}
-                    otherSlotsByModelId={otherMap}
-                    models={pickerModels}
-                    rankMap={rankMap}
-                    scoreMode={scoreMode}
-                    lang={lang}
-                    alignRight={isRightEdge}
-                    onSelect={(newId) => handleSelectSlot(idx, newId)}
-                  />
-                </div>
-                {chatUrl && (
-                  <a
-                    href={chatUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors shrink-0"
-                    title={t.openChatbotApp}
-                  >
-                    <span>Chat</span>
-                    <ExternalLink className="w-3 h-3 opacity-70" />
-                  </a>
-                )}
-                {model.isFreeApi && model.apiLink && (
-                  <a
-                    href={model.apiLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 transition-colors shrink-0"
-                    title={lang === 'de' ? 'Kostenloser API-Zugang' : 'Free API access'}
-                  >
-                    <Globe className="w-3 h-3" />
-                    <span className="hidden sm:inline">API</span>
-                  </a>
-                )}
-              </div>
-
-              {/* Clean Compact Metadata Line */}
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-tight text-slate-600 dark:text-slate-400">
-                {onSelectCompany ? (
-                  <button
-                    type="button"
-                    onClick={() => onSelectCompany(model.companyName)}
-                    className="font-semibold text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 underline decoration-dotted underline-offset-2 cursor-pointer transition-colors"
-                  >
-                    {model.companyName}
-                  </button>
-                ) : (
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {model.companyName}
-                  </span>
-                )}
-                {model.releaseDate && (
-                  <>
-                    <span className="text-slate-300 dark:text-slate-700">·</span>
-                    <span className="font-mono tabular-nums">{model.releaseDate}</span>
-                  </>
-                )}
-                {rank && (
-                  <>
-                    <span className="text-slate-300 dark:text-slate-700">·</span>
-                    <span className="font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300">
-                      #{rank}
-                    </span>
-                  </>
-                )}
-                {priceText ? (
-                  <>
-                    <span className="text-slate-300 dark:text-slate-700">·</span>
-                    <span className="font-mono tabular-nums font-semibold text-emerald-700 dark:text-emerald-400">
-                      {priceText}
-                    </span>
-                  </>
-                ) : !model.isPaid ? (
-                  <>
-                    <span className="text-slate-300 dark:text-slate-700">·</span>
-                    <span className="font-mono font-semibold text-emerald-700 dark:text-emerald-400">
-                      {lang === 'de' ? 'Gratis' : 'Free'}
-                    </span>
-                  </>
-                ) : null}
-                {model.isFreeApi && (
-                  <>
-                    <span className="text-slate-300 dark:text-slate-700">·</span>
-                    <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">
-                      API
-                    </span>
-                  </>
-                )}
-                {!model.isAvailable && (
-                  <>
-                    <span className="text-slate-300 dark:text-slate-700">·</span>
-                    <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold">
-                      Hist.
-                    </span>
-                  </>
-                )}
-              </div>
-
-              {/* Primary Composite Score + Gap to Leader */}
-              <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800/90 flex items-baseline justify-between gap-2">
-                <div className="flex items-baseline gap-1 min-w-0">
-                  <span className="text-xs font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 truncate">
-                    {activeScoreLabel}
-                  </span>
-                  <span className={`text-xl font-mono tabular-nums font-extrabold tracking-tight leading-none ${theme.text}`}>
-                    {primaryScore !== null ? formatNumber(primaryScore, 1) : '—'}
-                  </span>
-                  <span className="text-xs font-mono text-slate-600 dark:text-slate-400">/100</span>
-                </div>
-
-                {deltaVsTop !== null && (
-                  <div
-                    className={`text-xs font-mono tabular-nums font-bold flex items-center gap-1 shrink-0 ${
-                      isLeader
-                        ? 'text-emerald-700 dark:text-emerald-400'
-                        : 'text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {isLeader && <Trophy className="w-3 h-3 shrink-0" />}
-                    <span>
-                      {isLeader
-                        ? lang === 'de'
-                          ? '#1'
-                          : 'Leader'
-                        : isAllTied
-                        ? lang === 'de'
-                          ? 'Gleichstand'
-                          : 'Tied'
-                        : `${deltaVsTop.toFixed(1)} ${lang === 'de' ? 'Pkt.' : 'pts'}`}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Other Secondary Composite Scores (only the 2 non-active scores, avoiding redundancy with primary above) */}
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80 text-xs leading-tight">
-                {scoreMode !== 'new' && (
-                  <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreNew}>
-                    <span className="text-slate-600 dark:text-slate-400 truncate">
-                      {labelScoreNew}
-                    </span>
-                    <span className="font-mono tabular-nums font-bold shrink-0 text-slate-700 dark:text-slate-300">
-                      {scoreNewVal !== null ? formatNumber(scoreNewVal, 1) : '—'}
-                      {!model.hasAll8Benchmarks && scoreNewVal !== null && (
-                        <span className="font-normal text-amber-600 dark:text-amber-400 ml-0.5">*</span>
-                      )}
-                    </span>
-                  </div>
-                )}
-                {scoreMode !== 'old' && (
-                  <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreOld}>
-                    <span className="text-slate-600 dark:text-slate-400 truncate">
-                      {labelScoreOld}
-                    </span>
-                    <span className="font-mono tabular-nums font-bold shrink-0 text-slate-700 dark:text-slate-300">
-                      {scoreOldVal !== null ? formatNumber(scoreOldVal, 1) : '—'}
-                    </span>
-                  </div>
-                )}
-                {scoreMode !== 'worstCase' && (
-                  <div className="flex items-baseline justify-between gap-1 min-w-0" title={labelScoreWorst}>
-                    <span className="text-slate-600 dark:text-slate-400 truncate">
-                      {labelScoreWorst}
-                    </span>
-                    <span className="font-mono tabular-nums font-bold shrink-0 text-slate-700 dark:text-slate-300">
-                      {scoreWorstVal !== null ? formatNumber(scoreWorstVal, 1) : '—'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {storylineText && (
-                <p
-                  className="text-xs text-slate-600 dark:text-slate-300 italic leading-tight border-t border-slate-100 dark:border-slate-800/80 pt-1 truncate"
-                  title={storylineText}
-                >
-                  {storylineText}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </section>
-
-      {/* Compact Summary Strip (Category Wins + Biggest Category Edge) */}
-      <section
-        aria-label={lang === 'de' ? 'Vergleichs-Zusammenfassung' : 'Comparison Summary'}
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-slate-800"
-      >
-        {/* Category Wins Distribution */}
-        <div className="p-3 sm:px-4 flex flex-col justify-between gap-1.5">
-          <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
-            {scoreMode === 'old'
-              ? lang === 'de'
-                ? `Kategorie-Siege (${labelScoreOld} · 5 Benchmarks)`
-                : `Category Wins (${labelScoreOld} · 5 Benchmarks)`
-              : lang === 'de'
-              ? 'Kategorie-Siege (D–K)'
-              : 'Category Wins (D–K)'}
-          </div>
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono tabular-nums text-xs sm:text-sm font-bold">
-            {activeSlots.map(({ slot }, i) => (
-              <React.Fragment key={slot}>
-                {i > 0 && <span className="text-slate-400 dark:text-slate-700">·</span>}
-                <span className={SLOT_THEME[slot].text}>
-                  {slot}: {summaryStats.wins[slot]}
-                </span>
-              </React.Fragment>
-            ))}
-            <span className="text-slate-400 dark:text-slate-700">·</span>
-            <span className="text-slate-600 dark:text-slate-400">
-              {lang === 'de' ? 'Patt' : 'Tie'}: {summaryStats.ties}
-            </span>
-          </div>
-          {summaryStats.comparableCount > 0 && (
-            <div className="h-1.5 w-full rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex">
-              {activeSlots.map(({ slot }) =>
-                summaryStats.wins[slot] > 0 ? (
-                  <div
-                    key={slot}
-                    className={`${SLOT_THEME[slot].barActive} h-full`}
-                    style={{ width: `${(summaryStats.wins[slot] / summaryStats.comparableCount) * 100}%` }}
-                  />
-                ) : null
-              )}
-              {summaryStats.ties > 0 && (
-                <div
-                  className="bg-slate-400 dark:bg-slate-600 h-full"
-                  style={{ width: `${(summaryStats.ties / summaryStats.comparableCount) * 100}%` }}
-                />
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Peak Edge per Active Model */}
-        <div className="p-3 sm:px-4 flex flex-col justify-between gap-1">
-          <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
-            {lang === 'de' ? 'Größte Einzelstärke' : 'Biggest Category Edge'}
-          </div>
-          <div
-            className={
-              activeSlots.length > 4
-                ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 text-xs'
-                : 'space-y-0.5 text-xs'
-            }
-          >
-            {activeSlots.map(({ slot }) => {
-              const edge = summaryStats.bestEdge[slot];
-              const theme = SLOT_THEME[slot];
-              return (
-                <div key={slot} className="flex items-center justify-between gap-2 min-w-0">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className={`font-mono font-bold shrink-0 ${theme.text}`}>{slot}:</span>
-                    {edge ? (
-                      <span className="truncate font-semibold text-slate-800 dark:text-slate-200">
-                        {edge.label}
-                      </span>
-                    ) : (
-                      <span className="text-slate-600 dark:text-slate-400">
-                        {lang === 'de' ? 'kein Vorsprung' : 'no lead'}
-                      </span>
-                    )}
-                  </div>
-                  {edge && (
-                    <span className={`font-mono tabular-nums font-bold shrink-0 ${theme.text}`}>
-                      +{edge.margin.toFixed(1)}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Unified Compact Category-by-Category Horizontal Comparison */}
+      {/* Unified Compact Category-by-Category Horizontal / Radar Comparison */}
       <section
         aria-label={
           lang === 'de'
@@ -1272,6 +895,9 @@ export const CompareView: React.FC<CompareViewProps> = ({
             categoryComparisons={categoryComparisons}
             activeSlots={activeSlots}
             primaryScores={primaryScores}
+            summaryStats={summaryStats}
+            scoreMode={scoreMode}
+            scoreModeOldLabel={labelScoreOld}
             rankMap={rankMap}
             lang={lang}
             expandedCategoryId={expandedCategoryId}
@@ -1479,94 +1105,318 @@ export const CompareView: React.FC<CompareViewProps> = ({
         )}
       </section>
 
-      {/* Historical Sub-Benchmarks (Columns V-Y, Synced Row-2 Labels) */}
-      {scoreMode !== 'old' && hasAnyHistorical && (
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setShowHistoricalBenchmarks((prev) => !prev)}
-            className="w-full px-4 py-2.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-              <span>
-                {lang === 'de'
-                  ? `Historische Einzel-Benchmarks (${labelScoreOld}, Spalten V–Y)`
-                  : `Historical Sub-Benchmarks (${labelScoreOld}, Columns V–Y)`}
-              </span>
+      {/* Compact Summary Strip below Bars Diagram (in Radar mode it is integrated into "Modelle im Netz") */}
+      {benchmarkChartMode === 'bars' && (
+        <section
+          aria-label={lang === 'de' ? 'Vergleichs-Zusammenfassung' : 'Comparison Summary'}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-slate-800"
+        >
+          {/* Category Wins Distribution */}
+          <div className="p-3 sm:px-4 flex flex-col justify-between gap-1.5">
+            <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
+              {scoreMode === 'old'
+                ? lang === 'de'
+                  ? `Kategorie-Siege (${labelScoreOld} · 5 Benchmarks)`
+                  : `Category Wins (${labelScoreOld} · 5 Benchmarks)`
+                : lang === 'de'
+                ? 'Kategorie-Siege (D–K)'
+                : 'Category Wins (D–K)'}
             </div>
-            <span className="inline-flex items-center gap-1 text-xs font-mono text-slate-600 dark:text-slate-400">
-              <span>
-                {showHistoricalBenchmarks
-                  ? lang === 'de'
-                    ? 'Ausblenden'
-                    : 'Hide'
-                  : lang === 'de'
-                  ? 'Anzeigen'
-                  : 'Show'}
-              </span>
-              {showHistoricalBenchmarks ? (
-                <ChevronUp className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5" />
-              )}
-            </span>
-          </button>
-
-          {showHistoricalBenchmarks && (
-            <div className="border-t border-slate-200 dark:border-slate-800 divide-y divide-slate-200 dark:divide-slate-800">
-              {historicalComparisons.map((row) => (
-                <div
-                  key={row.comp.id}
-                  className="px-4 py-2.5 grid grid-cols-1 sm:grid-cols-[240px_minmax(0,1fr)] items-center gap-2 text-xs"
-                >
-                  <div>
-                    <div className="text-[15px] font-sans font-semibold text-black dark:text-slate-100">
-                      {row.label}
-                    </div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">
-                      {row.comp.sourceName}
-                    </div>
-                  </div>
-                  <div
-                    className={`grid ${
-                      effectiveCount === 2
-                        ? 'grid-cols-2'
-                        : effectiveCount === 3
-                        ? 'grid-cols-3'
-                        : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
-                    } gap-2 font-mono tabular-nums`}
-                  >
-                    {row.entries.map((entry) => {
-                      const theme = SLOT_THEME[entry.slot];
-                      const isWin =
-                        row.winners.includes(entry.slot) && !row.isTie && row.winners.length > 0;
-                      return (
-                        <div
-                          key={entry.slot}
-                          className="flex items-center justify-between px-2.5 py-1 rounded bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60"
-                        >
-                          <span className={`font-bold ${theme.text}`}>{entry.slot}</span>
-                          <span
-                            className={
-                              entry.val === null
-                                ? 'text-slate-600 dark:text-slate-400'
-                                : isWin
-                                ? `font-extrabold ${theme.text}`
-                                : 'font-semibold text-slate-800 dark:text-slate-200'
-                            }
-                          >
-                            {entry.val !== null ? `${formatNumber(entry.val, 1)}%` : '—'}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono tabular-nums text-xs sm:text-sm font-bold">
+              {activeSlots.map(({ slot }, i) => (
+                <React.Fragment key={slot}>
+                  {i > 0 && <span className="text-slate-400 dark:text-slate-700">·</span>}
+                  <span className={SLOT_THEME[slot].text}>
+                    {slot}: {summaryStats.wins[slot]}
+                  </span>
+                </React.Fragment>
               ))}
+              <span className="text-slate-400 dark:text-slate-700">·</span>
+              <span className="text-slate-600 dark:text-slate-400">
+                {lang === 'de' ? 'Patt' : 'Tie'}: {summaryStats.ties}
+              </span>
             </div>
-          )}
+            {summaryStats.comparableCount > 0 && (
+              <div className="h-1.5 w-full rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex">
+                {activeSlots.map(({ slot }) =>
+                  summaryStats.wins[slot] > 0 ? (
+                    <div
+                      key={slot}
+                      className={`${SLOT_THEME[slot].barActive} h-full`}
+                      style={{ width: `${(summaryStats.wins[slot] / summaryStats.comparableCount) * 100}%` }}
+                    />
+                  ) : null
+                )}
+                {summaryStats.ties > 0 && (
+                  <div
+                    className="bg-slate-400 dark:bg-slate-600 h-full"
+                    style={{ width: `${(summaryStats.ties / summaryStats.comparableCount) * 100}%` }}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Peak Edge per Active Model */}
+          <div className="p-3 sm:px-4 flex flex-col justify-between gap-1">
+            <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
+              {lang === 'de' ? 'Größte Einzelstärke' : 'Biggest Category Edge'}
+            </div>
+            <div
+              className={
+                activeSlots.length > 4
+                  ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 text-xs'
+                  : 'space-y-0.5 text-xs'
+              }
+            >
+              {activeSlots.map(({ slot }) => {
+                const edge = summaryStats.bestEdge[slot];
+                const theme = SLOT_THEME[slot];
+                return (
+                  <div key={slot} className="flex items-center justify-between gap-2 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`font-mono font-bold shrink-0 ${theme.text}`}>{slot}:</span>
+                      {edge ? (
+                        <span className="truncate font-semibold text-slate-800 dark:text-slate-200">
+                          {edge.label}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600 dark:text-slate-400">
+                          {lang === 'de' ? 'kein Vorsprung' : 'no lead'}
+                        </span>
+                      )}
+                    </div>
+                    {edge && (
+                      <span className={`font-mono tabular-nums font-bold shrink-0 ${theme.text}`}>
+                        +{edge.margin.toFixed(1)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </section>
       )}
+
+      {/* Split Overview Cards (2 to 8 Responsive Compact Cards, below central chart in both views) */}
+      <section
+        aria-label={lang === 'de' ? 'Modellauswahl und Übersicht' : 'Model Selection and Overview'}
+        className={`grid gap-2 overflow-visible ${
+          effectiveCount === 2
+            ? 'grid-cols-1 md:grid-cols-2'
+            : effectiveCount === 3
+            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            : effectiveCount === 4
+            ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'
+            : effectiveCount === 5
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
+            : effectiveCount === 6
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+        }`}
+      >
+        {activeSlots.map(({ slot, model }, idx) => {
+          const theme = SLOT_THEME[slot];
+          const primaryScore = getScoreForMode(model, scoreMode);
+          const rank = rankMap.get(model.id);
+          const priceText = formatCompactPrice(model, lang);
+          const storylineText = translateStoryline(model.storyline, lang)
+            .replace(/^["„“'»«\s]+/, '')
+            .replace(/["„“'»«\s]+$/, '')
+            .trim();
+          const chatUrl = model.chatLink || model.modelUrl;
+
+          const deltaVsTop =
+            primaryScore !== null && topPrimaryScore !== null ? primaryScore - topPrimaryScore : null;
+          const isLeader =
+            primaryScore !== null &&
+            topPrimaryScore !== null &&
+            topPrimaryScore - primaryScore < 0.05 &&
+            validPrimaries.length >= 2 &&
+            overallLeaders.length < validPrimaries.length;
+          const isAllTied =
+            validPrimaries.length >= 2 && overallLeaders.length === validPrimaries.length;
+
+          const otherMap = new Map<string, CompareSlot>();
+          for (const s of activeSlots) {
+            if (s.slot !== slot) otherMap.set(s.model.id, s.slot);
+          }
+
+          const isRightEdge =
+            effectiveCount >= 2 &&
+            ((effectiveCount === 2 && idx === 1) ||
+              (effectiveCount === 3 && idx === 2) ||
+              (effectiveCount === 4 && idx === 3) ||
+              (effectiveCount === 5 && idx === 4) ||
+              (effectiveCount === 6 && (idx === 2 || idx === 5)) ||
+              (effectiveCount === 7 && (idx === 3 || idx === 6)) ||
+              (effectiveCount === 8 && (idx === 3 || idx === 7)));
+
+          return (
+            <div
+              key={slot}
+              className={`p-2.5 flex flex-col gap-1.5 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs border-t-2 ${theme.borderTop}`}
+            >
+              {/* Selector + Compact Direct Links */}
+              <div className="flex items-center gap-1">
+                <div className="flex-1 min-w-0">
+                  <CompareModelSelector
+                    slot={slot}
+                    selectedModel={model}
+                    otherSlotsByModelId={otherMap}
+                    models={pickerModels}
+                    rankMap={rankMap}
+                    scoreMode={scoreMode}
+                    lang={lang}
+                    alignRight={isRightEdge}
+                    onSelect={(newId) => handleSelectSlot(idx, newId)}
+                  />
+                </div>
+                {chatUrl && (
+                  <a
+                    href={chatUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors shrink-0"
+                    title={t.openChatbotApp}
+                  >
+                    <span>Chat</span>
+                    <ExternalLink className="w-3 h-3 opacity-70" />
+                  </a>
+                )}
+                {model.isFreeApi && model.apiLink && (
+                  <a
+                    href={model.apiLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 transition-colors shrink-0"
+                    title={lang === 'de' ? 'Kostenloser API-Zugang' : 'Free API access'}
+                  >
+                    <Globe className="w-3 h-3" />
+                    <span className="hidden sm:inline">API</span>
+                  </a>
+                )}
+              </div>
+
+              {/* Clean Compact Metadata Line */}
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-tight text-slate-600 dark:text-slate-400">
+                {onSelectCompany ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelectCompany(model.companyName)}
+                    className="font-semibold text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 underline decoration-dotted underline-offset-2 cursor-pointer transition-colors"
+                  >
+                    {model.companyName}
+                  </button>
+                ) : (
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {model.companyName}
+                  </span>
+                )}
+                {model.releaseDate && (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-700">·</span>
+                    <span className="font-mono tabular-nums">{model.releaseDate}</span>
+                  </>
+                )}
+                {rank && (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-700">·</span>
+                    <span className="font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300">
+                      #{rank}
+                    </span>
+                  </>
+                )}
+                {priceText ? (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-700">·</span>
+                    <span className="font-mono tabular-nums font-semibold text-emerald-700 dark:text-emerald-400">
+                      {priceText}
+                    </span>
+                  </>
+                ) : !model.isPaid ? (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-700">·</span>
+                    <span className="font-mono font-semibold text-emerald-700 dark:text-emerald-400">
+                      {lang === 'de' ? 'Gratis' : 'Free'}
+                    </span>
+                  </>
+                ) : null}
+                {model.isFreeApi && (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-700">·</span>
+                    <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">
+                      API
+                    </span>
+                  </>
+                )}
+                {!model.isAvailable && (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-700">·</span>
+                    <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold">
+                      Hist.
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Active Composite Score Only + Gap to Leader */}
+              <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800/90 flex items-baseline justify-between gap-2">
+                <div className="flex items-baseline gap-1 min-w-0">
+                  <span className="text-xs font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 truncate">
+                    {activeScoreLabel}
+                  </span>
+                  <span className={`text-xl font-mono tabular-nums font-extrabold tracking-tight leading-none ${theme.text}`}>
+                    {primaryScore !== null ? formatNumber(primaryScore, 1) : '—'}
+                    {scoreMode === 'new' && !model.hasAll8Benchmarks && primaryScore !== null && (
+                      <span
+                        className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-0.5 align-top"
+                        title={lang === 'de' ? 'Nicht alle 8 Benchmarks vorhanden' : 'Not all 8 benchmarks available'}
+                      >
+                        *
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs font-mono text-slate-600 dark:text-slate-400">/100</span>
+                </div>
+
+                {deltaVsTop !== null && (
+                  <div
+                    className={`text-xs font-mono tabular-nums font-bold flex items-center gap-1 shrink-0 ${
+                      isLeader
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : 'text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {isLeader && <Trophy className="w-3 h-3 shrink-0" />}
+                    <span>
+                      {isLeader
+                        ? lang === 'de'
+                          ? '#1'
+                          : 'Leader'
+                        : isAllTied
+                        ? lang === 'de'
+                          ? 'Gleichstand'
+                          : 'Tied'
+                        : `${deltaVsTop.toFixed(1)} ${lang === 'de' ? 'Pkt.' : 'pts'}`}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {storylineText && (
+                <p
+                  className="text-xs text-slate-600 dark:text-slate-300 italic leading-tight border-t border-slate-100 dark:border-slate-800/80 pt-1 truncate"
+                  title={storylineText}
+                >
+                  {storylineText}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </section>
     </div>
   );
 };

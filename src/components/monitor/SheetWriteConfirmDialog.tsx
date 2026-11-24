@@ -8,11 +8,6 @@ interface SheetWriteConfirmDialogProps {
   lang: Language;
   pendingWrite: PendingSheetCellChange[];
   isWriting: boolean;
-  gdpxColLetter: string;
-  valsColLetter: string;
-  simpleBenchColLetter: string;
-  integrityColLetter: string;
-  minHistoryRow?: number;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
 }
@@ -21,11 +16,6 @@ export const SheetWriteConfirmDialog: React.FC<SheetWriteConfirmDialogProps> = (
   lang,
   pendingWrite,
   isWriting,
-  gdpxColLetter,
-  valsColLetter,
-  simpleBenchColLetter,
-  integrityColLetter,
-  minHistoryRow = 36,
   onCancel,
   onConfirm,
 }) => (
@@ -41,8 +31,8 @@ export const SheetWriteConfirmDialog: React.FC<SheetWriteConfirmDialogProps> = (
           </h3>
           <p className="text-xs text-slate-700 dark:text-slate-300 mt-1">
             {lang === 'de'
-              ? `Alle Updates erfolgen ab Zeile ${minHistoryRow} (Preise sowie GDPx ${gdpxColLetter}, Vals ${valsColLetter}, SimpleBench ${simpleBenchColLetter} & Integrity ${integrityColLetter} jeweils fett). Neue Zeilen werden sauber ergänzt.`
-              : `All updates target History rows (Row ${minHistoryRow}+). Official GDPx (${gdpxColLetter}), Vals (${valsColLetter}), SimpleBench (${simpleBenchColLetter}) & Integrity (${integrityColLetter}) scores will be formatted bold.`}
+              ? 'Alle ausgewählten Änderungen werden direkt ins Google Sheet übernommen.'
+              : 'All selected updates will be applied directly to Google Sheets.'}
           </p>
         </div>
       </div>
@@ -55,9 +45,6 @@ export const SheetWriteConfirmDialog: React.FC<SheetWriteConfirmDialogProps> = (
           >
             <div className="flex items-center justify-between gap-2">
               <span className="font-semibold text-slate-900 dark:text-slate-100">{c.label}</span>
-              <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shrink-0">
-                {c.cellRef}
-              </span>
             </div>
             <div className="grid grid-cols-2 gap-2 font-mono text-xs">
               <div
@@ -66,7 +53,11 @@ export const SheetWriteConfirmDialog: React.FC<SheetWriteConfirmDialogProps> = (
                 }`}
               >
                 − {c.kind === 'price' ? roundCurrencyString(c.before) : c.before}
-                {c.beforeIsBold === false && !c.isNewRowInsert ? ' (nicht-fett)' : ''}
+                {c.beforeIsBold === false && !c.isNewRowInsert
+                  ? lang === 'de'
+                    ? ' (Schätzwert)'
+                    : ' (Estimate)'
+                  : ''}
               </div>
               <div
                 className={`px-2 py-1 rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 break-words ${
@@ -74,7 +65,6 @@ export const SheetWriteConfirmDialog: React.FC<SheetWriteConfirmDialogProps> = (
                 }`}
               >
                 + {c.kind === 'price' ? roundCurrencyString(c.after) : c.after}
-                {c.afterIsBold ? ' (fett)' : ''}
               </div>
             </div>
           </div>

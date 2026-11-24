@@ -5,7 +5,6 @@ import {
   Bell,
   CheckCircle2,
   AlertTriangle,
-  ShieldCheck,
   Save,
   LogOut,
   Trophy,
@@ -749,6 +748,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   if (!isOpen) return null;
 
   const handleRunAllChecks = async () => {
+    if (!accessToken) return;
     await Promise.allSettled([
       isSheetsConnected ? onRunCheck() : Promise.resolve(),
       onRunGdpxCheck(),
@@ -796,17 +796,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         typeof m.sheetRowNumber === 'number'
           ? loadedData.boldMask?.[m.sheetRowNumber - 1]?.[gdpxColIdx]
           : undefined;
-      const boldTag =
-        m.rawScores.trickQuestions !== null
-          ? maskVal === false
-            ? ', nicht-fett'
-            : maskVal === true
-            ? ', fett'
-            : ''
+      const estimateTag =
+        m.rawScores.trickQuestions !== null && maskVal === false
+          ? lang === 'de'
+            ? ', Schätzwert'
+            : ', Estimate'
           : '';
       return m.rawScores.trickQuestions !== null
-        ? `${gdpxColLetter}=${formatExactScore(m.rawScores.trickQuestions, lang)}${boldTag}`
-        : `${gdpxColLetter} leer`;
+        ? `${formatExactScore(m.rawScores.trickQuestions, lang)}${estimateTag}`
+        : lang === 'de'
+        ? 'leer'
+        : 'empty';
     });
   };
 
@@ -840,17 +840,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         typeof m.sheetRowNumber === 'number'
           ? loadedData.boldMask?.[m.sheetRowNumber - 1]?.[valsColIdx]
           : undefined;
-      const boldTag =
-        m.rawScores.econLegal !== null
-          ? maskVal === false
-            ? ', nicht-fett'
-            : maskVal === true
-            ? ', fett'
-            : ''
+      const estimateTag =
+        m.rawScores.econLegal !== null && maskVal === false
+          ? lang === 'de'
+            ? ', Schätzwert'
+            : ', Estimate'
           : '';
       return m.rawScores.econLegal !== null
-        ? `${valsColLetter}=${formatExactScore(m.rawScores.econLegal, lang)}${boldTag}`
-        : `${valsColLetter} leer`;
+        ? `${formatExactScore(m.rawScores.econLegal, lang)}${estimateTag}`
+        : lang === 'de'
+        ? 'leer'
+        : 'empty';
     });
   };
 
@@ -884,17 +884,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         typeof m.sheetRowNumber === 'number'
           ? loadedData.boldMask?.[m.sheetRowNumber - 1]?.[simpleBenchColIdx]
           : undefined;
-      const boldTag =
-        m.rawScores.trickQuestionsOld !== null
-          ? maskVal === false
-            ? ', nicht-fett'
-            : maskVal === true
-            ? ', fett'
-            : ''
+      const estimateTag =
+        m.rawScores.trickQuestionsOld !== null && maskVal === false
+          ? lang === 'de'
+            ? ', Schätzwert'
+            : ', Estimate'
           : '';
       return m.rawScores.trickQuestionsOld !== null
-        ? `${simpleBenchColLetter}=${formatExactScore(m.rawScores.trickQuestionsOld, lang)}${boldTag}`
-        : `${simpleBenchColLetter} leer`;
+        ? `${formatExactScore(m.rawScores.trickQuestionsOld, lang)}${estimateTag}`
+        : lang === 'de'
+        ? 'leer'
+        : 'empty';
     });
   };
 
@@ -917,17 +917,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       const rowNum = m.sheetRowNumber ?? 0;
       const rowVal = integrityColByRow.get(rowNum) ?? null;
       const maskVal = rowNum > 0 ? loadedData.boldMask?.[rowNum - 1]?.[integrityColIdx] : undefined;
-      const boldTag =
-        rowVal !== null
-          ? maskVal === false
-            ? ', nicht-fett'
-            : maskVal === true
-            ? ', fett'
-            : ''
+      const estimateTag =
+        rowVal !== null && maskVal === false
+          ? lang === 'de'
+            ? ', Schätzwert'
+            : ', Estimate'
           : '';
       return rowVal !== null
-        ? `${integrityColLetter}=${formatExactScore(rowVal, lang)}${boldTag}`
-        : `${integrityColLetter} leer`;
+        ? `${formatExactScore(rowVal, lang)}${estimateTag}`
+        : lang === 'de'
+        ? 'leer'
+        : 'empty';
     });
   };
 
@@ -1013,7 +1013,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       changes.push({
         cellRef: `${params.colLetter}${params.target.sheetRowNumber}`,
         label: `${params.prefix}: ${params.sourceName} → ${
-          params.target.matchedDisplayName || `Zeile ${params.target.sheetRowNumber}`
+          params.target.matchedDisplayName || params.sourceName
         }`,
         before:
           params.target.currentScore !== null
@@ -1054,9 +1054,9 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       const numberFormatPattern = decimalsToPattern(params.liveScore, scoreDec);
       const companyMeta = resolveCompanyFlagAndName(params.companyRaw);
       changes.push({
-        cellRef: `${params.colLetter}${firstReleasedHistoryRow} (NEU)`,
-        label: `${params.prefix} NEU: ${params.sourceName} (${companyMeta.companyName}) → neue Zeile ${firstReleasedHistoryRow}`,
-        before: lang === 'de' ? '(neue Zeile in Tabelle)' : '(new row in table)',
+        cellRef: `${params.colLetter}${firstReleasedHistoryRow}-NEW`,
+        label: `${params.prefix}: ${params.sourceName} (${companyMeta.companyName})`,
+        before: lang === 'de' ? '(neues Modell)' : '(new model)',
         beforeIsBold: false,
         after: formatExactScore(params.liveScore, lang, scoreDec),
         afterIsBold: true,
@@ -1203,8 +1203,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     if (changes.length === 0) {
       setWriteError(
         lang === 'de'
-          ? 'Keine gültigen Änderungen ausgewählt. Bei neuen LLMs bitte zuerst eine Sheet-Zeile zuordnen oder „Neue Zeile in Tabelle ergänzen“ wählen.'
-          : 'No valid updates selected. For unmatched LLMs, please assign a Sheet row or choose "Insert new row".'
+          ? 'Keine gültigen Änderungen ausgewählt. Bei neuen Modellen bitte zuerst ein Zielmodell zuordnen oder „Als neues Modell ergänzen“ wählen.'
+          : 'No valid updates selected. For unmatched models, please assign a target model or choose "Add as new model".'
       );
       return;
     }
@@ -1413,12 +1413,12 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
 
       setWriteSuccess(
         lang === 'de'
-          ? `${totalUpdatedCells} Zelle(n)${
-              insertedRowsCount > 0 ? ` und ${insertedRowsCount} neue Zeile(n)` : ''
-            } ab Zeile ${minHistoryRow} erfolgreich im Google Sheet aktualisiert (offizielle Werte fett).`
-          : `Successfully updated ${totalUpdatedCells} cell(s)${
-              insertedRowsCount > 0 ? ` and ${insertedRowsCount} new row(s)` : ''
-            } (Row ${minHistoryRow}+, official scores bold) in Google Sheets.`
+          ? `${totalUpdatedCells} Wert(e)${
+              insertedRowsCount > 0 ? ` und ${insertedRowsCount} neues Modell` : ''
+            } erfolgreich im Google Sheet aktualisiert.`
+          : `Successfully updated ${totalUpdatedCells} value(s)${
+              insertedRowsCount > 0 ? ` and ${insertedRowsCount} new model(s)` : ''
+            } in Google Sheets.`
       );
       setPendingWrite(null);
       gdpxSel.clearOverrides();
@@ -1476,10 +1476,6 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                   {isUsingLiveReport
                     ? `${lang === 'de' ? 'Preise' : 'Plans'}: ${formatMonitorTimestamp(displayedTimestamp, lang)}`
                     : `${lang === 'de' ? 'Tarife' : 'Snapshot'}: ${formatMonitorTimestamp(displayedTimestamp, lang)}`}
-                  {gdpxReport ? ` · GDPx: ${gdpxReport.totalSourceModels}` : ''}
-                  {valsReport ? ` · Vals ${valsReport.versionLabel}: ${valsReport.totalSourceModels}` : ''}
-                  {simpleBenchReport ? ` · SimpleBench: ${simpleBenchReport.totalSourceModels}` : ''}
-                  {integrityReport ? ` · Integrity: ${integrityReport.totalSourceModels}` : ''}
                 </span>
               </p>
             </div>
@@ -1501,8 +1497,15 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 <button
                   type="button"
                   onClick={() => void handleRunAllChecks()}
-                  disabled={isAnyChecking}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+                  disabled={isAnyChecking || !accessToken}
+                  title={
+                    !accessToken
+                      ? lang === 'de'
+                        ? 'Bitte zuerst mit Google anmelden'
+                        : 'Sign in with Google first'
+                      : undefined
+                  }
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 dark:disabled:bg-slate-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isAnyChecking ? 'animate-spin' : ''}`} />
                   <span>
@@ -1515,10 +1518,35 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                       : 'Check Live'}
                   </span>
                 </button>
+
+                {!accessToken && (
+                  <button
+                    type="button"
+                    onClick={() => void onSignIn()}
+                    disabled={isSigningIn}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer disabled:opacity-55 shrink-0"
+                  >
+                    <svg className="w-3.5 h-3.5 block shrink-0" viewBox="0 0 48 48">
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                    </svg>
+                    <span>
+                      {isSigningIn
+                        ? lang === 'de'
+                          ? 'Verbinde…'
+                          : 'Signing in…'
+                        : lang === 'de'
+                        ? 'Mit Google anmelden'
+                        : 'Sign in with Google'}
+                    </span>
+                  </button>
+                )}
               </>
             )}
 
-            {accessToken && onSignOut && (
+            {(accessToken || authUser) && onSignOut && (
               <button
                 type="button"
                 onClick={() => void onSignOut()}
@@ -1586,48 +1614,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             </div>
           )}
 
-          {apiAvailable && !isSheetsConnected && (
-            <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 min-w-0">
-                <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                <span>
-                  {lang === 'de'
-                    ? `Einmal mit Google anmelden für Live-Diffs & direkte Übernahme (Preise ${colDeLetter}/${colUsLetter || 'US'}, GDPx ${gdpxColLetter}, Vals ${valsColLetter}, SimpleBench ${simpleBenchColLetter} & Integrity ${integrityColLetter}, ab Zeile ${minHistoryRow}).`
-                    : `Sign in once with Google to diff prices (${colDeLetter}/${colUsLetter || 'US'}), GDPx (${gdpxColLetter}), Vals (${valsColLetter}), SimpleBench (${simpleBenchColLetter}) & Integrity (${integrityColLetter}) and apply updates (Row ${minHistoryRow}+).`}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => void onSignIn()}
-                disabled={isSigningIn}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer disabled:opacity-55 shrink-0"
-              >
-                <svg className="w-3.5 h-3.5 block shrink-0" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                </svg>
-                <span>
-                  {isSigningIn
-                    ? lang === 'de'
-                      ? 'Verbinde…'
-                      : 'Signing in…'
-                    : lang === 'de'
-                    ? 'Mit Google anmelden'
-                    : 'Sign in with Google'}
-                </span>
-              </button>
-            </div>
-          )}
-
           {apiAvailable && isSheetsConnected && isChecking && !effectiveDiffReport && (
-            <div className="px-3.5 py-2.5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/70 dark:bg-blue-950/30 flex items-center gap-2.5 text-xs">
+            <div className="px-3.5 py-2 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/70 dark:bg-blue-950/30 flex items-center gap-2.5 text-xs">
               <RefreshCw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
               <span className="font-medium text-slate-800 dark:text-slate-200">
-                {lang === 'de'
-                  ? `Prüfe Live-Preise gegen Spalten ${colDeLetter} / ${colUsLetter || 'US'}…`
-                  : `Checking live pricing against Columns ${colDeLetter} / ${colUsLetter || 'US'}…`}
+                {lang === 'de' ? 'Prüfe Live-Preise…' : 'Checking live pricing…'}
               </span>
             </div>
           )}
@@ -1641,8 +1632,6 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               onTogglePriceItem={(modelId) =>
                 setSelectedPriceIds((prev) => ({ ...prev, [modelId]: !prev[modelId] }))
               }
-              colDeLetter={colDeLetter}
-              colUsLetter={colUsLetter}
             />
           )}
 
@@ -1653,11 +1642,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 lang={lang}
                 accent="indigo"
                 icon={<Trophy className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
-                title={
-                  lang === 'de'
-                    ? `GDPx-Prüfer (Spalte ${gdpxColLetter} · ab Z. ${minHistoryRow})`
-                    : `GDPx Checker (Column ${gdpxColLetter} · Row ${minHistoryRow}+)`
-                }
+                title={lang === 'de' ? 'GDPx-Prüfer' : 'GDPx Checker'}
                 sourceUrl="https://gdpx.semianalysis.com/"
                 sourceDomainLabel="gdpx.semianalysis.com"
                 headerCountText={
@@ -1668,15 +1653,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                     : undefined
                 }
                 modelColumnHeader={lang === 'de' ? 'GDPx-Modell' : 'GDPx Model'}
-                scoreColumnHeader={
-                  lang === 'de'
-                    ? `Spalte ${gdpxColLetter} (offiziell = fett)`
-                    : `Column ${gdpxColLetter} (official = bold)`
-                }
+                scoreColumnHeader={lang === 'de' ? 'Vergleich' : 'Comparison'}
                 checkingText={
                   lang === 'de'
-                    ? `Prüfe gdpx.semianalysis.com gegen Spalte ${gdpxColLetter} (offiziell = fett, Schätzwerte = nicht-fett)…`
-                    : `Checking gdpx.semianalysis.com against Column ${gdpxColLetter}…`
+                    ? 'Prüfe gdpx.semianalysis.com…'
+                    : 'Checking gdpx.semianalysis.com…'
                 }
                 bannerPrefixActionable={
                   effectiveGdpxDiffReport
@@ -1688,18 +1669,15 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 bannerPrefixOk="GDPx OK:"
                 unmatchedPillLabel={lang === 'de' ? 'Neu' : 'New'}
                 unmatchedBadgeLabel={lang === 'de' ? 'Neues LLM' : 'New LLM'}
-                missingBadgeLabel={lang === 'de' ? `Fehlt in ${gdpxColLetter}` : `Missing ${gdpxColLetter}`}
-                estimateBadgeLabel={lang === 'de' ? 'Schätzwert → Offiziell (fett)' : 'Estimate → Official (bold)'}
+                missingBadgeLabel={lang === 'de' ? 'Fehlt' : 'Missing'}
+                estimateBadgeLabel={lang === 'de' ? 'Schätzwert' : 'Estimate'}
                 changedBadgeLabel={lang === 'de' ? 'Geändert' : 'Changed'}
-                unchangedOkLabel="OK (fett)"
+                unchangedOkLabel="OK"
                 supportsBoldState={true}
                 showSelectAllToggle={false}
                 showRankInRow={false}
-                firstReleasedHistoryRow={firstReleasedHistoryRow}
                 minHistoryRow={minHistoryRow}
-                assignPlaceholder={
-                  lang === 'de' ? `— Zeile zuordnen (ab Z. ${minHistoryRow}) —` : `— Assign Row (${minHistoryRow}+) —`
-                }
+                assignPlaceholder={lang === 'de' ? '— Zuordnen —' : '— Assign —'}
                 isChecking={isCheckingGdpx}
                 isSheetsConnected={isSheetsConnected}
                 rawReport={gdpxReport}
@@ -1728,8 +1706,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 icon={<Briefcase className="w-3.5 h-3.5 text-cyan-700 dark:text-cyan-400 shrink-0" />}
                 title={
                   lang === 'de'
-                    ? `Vals Index ${valsReport?.versionLabel || 'v2.2'}-Prüfer (Spalte ${valsColLetter} · ab Z. ${minHistoryRow})`
-                    : `Vals Index ${valsReport?.versionLabel || 'v2.2'} Checker (Column ${valsColLetter} · Row ${minHistoryRow}+)`
+                    ? `Vals Index ${valsReport?.versionLabel || 'v2.2'}-Prüfer`
+                    : `Vals Index ${valsReport?.versionLabel || 'v2.2'} Checker`
                 }
                 sourceUrl="https://www.vals.ai/benchmarks/vals_index"
                 sourceDomainLabel="vals.ai/benchmarks/vals_index"
@@ -1741,15 +1719,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                     : undefined
                 }
                 modelColumnHeader={lang === 'de' ? 'Vals-Modell' : 'Vals Model'}
-                scoreColumnHeader={
-                  lang === 'de'
-                    ? `Spalte ${valsColLetter} (offiziell = fett)`
-                    : `Column ${valsColLetter} (official = bold)`
-                }
+                scoreColumnHeader={lang === 'de' ? 'Vergleich' : 'Comparison'}
                 checkingText={
                   lang === 'de'
-                    ? `Prüfe vals.ai (Vals Index v2.2) gegen Spalte ${valsColLetter} (offiziell = fett, Schätzwerte = nicht-fett)…`
-                    : `Checking vals.ai (Vals Index v2.2) against Column ${valsColLetter}…`
+                    ? 'Prüfe vals.ai (Vals Index v2.2)…'
+                    : 'Checking vals.ai (Vals Index v2.2)…'
                 }
                 bannerPrefixActionable={
                   effectiveValsDiffReport
@@ -1761,18 +1735,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 bannerPrefixOk={`Vals ${effectiveValsDiffReport?.versionLabel || 'v2.2'} OK:`}
                 unmatchedPillLabel={lang === 'de' ? 'Neu' : 'New'}
                 unmatchedBadgeLabel={lang === 'de' ? 'Neu / Ergänzen' : 'New / Insert'}
-                missingBadgeLabel={lang === 'de' ? `Fehlt in ${valsColLetter}` : `Missing ${valsColLetter}`}
-                estimateBadgeLabel={lang === 'de' ? 'Schätzwert → Offiziell (fett)' : 'Estimate → Official (bold)'}
+                missingBadgeLabel={lang === 'de' ? 'Fehlt' : 'Missing'}
+                estimateBadgeLabel={lang === 'de' ? 'Schätzwert' : 'Estimate'}
                 changedBadgeLabel={lang === 'de' ? 'Geändert' : 'Changed'}
-                unchangedOkLabel="OK (fett)"
+                unchangedOkLabel="OK"
                 supportsBoldState={true}
                 supportsInsertNewRow={true}
                 showSelectAllToggle={true}
                 showRankInRow={true}
-                firstReleasedHistoryRow={firstReleasedHistoryRow}
                 minHistoryRow={minHistoryRow}
                 assignPlaceholder={
-                  lang === 'de' ? '— Zeile zuordnen / ergänzen —' : '— Assign / Insert Row —'
+                  lang === 'de' ? '— Zuordnen / ergänzen —' : '— Assign / Add —'
                 }
                 isChecking={isCheckingVals}
                 isSheetsConnected={isSheetsConnected}
@@ -1800,11 +1773,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 lang={lang}
                 accent="amber"
                 icon={<HelpCircle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" />}
-                title={
-                  lang === 'de'
-                    ? `SimpleBench-Prüfer (Spalte ${simpleBenchColLetter} · ab Z. ${minHistoryRow})`
-                    : `SimpleBench Checker (Column ${simpleBenchColLetter} · Row ${minHistoryRow}+)`
-                }
+                title={lang === 'de' ? 'SimpleBench-Prüfer' : 'SimpleBench Checker'}
                 sourceUrl="https://simple-bench.com/"
                 sourceDomainLabel="simple-bench.com"
                 headerCountText={
@@ -1817,15 +1786,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                     : undefined
                 }
                 modelColumnHeader={lang === 'de' ? 'SimpleBench-Modell' : 'SimpleBench Model'}
-                scoreColumnHeader={
-                  lang === 'de'
-                    ? `Spalte ${simpleBenchColLetter} (offiziell = fett)`
-                    : `Column ${simpleBenchColLetter} (official = bold)`
-                }
+                scoreColumnHeader={lang === 'de' ? 'Vergleich' : 'Comparison'}
                 checkingText={
                   lang === 'de'
-                    ? `Prüfe simple-bench.com gegen Spalte ${simpleBenchColLetter} (offiziell = fett, Schätzwerte = nicht-fett)…`
-                    : `Checking simple-bench.com against Column ${simpleBenchColLetter}…`
+                    ? 'Prüfe simple-bench.com…'
+                    : 'Checking simple-bench.com…'
                 }
                 bannerPrefixActionable={
                   effectiveSimpleBenchDiffReport
@@ -1837,20 +1802,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 bannerPrefixOk="SimpleBench OK:"
                 unmatchedPillLabel={lang === 'de' ? 'Neu' : 'New'}
                 unmatchedBadgeLabel={lang === 'de' ? 'Neu / Ergänzen' : 'New / Insert'}
-                missingBadgeLabel={
-                  lang === 'de' ? `Fehlt in ${simpleBenchColLetter}` : `Missing ${simpleBenchColLetter}`
-                }
-                estimateBadgeLabel={lang === 'de' ? 'Schätzwert → Offiziell (fett)' : 'Estimate → Official (bold)'}
+                missingBadgeLabel={lang === 'de' ? 'Fehlt' : 'Missing'}
+                estimateBadgeLabel={lang === 'de' ? 'Schätzwert' : 'Estimate'}
                 changedBadgeLabel={lang === 'de' ? 'Geändert' : 'Changed'}
-                unchangedOkLabel="OK (fett)"
+                unchangedOkLabel="OK"
                 supportsBoldState={true}
                 supportsInsertNewRow={true}
                 showSelectAllToggle={true}
                 showRankInRow={true}
-                firstReleasedHistoryRow={firstReleasedHistoryRow}
                 minHistoryRow={minHistoryRow}
                 assignPlaceholder={
-                  lang === 'de' ? '— Zeile zuordnen / ergänzen —' : '— Assign / Insert Row —'
+                  lang === 'de' ? '— Zuordnen / ergänzen —' : '— Assign / Add —'
                 }
                 isChecking={isCheckingSimpleBench}
                 isSheetsConnected={isSheetsConnected}
@@ -1878,11 +1840,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 lang={lang}
                 accent="teal"
                 icon={<Scale className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />}
-                title={
-                  lang === 'de'
-                    ? `Integrity-Prüfer (Spalte ${integrityColLetter} · ab Z. ${minHistoryRow})`
-                    : `Integrity Checker (Column ${integrityColLetter} · Row ${minHistoryRow}+)`
-                }
+                title={lang === 'de' ? 'Integrity-Prüfer' : 'Integrity Checker'}
                 sourceUrl="https://integrity-bench.com/"
                 sourceDomainLabel="integrity-bench.com"
                 headerCountText={
@@ -1895,15 +1853,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                     : undefined
                 }
                 modelColumnHeader={lang === 'de' ? 'Integrity-Modell' : 'Integrity Model'}
-                scoreColumnHeader={
-                  lang === 'de'
-                    ? `Spalte ${integrityColLetter} (offiziell = fett)`
-                    : `Column ${integrityColLetter} (official = bold)`
-                }
+                scoreColumnHeader={lang === 'de' ? 'Vergleich' : 'Comparison'}
                 checkingText={
                   lang === 'de'
-                    ? `Prüfe integrity-bench.com ("Table") gegen Spalte ${integrityColLetter} (offiziell = fett, Schätzwerte = nicht-fett)…`
-                    : `Checking integrity-bench.com ("Table") against Column ${integrityColLetter}…`
+                    ? 'Prüfe integrity-bench.com ("Table")…'
+                    : 'Checking integrity-bench.com ("Table")…'
                 }
                 bannerPrefixActionable={
                   effectiveIntegrityDiffReport
@@ -1913,22 +1867,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                     : ''
                 }
                 bannerPrefixOk="Integrity OK:"
-                unmatchedPillLabel={lang === 'de' ? 'Ohne Zeile' : 'Unmatched'}
-                unmatchedBadgeLabel={lang === 'de' ? 'Ohne Zeile' : 'Unmatched'}
-                missingBadgeLabel={
-                  lang === 'de' ? `Fehlt in ${integrityColLetter}` : `Missing ${integrityColLetter}`
-                }
-                estimateBadgeLabel={lang === 'de' ? 'Schätzwert → Offiziell (fett)' : 'Estimate → Official (bold)'}
+                unmatchedPillLabel={lang === 'de' ? 'Offen' : 'Unmatched'}
+                unmatchedBadgeLabel={lang === 'de' ? 'Offen' : 'Unmatched'}
+                missingBadgeLabel={lang === 'de' ? 'Fehlt' : 'Missing'}
+                estimateBadgeLabel={lang === 'de' ? 'Schätzwert' : 'Estimate'}
                 changedBadgeLabel={lang === 'de' ? 'Geändert' : 'Changed'}
-                unchangedOkLabel="OK (fett)"
+                unchangedOkLabel="OK"
                 supportsBoldState={true}
                 showSelectAllToggle={true}
                 showRankInRow={true}
-                firstReleasedHistoryRow={firstReleasedHistoryRow}
                 minHistoryRow={minHistoryRow}
-                assignPlaceholder={
-                  lang === 'de' ? `— Zeile zuordnen (ab Z. ${minHistoryRow}) —` : `— Assign Row (${minHistoryRow}+) —`
-                }
+                assignPlaceholder={lang === 'de' ? '— Zuordnen —' : '— Assign —'}
                 isChecking={isCheckingIntegrity}
                 isSheetsConnected={isSheetsConnected}
                 rawReport={integrityReport}
@@ -1953,50 +1902,27 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
           )}
 
           {/* Unified Sheet Update Action Bar */}
-          {apiAvailable && isSheetsConnected && hasAnyActionable && (
+          {apiAvailable && isSheetsConnected && hasAnyActionable && accessToken && (
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <span className="text-xs text-slate-700 dark:text-slate-300">
                 {lang === 'de'
-                  ? `Schreibt ausschließlich ab Zeile ${minHistoryRow} in Spalten ${colDeLetter}/${colUsLetter || 'US'} sowie ${gdpxColLetter}, ${valsColLetter}, ${simpleBenchColLetter} & ${integrityColLetter} (jeweils fett, + neue Zeilen).`
-                  : `Writes strictly from Row ${minHistoryRow}+ to Columns ${colDeLetter}/${colUsLetter || 'US'} plus ${gdpxColLetter}, ${valsColLetter}, ${simpleBenchColLetter} & ${integrityColLetter} (all bold, + new rows).`}
+                  ? 'Ausgewählte Änderungen direkt ins Google Sheet übernehmen.'
+                  : 'Apply selected updates directly to Google Sheets.'}
               </span>
 
-              {accessToken ? (
-                <button
-                  type="button"
-                  disabled={totalSelectedCount === 0}
-                  onClick={handlePrepareSheetUpdates}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>
-                    {lang === 'de'
-                      ? `${totalSelectedCount} ausgewählte Änderung(en) prüfen & ins Sheet schreiben`
-                      : `Review & Write ${totalSelectedCount} Selected Update(s) to Sheet`}
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void onSignIn()}
-                  disabled={isSigningIn}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <span>
-                    {isSigningIn
-                      ? lang === 'de'
-                        ? 'Verbinde…'
-                        : 'Connecting…'
-                      : authUser
-                      ? lang === 'de'
-                        ? 'Google Sheets neu verbinden um zu schreiben'
-                        : 'Reconnect Google Sheets to Apply'
-                      : lang === 'de'
-                      ? 'Mit Google anmelden um Änderungen ins Sheet zu übernehmen'
-                      : 'Sign in with Google to Apply Changes'}
-                  </span>
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={totalSelectedCount === 0}
+                onClick={handlePrepareSheetUpdates}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>
+                  {lang === 'de'
+                    ? `${totalSelectedCount} ausgewählte Änderung(en) prüfen & ins Sheet schreiben`
+                    : `Review & Write ${totalSelectedCount} Selected Update(s) to Sheet`}
+                </span>
+              </button>
             </div>
           )}
         </div>
@@ -2006,11 +1932,6 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             lang={lang}
             pendingWrite={pendingWrite}
             isWriting={isWriting}
-            gdpxColLetter={gdpxColLetter}
-            valsColLetter={valsColLetter}
-            simpleBenchColLetter={simpleBenchColLetter}
-            integrityColLetter={integrityColLetter}
-            minHistoryRow={minHistoryRow}
             onCancel={() => setPendingWrite(null)}
             onConfirm={handleConfirmSheetWrite}
           />

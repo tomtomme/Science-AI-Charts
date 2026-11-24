@@ -571,7 +571,7 @@ export function buildSimpleBenchDiffs(
         sheetRowNumber: null,
         currentColY: null,
         currentColYIsBold: null,
-        reason: 'Kein passendes Modell im Sheet gefunden — zuordnen oder als neue Zeile ergänzen.',
+        reason: 'Kein passendes Modell gefunden — zuordnen oder neu ergänzen.',
       };
     }
 
@@ -584,8 +584,7 @@ export function buildSimpleBenchDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColY: null,
         currentColYIsBold: bestMatch.colYIsBold,
-        reason:
-          'Spalte Y ist in dieser Zeile noch leer (wird fett als offizieller Wert eingetragen).',
+        reason: 'Wert fehlt noch (wird offiziell übernommen).',
       };
     }
 
@@ -602,7 +601,7 @@ export function buildSimpleBenchDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColY: bestMatch.colY,
         currentColYIsBold: false,
-        reason: `Nicht-fetter Schätzwert (${bestMatch.colY}) → offiziellen SimpleBench-Score (${liveFormatted}, fett) übernehmen.`,
+        reason: `Schätzwert (${bestMatch.colY}) → offiziellen Wert (${liveFormatted}) übernehmen.`,
       };
     }
 
@@ -615,7 +614,7 @@ export function buildSimpleBenchDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColY: bestMatch.colY,
         currentColYIsBold: bestMatch.colYIsBold,
-        reason: `Offizieller Score weicht ab (${bestMatch.colY} → ${liveFormatted}).`,
+        reason: `Offizieller Wert weicht ab (${bestMatch.colY} → ${liveFormatted}).`,
       };
     }
 
@@ -627,13 +626,13 @@ export function buildSimpleBenchDiffs(
       sheetRowNumber: bestMatch.sheetRowNumber,
       currentColY: bestMatch.colY,
       currentColYIsBold: bestMatch.colYIsBold,
-      reason: 'Synchron (fett/offiziell).',
+      reason: 'Synchron.',
     };
   });
 }
 
 function summarizeSimpleBenchReportCounts(
-  totalSourceModels: number,
+  _totalSourceModels: number,
   diffs: SimpleBenchDiffItem[],
   hasSheetModels: boolean
 ) {
@@ -642,32 +641,34 @@ function summarizeSimpleBenchReportCounts(
   let summaryEn = '';
 
   if (!hasSheetModels) {
-    summaryDe = `${totalSourceModels} Modelle live auf SimpleBench geladen.`;
-    summaryEn = `Loaded ${totalSourceModels} live models from SimpleBench.`;
+    summaryDe = 'Live-Daten von SimpleBench geladen.';
+    summaryEn = 'Live data loaded from SimpleBench.';
   } else if (counts.actionableCount > 0) {
     const partsDe: string[] = [];
     const partsEn: string[] = [];
     if (counts.unmatchedCount > 0) {
-      partsDe.push(`${counts.unmatchedCount} neu ohne Zeile`);
-      partsEn.push(`${counts.unmatchedCount} new unmatched`);
+      partsDe.push(`${counts.unmatchedCount} nicht zugeordnet`);
+      partsEn.push(`${counts.unmatchedCount} unmatched`);
     }
     if (counts.missingCount > 0) {
-      partsDe.push(`${counts.missingCount} fehlend in Y`);
-      partsEn.push(`${counts.missingCount} missing in Y`);
+      partsDe.push(`${counts.missingCount} fehlend`);
+      partsEn.push(`${counts.missingCount} missing`);
     }
     if (counts.overwriteEstimateCount > 0) {
-      partsDe.push(`${counts.overwriteEstimateCount} nicht-fette Schätzwerte`);
-      partsEn.push(`${counts.overwriteEstimateCount} non-bold estimate(s)`);
+      partsDe.push(
+        counts.overwriteEstimateCount === 1 ? '1 Schätzwert' : `${counts.overwriteEstimateCount} Schätzwerte`
+      );
+      partsEn.push(`${counts.overwriteEstimateCount} estimate(s)`);
     }
     if (counts.changedCount > 0) {
-      partsDe.push(`${counts.changedCount} geänderte Score(s)`);
-      partsEn.push(`${counts.changedCount} changed score(s)`);
+      partsDe.push(`${counts.changedCount} geändert`);
+      partsEn.push(`${counts.changedCount} changed`);
     }
-    summaryDe = `${partsDe.join(', ')} (${totalSourceModels} LLMs auf SimpleBench).`;
-    summaryEn = `${partsEn.join(', ')} (${totalSourceModels} LLMs on SimpleBench).`;
+    summaryDe = `${partsDe.join(', ')}.`;
+    summaryEn = `${partsEn.join(', ')}.`;
   } else {
-    summaryDe = `Alle ${totalSourceModels} SimpleBench-Einträge sind in Spalte Y aktuell (fett).`;
-    summaryEn = `All ${totalSourceModels} SimpleBench entries are synced & bold in Column Y.`;
+    summaryDe = 'Alle Einträge sind aktuell.';
+    summaryEn = 'All entries are up to date.';
   }
 
   return { ...counts, summaryDe, summaryEn };
@@ -730,11 +731,16 @@ export async function getSimpleBenchMonitorStatus(): Promise<SimpleBenchMonitorS
 export async function runSimpleBenchCheck(options?: {
   models?: SimpleBenchSheetModelSnapshot[];
   trigger?: 'manual' | 'daily_auto';
+  replaceAll?: boolean;
+  ignoredIds?: string[];
+  manualMappings?: Record<string, ManualRowMapping>;
 }): Promise<SimpleBenchCheckReport> {
   return runtime.runCheck(options);
 }
 
 export async function updateSimpleBenchPreferences(options: {
+  replaceAll?: boolean;
+  ignoredIds?: string[];
   ignoreIds?: string[];
   unignoreIds?: string[];
   manualMappings?: Record<string, ManualRowMapping>;

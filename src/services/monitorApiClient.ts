@@ -14,6 +14,8 @@ export async function parseMonitorJsonResponse<T>(res: Response): Promise<T> {
 }
 
 export interface BenchmarkPreferencesPayload<TSnapshot> {
+  replaceAll?: boolean;
+  ignoredIds?: string[];
   ignoreIds?: string[];
   unignoreIds?: string[];
   manualMappings?: Record<string, ManualRowMapping>;
@@ -21,9 +23,19 @@ export interface BenchmarkPreferencesPayload<TSnapshot> {
   models?: TSnapshot[];
 }
 
+export interface BenchmarkCheckPreferences {
+  replaceAll?: boolean;
+  ignoredIds?: string[];
+  manualMappings?: Record<string, ManualRowMapping>;
+}
+
 export interface BenchmarkMonitorApiClient<TStatus, TReport, TSnapshot> {
   fetchStatus: () => Promise<TStatus>;
-  triggerCheck: (models?: TSnapshot[], trigger?: 'manual' | 'daily_auto') => Promise<TReport>;
+  triggerCheck: (
+    models?: TSnapshot[],
+    trigger?: 'manual' | 'daily_auto',
+    preferences?: BenchmarkCheckPreferences
+  ) => Promise<TReport>;
   updatePreferences: (
     options: BenchmarkPreferencesPayload<TSnapshot>
   ) => Promise<TReport | null>;
@@ -40,14 +52,25 @@ export function createMonitorApiClient<TStatus, TReport, TSnapshot>(
 
     async triggerCheck(
       models: TSnapshot[] = [],
-      trigger: 'manual' | 'daily_auto' = 'manual'
+      trigger: 'manual' | 'daily_auto' = 'manual',
+      preferences?: BenchmarkCheckPreferences
     ): Promise<TReport> {
       const res = await fetch(`${basePath}/check`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ models, trigger }),
+        body: JSON.stringify({
+          models,
+          trigger,
+          ...(preferences?.replaceAll
+            ? {
+                replaceAll: true,
+                ignoredIds: preferences.ignoredIds ?? [],
+                manualMappings: preferences.manualMappings ?? {},
+              }
+            : {}),
+        }),
       });
       const data = await parseMonitorJsonResponse<{ report: TReport }>(res);
       return data.report;

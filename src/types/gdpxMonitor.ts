@@ -72,6 +72,7 @@ export interface GdpxCheckReport {
   unchangedCount: number;
   ignoredCount?: number;
   actionableCount: number;
+  ignoredIds?: string[];
   manualMappings?: Record<string, ManualRowMapping>;
   summaryDe: string;
   summaryEn: string;

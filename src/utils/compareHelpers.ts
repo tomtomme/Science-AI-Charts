@@ -40,7 +40,7 @@ export const SLOT_THEME: Record<
     badgeBg: 'bg-blue-600 text-white',
     text: 'text-blue-600 dark:text-blue-400',
     barActive: 'bg-blue-600 dark:bg-blue-500',
-    barDim: 'bg-blue-400/65 dark:bg-blue-500/45',
+    barDim: 'bg-blue-400/25 dark:bg-blue-500/20',
     ring: 'hover:border-blue-400 dark:hover:border-blue-500 focus-visible:ring-blue-500',
     rowSelected: 'bg-blue-50/90 dark:bg-blue-950/40',
     borderTop: 'border-t-blue-500',
@@ -50,7 +50,7 @@ export const SLOT_THEME: Record<
     badgeBg: 'bg-rose-600 text-white',
     text: 'text-rose-600 dark:text-rose-400',
     barActive: 'bg-rose-600 dark:bg-rose-500',
-    barDim: 'bg-rose-400/65 dark:bg-rose-500/45',
+    barDim: 'bg-rose-400/25 dark:bg-rose-500/20',
     ring: 'hover:border-rose-400 dark:hover:border-rose-500 focus-visible:ring-rose-500',
     rowSelected: 'bg-rose-50/90 dark:bg-rose-950/40',
     borderTop: 'border-t-rose-500',
@@ -60,7 +60,7 @@ export const SLOT_THEME: Record<
     badgeBg: 'bg-violet-600 text-white',
     text: 'text-violet-600 dark:text-violet-400',
     barActive: 'bg-violet-600 dark:bg-violet-500',
-    barDim: 'bg-violet-400/65 dark:bg-violet-500/45',
+    barDim: 'bg-violet-400/25 dark:bg-violet-500/20',
     ring: 'hover:border-violet-400 dark:hover:border-violet-500 focus-visible:ring-violet-500',
     rowSelected: 'bg-violet-50/90 dark:bg-violet-950/40',
     borderTop: 'border-t-violet-500',
@@ -70,7 +70,7 @@ export const SLOT_THEME: Record<
     badgeBg: 'bg-emerald-600 text-white',
     text: 'text-emerald-600 dark:text-emerald-400',
     barActive: 'bg-emerald-600 dark:bg-emerald-500',
-    barDim: 'bg-emerald-400/65 dark:bg-emerald-500/45',
+    barDim: 'bg-emerald-400/25 dark:bg-emerald-500/20',
     ring: 'hover:border-emerald-400 dark:hover:border-emerald-500 focus-visible:ring-emerald-500',
     rowSelected: 'bg-emerald-50/90 dark:bg-emerald-950/40',
     borderTop: 'border-t-emerald-500',
@@ -80,7 +80,7 @@ export const SLOT_THEME: Record<
     badgeBg: 'bg-amber-600 text-white',
     text: 'text-amber-600 dark:text-amber-400',
     barActive: 'bg-amber-600 dark:bg-amber-500',
-    barDim: 'bg-amber-400/65 dark:bg-amber-500/45',
+    barDim: 'bg-amber-400/25 dark:bg-amber-500/20',
     ring: 'hover:border-amber-400 dark:hover:border-amber-500 focus-visible:ring-amber-500',
     rowSelected: 'bg-amber-50/90 dark:bg-amber-950/40',
     borderTop: 'border-t-amber-500',
@@ -90,7 +90,7 @@ export const SLOT_THEME: Record<
     badgeBg: 'bg-cyan-600 text-white',
     text: 'text-cyan-600 dark:text-cyan-400',
     barActive: 'bg-cyan-600 dark:bg-cyan-500',
-    barDim: 'bg-cyan-400/65 dark:bg-cyan-500/45',
+    barDim: 'bg-cyan-400/25 dark:bg-cyan-500/20',
     ring: 'hover:border-cyan-400 dark:hover:border-cyan-500 focus-visible:ring-cyan-500',
     rowSelected: 'bg-cyan-50/90 dark:bg-cyan-950/40',
     borderTop: 'border-t-cyan-500',
@@ -100,7 +100,7 @@ export const SLOT_THEME: Record<
     badgeBg: 'bg-fuchsia-600 text-white',
     text: 'text-fuchsia-600 dark:text-fuchsia-400',
     barActive: 'bg-fuchsia-600 dark:bg-fuchsia-500',
-    barDim: 'bg-fuchsia-400/65 dark:bg-fuchsia-500/45',
+    barDim: 'bg-fuchsia-400/25 dark:bg-fuchsia-500/20',
     ring: 'hover:border-fuchsia-400 dark:hover:border-fuchsia-500 focus-visible:ring-fuchsia-500',
     rowSelected: 'bg-fuchsia-50/90 dark:bg-fuchsia-950/40',
     borderTop: 'border-t-fuchsia-500',
@@ -110,7 +110,7 @@ export const SLOT_THEME: Record<
     badgeBg: 'bg-lime-600 text-white',
     text: 'text-lime-600 dark:text-lime-400',
     barActive: 'bg-lime-600 dark:bg-lime-500',
-    barDim: 'bg-lime-400/65 dark:bg-lime-500/45',
+    barDim: 'bg-lime-400/25 dark:bg-lime-500/20',
     ring: 'hover:border-lime-400 dark:hover:border-lime-500 focus-visible:ring-lime-500',
     rowSelected: 'bg-lime-50/90 dark:bg-lime-950/40',
     borderTop: 'border-t-lime-500',
@@ -136,6 +136,13 @@ export interface CategoryComparisonRow {
   margin: number;
   isTie: boolean;
   isRescaled: boolean;
+}
+
+export interface CompareSummaryStats {
+  wins: Record<CompareSlot, number>;
+  ties: number;
+  comparableCount: number;
+  bestEdge: Record<CompareSlot, { label: string; margin: number; color: string } | null>;
 }
 
 export function getScoreForMode(model: ModelRecord, mode: ScoreMode): number | null {

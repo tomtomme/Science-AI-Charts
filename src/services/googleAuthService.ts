@@ -17,8 +17,10 @@ export const WORKSPACE_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets.readonly',
 ] as const;
 
-const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
+export const firebaseApp: FirebaseApp =
+  getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+export const firebaseAuth = getAuth(firebaseApp);
+const auth = firebaseAuth;
 
 const provider = new GoogleAuthProvider();
 for (const scope of WORKSPACE_SCOPES) {

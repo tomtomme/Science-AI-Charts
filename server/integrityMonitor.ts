@@ -395,7 +395,7 @@ export function buildIntegrityDiffs(
         currentColAN: null,
         currentColANIsBold: null,
         reason:
-          'Kein passendes Modell im Sheet gefunden — manuell zuordnen oder Zeile im Sheet anlegen.',
+          'Kein passendes Modell gefunden — manuell zuordnen.',
       };
     }
 
@@ -408,7 +408,7 @@ export function buildIntegrityDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColAN: null,
         currentColANIsBold: bestMatch.colANIsBold,
-        reason: 'Spalte AN ist in dieser Zeile noch leer (wird fett als offizieller Wert eingetragen).',
+        reason: 'Wert fehlt noch (wird offiziell übernommen).',
       };
     }
 
@@ -425,7 +425,7 @@ export function buildIntegrityDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColAN: bestMatch.colAN,
         currentColANIsBold: false,
-        reason: `Nicht-fetter Schätzwert (${bestMatch.colAN}) → offiziellen Integrity-Score (${liveFormatted}, fett) übernehmen.`,
+        reason: `Schätzwert (${bestMatch.colAN}) → offiziellen Wert (${liveFormatted}) übernehmen.`,
       };
     }
 
@@ -438,7 +438,7 @@ export function buildIntegrityDiffs(
         sheetRowNumber: bestMatch.sheetRowNumber,
         currentColAN: bestMatch.colAN,
         currentColANIsBold: bestMatch.colANIsBold,
-        reason: `Offizieller Score weicht ab (${bestMatch.colAN} → ${liveFormatted}).`,
+        reason: `Offizieller Wert weicht ab (${bestMatch.colAN} → ${liveFormatted}).`,
       };
     }
 
@@ -450,13 +450,13 @@ export function buildIntegrityDiffs(
       sheetRowNumber: bestMatch.sheetRowNumber,
       currentColAN: bestMatch.colAN,
       currentColANIsBold: bestMatch.colANIsBold,
-      reason: 'Synchron (fett/offiziell).',
+      reason: 'Synchron.',
     };
   });
 }
 
 function summarizeIntegrityReportCounts(
-  totalSourceModels: number,
+  _totalSourceModels: number,
   diffs: IntegrityDiffItem[],
   hasSheetModels: boolean
 ) {
@@ -465,32 +465,34 @@ function summarizeIntegrityReportCounts(
   let summaryEn = '';
 
   if (!hasSheetModels) {
-    summaryDe = `${totalSourceModels} LLMs live auf Integrity-Bench geladen.`;
-    summaryEn = `Loaded ${totalSourceModels} live LLMs from Integrity-Bench.`;
+    summaryDe = 'Live-Daten von Integrity-Bench geladen.';
+    summaryEn = 'Live data loaded from Integrity-Bench.';
   } else if (counts.actionableCount > 0) {
     const partsDe: string[] = [];
     const partsEn: string[] = [];
     if (counts.unmatchedCount > 0) {
-      partsDe.push(`${counts.unmatchedCount} ohne Sheet-Zeile`);
-      partsEn.push(`${counts.unmatchedCount} without Sheet match`);
+      partsDe.push(`${counts.unmatchedCount} nicht zugeordnet`);
+      partsEn.push(`${counts.unmatchedCount} unmatched`);
     }
     if (counts.missingCount > 0) {
-      partsDe.push(`${counts.missingCount} fehlend in AN`);
-      partsEn.push(`${counts.missingCount} missing in AN`);
+      partsDe.push(`${counts.missingCount} fehlend`);
+      partsEn.push(`${counts.missingCount} missing`);
     }
     if (counts.overwriteEstimateCount > 0) {
-      partsDe.push(`${counts.overwriteEstimateCount} nicht-fette Schätzwerte`);
-      partsEn.push(`${counts.overwriteEstimateCount} non-bold estimate(s)`);
+      partsDe.push(
+        counts.overwriteEstimateCount === 1 ? '1 Schätzwert' : `${counts.overwriteEstimateCount} Schätzwerte`
+      );
+      partsEn.push(`${counts.overwriteEstimateCount} estimate(s)`);
     }
     if (counts.changedCount > 0) {
-      partsDe.push(`${counts.changedCount} geänderte Score(s)`);
-      partsEn.push(`${counts.changedCount} changed score(s)`);
+      partsDe.push(`${counts.changedCount} geändert`);
+      partsEn.push(`${counts.changedCount} changed`);
     }
-    summaryDe = `${partsDe.join(', ')} (${totalSourceModels} LLMs auf Integrity-Bench).`;
-    summaryEn = `${partsEn.join(', ')} (${totalSourceModels} LLMs on Integrity-Bench).`;
+    summaryDe = `${partsDe.join(', ')}.`;
+    summaryEn = `${partsEn.join(', ')}.`;
   } else {
-    summaryDe = `Alle ${totalSourceModels} Integrity-Bench-LLMs sind in Spalte AN aktuell (fett).`;
-    summaryEn = `All ${totalSourceModels} Integrity-Bench LLMs are synced & bold in Column AN.`;
+    summaryDe = 'Alle Einträge sind aktuell.';
+    summaryEn = 'All entries are up to date.';
   }
 
   return { ...counts, summaryDe, summaryEn };
@@ -554,11 +556,16 @@ export async function getIntegrityMonitorStatus(): Promise<IntegrityMonitorStatu
 export async function runIntegrityCheck(options?: {
   models?: IntegritySheetModelSnapshot[];
   trigger?: 'manual' | 'daily_auto';
+  replaceAll?: boolean;
+  ignoredIds?: string[];
+  manualMappings?: Record<string, ManualRowMapping>;
 }): Promise<IntegrityCheckReport> {
   return runtime.runCheck(options);
 }
 
 export async function updateIntegrityPreferences(options: {
+  replaceAll?: boolean;
+  ignoredIds?: string[];
   ignoreIds?: string[];
   unignoreIds?: string[];
   manualMappings?: Record<string, ManualRowMapping>;

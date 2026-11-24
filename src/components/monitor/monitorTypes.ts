@@ -58,6 +58,82 @@ export function formatExactScore(
   return lang === 'de' ? str.replace('.', ',') : str;
 }
 
+export function formatScoreDiff(
+  currentScore: number,
+  liveScore: number,
+  lang: Language
+): {
+  pointDiff: number;
+  pointFormatted: string;
+  pctDiff: number | null;
+  absPctDiff: number;
+  pctFormatted: string;
+  isLargeDiff: boolean;
+} {
+  const countDecimals = (v: number): number => {
+    const s = String(v);
+    const dot = s.indexOf('.');
+    return dot !== -1 ? s.length - dot - 1 : 0;
+  };
+  const decimals = Math.min(4, Math.max(countDecimals(currentScore), countDecimals(liveScore)));
+  const rawDiff = liveScore - currentScore;
+  const roundedPoint = Number(rawDiff.toFixed(decimals));
+  const absPoint = Math.abs(roundedPoint);
+
+  let pointFormatted: string;
+  if (roundedPoint === 0) {
+    const zeroStr = decimals > 0 ? (0).toFixed(decimals) : '0';
+    pointFormatted = lang === 'de' ? zeroStr.replace('.', ',') : zeroStr;
+  } else {
+    const sign = roundedPoint > 0 ? '+' : '-';
+    const absStr = decimals > 0 ? absPoint.toFixed(decimals) : String(absPoint);
+    pointFormatted = `${sign}${lang === 'de' ? absStr.replace('.', ',') : absStr}`;
+  }
+
+  if (currentScore === 0) {
+    if (roundedPoint === 0) {
+      return {
+        pointDiff: 0,
+        pointFormatted,
+        pctDiff: 0,
+        absPctDiff: 0,
+        pctFormatted: lang === 'de' ? '0,0%' : '0.0%',
+        isLargeDiff: false,
+      };
+    }
+    return {
+      pointDiff: roundedPoint,
+      pointFormatted,
+      pctDiff: null,
+      absPctDiff: Infinity,
+      pctFormatted: roundedPoint > 0 ? '+∞%' : '-∞%',
+      isLargeDiff: true,
+    };
+  }
+
+  const rawPct = (rawDiff / Math.abs(currentScore)) * 100;
+  const roundedPct = Number(rawPct.toFixed(1));
+  const absPct = Math.abs(roundedPct);
+
+  let pctFormatted: string;
+  if (roundedPct === 0) {
+    pctFormatted = lang === 'de' ? '0,0%' : '0.0%';
+  } else {
+    const pctSign = roundedPct > 0 ? '+' : '-';
+    const pctAbsStr = absPct.toFixed(1);
+    pctFormatted = `${pctSign}${lang === 'de' ? pctAbsStr.replace('.', ',') : pctAbsStr}%`;
+  }
+
+  return {
+    pointDiff: roundedPoint,
+    pointFormatted,
+    pctDiff: roundedPct,
+    absPctDiff: Math.abs(rawPct),
+    pctFormatted,
+    isLargeDiff: Math.abs(rawPct) > 5,
+  };
+}
+
 export function decimalsToPattern(val: number, minDecimals = 0): string {
   const str = String(val);
   const dot = str.indexOf('.');

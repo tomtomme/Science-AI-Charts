@@ -15,7 +15,7 @@ const SocialBrandIcon: React.FC<{ label: string }> = ({ label }) => {
     return (
       <svg
         viewBox="0 0 24 24"
-        className="w-4 h-4 text-[#DC2626] dark:text-[#F87171]"
+        className="w-5 h-5 sm:w-[18px] sm:h-[18px] text-[#DC2626] dark:text-[#F87171]"
         aria-hidden="true"
       >
         <path
@@ -31,7 +31,7 @@ const SocialBrandIcon: React.FC<{ label: string }> = ({ label }) => {
     return (
       <svg
         viewBox="0 0 24 24"
-        className="w-4 h-4 text-slate-900 dark:text-slate-100"
+        className="w-5 h-5 sm:w-[18px] sm:h-[18px] text-slate-900 dark:text-slate-100"
         fill="currentColor"
         aria-hidden="true"
       >
@@ -42,7 +42,7 @@ const SocialBrandIcon: React.FC<{ label: string }> = ({ label }) => {
 
   if (key.includes('orcid')) {
     return (
-      <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true">
+      <svg viewBox="0 0 24 24" className="w-5 h-5 sm:w-[18px] sm:h-[18px]" aria-hidden="true">
         <circle cx="12" cy="12" r="11" className="fill-[#65A30D] dark:fill-[#84CC16]" />
         <path
           fill="#ffffff"
@@ -54,7 +54,7 @@ const SocialBrandIcon: React.FC<{ label: string }> = ({ label }) => {
 
   if (key.includes('zotero')) {
     return (
-      <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true">
+      <svg viewBox="0 0 24 24" className="w-5 h-5 sm:w-[18px] sm:h-[18px]" aria-hidden="true">
         <rect
           x="2"
           y="2"
@@ -75,7 +75,7 @@ const SocialBrandIcon: React.FC<{ label: string }> = ({ label }) => {
     return (
       <svg
         viewBox="0 0 24 24"
-        className="w-4 h-4 text-[#1D4ED8] dark:text-[#60A5FA]"
+        className="w-5 h-5 sm:w-[18px] sm:h-[18px] text-[#1D4ED8] dark:text-[#60A5FA]"
         aria-hidden="true"
       >
         <path fill="currentColor" d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3z" />
@@ -89,7 +89,7 @@ const SocialBrandIcon: React.FC<{ label: string }> = ({ label }) => {
 
   if (key.includes('researchgate')) {
     return (
-      <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true">
+      <svg viewBox="0 0 24 24" className="w-5 h-5 sm:w-[18px] sm:h-[18px]" aria-hidden="true">
         <rect
           x="2"
           y="2"
@@ -115,7 +115,7 @@ const SocialBrandIcon: React.FC<{ label: string }> = ({ label }) => {
 
   if (key.includes('linkedin')) {
     return (
-      <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#0A66C2] dark:text-[#60A5FA]" fill="currentColor" aria-hidden="true">
+      <svg viewBox="0 0 24 24" className="w-5 h-5 sm:w-[18px] sm:h-[18px] text-[#0A66C2] dark:text-[#60A5FA]" fill="currentColor" aria-hidden="true">
         <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
       </svg>
     );
@@ -123,13 +123,13 @@ const SocialBrandIcon: React.FC<{ label: string }> = ({ label }) => {
 
   if (key === 'x' || key.includes('twitter')) {
     return (
-      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-slate-900 dark:text-slate-100" fill="currentColor" aria-hidden="true">
+      <svg viewBox="0 0 24 24" className="w-[18px] h-[18px] sm:w-4 sm:h-4 text-slate-900 dark:text-slate-100" fill="currentColor" aria-hidden="true">
         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
       </svg>
     );
   }
 
-  return <Globe className="w-4 h-4 text-slate-700 dark:text-slate-300" aria-hidden="true" />;
+  return <Globe className="w-5 h-5 sm:w-[18px] sm:h-[18px] text-slate-700 dark:text-slate-300" aria-hidden="true" />;
 };
 
 export const AuthorSocialSubtitle: React.FC<AuthorSocialSubtitleProps> = ({
@@ -176,7 +176,7 @@ export const AuthorSocialSubtitle: React.FC<AuthorSocialSubtitleProps> = ({
 
       {authorMeta.links.length > 0 && (
         <div
-          className="inline-flex flex-wrap items-center gap-1"
+          className="inline-flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-1.5"
           role="group"
           aria-label={
             lang === 'de'
@@ -192,7 +192,7 @@ export const AuthorSocialSubtitle: React.FC<AuthorSocialSubtitleProps> = ({
               rel="noopener noreferrer"
               title={link.label}
               aria-label={`${authorMeta.authorName || 'Thomas Langkamp'} – ${link.label}`}
-              className="inline-flex items-center justify-center w-[26px] h-[26px] rounded-md border border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600 shadow-2xs transition-all hover:scale-105 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
+              className="inline-flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600 shadow-2xs transition-all hover:scale-105 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
             >
               <SocialBrandIcon label={link.label} />
             </a>
