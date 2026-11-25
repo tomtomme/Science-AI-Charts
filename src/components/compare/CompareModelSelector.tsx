@@ -5,6 +5,7 @@ import { Language } from '../../utils/i18n';
 import { matchesSearchQuery } from '../../utils/searchUtils';
 import {
   CompareSlot,
+  SlotTheme,
   SLOT_THEME,
   getScoreForMode,
   formatNumber,
@@ -20,6 +21,8 @@ export interface CompareModelSelectorProps {
   scoreMode: ScoreMode;
   lang: Language;
   alignRight?: boolean;
+  compact?: boolean;
+  theme?: SlotTheme;
   onSelect: (modelId: string) => void;
 }
 
@@ -32,6 +35,8 @@ export const CompareModelSelector: React.FC<CompareModelSelectorProps> = ({
   scoreMode,
   lang,
   alignRight = false,
+  compact = false,
+  theme: propTheme,
   onSelect,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -76,7 +81,7 @@ export const CompareModelSelector: React.FC<CompareModelSelectorProps> = ({
     });
   }, [models, query, tierFilter]);
 
-  const theme = SLOT_THEME[slot];
+  const theme = propTheme ?? SLOT_THEME[slot];
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -85,7 +90,9 @@ export const CompareModelSelector: React.FC<CompareModelSelectorProps> = ({
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        className={`w-full flex items-center justify-between gap-1.5 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/70 transition-colors cursor-pointer text-left focus:outline-hidden focus-visible:ring-2 ${theme.ring}`}
+        className={`w-full flex items-center justify-between gap-1.5 ${
+          compact ? 'px-1.5 py-1' : 'px-2 py-1.5'
+        } rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/70 transition-colors cursor-pointer text-left focus:outline-hidden focus-visible:ring-2 ${theme.ring}`}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span

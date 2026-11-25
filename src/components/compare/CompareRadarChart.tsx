@@ -1,15 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { ExternalLink, Info, BookOpen, X, Eye, EyeOff } from 'lucide-react';
+import { Info, BookOpen, X, ExternalLink } from 'lucide-react';
 import { ModelRecord, ScoreMode } from '../../types';
 import { Language } from '../../utils/i18n';
 import {
   BENCHMARK_ANCHOR_MAP,
   CompareSlot,
   CompareSummaryStats,
-  SLOT_THEME,
+  SlotTheme,
   CategoryComparisonRow,
   formatNumber,
+  isZoomedCompany,
 } from '../../utils/compareHelpers';
+import { CompareModelsCard } from './CompareModelsCard';
 
 function wrapRadarLabel(label: string, maxChars = 16): string[] {
   const clean = label.trim();
@@ -38,8 +40,14 @@ export interface CompareRadarChartProps {
   categoryComparisons: CategoryComparisonRow[];
   activeSlots: { slot: CompareSlot; model: ModelRecord }[];
   primaryScores: { slot: CompareSlot; model: ModelRecord; score: number | null }[];
+  slotThemes: Record<CompareSlot, SlotTheme>;
+  pickerModels: ModelRecord[];
+  onSelectSlot: (slotIndex: number, modelId: string) => void;
+  onSelectCompany?: (company: string) => void;
+  openChatbotLabel: string;
   summaryStats: CompareSummaryStats;
   scoreMode: ScoreMode;
+  activeScoreLabel?: string;
   scoreModeOldLabel: string;
   rankMap: Map<string, number>;
   lang: Language;
@@ -47,14 +55,27 @@ export interface CompareRadarChartProps {
   onToggleExpandCategory: (categoryId: string) => void;
   onScrollToParagraph?: (targetId: string) => void;
   sourceLinkLabel: string;
+  hoveredSlot?: CompareSlot | null;
+  onHoverSlot?: (slot: CompareSlot | null) => void;
+  pinnedSlot?: CompareSlot | null;
+  onPinSlot?: (slot: CompareSlot | null) => void;
+  hiddenSlots?: Set<CompareSlot>;
+  onToggleVisibility?: (slot: CompareSlot) => void;
+  onShowAllSlots?: () => void;
 }
 
 export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
   categoryComparisons,
   activeSlots,
   primaryScores,
+  slotThemes,
+  pickerModels,
+  onSelectSlot,
+  onSelectCompany,
+  openChatbotLabel,
   summaryStats,
   scoreMode,
+  activeScoreLabel,
   scoreModeOldLabel,
   rankMap,
   lang,
@@ -62,13 +83,33 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
   onToggleExpandCategory,
   onScrollToParagraph,
   sourceLinkLabel,
+  hoveredSlot: controlledHoveredSlot,
+  onHoverSlot: controlledOnHoverSlot,
+  pinnedSlot: controlledPinnedSlot,
+  onPinSlot: controlledOnPinSlot,
+  hiddenSlots: controlledHiddenSlots,
+  onToggleVisibility: controlledOnToggleVisibility,
+  onShowAllSlots: controlledOnShowAllSlots,
 }) => {
-  const [hoveredSlot, setHoveredSlot] = useState<CompareSlot | null>(null);
-  const [pinnedSlot, setPinnedSlot] = useState<CompareSlot | null>(null);
-  const [hiddenSlots, setHiddenSlots] = useState<Set<CompareSlot>>(() => new Set());
+  const [localHoveredSlot, setLocalHoveredSlot] = useState<CompareSlot | null>(null);
+  const [localPinnedSlot, setLocalPinnedSlot] = useState<CompareSlot | null>(null);
+  const [localHiddenSlots, setLocalHiddenSlots] = useState<Set<CompareSlot>>(() => new Set());
   const [hoveredAxisIdx, setHoveredAxisIdx] = useState<number | null>(null);
   const [selectedAxisIdx, setSelectedAxisIdx] = useState<number>(0);
   const [scaleMode, setScaleMode] = useState<'full' | 'zoom'>('full');
+
+  const hoveredSlot = controlledHoveredSlot !== undefined ? controlledHoveredSlot : localHoveredSlot;
+  const setHoveredSlot = controlledOnHoverSlot ?? setLocalHoveredSlot;
+  const pinnedSlot = controlledPinnedSlot !== undefined ? controlledPinnedSlot : localPinnedSlot;
+  const setPinnedSlot = (val: CompareSlot | null | ((prev: CompareSlot | null) => CompareSlot | null)) => {
+    const resolved = typeof val === 'function' ? val(pinnedSlot) : val;
+    if (controlledOnPinSlot) {
+      controlledOnPinSlot(resolved);
+    } else {
+      setLocalPinnedSlot(resolved);
+    }
+  };
+  const hiddenSlots = controlledHiddenSlots ?? localHiddenSlots;
 
   const activeSlotSet = useMemo(
     () => new Set(activeSlots.map((s) => s.slot)),
@@ -188,7 +229,11 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
       : 0.06;
 
   const toggleSlotVisibility = (slot: CompareSlot) => {
-    setHiddenSlots((prev) => {
+    if (controlledOnToggleVisibility) {
+      controlledOnToggleVisibility(slot);
+      return;
+    }
+    setLocalHiddenSlots((prev) => {
       const next = new Set(prev);
       if (next.has(slot)) {
         next.delete(slot);
@@ -255,7 +300,7 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
           {hiddenSlots.size > 0 && (
             <button
               type="button"
-              onClick={() => setHiddenSlots(new Set())}
+              onClick={() => (controlledOnShowAllSlots ? controlledOnShowAllSlots() : setLocalHiddenSlots(new Set()))}
               className="px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               {lang === 'de' ? 'Alle einblenden' : 'Show all'}
@@ -264,8 +309,8 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
         </div>
       </div>
 
-      {/* Main Responsive Grid: Radar SVG + Interactive Inspector */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(290px,1fr)] gap-3 items-start">
+      {/* Main Responsive Grid: Radar SVG + Unified Compact Cards */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.38fr)_minmax(360px,1fr)] gap-3 items-start">
         {/* Left: SVG Spider / Radar Chart */}
         <div className="relative rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 p-1 sm:p-1.5">
           <svg
@@ -349,7 +394,7 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
 
             {/* Model Polygons (2 to 8 models, gaps dashed cleanly for null values) */}
             {orderedSlotsForRender.map(({ slot }) => {
-              const theme = SLOT_THEME[slot];
+              const theme = slotThemes[slot];
               const isFocused = focusedSlot === slot;
               const isDimmed = focusedSlot !== null && !isFocused;
 
@@ -502,11 +547,11 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
                   axisLeaderText = lang === 'de' ? 'Patt' : 'Tie';
                 } else {
                   axisLeaderText = `${ties.map((t) => t.slot).join('/')} ${formatNumber(topV, 1)}%`;
-                  axisLeaderColor = SLOT_THEME[ties[0].slot].hex;
+                  axisLeaderColor = slotThemes[ties[0].slot].hex;
                 }
               } else if (visibleEntries.length === 1) {
                 axisLeaderText = `${visibleEntries[0].slot} ${formatNumber(visibleEntries[0].val, 1)}%`;
-                axisLeaderColor = SLOT_THEME[visibleEntries[0].slot].hex;
+                axisLeaderColor = slotThemes[visibleEntries[0].slot].hex;
               }
 
               const spokeMid = getPoint(idx, R * 0.55);
@@ -579,224 +624,204 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
                 </g>
               );
             })}
+
+            {/* Per-Model Developer Favicon Badges anchored cleanly onto each polygon */}
+            {(() => {
+              interface Candidate {
+                slot: CompareSlot;
+                model: ModelRecord;
+                axisIdx: number;
+                val: number;
+                pt: { x: number; y: number };
+                score: number;
+              }
+              const candidates: Candidate[] = [];
+
+              for (const { slot, model } of orderedSlotsForRender) {
+                for (let idx = 0; idx < categoryComparisons.length; idx++) {
+                  const row = categoryComparisons[idx];
+                  const entry = row.entries.find((e) => e.slot === slot);
+                  const val = entry?.val ?? null;
+                  if (val === null) continue;
+                  const others = row.entries.filter(
+                    (e) => e.slot !== slot && !hiddenSlots.has(e.slot) && e.val !== null
+                  );
+                  const minDiff =
+                    others.length > 0
+                      ? Math.min(...others.map((o) => Math.abs(val - (o.val as number))))
+                      : 30;
+                  const avgOther =
+                    others.length > 0
+                      ? others.reduce((acc, o) => acc + (o.val as number), 0) / others.length
+                      : val;
+                  const lead = val - avgOther;
+                  const pt = getPoint(idx, ratioForVal(val) * R);
+                  // Prefer vertices clearly separated from other polygons & strong values
+                  const score = minDiff * 1.6 + lead * 0.7 + val * 0.15;
+                  candidates.push({ slot, model, axisIdx: idx, val, pt, score });
+                }
+              }
+
+              const assignedBySlot = new Map<CompareSlot, Candidate>();
+              const usedAxes = new Set<number>();
+              const axisCounts = new Map<number, number>();
+
+              // Pass 1: greedy assignment preferring unique unclaimed axes
+              const sortedCand = [...candidates].sort((a, b) => b.score - a.score);
+              for (const c of sortedCand) {
+                if (assignedBySlot.has(c.slot) || usedAxes.has(c.axisIdx)) continue;
+                assignedBySlot.set(c.slot, c);
+                usedAxes.add(c.axisIdx);
+                axisCounts.set(c.axisIdx, 1);
+              }
+              // Pass 2: fallback if more visible models than valid axes
+              for (const c of sortedCand) {
+                if (assignedBySlot.has(c.slot)) continue;
+                assignedBySlot.set(c.slot, c);
+                axisCounts.set(c.axisIdx, (axisCounts.get(c.axisIdx) ?? 0) + 1);
+              }
+
+              const seenOnAxis = new Map<number, number>();
+
+              return orderedSlotsForRender.map(({ slot, model }) => {
+                const chosen = assignedBySlot.get(slot);
+                if (!chosen) return null;
+                const theme = slotThemes[slot];
+                const isFocused = focusedSlot === slot;
+                const isDimmed = focusedSlot !== null && !isFocused;
+
+                const onAxisOrder = seenOnAxis.get(chosen.axisIdx) ?? 0;
+                seenOnAxis.set(chosen.axisIdx, onAxisOrder + 1);
+
+                const angle = getAxisAngle(chosen.axisIdx);
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                const baseR = ratioForVal(chosen.val) * R;
+                // Keep inside outer ring comfortably & stagger if multiple badges share an axis
+                const radialNudge =
+                  onAxisOrder > 0
+                    ? -18 * onAxisOrder
+                    : baseR > R - 14
+                    ? -10
+                    : baseR < 26
+                    ? 12
+                    : 0;
+                const tangentNudge = onAxisOrder > 0 ? (onAxisOrder % 2 === 1 ? 14 : -14) : 0;
+                const targetR = Math.max(18, Math.min(R - 12, baseR + radialNudge));
+                const bx = cx + targetR * cos + tangentNudge * -sin;
+                const by = cy + targetR * sin + tangentNudge * cos;
+                const moved = Math.hypot(bx - chosen.pt.x, by - chosen.pt.y) > 4;
+
+                const badgeR = isFocused ? 11.5 : 10;
+                const imgSize = isZoomedCompany(model) ? badgeR * 1.9 : badgeR * 1.48;
+                const clipId = `radar-fav-clip-${slot}`;
+
+                return (
+                  <g
+                    key={`radar-fav-${slot}`}
+                    className="cursor-pointer transition-opacity duration-150"
+                    opacity={isDimmed ? 0.25 : 1}
+                    onMouseEnter={() => setHoveredSlot(slot)}
+                    onMouseLeave={() => setHoveredSlot(null)}
+                    onClick={() => setPinnedSlot((prev) => (prev === slot ? null : slot))}
+                  >
+                    <title>{`${slot} · ${model.displayName} (${model.companyName})`}</title>
+                    {moved && (
+                      <line
+                        x1={chosen.pt.x}
+                        y1={chosen.pt.y}
+                        x2={bx}
+                        y2={by}
+                        stroke={theme.hex}
+                        strokeWidth={1.3}
+                        strokeOpacity={0.75}
+                      />
+                    )}
+                    <defs>
+                      <clipPath id={clipId}>
+                        <circle cx={bx} cy={by} r={badgeR - 1.5} />
+                      </clipPath>
+                    </defs>
+                    <circle
+                      cx={bx}
+                      cy={by}
+                      r={badgeR}
+                      fill="#FFFFFF"
+                      stroke={theme.hex}
+                      strokeWidth={isFocused ? 2.5 : 2}
+                      style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.22))' }}
+                    />
+                    <image
+                      href={model.faviconUrl}
+                      x={bx - imgSize / 2}
+                      y={by - imgSize / 2}
+                      width={imgSize}
+                      height={imgSize}
+                      preserveAspectRatio="xMidYMid meet"
+                      clipPath={`url(#${clipId})`}
+                      pointerEvents="none"
+                    />
+                    <circle
+                      cx={bx + badgeR * 0.72}
+                      cy={by + badgeR * 0.72}
+                      r={5.3}
+                      fill={theme.hex}
+                      stroke="#FFFFFF"
+                      strokeWidth={1.1}
+                      pointerEvents="none"
+                    />
+                    <text
+                      x={bx + badgeR * 0.72}
+                      y={by + badgeR * 0.72 + 2.7}
+                      textAnchor="middle"
+                      fontSize="7.5"
+                      fontFamily="var(--font-mono)"
+                      fontWeight={800}
+                      fill="#FFFFFF"
+                      pointerEvents="none"
+                    >
+                      {slot}
+                    </text>
+                  </g>
+                );
+              });
+            })()}
           </svg>
         </div>
 
-        {/* Right: Interactive Legend & Axis Inspector */}
+        {/* Right: 2 Compact Cards (Unified Models + Wins/Edges Card & Axis Inspector Card) */}
         <div className="space-y-3 min-w-0">
-          {/* Active Models Legend / Highlight & Visibility Controls */}
-          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 overflow-hidden">
-            <div className="px-3 py-2 bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
-              <span>
-                {lang === 'de'
-                  ? `Modelle im Netz (${visibleSlots.length}/${activeSlots.length})`
-                  : `Models on Radar (${visibleSlots.length}/${activeSlots.length})`}
-              </span>
-              {effectivePinnedSlot && (
-                <button
-                  type="button"
-                  onClick={() => setPinnedSlot(null)}
-                  className="text-xs normal-case font-sans font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                >
-                  {lang === 'de' ? 'Fokus lösen' : 'Clear focus'}
-                </button>
-              )}
-            </div>
-
-            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-              {sortedPrimaryScores.map(({ slot, model, score }) => {
-                const theme = SLOT_THEME[slot];
-                const isHidden = hiddenSlots.has(slot);
-                const isPinned = effectivePinnedSlot === slot;
-                const isFocused = focusedSlot === slot;
-                const rank = rankMap.get(model.id);
-
-                return (
-                  <div
-                    key={slot}
-                    onMouseEnter={() => {
-                      if (!isHidden) setHoveredSlot(slot);
-                    }}
-                    onMouseLeave={() => setHoveredSlot(null)}
-                    className={`px-3 py-1.5 flex items-center justify-between gap-2 transition-colors ${
-                      isFocused
-                        ? theme.rowSelected
-                        : isHidden
-                        ? 'opacity-45 bg-slate-50/40 dark:bg-slate-950/30'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isHidden) {
-                          toggleSlotVisibility(slot);
-                          setPinnedSlot(slot);
-                        } else {
-                          setPinnedSlot((prev) => (prev === slot ? null : slot));
-                        }
-                      }}
-                      className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer focus:outline-hidden"
-                      title={
-                        lang === 'de'
-                          ? isPinned
-                            ? 'Hervorhebung aufheben'
-                            : 'Modell im Netz hervorheben'
-                          : isPinned
-                          ? 'Unpin highlight'
-                          : 'Highlight model on radar'
-                      }
-                    >
-                      <span
-                        className={`w-5 h-5 rounded text-xs font-mono font-bold flex items-center justify-center shrink-0 ${theme.badgeBg}`}
-                      >
-                        {slot}
-                      </span>
-                      <span
-                        className={`text-xs font-semibold truncate ${
-                          isFocused
-                            ? theme.text
-                            : 'text-slate-800 dark:text-slate-200'
-                        }`}
-                      >
-                        {model.displayName}
-                      </span>
-                      {rank !== undefined && (
-                        <span className="text-xs font-mono text-slate-600 dark:text-slate-400 shrink-0">
-                          #{rank}
-                        </span>
-                      )}
-                    </button>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className={`font-mono tabular-nums text-xs font-bold ${theme.text}`}>
-                        {score !== null ? formatNumber(score, 1) : '—'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => toggleSlotVisibility(slot)}
-                        className="p-1 rounded hover:bg-slate-200/70 dark:hover:bg-slate-700/70 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                        aria-label={
-                          isHidden
-                            ? lang === 'de'
-                              ? `${model.displayName} einblenden`
-                              : `Show ${model.displayName}`
-                            : lang === 'de'
-                            ? `${model.displayName} ausblenden`
-                            : `Hide ${model.displayName}`
-                        }
-                        title={
-                          isHidden
-                            ? lang === 'de'
-                              ? 'Im Diagramm einblenden'
-                              : 'Show on radar'
-                            : lang === 'de'
-                            ? 'Im Diagramm ausblenden'
-                            : 'Hide on radar'
-                        }
-                      >
-                        {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Integrated Category Wins inside "Modelle im Netz" */}
-            <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/35 space-y-1.5">
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
-                {scoreMode === 'old'
-                  ? lang === 'de'
-                    ? `Kategorie-Siege (${scoreModeOldLabel} · 5 Benchmarks)`
-                    : `Category Wins (${scoreModeOldLabel} · 5 Benchmarks)`
-                  : lang === 'de'
-                  ? 'Kategorie-Siege (D–K)'
-                  : 'Category Wins (D–K)'}
-              </div>
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono tabular-nums text-xs font-bold">
-                {sortedPrimaryScores.map(({ slot }, i) => (
-                  <React.Fragment key={slot}>
-                    {i > 0 && <span className="text-slate-400 dark:text-slate-700">·</span>}
-                    <span className={SLOT_THEME[slot].text}>
-                      {slot}: {summaryStats.wins[slot]}
-                    </span>
-                  </React.Fragment>
-                ))}
-                <span className="text-slate-400 dark:text-slate-700">·</span>
-                <span className="text-slate-600 dark:text-slate-400">
-                  {lang === 'de' ? 'Patt' : 'Tie'}: {summaryStats.ties}
-                </span>
-              </div>
-              {summaryStats.comparableCount > 0 && (
-                <div className="h-1.5 w-full rounded-full overflow-hidden bg-slate-200/80 dark:bg-slate-800 flex">
-                  {sortedPrimaryScores.map(({ slot }) =>
-                    summaryStats.wins[slot] > 0 ? (
-                      <div
-                        key={slot}
-                        className={`${SLOT_THEME[slot].barActive} h-full`}
-                        style={{
-                          width: `${(summaryStats.wins[slot] / summaryStats.comparableCount) * 100}%`,
-                        }}
-                      />
-                    ) : null
-                  )}
-                  {summaryStats.ties > 0 && (
-                    <div
-                      className="bg-slate-400 dark:bg-slate-600 h-full"
-                      style={{
-                        width: `${(summaryStats.ties / summaryStats.comparableCount) * 100}%`,
-                      }}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Integrated Biggest Category Edge inside "Modelle im Netz" */}
-            <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/20 space-y-1">
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-semibold">
-                {lang === 'de' ? 'Größte Einzelstärke' : 'Biggest Category Edge'}
-              </div>
-              <div className="space-y-0.5 text-xs">
-                {sortedPrimaryScores.map(({ slot }) => {
-                  const edge = summaryStats.bestEdge[slot];
-                  const theme = SLOT_THEME[slot];
-                  const isHidden = hiddenSlots.has(slot);
-                  return (
-                    <div
-                      key={slot}
-                      onMouseEnter={() => {
-                        if (!isHidden) setHoveredSlot(slot);
-                      }}
-                      onMouseLeave={() => setHoveredSlot(null)}
-                      className={`flex items-center justify-between gap-2 min-w-0 transition-opacity ${
-                        isHidden ? 'opacity-45' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`font-mono font-bold shrink-0 ${theme.text}`}>{slot}:</span>
-                        {edge ? (
-                          <span className="truncate font-semibold text-slate-800 dark:text-slate-200">
-                            {edge.label}
-                          </span>
-                        ) : (
-                          <span className="text-slate-600 dark:text-slate-400">
-                            {lang === 'de' ? 'kein Vorsprung' : 'no lead'}
-                          </span>
-                        )}
-                      </div>
-                      {edge && (
-                        <span className={`font-mono tabular-nums font-bold shrink-0 ${theme.text}`}>
-                          +{edge.margin.toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <CompareModelsCard
+            title={
+              lang === 'de'
+                ? `Modelle im Netz (${visibleSlots.length}/${activeSlots.length})`
+                : `Models on Radar (${visibleSlots.length}/${activeSlots.length})`
+            }
+            activeScoreLabel={activeScoreLabel}
+            activeSlots={activeSlots}
+            sortedPrimaryScores={sortedPrimaryScores}
+            slotThemes={slotThemes}
+            pickerModels={pickerModels}
+            onSelectSlot={onSelectSlot}
+            onSelectCompany={onSelectCompany}
+            openChatbotLabel={openChatbotLabel}
+            summaryStats={summaryStats}
+            scoreMode={scoreMode}
+            scoreModeOldLabel={scoreModeOldLabel}
+            rankMap={rankMap}
+            lang={lang}
+            hiddenSlots={hiddenSlots}
+            focusedSlot={focusedSlot}
+            effectivePinnedSlot={effectivePinnedSlot}
+            onHoverSlot={setHoveredSlot}
+            onPinSlot={(slot) => setPinnedSlot(slot)}
+            onToggleVisibility={toggleSlotVisibility}
+            focusActionLabel={
+              lang === 'de' ? 'Modell im Spinnennetz fokussieren' : 'Focus model on radar'
+            }
+            hideActionLabel={lang === 'de' ? 'Im Diagramm ausblenden' : 'Hide on radar'}
+            showActionLabel={lang === 'de' ? 'Im Diagramm einblenden' : 'Show on radar'}
+          />
 
           {/* Selected / Hovered Axis Ranking Inspector */}
           {inspectedRow && (
@@ -864,7 +889,7 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
                     return b.val - a.val;
                   })
                   .map((entry) => {
-                    const theme = SLOT_THEME[entry.slot];
+                    const theme = slotThemes[entry.slot];
                     const isHidden = hiddenSlots.has(entry.slot);
                     const isWinner =
                       inspectedRow.winners.includes(entry.slot) &&

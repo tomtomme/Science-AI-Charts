@@ -23,20 +23,38 @@ export type CompareSlot = (typeof COMPARE_SLOTS)[number];
 export const MAX_COMPARE_MODELS = 8;
 export type PresetKind = 'newest' | 'same_price' | 'same_family' | 'same_size';
 
-export const SLOT_THEME: Record<
-  CompareSlot,
-  {
-    badgeBg: string;
-    text: string;
-    barActive: string;
-    barDim: string;
-    ring: string;
-    rowSelected: string;
-    borderTop: string;
-    hex: string;
-  }
-> = {
-  A: {
+export interface SlotTheme {
+  badgeBg: string;
+  text: string;
+  barActive: string;
+  barDim: string;
+  ring: string;
+  rowSelected: string;
+  borderTop: string;
+  borderLeft: string;
+  hex: string;
+}
+
+export type PaletteKey =
+  | 'blue'
+  | 'orange'
+  | 'teal'
+  | 'emerald'
+  | 'indigo'
+  | 'sky'
+  | 'amber'
+  | 'red'
+  | 'cyan'
+  | 'pink'
+  | 'purple'
+  | 'rose'
+  | 'violet'
+  | 'lime'
+  | 'fuchsia'
+  | 'slate';
+
+export const COLOR_PALETTES: Record<PaletteKey, SlotTheme> = {
+  blue: {
     badgeBg: 'bg-blue-600 text-white',
     text: 'text-blue-600 dark:text-blue-400',
     barActive: 'bg-blue-600 dark:bg-blue-500',
@@ -44,29 +62,32 @@ export const SLOT_THEME: Record<
     ring: 'hover:border-blue-400 dark:hover:border-blue-500 focus-visible:ring-blue-500',
     rowSelected: 'bg-blue-50/90 dark:bg-blue-950/40',
     borderTop: 'border-t-blue-500',
+    borderLeft: 'border-l-blue-500',
     hex: '#2563eb',
   },
-  B: {
-    badgeBg: 'bg-rose-600 text-white',
-    text: 'text-rose-600 dark:text-rose-400',
-    barActive: 'bg-rose-600 dark:bg-rose-500',
-    barDim: 'bg-rose-400/25 dark:bg-rose-500/20',
-    ring: 'hover:border-rose-400 dark:hover:border-rose-500 focus-visible:ring-rose-500',
-    rowSelected: 'bg-rose-50/90 dark:bg-rose-950/40',
-    borderTop: 'border-t-rose-500',
-    hex: '#e11d48',
+  orange: {
+    badgeBg: 'bg-orange-600 text-white',
+    text: 'text-orange-600 dark:text-orange-400',
+    barActive: 'bg-orange-600 dark:bg-orange-500',
+    barDim: 'bg-orange-400/25 dark:bg-orange-500/20',
+    ring: 'hover:border-orange-400 dark:hover:border-orange-500 focus-visible:ring-orange-500',
+    rowSelected: 'bg-orange-50/90 dark:bg-orange-950/40',
+    borderTop: 'border-t-orange-500',
+    borderLeft: 'border-l-orange-500',
+    hex: '#ea580c',
   },
-  C: {
-    badgeBg: 'bg-violet-600 text-white',
-    text: 'text-violet-600 dark:text-violet-400',
-    barActive: 'bg-violet-600 dark:bg-violet-500',
-    barDim: 'bg-violet-400/25 dark:bg-violet-500/20',
-    ring: 'hover:border-violet-400 dark:hover:border-violet-500 focus-visible:ring-violet-500',
-    rowSelected: 'bg-violet-50/90 dark:bg-violet-950/40',
-    borderTop: 'border-t-violet-500',
-    hex: '#7c3aed',
+  teal: {
+    badgeBg: 'bg-teal-600 text-white',
+    text: 'text-teal-600 dark:text-teal-400',
+    barActive: 'bg-teal-600 dark:bg-teal-500',
+    barDim: 'bg-teal-400/25 dark:bg-teal-500/20',
+    ring: 'hover:border-teal-400 dark:hover:border-teal-500 focus-visible:ring-teal-500',
+    rowSelected: 'bg-teal-50/90 dark:bg-teal-950/40',
+    borderTop: 'border-t-teal-500',
+    borderLeft: 'border-l-teal-500',
+    hex: '#0d9488',
   },
-  D: {
+  emerald: {
     badgeBg: 'bg-emerald-600 text-white',
     text: 'text-emerald-600 dark:text-emerald-400',
     barActive: 'bg-emerald-600 dark:bg-emerald-500',
@@ -74,9 +95,32 @@ export const SLOT_THEME: Record<
     ring: 'hover:border-emerald-400 dark:hover:border-emerald-500 focus-visible:ring-emerald-500',
     rowSelected: 'bg-emerald-50/90 dark:bg-emerald-950/40',
     borderTop: 'border-t-emerald-500',
+    borderLeft: 'border-l-emerald-500',
     hex: '#059669',
   },
-  E: {
+  indigo: {
+    badgeBg: 'bg-indigo-600 text-white',
+    text: 'text-indigo-600 dark:text-indigo-400',
+    barActive: 'bg-indigo-600 dark:bg-indigo-500',
+    barDim: 'bg-indigo-400/25 dark:bg-indigo-500/20',
+    ring: 'hover:border-indigo-400 dark:hover:border-indigo-500 focus-visible:ring-indigo-500',
+    rowSelected: 'bg-indigo-50/90 dark:bg-indigo-950/40',
+    borderTop: 'border-t-indigo-500',
+    borderLeft: 'border-l-indigo-500',
+    hex: '#4f46e5',
+  },
+  sky: {
+    badgeBg: 'bg-sky-600 text-white',
+    text: 'text-sky-600 dark:text-sky-400',
+    barActive: 'bg-sky-600 dark:bg-sky-500',
+    barDim: 'bg-sky-400/25 dark:bg-sky-500/20',
+    ring: 'hover:border-sky-400 dark:hover:border-sky-500 focus-visible:ring-sky-500',
+    rowSelected: 'bg-sky-50/90 dark:bg-sky-950/40',
+    borderTop: 'border-t-sky-500',
+    borderLeft: 'border-l-sky-500',
+    hex: '#0284c7',
+  },
+  amber: {
     badgeBg: 'bg-amber-600 text-white',
     text: 'text-amber-600 dark:text-amber-400',
     barActive: 'bg-amber-600 dark:bg-amber-500',
@@ -84,9 +128,21 @@ export const SLOT_THEME: Record<
     ring: 'hover:border-amber-400 dark:hover:border-amber-500 focus-visible:ring-amber-500',
     rowSelected: 'bg-amber-50/90 dark:bg-amber-950/40',
     borderTop: 'border-t-amber-500',
+    borderLeft: 'border-l-amber-500',
     hex: '#d97706',
   },
-  F: {
+  red: {
+    badgeBg: 'bg-red-600 text-white',
+    text: 'text-red-600 dark:text-red-400',
+    barActive: 'bg-red-600 dark:bg-red-500',
+    barDim: 'bg-red-400/25 dark:bg-red-500/20',
+    ring: 'hover:border-red-400 dark:hover:border-red-500 focus-visible:ring-red-500',
+    rowSelected: 'bg-red-50/90 dark:bg-red-950/40',
+    borderTop: 'border-t-red-500',
+    borderLeft: 'border-l-red-500',
+    hex: '#dc2626',
+  },
+  cyan: {
     badgeBg: 'bg-cyan-600 text-white',
     text: 'text-cyan-600 dark:text-cyan-400',
     barActive: 'bg-cyan-600 dark:bg-cyan-500',
@@ -94,19 +150,54 @@ export const SLOT_THEME: Record<
     ring: 'hover:border-cyan-400 dark:hover:border-cyan-500 focus-visible:ring-cyan-500',
     rowSelected: 'bg-cyan-50/90 dark:bg-cyan-950/40',
     borderTop: 'border-t-cyan-500',
+    borderLeft: 'border-l-cyan-500',
     hex: '#0891b2',
   },
-  G: {
-    badgeBg: 'bg-fuchsia-600 text-white',
-    text: 'text-fuchsia-600 dark:text-fuchsia-400',
-    barActive: 'bg-fuchsia-600 dark:bg-fuchsia-500',
-    barDim: 'bg-fuchsia-400/25 dark:bg-fuchsia-500/20',
-    ring: 'hover:border-fuchsia-400 dark:hover:border-fuchsia-500 focus-visible:ring-fuchsia-500',
-    rowSelected: 'bg-fuchsia-50/90 dark:bg-fuchsia-950/40',
-    borderTop: 'border-t-fuchsia-500',
-    hex: '#c026d3',
+  pink: {
+    badgeBg: 'bg-pink-600 text-white',
+    text: 'text-pink-600 dark:text-pink-400',
+    barActive: 'bg-pink-600 dark:bg-pink-500',
+    barDim: 'bg-pink-400/25 dark:bg-pink-500/20',
+    ring: 'hover:border-pink-400 dark:hover:border-pink-500 focus-visible:ring-pink-500',
+    rowSelected: 'bg-pink-50/90 dark:bg-pink-950/40',
+    borderTop: 'border-t-pink-500',
+    borderLeft: 'border-l-pink-500',
+    hex: '#db2777',
   },
-  H: {
+  purple: {
+    badgeBg: 'bg-purple-600 text-white',
+    text: 'text-purple-600 dark:text-purple-400',
+    barActive: 'bg-purple-600 dark:bg-purple-500',
+    barDim: 'bg-purple-400/25 dark:bg-purple-500/20',
+    ring: 'hover:border-purple-400 dark:hover:border-purple-500 focus-visible:ring-purple-500',
+    rowSelected: 'bg-purple-50/90 dark:bg-purple-950/40',
+    borderTop: 'border-t-purple-500',
+    borderLeft: 'border-l-purple-500',
+    hex: '#9333ea',
+  },
+  rose: {
+    badgeBg: 'bg-rose-600 text-white',
+    text: 'text-rose-600 dark:text-rose-400',
+    barActive: 'bg-rose-600 dark:bg-rose-500',
+    barDim: 'bg-rose-400/25 dark:bg-rose-500/20',
+    ring: 'hover:border-rose-400 dark:hover:border-rose-500 focus-visible:ring-rose-500',
+    rowSelected: 'bg-rose-50/90 dark:bg-rose-950/40',
+    borderTop: 'border-t-rose-500',
+    borderLeft: 'border-l-rose-500',
+    hex: '#e11d48',
+  },
+  violet: {
+    badgeBg: 'bg-violet-600 text-white',
+    text: 'text-violet-600 dark:text-violet-400',
+    barActive: 'bg-violet-600 dark:bg-violet-500',
+    barDim: 'bg-violet-400/25 dark:bg-violet-500/20',
+    ring: 'hover:border-violet-400 dark:hover:border-violet-500 focus-visible:ring-violet-500',
+    rowSelected: 'bg-violet-50/90 dark:bg-violet-950/40',
+    borderTop: 'border-t-violet-500',
+    borderLeft: 'border-l-violet-500',
+    hex: '#7c3aed',
+  },
+  lime: {
     badgeBg: 'bg-lime-600 text-white',
     text: 'text-lime-600 dark:text-lime-400',
     barActive: 'bg-lime-600 dark:bg-lime-500',
@@ -114,9 +205,151 @@ export const SLOT_THEME: Record<
     ring: 'hover:border-lime-400 dark:hover:border-lime-500 focus-visible:ring-lime-500',
     rowSelected: 'bg-lime-50/90 dark:bg-lime-950/40',
     borderTop: 'border-t-lime-500',
+    borderLeft: 'border-l-lime-500',
     hex: '#65a30d',
   },
+  fuchsia: {
+    badgeBg: 'bg-fuchsia-600 text-white',
+    text: 'text-fuchsia-600 dark:text-fuchsia-400',
+    barActive: 'bg-fuchsia-600 dark:bg-fuchsia-500',
+    barDim: 'bg-fuchsia-400/25 dark:bg-fuchsia-500/20',
+    ring: 'hover:border-fuchsia-400 dark:hover:border-fuchsia-500 focus-visible:ring-fuchsia-500',
+    rowSelected: 'bg-fuchsia-50/90 dark:bg-fuchsia-950/40',
+    borderTop: 'border-t-fuchsia-500',
+    borderLeft: 'border-l-fuchsia-500',
+    hex: '#c026d3',
+  },
+  slate: {
+    badgeBg: 'bg-slate-700 text-white',
+    text: 'text-slate-700 dark:text-slate-300',
+    barActive: 'bg-slate-700 dark:bg-slate-400',
+    barDim: 'bg-slate-400/25 dark:bg-slate-500/20',
+    ring: 'hover:border-slate-400 dark:hover:border-slate-500 focus-visible:ring-slate-500',
+    rowSelected: 'bg-slate-100/90 dark:bg-slate-800/60',
+    borderTop: 'border-t-slate-500',
+    borderLeft: 'border-l-slate-500',
+    hex: '#475569',
+  },
 };
+
+export const SLOT_THEME: Record<CompareSlot, SlotTheme> = {
+  A: COLOR_PALETTES.blue,
+  B: COLOR_PALETTES.rose,
+  C: COLOR_PALETTES.violet,
+  D: COLOR_PALETTES.emerald,
+  E: COLOR_PALETTES.amber,
+  F: COLOR_PALETTES.cyan,
+  G: COLOR_PALETTES.fuchsia,
+  H: COLOR_PALETTES.lime,
+};
+
+const PALETTE_ORDER: PaletteKey[] = [
+  'blue',
+  'orange',
+  'teal',
+  'violet',
+  'rose',
+  'emerald',
+  'amber',
+  'indigo',
+  'cyan',
+  'sky',
+  'pink',
+  'red',
+  'purple',
+  'lime',
+  'fuchsia',
+  'slate',
+];
+
+function getPreferredPaletteKeys(model: ModelRecord): PaletteKey[] {
+  const hay = `${model.companyName} ${model.creatorClean} ${model.displayName} ${model.faviconUrl}`.toLowerCase();
+  if (hay.includes('google') || hay.includes('gemini') || hay.includes('gemma')) {
+    return ['blue', 'emerald', 'amber', 'red'];
+  }
+  if (hay.includes('anthropic') || hay.includes('claude')) {
+    return ['orange', 'rose', 'amber', 'red'];
+  }
+  if (hay.includes('openai') || hay.includes('chatgpt') || /\bgpt[-\s]?\d|\bo[134]\b/i.test(hay)) {
+    return ['teal', 'emerald', 'slate', 'indigo'];
+  }
+  if (hay.includes('deepseek')) {
+    return ['indigo', 'blue', 'sky', 'cyan'];
+  }
+  if (hay.includes('meta') || hay.includes('muse') || hay.includes('llama')) {
+    return ['sky', 'blue', 'indigo', 'cyan'];
+  }
+  if (hay.includes('alibaba') || hay.includes('qwen')) {
+    return ['amber', 'orange', 'violet', 'purple'];
+  }
+  if (hay.includes('mistral')) {
+    return ['red', 'orange', 'amber', 'rose'];
+  }
+  if (hay.includes('kimi') || hay.includes('moonshot')) {
+    return ['cyan', 'sky', 'teal', 'blue'];
+  }
+  if (hay.includes('minimax')) {
+    return ['pink', 'fuchsia', 'rose', 'purple'];
+  }
+  if (hay.includes('xai') || hay.includes('spacexai') || hay.includes('grok')) {
+    return ['purple', 'slate', 'violet', 'indigo'];
+  }
+  if (hay.includes('xiaomi') || hay.includes('mimo')) {
+    return ['rose', 'orange', 'red', 'amber'];
+  }
+  if (hay.includes('nvidia') || hay.includes('nemotron')) {
+    return ['lime', 'emerald', 'teal'];
+  }
+  if (hay.includes('z ai') || hay.includes('z.ai') || hay.includes('glm') || hay.includes('zhipu')) {
+    return ['lime', 'cyan', 'teal', 'emerald'];
+  }
+  if (hay.includes('thinking') || hay.includes('inkling')) {
+    return ['violet', 'purple', 'indigo'];
+  }
+  if (hay.includes('amazon') || hay.includes('nova')) {
+    return ['amber', 'orange', 'sky'];
+  }
+  if (hay.includes('tencent') || /\bhy\d/i.test(hay)) {
+    return ['sky', 'teal', 'blue'];
+  }
+  if (hay.includes('inclusion') || hay.includes('ling')) {
+    return ['emerald', 'teal', 'cyan'];
+  }
+  if (hay.includes('baidu') || hay.includes('ernie')) {
+    return ['blue', 'red', 'indigo'];
+  }
+  if (hay.includes('inception') || hay.includes('mercury')) {
+    return ['fuchsia', 'violet', 'indigo'];
+  }
+  if (hay.includes('upstage') || hay.includes('solar')) {
+    return ['purple', 'amber', 'violet'];
+  }
+  return PALETTE_ORDER;
+}
+
+/**
+ * Assigns each active comparison slot a distinct theme aligned with the model/lab's
+ * favicon brand color, automatically picking non-colliding companion colors when
+ * multiple models from the same company are compared side-by-side.
+ */
+export function resolveSlotThemes(
+  activeSlots: { slot: CompareSlot; model: ModelRecord }[]
+): Record<CompareSlot, SlotTheme> {
+  const result: Record<CompareSlot, SlotTheme> = { ...SLOT_THEME };
+  const used = new Set<PaletteKey>();
+
+  for (const { slot, model } of activeSlots) {
+    const prefs = getPreferredPaletteKeys(model);
+    const chosen =
+      prefs.find((k) => !used.has(k)) ??
+      PALETTE_ORDER.find((k) => !used.has(k)) ??
+      'blue';
+    used.add(chosen);
+    result[slot] = COLOR_PALETTES[chosen];
+  }
+
+  return result;
+}
 
 export interface CategoryComparisonEntry {
   slot: CompareSlot;
