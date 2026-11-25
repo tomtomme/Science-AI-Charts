@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function isValidMonitorKey(key) {
-      return key in ['gdpx', 'vals', 'simplebench', 'integrity'];
+      return key in ['gdpx', 'vals', 'simplebench', 'integrity', 'aa'];
     }
 
     function incoming() {

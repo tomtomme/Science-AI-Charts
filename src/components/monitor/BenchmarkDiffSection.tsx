@@ -3,8 +3,10 @@ import {
   AlertTriangle,
   ArrowRight,
   ExternalLink,
+  Loader2,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { Language } from '../../utils/i18n';
@@ -149,6 +151,9 @@ export interface BenchmarkDiffSectionProps<TRaw = unknown> {
   resolveTarget: (row: BenchmarkDiffRowViewModel<TRaw>) => ResolvedBenchmarkTarget;
   getPickerOptionsForRow: (row: BenchmarkDiffRowViewModel<TRaw>) => BenchmarkPickerOption[];
   defaultLiveDecimals: number;
+  onResearchNewModel?: (row: BenchmarkDiffRowViewModel<TRaw>) => void;
+  researchingRowId?: string | null;
+  researchKeyPrefix?: string;
 }
 
 export function useBenchmarkSelectionState<TRaw>(
@@ -321,6 +326,9 @@ export function BenchmarkDiffSection<TRaw>({
   resolveTarget,
   getPickerOptionsForRow,
   defaultLiveDecimals,
+  onResearchNewModel,
+  researchingRowId,
+  researchKeyPrefix,
 }: BenchmarkDiffSectionProps<TRaw>) {
   const styles = ACCENT_STYLES[accent];
   const [showMapped, setShowMapped] = useState(false);
@@ -610,32 +618,67 @@ export function BenchmarkDiffSection<TRaw>({
                           </td>
                           <td className="py-1.5 px-3 align-middle whitespace-nowrap">
                             {item.status === 'new_unmatched' ? (
-                              <select
-                                value={manualRowOverrides[item.id] ?? ''}
-                                onChange={(e) => onAssignManualRow(item.id, e.target.value)}
-                                className={`w-full ${
-                                  supportsInsertNewRow ? 'max-w-[340px]' : 'max-w-[320px]'
-                                } px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100`}
-                              >
-                                <option value="">{assignPlaceholder}</option>
-                                {supportsInsertNewRow && (
-                                  <option value={INSERT_NEW_ROW_OPTION_VALUE}>
+                              <div className="flex items-center gap-1.5">
+                                <select
+                                  value={manualRowOverrides[item.id] ?? ''}
+                                  onChange={(e) => onAssignManualRow(item.id, e.target.value)}
+                                  className={`w-full ${
+                                    supportsInsertNewRow ? 'max-w-[260px]' : 'max-w-[240px]'
+                                  } px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100`}
+                                >
+                                  <option value="">{assignPlaceholder}</option>
+                                  {supportsInsertNewRow && (
+                                    <option value={INSERT_NEW_ROW_OPTION_VALUE}>
+                                      {lang === 'de'
+                                        ? '➕ Als neues Modell ergänzen'
+                                        : '➕ Add as new model'}
+                                    </option>
+                                  )}
+                                  <option value={IGNORE_OPTION_VALUE}>
                                     {lang === 'de'
-                                      ? '➕ Als neues Modell ergänzen'
-                                      : '➕ Add as new model'}
+                                      ? '🚫 Ignorieren (nicht mehr nachfragen)'
+                                      : "🚫 Ignore (don't ask again)"}
                                   </option>
-                                )}
-                                <option value={IGNORE_OPTION_VALUE}>
-                                  {lang === 'de'
-                                    ? '🚫 Ignorieren (nicht mehr nachfragen)'
-                                    : "🚫 Ignore (don't ask again)"}
-                                </option>
-                                {getPickerOptionsForRow(item).map((opt) => (
-                                  <option key={opt.id} value={opt.sheetRowNumber}>
-                                    {opt.displayName} ({opt.labelSuffix})
-                                  </option>
-                                ))}
-                              </select>
+                                  {getPickerOptionsForRow(item).map((opt) => (
+                                    <option key={opt.id} value={opt.sheetRowNumber}>
+                                      {opt.displayName} ({opt.labelSuffix})
+                                    </option>
+                                  ))}
+                                </select>
+                                {onResearchNewModel && (() => {
+                                  const isResearching =
+                                    Boolean(researchKeyPrefix) &&
+                                    researchingRowId === `${researchKeyPrefix}:${item.id}`;
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled={Boolean(researchingRowId)}
+                                      onClick={() => onResearchNewModel(item)}
+                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer disabled:cursor-wait shrink-0"
+                                      title={
+                                        lang === 'de'
+                                          ? 'Komplette Zeile (alle Benchmarks, Storyline, Links, Preise) automatisch recherchieren & anlegen'
+                                          : 'Research & create complete Sheet row (all benchmarks, storyline, links, prices)'
+                                      }
+                                    >
+                                      {isResearching ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <Sparkles className="w-3 h-3" />
+                                      )}
+                                      <span>
+                                        {isResearching
+                                          ? lang === 'de'
+                                            ? 'Lädt…'
+                                            : 'Loading…'
+                                          : lang === 'de'
+                                          ? 'Zeile'
+                                          : 'Row'}
+                                      </span>
+                                    </button>
+                                  );
+                                })()}
+                              </div>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 text-xs text-slate-800 dark:text-slate-200">
                                 <span>{target.matchedDisplayName}</span>

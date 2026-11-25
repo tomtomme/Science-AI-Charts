@@ -14,7 +14,7 @@
         "monitorKey": {
           "type": "string",
           "description": "Benchmark monitor identifier.",
-          "enum": ["gdpx", "vals", "simplebench", "integrity"]
+          "enum": ["gdpx", "vals", "simplebench", "integrity", "aa"]
         },
         "ignoredIds": {
           "type": "array",

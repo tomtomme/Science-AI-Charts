@@ -11,7 +11,7 @@ import firebaseConfig from '../../firebase-applet-config.json';
 import { firebaseApp, firebaseAuth } from './googleAuthService';
 import type { ManualRowMapping } from '../types/integrityMonitor';
 
-export type MonitorKey = 'gdpx' | 'vals' | 'simplebench' | 'integrity';
+export type MonitorKey = 'gdpx' | 'vals' | 'simplebench' | 'integrity' | 'aa';
 
 export interface MonitorPreferencesState {
   ignoredIds: string[];
@@ -99,6 +99,7 @@ export function toMonitorKey(label: string): MonitorKey {
   if (norm === 'vals' || norm === 'vals index') return 'vals';
   if (norm === 'simplebench') return 'simplebench';
   if (norm === 'integrity' || norm === 'integrity-bench') return 'integrity';
+  if (norm === 'aa' || norm === 'artificial analysis') return 'aa';
   throw new Error(`Unsupported monitor label: ${label}`);
 }
 

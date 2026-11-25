@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { LabEntry, ModelRecord } from '../types';
 import { LabPlanInfo } from '../types/pricingMonitor';
 import { DEFAULT_LAB_PLANS } from '../data/pricingPlansFallback';
@@ -16,9 +16,15 @@ import {
   GRANULAR_SLIDER_KEYS,
   getSizeFilterTiers,
 } from '../data/labMatrixData';
-import { normalizePricingLabKey } from '../utils/labMatrixPricing';
+import {
+  hasExactEnSubscriptionTiersTranslation,
+  looksGermanSubscriptionTiers,
+  normalizePricingLabKey,
+} from '../utils/labMatrixPricing';
+import { fetchLabTiersEnTranslations } from '../services/translationService';
 import { LabMatrixCard } from './labs/LabMatrixCard';
 import { LabWeightsAndGlossary } from './labs/LabWeightsAndGlossary';
+import { CountryFlag } from './labs/CountryFlag';
 
 export {
   WEIGHTS_CONCEPTS,
@@ -72,6 +78,33 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   const [expandedLabId, setExpandedLabId] = useState<string | null>(null);
   const [glossaryCategory, setGlossaryCategory] = useState<GlossaryCategory | 'all'>('all');
   const [glossarySearch, setGlossarySearch] = useState<string>('');
+  const [dynamicLabTiersEn, setDynamicLabTiersEn] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (lang !== 'en') return;
+    const entriesToTranslate: Record<string, string> = {};
+    for (const lab of labs) {
+      const tiers = (lab.subscriptionTiers || '').trim();
+      if (
+        tiers &&
+        !hasExactEnSubscriptionTiersTranslation(tiers) &&
+        looksGermanSubscriptionTiers(tiers)
+      ) {
+        entriesToTranslate[lab.id] = tiers;
+      }
+    }
+    if (Object.keys(entriesToTranslate).length === 0) return;
+
+    let cancelled = false;
+    void fetchLabTiersEnTranslations(entriesToTranslate).then((translations) => {
+      if (!cancelled && translations) {
+        setDynamicLabTiersEn(translations);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [lang, labs]);
 
   const activeGroup = controlledActiveGroup ?? internalActiveGroup;
   const showAdvanced = controlledShowAdvanced ?? internalShowAdvanced;
@@ -473,12 +506,9 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
       {/* Advanced Drawer: Revealed when showAdvanced is true */}
       {showAdvanced && (
         <div className="flex flex-col gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
-          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
-            {/* Country Filter Strip (Pills) positioned where categories used to be */}
-            <div
-              className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 text-xs scrollbar-thin max-w-full"
-              onWheel={handleHorizontalWheel}
-            >
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
+            {/* Country Filter Buttons: wrap cleanly instead of being squeezed into horizontal scroll */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs min-w-0">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 shrink-0 mr-1 flex items-center gap-1">
                 <span>🌐</span>
                 <span>{lang === 'de' ? 'Land:' : 'Country:'}</span>
@@ -507,7 +537,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
                         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
-                    <span>{c.flag}</span>
+                    <CountryFlag country={c.country} fallbackEmoji={c.flag} size="sm" />
                     <span>{c.country}</span>
                     <span className={`text-xs ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
                       ({c.count})
@@ -517,7 +547,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5 max-w-full">
               {/* Open / Hybrid / Closed Weights Segmented Toggle Button */}
               <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs shrink-0">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-2 flex items-center gap-1.5">
@@ -683,7 +713,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
               </div>
 
               {/* Search Input */}
-              <div className="relative flex-1 min-w-[200px] max-w-md">
+              <div className="relative flex-1 sm:flex-initial min-w-[210px] sm:w-64 max-w-full">
                 <Search className="w-4 h-4 text-slate-600 dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
@@ -785,10 +815,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             </div>
 
             {/* Right: Quick filter buttons for the 5 primary 2-category-combined pills + All */}
-            <div
-              className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin"
-              onWheel={handleHorizontalWheel}
-            >
+            <div className="flex flex-wrap items-center gap-1.5">
               {SIZE_CATEGORIES.map((cat) => {
                 const isExact = sizeFilter === cat.key;
                 const isSubSelected =
@@ -887,6 +914,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             key={lab.id}
             lab={lab}
             lang={lang}
+            translatedTiersEn={dynamicLabTiersEn[lab.id]}
             isExpanded={expandedLabId === lab.id}
             onToggleExpand={() => setExpandedLabId(expandedLabId === lab.id ? null : lab.id)}
             isSimplifiedView={isSimplifiedView}

@@ -30,7 +30,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "Fable/Mythos",
       "godTier": ""
     },
-    "subscriptionTiers": "Pro, Max, Ultra, Team, Enterprise",
+    "subscriptionTiers": "Free, Pro, Max, Ultra, Team, Enterprise | separat ab Max API Guthaben über Claude Console",
     "harnessSdk": "Claude SDK +Managed Agents",
     "dailyAgent": "Claude Duet",
     "codingAgent": "Claude Code & Cowork"
@@ -63,7 +63,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "Carbon",
       "godTier": ""
     },
-    "subscriptionTiers": "Plus, Pro, Ultra",
+    "subscriptionTiers": "Free, Plus, Pro, Ultra | kostenloser API Schlüssel für Hydrogen; separat ab AI Pro API Guthaben über Cloud-Billing-Konto",
     "harnessSdk": "Antigravity Harness",
     "dailyAgent": "Notebook; Tasks",
     "codingAgent": "Antigravity; Build"
@@ -94,7 +94,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "Wonder Full",
       "godTier": ""
     },
-    "subscriptionTiers": "Core, Premium, Essential, Advanced, Expert, Max",
+    "subscriptionTiers": "Meta Muse: Free, Power, Maximum | Meta One: Core, Premium, Essential, Advanced, Expert, Max | separat API Guthaben über api.meta.ai",
     "harnessSdk": "Muse Hatch",
     "dailyAgent": "Muse App",
     "codingAgent": "Muse Code"
@@ -124,7 +124,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "",
       "godTier": ""
     },
-    "subscriptionTiers": "",
+    "subscriptionTiers": "Chat-Playground & API Schlüssel kostenlos: build.nvidia.com",
     "harnessSdk": "NemoClaw +NeMo Toolkit",
     "dailyAgent": "–",
     "codingAgent": "Enterprise AI Fact."
@@ -155,7 +155,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "Astra/Cyber",
       "godTier": ""
     },
-    "subscriptionTiers": "Go, Plus, Pro, Business, Ent.",
+    "subscriptionTiers": "Free, Go, Plus, Pro, Business, Enterprise | separat ab Pro API Guthaben über platform.openai.com",
     "harnessSdk": "Codex Harness",
     "dailyAgent": "Dots, ChatGPT Work",
     "codingAgent": "Codex + Workspace"
@@ -186,7 +186,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "",
       "godTier": ""
     },
-    "subscriptionTiers": "Supergrok Lite, Plus, Heavy, Bus., Ent.",
+    "subscriptionTiers": "Free, Plus, Premium, Super, Ultra, Business, Enterprise | API Guthaben separat über xAI Console",
     "harnessSdk": "Cursor Engine",
     "dailyAgent": "Grok Bot",
     "codingAgent": "Cursor Agent, Grok Build"
@@ -216,7 +216,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "",
       "godTier": ""
     },
-    "subscriptionTiers": "Lite, Essential, Standard, Pro, Team Pro & Max",
+    "subscriptionTiers": "chat.qwen.ai kostenlos | separat API Guthaben über Alibaba Cloud Model Studio oder Qoder-Pläne, jedoch nicht für externe Apps wie JASP nutzbar",
     "harnessSdk": "Qoder Cloud Agents; Tongyi Harness",
     "dailyAgent": "Qoder; Deep Research",
     "codingAgent": "Qwen Code; Tongyi Lingma"
@@ -246,7 +246,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "",
       "godTier": ""
     },
-    "subscriptionTiers": "per token price",
+    "subscriptionTiers": "chat.deepseek.com kostenlos | separat API Guthaben über platform.deepseek.com",
     "harnessSdk": "DeepSeek Harness",
     "dailyAgent": "-",
     "codingAgent": "Deep Code"
@@ -275,7 +275,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "",
       "godTier": ""
     },
-    "subscriptionTiers": "Plus, Pro, Max, Ultra, Prem.",
+    "subscriptionTiers": "Free, Plus, Pro, Max, Ultra | separat API Guthaben über api.moonshot.ai",
     "harnessSdk": "Kimi Code & Work Harness",
     "dailyAgent": "Kimi Work",
     "codingAgent": "Kimi Code & Claw"
@@ -304,7 +304,7 @@ export const FALLBACK_LAB_ENTRIES: LabEntry[] = [
       "singularity": "",
       "godTier": ""
     },
-    "subscriptionTiers": "Lite, Pro, Max, Team Standard & Premium",
+    "subscriptionTiers": "chat.z.ai kostenlos | separat API Guthaben über Z.ai Developer Portal für unterstützte Coding-Tools",
     "harnessSdk": "ZCode Harness",
     "dailyAgent": "AutoClaw with AutoGLM",
     "codingAgent": "Zcode"

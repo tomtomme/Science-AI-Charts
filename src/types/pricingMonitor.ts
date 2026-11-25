@@ -1,4 +1,4 @@
-export type MonitoredLab = 'OpenAI' | 'Anthropic' | 'Google' | 'Meta';
+export type MonitoredLab = 'OpenAI' | 'Anthropic' | 'Google' | 'Meta' | 'xAI' | 'Moonshot';
 
 export type PriceDiffStatus = 'changed' | 'missing' | 'unchanged';
 

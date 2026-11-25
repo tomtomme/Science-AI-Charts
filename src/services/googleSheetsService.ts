@@ -206,11 +206,12 @@ function extractCellRichLinks(cell: any): AuthorSocialLink[] {
 export async function fetchSheetGridWithFormatting(
   spreadsheetId: string,
   sheetTitle: string,
-  accessToken: string
+  accessToken: string,
+  options?: { expandHorizontalMerges?: boolean }
 ): Promise<SheetGridWithFormatting> {
   const range = encodeURIComponent(quoteSheetTitle(sheetTitle));
   const fields = encodeURIComponent(
-    'sheets(merges,data(rowData(values(formattedValue,effectiveValue(numberValue),hyperlink,textFormatRuns(startIndex,format(link(uri))),effectiveFormat(backgroundColor,textFormat(bold),numberFormat(type))))))'
+    'sheets(merges,data(startRow,startColumn,rowData(values(formattedValue,effectiveValue(numberValue),hyperlink,textFormatRuns(startIndex,format(link(uri))),effectiveFormat(backgroundColor,textFormat(bold),numberFormat(type))))))'
   );
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
     spreadsheetId
@@ -230,10 +231,19 @@ export async function fetchSheetGridWithFormatting(
   const sheetObj = Array.isArray(data.sheets) ? data.sheets[0] : null;
   const gridData = Array.isArray(sheetObj?.data) ? sheetObj.data[0] : null;
   const rowData = Array.isArray(gridData?.rowData) ? gridData.rowData : [];
+  const startRow = Math.max(0, Number(gridData?.startRow ?? 0));
+  const startColumn = Math.max(0, Number(gridData?.startColumn ?? 0));
 
   const rows: string[][] = [];
   const greenMask: boolean[][] = [];
   const boldMask: boolean[][] = [];
+
+  for (let rPad = 0; rPad < startRow; rPad++) {
+    rows.push([]);
+    greenMask.push([]);
+    boldMask.push([]);
+  }
+
   const row0Cells = Array.isArray(rowData[0]?.values) ? rowData[0].values : [];
   const authorCell =
     row0Cells.find((cell: any) => {
@@ -255,9 +265,9 @@ export async function fetchSheetGridWithFormatting(
 
   for (const rowItem of rowData) {
     const cells = Array.isArray(rowItem?.values) ? rowItem.values : [];
-    const rowVals: string[] = [];
-    const rowGreens: boolean[] = [];
-    const rowBolds: boolean[] = [];
+    const rowVals: string[] = startColumn > 0 ? new Array(startColumn).fill('') : [];
+    const rowGreens: boolean[] = startColumn > 0 ? new Array(startColumn).fill(false) : [];
+    const rowBolds: boolean[] = startColumn > 0 ? new Array(startColumn).fill(false) : [];
 
     for (const cell of cells) {
       const formattedStr =
@@ -299,6 +309,30 @@ export async function fetchSheetGridWithFormatting(
     rows.push(rowVals);
     greenMask.push(rowGreens);
     boldMask.push(rowBolds);
+  }
+
+  // Optionally propagate single-row horizontal merge values (e.g. merged country headers in the Labs sheet)
+  if (options?.expandHorizontalMerges && Array.isArray(sheetObj?.merges)) {
+    for (const merge of sheetObj.merges) {
+      const rStart = Number(merge?.startRowIndex ?? -1);
+      const rEnd = Number(merge?.endRowIndex ?? -1);
+      const cStart = Number(merge?.startColumnIndex ?? -1);
+      const cEnd = Number(merge?.endColumnIndex ?? -1);
+      if (rStart >= 0 && rEnd === rStart + 1 && cStart >= 0 && cEnd > cStart + 1 && rows[rStart]) {
+        const val = (rows[rStart][cStart] || '').trim();
+        if (!val) continue;
+        while (rows[rStart].length < cEnd) {
+          rows[rStart].push('');
+          greenMask[rStart]?.push(false);
+          boldMask[rStart]?.push(false);
+        }
+        for (let c = cStart + 1; c < cEnd; c++) {
+          if (!rows[rStart][c]) {
+            rows[rStart][c] = val;
+          }
+        }
+      }
+    }
   }
 
   return { rows, greenMask, boldMask, cellO1Links };

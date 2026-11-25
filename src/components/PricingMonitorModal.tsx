@@ -47,11 +47,23 @@ import {
 } from '../types/simpleBenchMonitor';
 import { DEFAULT_SIMPLEBENCH_COL_INDEX } from '../services/simpleBenchMonitorService';
 import {
-  DEFAULT_LAB_PLANS,
+  AA_METRIC_KEYS,
+  AaCheckReport,
+  AaDiffItem,
+  AaMetricDiffItem,
+  AaMetricDiffStatus,
+  AaMetricKey,
+  ModelResearchRequest,
+  NewModelRowDraft,
+} from '../types/aaMonitor';
+import { requestNewModelRowDraft } from '../services/aaMonitorService';
+import {
   DEFAULT_PRICING_SNAPSHOT_DATE,
+  mergePricingPlansWithDefaults,
 } from '../data/pricingPlansFallback';
 import { Language } from '../utils/i18n';
 import {
+  IGNORE_OPTION_VALUE,
   INSERT_NEW_ROW_OPTION_VALUE,
   PendingSheetCellChange,
   decimalsToPattern,
@@ -68,6 +80,12 @@ import {
   ResolvedBenchmarkTarget,
   useBenchmarkSelectionState,
 } from './monitor/BenchmarkDiffSection';
+import {
+  AA_METRIC_LABELS,
+  ArtificialAnalysisDiffSection,
+  ResolvedAaTarget,
+} from './monitor/ArtificialAnalysisDiffSection';
+import { NewModelRowDraftDialog } from './monitor/NewModelRowDraftDialog';
 import { SheetWriteConfirmDialog } from './monitor/SheetWriteConfirmDialog';
 
 interface PricingMonitorModalProps {
@@ -80,6 +98,16 @@ interface PricingMonitorModalProps {
   isChecking: boolean;
   checkError: string | null;
   onRunCheck: () => Promise<void>;
+  // Artificial Analysis 6-column monitor state (Columns D–I)
+  aaReport: AaCheckReport | null;
+  isAaDiffValid?: boolean;
+  isCheckingAa: boolean;
+  aaCheckError: string | null;
+  onRunAaCheck: () => Promise<void>;
+  onIgnoreAaModel?: (aaId: string) => Promise<void>;
+  onRestoreAaModel?: (aaId: string) => Promise<void>;
+  onPersistAaMapping?: (aaId: string, mapping: ManualRowMapping) => Promise<void>;
+  onRemoveAaMapping?: (aaId: string) => Promise<void>;
   // GDPx monitor state (unified)
   gdpxReport: GdpxCheckReport | null;
   isGdpxDiffValid?: boolean;
@@ -122,6 +150,7 @@ interface PricingMonitorModalProps {
   onPersistIntegrityMapping?: (integrityId: string, mapping: ManualRowMapping) => Promise<void>;
   onRemoveIntegrityMapping?: (integrityId: string) => Promise<void>;
   onSaveManualMappings?: (mappings: {
+    aa?: Record<string, ManualRowMapping>;
     gdpx?: Record<string, ManualRowMapping>;
     integrity?: Record<string, ManualRowMapping>;
     vals?: Record<string, ManualRowMapping>;
@@ -152,6 +181,15 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   isChecking,
   checkError,
   onRunCheck,
+  aaReport,
+  isAaDiffValid = true,
+  isCheckingAa,
+  aaCheckError,
+  onRunAaCheck,
+  onIgnoreAaModel,
+  onRestoreAaModel,
+  onPersistAaMapping,
+  onRemoveAaMapping,
   gdpxReport,
   isGdpxDiffValid = true,
   isCheckingGdpx,
@@ -204,6 +242,12 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   onRetryConnection,
 }) => {
   const [selectedPriceIds, setSelectedPriceIds] = useState<Record<string, boolean>>({});
+  const [selectedAaCells, setSelectedAaCells] = useState<Record<string, boolean>>({});
+  const [aaManualOverrides, setAaManualOverrides] = useState<Record<string, number>>({});
+  const [aaShowIgnored, setAaShowIgnored] = useState<boolean>(false);
+  const [researchingRowId, setResearchingRowId] = useState<string | null>(null);
+  const [activeRowDraft, setActiveRowDraft] = useState<NewModelRowDraft | null>(null);
+  const [isWritingFullRow, setIsWritingFullRow] = useState<boolean>(false);
   const [pendingWrite, setPendingWrite] = useState<PendingSheetCellChange[] | null>(null);
   const [isWriting, setIsWriting] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -213,6 +257,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   const minHistoryRow = loadedData.historyStartRow ?? layout?.historyStartRow ?? 36;
   const colDeIdx = layout?.colDePrice ?? 19;
   const colUsIdx = layout?.colUsPrice ?? null;
+  const aaColByMetric = useMemo<Record<AaMetricKey, number>>(
+    () => ({
+      iq: layout?.colActCodeReason ?? 3,
+      nonHallucination: layout?.colNonHallucination ?? 4,
+      accuracy: layout?.colScienceKnowledge ?? 5,
+      mmmuPro: layout?.colVisionPlot ?? 6,
+      mlcr: layout?.colMedReasoning ?? 7,
+      excelAgent: layout?.colExcelAgent ?? 8,
+    }),
+    [layout]
+  );
   const gdpxColIdx = layout?.colTrickQuestions ?? GDPX_COL_INDEX;
   const valsColIdx = layout?.colEconLegal ?? VALS_COL_INDEX;
   const simpleBenchColIdx = layout?.colTrickOld ?? DEFAULT_SIMPLEBENCH_COL_INDEX;
@@ -227,6 +282,10 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
 
   const effectiveDiffReport =
     apiAvailable && isSheetsConnected && isDiffValid && report ? report : null;
+  const effectiveAaDiffReport =
+    apiAvailable && isSheetsConnected && isAaDiffValid && aaReport && aaReport.diffs.length > 0
+      ? aaReport
+      : null;
   const effectiveGdpxDiffReport =
     apiAvailable && isSheetsConnected && isGdpxDiffValid && gdpxReport && gdpxReport.diffs.length > 0
       ? gdpxReport
@@ -294,7 +353,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     return map;
   }, [sheetRowsForPicker, loadedData.rawRows, integrityColIdx]);
 
-  // Pre-select changed prices
+  // Pre-select changed and missing prices so new 0-5€ / 0-8€ etc. entries are ready to write to Col T/U
   useEffect(() => {
     if (!effectiveDiffReport) {
       setSelectedPriceIds({});
@@ -305,7 +364,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       const hasChange = item.deStatus === 'changed' || item.usStatus === 'changed';
       const hasMissing = item.deStatus === 'missing' || item.usStatus === 'missing';
       if (hasChange || hasMissing) {
-        next[item.modelId] = hasChange;
+        next[item.modelId] = true;
       }
     }
     setSelectedPriceIds(next);
@@ -316,6 +375,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       setWriteError(null);
       setWriteSuccess(null);
       setPendingWrite(null);
+      setAaManualOverrides({});
+      setActiveRowDraft(null);
     }
   }, [isOpen]);
 
@@ -326,7 +387,215 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     );
   }, [effectiveDiffReport]);
 
-  // --- View-model adapters for the 4 benchmark monitors ---
+  // --- Artificial Analysis (6-column) rows, manual target resolution & selection ---
+  const aaRows = useMemo((): AaDiffItem[] => {
+    if (!effectiveAaDiffReport) return [];
+    return effectiveAaDiffReport.diffs.filter(
+      (d) => d.status !== 'unchanged' && d.status !== 'ignored'
+    );
+  }, [effectiveAaDiffReport]);
+
+  const aaIgnored = useMemo(
+    () =>
+      (effectiveAaDiffReport?.diffs ?? [])
+        .filter((d) => d.status === 'ignored')
+        .map((d) => ({ id: d.aaId, name: d.aaName })),
+    [effectiveAaDiffReport]
+  );
+
+  const aaMapped = useMemo(() => {
+    const mappings = effectiveAaDiffReport?.manualMappings ?? {};
+    const byId = new Map((effectiveAaDiffReport?.diffs ?? []).map((d) => [d.aaId, d.aaName]));
+    return Object.entries(mappings).map(([id, m]) => ({
+      id,
+      sourceName: byId.get(id) || id,
+      sheetRowNumber: m.sheetRowNumber,
+      matchedDisplayName: m.matchedDisplayName || sheetRowByNumber.get(m.sheetRowNumber)?.displayName,
+    }));
+  }, [effectiveAaDiffReport, sheetRowByNumber]);
+
+  const resolveAaTarget = useCallback(
+    (item: AaDiffItem, overrides: Record<string, number> = aaManualOverrides): ResolvedAaTarget => {
+      const overrideRow = overrides[item.aaId];
+      if (typeof overrideRow === 'number' && overrideRow >= minHistoryRow) {
+        const sheetModel = sheetRowByNumber.get(overrideRow);
+        const raw = sheetModel?.rawScores;
+        const sheetScores: Record<AaMetricKey, number | null> = {
+          iq: typeof raw?.actCodeReason === 'number' ? raw.actCodeReason : null,
+          nonHallucination: typeof raw?.nonHallucination === 'number' ? raw.nonHallucination : null,
+          accuracy: typeof raw?.scienceKnowledge === 'number' ? raw.scienceKnowledge : null,
+          mmmuPro: typeof raw?.visionPlot === 'number' ? raw.visionPlot : null,
+          mlcr: typeof raw?.medReasoning === 'number' ? raw.medReasoning : null,
+          excelAgent: typeof raw?.excelAgent === 'number' ? raw.excelAgent : null,
+        };
+        const metricDiffs: AaMetricDiffItem[] = AA_METRIC_KEYS.map((metric) => {
+          const liveScore = item.liveScores[metric];
+          const currentScore = sheetScores[metric];
+          const maskCell = loadedData.boldMask?.[overrideRow - 1]?.[aaColByMetric[metric]];
+          const currentIsBold = typeof maskCell === 'boolean' ? maskCell : null;
+          let status: AaMetricDiffStatus;
+          if (liveScore === null) {
+            status = 'unavailable';
+          } else if (currentScore === null) {
+            status = 'missing';
+          } else if (currentIsBold === false) {
+            status = 'overwrite_estimate';
+          } else if (Math.abs(currentScore - liveScore) < 0.05) {
+            status = 'unchanged';
+          } else if (
+            Math.abs(currentScore - Math.round(currentScore)) < 1e-6 &&
+            Math.abs(currentScore - liveScore) <= 0.55
+          ) {
+            status = 'unchanged';
+          } else {
+            status = 'changed';
+          }
+          return { metric, liveScore, currentScore, currentIsBold, status };
+        });
+        return {
+          sheetRowNumber: overrideRow,
+          matchedDisplayName: sheetModel?.displayName || `Row ${overrideRow}`,
+          metricDiffs,
+        };
+      }
+      return {
+        sheetRowNumber: item.sheetRowNumber,
+        matchedDisplayName: item.matchedDisplayName,
+        metricDiffs: item.metricDiffs,
+      };
+    },
+    [aaManualOverrides, minHistoryRow, sheetRowByNumber, loadedData.boldMask, aaColByMetric]
+  );
+
+  // Pre-select actionable AA metric cells whenever effectiveAaDiffReport updates
+  useEffect(() => {
+    if (!effectiveAaDiffReport) {
+      setSelectedAaCells({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const item of aaRows) {
+      if (typeof item.sheetRowNumber === 'number' && item.sheetRowNumber >= minHistoryRow) {
+        for (const md of item.metricDiffs) {
+          if (
+            md.liveScore !== null &&
+            (md.status === 'missing' || md.status === 'overwrite_estimate' || md.status === 'changed')
+          ) {
+            next[`${item.aaId}:${md.metric}`] = true;
+          }
+        }
+      }
+    }
+    setSelectedAaCells(next);
+  }, [effectiveAaDiffReport, aaRows, minHistoryRow]);
+
+  const handleToggleAaMetricCell = useCallback((aaId: string, metric: AaMetricKey) => {
+    const key = `${aaId}:${metric}`;
+    setSelectedAaCells((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const handleToggleAaRowAllMetrics = useCallback(
+    (aaId: string, metrics: AaMetricKey[], checked: boolean) => {
+      setSelectedAaCells((prev) => {
+        const next = { ...prev };
+        for (const m of metrics) {
+          next[`${aaId}:${m}`] = checked;
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleToggleAaSectionAll = useCallback(
+    (checked: boolean) => {
+      setSelectedAaCells((prev) => {
+        const next = { ...prev };
+        for (const item of aaRows) {
+          const target = resolveAaTarget(item);
+          if (typeof target.sheetRowNumber === 'number' && target.sheetRowNumber >= minHistoryRow) {
+            for (const md of target.metricDiffs) {
+              if (
+                md.liveScore !== null &&
+                (md.status === 'missing' ||
+                  md.status === 'overwrite_estimate' ||
+                  md.status === 'changed')
+              ) {
+                next[`${item.aaId}:${md.metric}`] = checked;
+              }
+            }
+          }
+        }
+        return next;
+      });
+    },
+    [aaRows, resolveAaTarget, minHistoryRow]
+  );
+
+  const handleAssignAaManualRow = useCallback(
+    (aaId: string, rowValue: string) => {
+      if (rowValue === IGNORE_OPTION_VALUE) {
+        setAaManualOverrides((prev) => {
+          const next = { ...prev };
+          delete next[aaId];
+          return next;
+        });
+        setSelectedAaCells((prev) => {
+          const next = { ...prev };
+          for (const m of AA_METRIC_KEYS) delete next[`${aaId}:${m}`];
+          return next;
+        });
+        if (onIgnoreAaModel) void onIgnoreAaModel(aaId);
+        return;
+      }
+
+      const parsed = Number(rowValue);
+
+      if (!rowValue || !Number.isFinite(parsed) || parsed < minHistoryRow) {
+        setAaManualOverrides((prev) => {
+          const next = { ...prev };
+          delete next[aaId];
+          return next;
+        });
+        setSelectedAaCells((prev) => {
+          const next = { ...prev };
+          for (const m of AA_METRIC_KEYS) delete next[`${aaId}:${m}`];
+          return next;
+        });
+        return;
+      }
+
+      const nextOverrides = { ...aaManualOverrides, [aaId]: parsed };
+      setAaManualOverrides(nextOverrides);
+      const item = aaRows.find((r) => r.aaId === aaId);
+      if (item) {
+        const target = resolveAaTarget(item, nextOverrides);
+        setSelectedAaCells((prev) => {
+          const next = { ...prev };
+          for (const md of target.metricDiffs) {
+            const actionable =
+              md.liveScore !== null &&
+              (md.status === 'missing' ||
+                md.status === 'overwrite_estimate' ||
+                md.status === 'changed');
+            next[`${aaId}:${md.metric}`] = actionable;
+          }
+          return next;
+        });
+      }
+
+      const sheetModel = sheetRowByNumber.get(parsed);
+      if (onPersistAaMapping) {
+        void onPersistAaMapping(aaId, {
+          sheetRowNumber: parsed,
+          ...(sheetModel ? { matchedModelId: sheetModel.id, matchedDisplayName: sheetModel.displayName } : {}),
+        });
+      }
+    },
+    [aaManualOverrides, aaRows, minHistoryRow, onIgnoreAaModel, onPersistAaMapping, resolveAaTarget, sheetRowByNumber]
+  );
+
+  // --- View-model adapters for the 4 single-column benchmark monitors ---
   const gdpxRows = useMemo((): Array<BenchmarkDiffRowViewModel<GdpxDiffItem>> => {
     if (!effectiveGdpxDiffReport) return [];
     return effectiveGdpxDiffReport.diffs
@@ -716,8 +985,35 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     [integrityRows, intSel.selectedIds, intSel.manualRowOverrides, resolveIntegrityTarget, minHistoryRow]
   );
 
+  const selectedAaCellEntries = useMemo(() => {
+    const entries: Array<{
+      item: AaDiffItem;
+      target: ResolvedAaTarget;
+      mDiff: AaMetricDiffItem;
+    }> = [];
+    for (const item of aaRows) {
+      const target = resolveAaTarget(item);
+      if (typeof target.sheetRowNumber !== 'number' || target.sheetRowNumber < minHistoryRow) {
+        continue;
+      }
+      for (const mDiff of target.metricDiffs) {
+        if (
+          mDiff.liveScore !== null &&
+          (mDiff.status === 'missing' ||
+            mDiff.status === 'overwrite_estimate' ||
+            mDiff.status === 'changed') &&
+          selectedAaCells[`${item.aaId}:${mDiff.metric}`]
+        ) {
+          entries.push({ item, target, mDiff });
+        }
+      }
+    }
+    return entries;
+  }, [aaRows, resolveAaTarget, minHistoryRow, selectedAaCells]);
+
   const totalSelectedCount =
     selectedPriceCount +
+    selectedAaCellEntries.length +
     selectedGdpxItems.length +
     selectedValsItems.length +
     selectedSimpleBenchItems.length +
@@ -725,6 +1021,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
 
   const hasAnyActionable =
     actionablePriceDiffs.length > 0 ||
+    aaRows.length > 0 ||
     gdpxRows.length > 0 ||
     valsRows.length > 0 ||
     simpleBenchRows.length > 0 ||
@@ -732,13 +1029,14 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
 
   const isAnyChecking =
     isChecking ||
+    isCheckingAa ||
     isCheckingGdpx ||
     isCheckingVals ||
     isCheckingSimpleBench ||
     isCheckingIntegrity;
 
   const displayedLabs = useMemo(
-    () => (report?.labs && report.labs.length > 0 ? report.labs : DEFAULT_LAB_PLANS),
+    () => mergePricingPlansWithDefaults(report?.labs),
     [report]
   );
   const displayedSources = report?.sources ?? [];
@@ -751,6 +1049,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     if (!accessToken) return;
     await Promise.allSettled([
       isSheetsConnected ? onRunCheck() : Promise.resolve(),
+      onRunAaCheck(),
       onRunGdpxCheck(),
       onRunValsCheck(),
       onRunSimpleBenchCheck(),
@@ -771,6 +1070,41 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         displayName: m.displayName,
         labelSuffix: formatRow(m),
       }));
+
+  const getAaPickerOptions = (item: AaDiffItem) => {
+    const creatorLow = (item.creator || '').toLowerCase();
+    const firstWord = (item.aaName || '').toLowerCase().split(/[\s-]+/)[0] || '';
+    const sorted = [...sheetRowsForPicker].sort((a, b) => {
+      const aCo =
+        creatorLow &&
+        ((a.companyName || '').toLowerCase().includes(creatorLow) ||
+          creatorLow.includes((a.companyName || '').toLowerCase()))
+          ? 0
+          : 1;
+      const bCo =
+        creatorLow &&
+        ((b.companyName || '').toLowerCase().includes(creatorLow) ||
+          creatorLow.includes((b.companyName || '').toLowerCase()))
+          ? 0
+          : 1;
+      if (aCo !== bCo) return aCo - bCo;
+      const aMatch = firstWord && a.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
+      const bMatch = firstWord && b.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
+      if (aMatch !== bMatch) return aMatch - bMatch;
+      const aEmpty = a.rawScores.actCodeReason === null ? 0 : 1;
+      const bEmpty = b.rawScores.actCodeReason === null ? 0 : 1;
+      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
+      return (a.sheetRowNumber ?? 0) - (b.sheetRowNumber ?? 0);
+    });
+    return buildPickerOptions(sorted, (m) => {
+      const iq = m.rawScores.actCodeReason;
+      return iq !== null
+        ? `IQ ${formatExactScore(iq, lang)}`
+        : lang === 'de'
+        ? 'IQ leer'
+        : 'IQ empty';
+    });
+  };
 
   const getGdpxPickerOptions = (row: BenchmarkDiffRowViewModel<GdpxDiffItem>) => {
     const labLow = (row.raw.lab || '').toLowerCase();
@@ -1080,6 +1414,34 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       });
     };
 
+    if (effectiveAaDiffReport) {
+      for (const { item, target, mDiff } of selectedAaCellEntries) {
+        const colIdx = aaColByMetric[mDiff.metric];
+        const colLetter = columnIndexToA1(colIdx);
+        const metricLabel = AA_METRIC_LABELS[mDiff.metric].short;
+        pushBenchmarkExistingChange({
+          kind: 'aa',
+          sourceId: item.aaId,
+          sourceName: `${item.aaName} (${metricLabel})`,
+          prefix: 'AA',
+          colIdx,
+          colLetter,
+          liveScore: mDiff.liveScore as number,
+          defaultDecimals: 1,
+          scoreDecimals: 1,
+          target: {
+            sheetRowNumber: target.sheetRowNumber,
+            matchedDisplayName: target.matchedDisplayName,
+            currentScore: mDiff.currentScore,
+            currentIsBold: mDiff.currentIsBold,
+          },
+          itemMatchedModelId: item.matchedModelId,
+          isManualAssignment: typeof aaManualOverrides[item.aaId] === 'number',
+          applyBold: true,
+        });
+      }
+    }
+
     if (effectiveGdpxDiffReport) {
       for (const item of selectedGdpxItems) {
         const target = resolveGdpxTarget(item, gdpxSel.manualRowOverrides);
@@ -1378,6 +1740,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         insertedRowsCount += 1;
       }
 
+      const aaMappings: Record<string, ManualRowMapping> = {};
       const gdpxMappings: Record<string, ManualRowMapping> = {};
       const valsMappings: Record<string, ManualRowMapping> = {};
       const simpleBenchMappings: Record<string, ManualRowMapping> = {};
@@ -1389,7 +1752,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
           ...(c.matchedModelId ? { matchedModelId: c.matchedModelId } : {}),
           ...(c.matchedDisplayName ? { matchedDisplayName: c.matchedDisplayName } : {}),
         };
-        if (c.kind === 'gdpx') gdpxMappings[c.sourceId] = mapping;
+        if (c.kind === 'aa') aaMappings[c.sourceId] = mapping;
+        else if (c.kind === 'gdpx') gdpxMappings[c.sourceId] = mapping;
         else if (c.kind === 'vals') valsMappings[c.sourceId] = mapping;
         else if (c.kind === 'simpleBench') simpleBenchMappings[c.sourceId] = mapping;
         else if (c.kind === 'integrity') integrityMappings[c.sourceId] = mapping;
@@ -1397,12 +1761,14 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
 
       if (
         onSaveManualMappings &&
-        (Object.keys(gdpxMappings).length > 0 ||
+        (Object.keys(aaMappings).length > 0 ||
+          Object.keys(gdpxMappings).length > 0 ||
           Object.keys(valsMappings).length > 0 ||
           Object.keys(simpleBenchMappings).length > 0 ||
           Object.keys(integrityMappings).length > 0)
       ) {
         await onSaveManualMappings({
+          aa: Object.keys(aaMappings).length > 0 ? aaMappings : undefined,
           gdpx: Object.keys(gdpxMappings).length > 0 ? gdpxMappings : undefined,
           vals: Object.keys(valsMappings).length > 0 ? valsMappings : undefined,
           simpleBench:
@@ -1421,6 +1787,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             } in Google Sheets.`
       );
       setPendingWrite(null);
+      setAaManualOverrides({});
       gdpxSel.clearOverrides();
       valsSel.clearOverrides();
       sbSel.clearOverrides();
@@ -1434,8 +1801,213 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     }
   };
 
+  // --- Full-Row New Model Research & Insert (all used Sheet columns) ---
+  const handleResearchNewModel = async (req: Omit<ModelResearchRequest, 'existingCompanies'>) => {
+    const key = `${req.sourceMonitor}:${req.sourceId}`;
+    setResearchingRowId(key);
+    setWriteError(null);
+    setWriteSuccess(null);
+    try {
+      const seen = new Set<string>();
+      const existingCompanies: Array<{ name: string; flag: string; domain?: string }> = [];
+      for (const m of loadedData.allModels) {
+        const cleanName = (m.companyName || '').trim();
+        if (!cleanName) continue;
+        const low = cleanName.toLowerCase();
+        if (seen.has(low)) continue;
+        seen.add(low);
+        existingCompanies.push({
+          name: cleanName,
+          flag: m.flag || '',
+          domain: m.companyDomain || undefined,
+        });
+      }
+      const draft = await requestNewModelRowDraft({
+        ...req,
+        existingCompanies,
+      });
+      setActiveRowDraft(draft);
+    } catch (err) {
+      setWriteError(
+        err instanceof Error
+          ? err.message
+          : lang === 'de'
+          ? 'Modell-Recherche fehlgeschlagen.'
+          : 'Model research failed.'
+      );
+    } finally {
+      setResearchingRowId(null);
+    }
+  };
+
+  const handleConfirmWriteFullRow = async (draft: NewModelRowDraft) => {
+    if (!accessToken) {
+      setWriteError(
+        lang === 'de'
+          ? 'Bitte zuerst mit Google anmelden, um eine Zeile ins Sheet zu schreiben.'
+          : 'Please sign in with Google first to write a row to Google Sheets.'
+      );
+      return;
+    }
+
+    setIsWritingFullRow(true);
+    setWriteError(null);
+    setWriteSuccess(null);
+
+    try {
+      const targetSheetId = loadedData.activeSheetId ?? MAIN_SHEET_GID;
+      const rowNum = firstReleasedHistoryRow;
+      const quotedTitle = quoteSheetTitle(sheetTitle);
+
+      const colNameLabelIdx = layout?.colNameLabel ?? 1;
+      const colCreatorYearIdx = layout?.colCreatorYear ?? 2;
+      const colStorylineIdx = layout?.colStoryline ?? 14;
+      const colChatLinkIdx = layout?.colChatLink ?? 15;
+      const colApiLinkIdx = layout?.colApiLink ?? 16;
+      const colModelNameIdx = layout?.colModelName ?? 18;
+      const colReleaseIdx = layout?.colReleaseDate ?? 25;
+      const colCreatorIdx = layout?.colModelCreator ?? 26;
+
+      // Clone existing Sheet formulas (Col A Logo, Col L/M/N composite scores, etc.) verbatim
+      const templateFormulaOffsets = new Map<number, number>();
+      try {
+        const maxInspectCol = Math.max(
+          colCreatorIdx,
+          integrityColIdx,
+          layout?.colWorstCaseScore ?? 13,
+          layout?.colFlag ?? 37,
+          45
+        );
+        const templateRows = await fetchMultiRowFormulas(
+          activeSpreadsheetId,
+          sheetTitle,
+          rowNum,
+          rowNum + 3,
+          accessToken,
+          columnIndexToA1(maxInspectCol)
+        );
+        for (let rowOffset = 0; rowOffset < templateRows.length; rowOffset++) {
+          const trow = templateRows[rowOffset] || [];
+          for (let colIdx = 0; colIdx < trow.length; colIdx++) {
+            if (!templateFormulaOffsets.has(colIdx) && String(trow[colIdx] || '').startsWith('=')) {
+              templateFormulaOffsets.set(colIdx, rowOffset);
+            }
+          }
+        }
+      } catch {
+        // Proceed safely without cloning formulas if inspection fails
+      }
+
+      const colBValue = `${draft.countryFlag ? `${draft.countryFlag} ` : ''}${
+        draft.displayNameColB || draft.canonicalName
+      }${draft.hasFreeApi ? ' 🌐' : ''}✦NEW${draft.isPaidOnly ? ' 💲' : ''}`.trim();
+      const colCValue = formatCreatorColC(draft.companyName, draft.releaseDate);
+
+      const sparseUpdates: CellUpdateSpec[] = [];
+      const explicitlyWrittenCols = new Set<number>();
+      const pushCell = (colIdx: number, value: string | number) => {
+        sparseUpdates.push({
+          range: `${quotedTitle}!${columnIndexToA1(colIdx)}${rowNum}`,
+          value,
+        });
+        explicitlyWrittenCols.add(colIdx);
+      };
+
+      pushCell(colNameLabelIdx, colBValue);
+      pushCell(colCreatorYearIdx, colCValue);
+      pushCell(colModelNameIdx, draft.canonicalName.trim());
+      if (draft.releaseDate.trim()) pushCell(colReleaseIdx, draft.releaseDate.trim());
+      if (draft.companyName.trim()) pushCell(colCreatorIdx, draft.companyName.trim());
+      if (draft.storyline.trim()) pushCell(colStorylineIdx, draft.storyline.trim());
+
+      const chatLinkVal = draft.chatLink.trim() || (draft.isPaidOnly ? 'paid' : '');
+      if (chatLinkVal) pushCell(colChatLinkIdx, chatLinkVal);
+      if (draft.apiLink.trim()) pushCell(colApiLinkIdx, draft.apiLink.trim());
+      if (draft.priceDeMonthly.trim()) pushCell(colDeIdx, draft.priceDeMonthly.trim());
+      if (colUsIdx !== null && draft.priceUsMonthly.trim()) {
+        pushCell(colUsIdx, draft.priceUsMonthly.trim());
+      }
+
+      const benchmarkMappings: Array<{
+        key: keyof NewModelRowDraft['benchmarks'];
+        colIdx: number;
+        defaultDecimals: number;
+      }> = [
+        { key: 'iq', colIdx: aaColByMetric.iq, defaultDecimals: 1 },
+        { key: 'nonHallucination', colIdx: aaColByMetric.nonHallucination, defaultDecimals: 1 },
+        { key: 'accuracy', colIdx: aaColByMetric.accuracy, defaultDecimals: 1 },
+        { key: 'mmmuPro', colIdx: aaColByMetric.mmmuPro, defaultDecimals: 1 },
+        { key: 'mlcr', colIdx: aaColByMetric.mlcr, defaultDecimals: 1 },
+        { key: 'excelAgent', colIdx: aaColByMetric.excelAgent, defaultDecimals: 1 },
+        { key: 'gdpx', colIdx: gdpxColIdx, defaultDecimals: 1 },
+        { key: 'vals', colIdx: valsColIdx, defaultDecimals: 2 },
+        { key: 'simpleBench', colIdx: simpleBenchColIdx, defaultDecimals: 1 },
+        { key: 'integrity', colIdx: integrityColIdx, defaultDecimals: 1 },
+      ];
+
+      const boldSpecs: CellBoldSpec[] = [];
+      for (const bm of benchmarkMappings) {
+        const cell = draft.benchmarks[bm.key];
+        if (cell.value !== null && Number.isFinite(cell.value)) {
+          pushCell(bm.colIdx, cell.value);
+          boldSpecs.push({
+            row1Based: rowNum,
+            col0Based: bm.colIdx,
+            bold: Boolean(cell.isOfficial),
+            numberFormatPattern: decimalsToPattern(cell.value, bm.defaultDecimals),
+          });
+        } else {
+          boldSpecs.push({
+            row1Based: rowNum,
+            col0Based: bm.colIdx,
+            bold: false,
+          });
+        }
+      }
+
+      const formulaCopySpecs: FormulaCopySpec[] = [];
+      for (const [colIdx, rowOffset] of templateFormulaOffsets.entries()) {
+        if (!explicitlyWrittenCols.has(colIdx)) {
+          formulaCopySpecs.push({
+            sourceRow1BasedAfterInsert: rowNum + 1 + rowOffset,
+            col0Based: colIdx,
+          });
+        }
+      }
+
+      const res = await insertRowAndWriteSparseCells(
+        activeSpreadsheetId,
+        targetSheetId,
+        rowNum,
+        sparseUpdates,
+        boldSpecs,
+        accessToken,
+        formulaCopySpecs
+      );
+
+      setActiveRowDraft(null);
+      setWriteSuccess(
+        lang === 'de'
+          ? `Komplette Zeile für „${draft.canonicalName}“ in Zeile ${rowNum} angelegt (${res.totalUpdatedCells} Zellen + Formeln geklont).`
+          : `Created complete row for "${draft.canonicalName}" at row ${rowNum} (${res.totalUpdatedCells} cells + cloned formulas).`
+      );
+      await onRefreshFromSheets(activeSpreadsheetId);
+    } catch (err) {
+      setWriteError(
+        err instanceof Error
+          ? err.message
+          : lang === 'de'
+          ? 'Konnte neue Modellzeile nicht ins Google Sheet schreiben.'
+          : 'Failed to write new model row to Google Sheets.'
+      );
+    } finally {
+      setIsWritingFullRow(false);
+    }
+  };
+
   const totalBadgeAlerts =
     (effectiveDiffReport?.changedCount ?? 0) +
+    (effectiveAaDiffReport?.actionableCount ?? 0) +
     (effectiveGdpxDiffReport?.actionableCount ?? 0) +
     (effectiveValsDiffReport?.actionableCount ?? 0) +
     (effectiveSimpleBenchDiffReport?.actionableCount ?? 0) +
@@ -1443,6 +2015,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
 
   const errorBanners = [
     checkError,
+    aaCheckError,
     gdpxCheckError,
     valsCheckError,
     simpleBenchCheckError,
@@ -1468,8 +2041,8 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             <div className="min-w-0">
               <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
                 {lang === 'de'
-                  ? 'Tarife, Preis-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer'
-                  : 'Plans, Price, GDPx, Vals, SimpleBench & Integrity Checker'}
+                  ? 'Tarife, Preis-, AA (6)-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer'
+                  : 'Plans, Price, AA (6), GDPx, Vals, SimpleBench & Integrity Checker'}
               </h2>
               <p className="text-xs font-mono tabular-nums text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <span>
@@ -1637,6 +2210,49 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
 
           {apiAvailable && (
             <>
+              {/* Artificial Analysis 6-Column Section (Columns D–I) */}
+              <ArtificialAnalysisDiffSection
+                lang={lang}
+                isChecking={isCheckingAa}
+                isSheetsConnected={isSheetsConnected}
+                rawReport={aaReport}
+                effectiveReport={effectiveAaDiffReport}
+                actionableRows={aaRows}
+                ignoredRows={aaIgnored}
+                mappedRows={aaMapped}
+                selectedCells={selectedAaCells}
+                manualRowOverrides={aaManualOverrides}
+                showIgnored={aaShowIgnored}
+                minHistoryRow={minHistoryRow}
+                researchingRowId={researchingRowId}
+                onToggleShowIgnored={() => setAaShowIgnored((prev) => !prev)}
+                onToggleMetricCell={handleToggleAaMetricCell}
+                onToggleRowAllMetrics={handleToggleAaRowAllMetrics}
+                onToggleSectionAll={handleToggleAaSectionAll}
+                onAssignManualRow={handleAssignAaManualRow}
+                onRestoreModel={onRestoreAaModel}
+                onRemoveManualMapping={onRemoveAaMapping}
+                onResearchNewModel={(item) =>
+                  void handleResearchNewModel({
+                    sourceMonitor: 'aa',
+                    sourceId: item.aaId,
+                    modelName: item.aaName,
+                    creatorHint: item.creator || undefined,
+                    isOpenWeightsHint: item.isOpenWeights,
+                    knownScores: {
+                      iq: item.liveScores.iq,
+                      nonHallucination: item.liveScores.nonHallucination,
+                      accuracy: item.liveScores.accuracy,
+                      mmmuPro: item.liveScores.mmmuPro,
+                      mlcr: item.liveScores.mlcr,
+                      excelAgent: item.liveScores.excelAgent,
+                    },
+                  })
+                }
+                resolveTarget={(item) => resolveAaTarget(item)}
+                getPickerOptionsForRow={getAaPickerOptions}
+              />
+
               {/* GDPx Section */}
               <BenchmarkDiffSection<GdpxDiffItem>
                 lang={lang}
@@ -1697,6 +2313,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 resolveTarget={(row) => resolveGdpxTarget(row.raw, gdpxSel.manualRowOverrides)}
                 getPickerOptionsForRow={getGdpxPickerOptions}
                 defaultLiveDecimals={1}
+                researchingRowId={researchingRowId}
+                researchKeyPrefix="gdpx"
+                onResearchNewModel={(row) =>
+                  void handleResearchNewModel({
+                    sourceMonitor: 'gdpx',
+                    sourceId: row.id,
+                    modelName: row.name,
+                    creatorHint: row.raw.lab || undefined,
+                    knownScores: { gdpx: row.liveScore },
+                  })
+                }
               />
 
               {/* Vals Index Section */}
@@ -1766,6 +2393,17 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 resolveTarget={(row) => resolveValsTarget(row.raw, valsSel.manualRowOverrides)}
                 getPickerOptionsForRow={getValsPickerOptions}
                 defaultLiveDecimals={2}
+                researchingRowId={researchingRowId}
+                researchKeyPrefix="vals"
+                onResearchNewModel={(row) =>
+                  void handleResearchNewModel({
+                    sourceMonitor: 'vals',
+                    sourceId: row.id,
+                    modelName: row.name,
+                    creatorHint: row.raw.company || undefined,
+                    knownScores: { vals: row.liveScore },
+                  })
+                }
               />
 
               {/* SimpleBench Section */}
@@ -1833,6 +2471,18 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 resolveTarget={(row) => resolveSimpleBenchTarget(row.raw, sbSel.manualRowOverrides)}
                 getPickerOptionsForRow={getSimpleBenchPickerOptions}
                 defaultLiveDecimals={1}
+                researchingRowId={researchingRowId}
+                researchKeyPrefix="simpleBench"
+                onResearchNewModel={(row) =>
+                  void handleResearchNewModel({
+                    sourceMonitor: 'simpleBench',
+                    sourceId: row.id,
+                    modelName: row.name,
+                    creatorHint: row.raw.organization || undefined,
+                    releaseDateHint: row.raw.dateAdded || undefined,
+                    knownScores: { simpleBench: row.liveScore },
+                  })
+                }
               />
 
               {/* Integrity-Bench Section */}
@@ -1897,6 +2547,16 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 resolveTarget={(row) => resolveIntegrityTarget(row.raw, intSel.manualRowOverrides)}
                 getPickerOptionsForRow={getIntegrityPickerOptions}
                 defaultLiveDecimals={1}
+                researchingRowId={researchingRowId}
+                researchKeyPrefix="integrity"
+                onResearchNewModel={(row) =>
+                  void handleResearchNewModel({
+                    sourceMonitor: 'integrity',
+                    sourceId: row.id,
+                    modelName: row.name,
+                    knownScores: { integrity: row.liveScore },
+                  })
+                }
               />
             </>
           )}
@@ -1934,6 +2594,19 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             isWriting={isWriting}
             onCancel={() => setPendingWrite(null)}
             onConfirm={handleConfirmSheetWrite}
+          />
+        )}
+
+        {activeRowDraft && (
+          <NewModelRowDraftDialog
+            lang={lang}
+            draft={activeRowDraft}
+            insertRowNumber={firstReleasedHistoryRow}
+            isWriting={isWritingFullRow}
+            onCancel={() => {
+              if (!isWritingFullRow) setActiveRowDraft(null);
+            }}
+            onConfirmWrite={handleConfirmWriteFullRow}
           />
         )}
       </div>

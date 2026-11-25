@@ -11,9 +11,11 @@ import {
   resolveLabPricingSummary,
   resolveTierRowPrice,
   TierRowPriceInfo,
+  translateSubscriptionTiersToEn,
 } from '../../utils/labMatrixPricing';
 import { roundCurrencyString, roundCurrencyTokensInText } from '../../utils/priceFormat';
 import { Tooltip } from '../Tooltip';
+import { CountryFlag } from './CountryFlag';
 
 /**
  * Visual mini scale meter gauge indicating model parameter size (1 to 5 bars)
@@ -44,6 +46,7 @@ const MiniScaleMeter: React.FC<{ level: number; colorClass?: string }> = ({
 export interface LabMatrixCardProps {
   lab: LabEntry;
   lang: 'de' | 'en';
+  translatedTiersEn?: string;
   isExpanded: boolean;
   onToggleExpand: () => void;
   isSimplifiedView: boolean;
@@ -57,6 +60,7 @@ export interface LabMatrixCardProps {
 export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
   lab,
   lang,
+  translatedTiersEn,
   isExpanded,
   onToggleExpand,
   isSimplifiedView,
@@ -111,7 +115,8 @@ export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
     matchedLabModels,
     pricingPlans,
     tierRowPrices.size > 0,
-    lang
+    lang,
+    translatedTiersEn
   );
 
   return (
@@ -124,8 +129,8 @@ export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
         {/* Lab Card Header */}
         <div className="flex items-start justify-between gap-2 mb-2.5">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xl leading-none shrink-0" title={lab.country}>
-              {lab.countryFlag}
+            <span className="inline-flex items-center justify-center shrink-0" title={lab.country}>
+              <CountryFlag country={lab.country} fallbackEmoji={lab.countryFlag} size="md" />
             </span>
             <div className="min-w-0">
               {onSelectLabForBenchmark ? (
@@ -483,8 +488,37 @@ export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
               </div>
             )}
 
-            {pricingSummary.primaryText && (
-              pricingSummary.consumerPlans.length > 0 ? (
+            {pricingSummary.primaryText && (() => {
+              const tierSegments = pricingSummary.primaryText
+                .split('|')
+                .map((segment) => segment.trim())
+                .filter(Boolean);
+
+              const tiersContent = (
+                <div
+                  className={`w-full space-y-1 text-xs leading-snug whitespace-normal break-words ${
+                    pricingSummary.consumerPlans.length > 0 ? 'cursor-help' : ''
+                  }`}
+                >
+                  {tierSegments.map((segment, idx) => {
+                    const isApiNote = idx > 0 && /\bapi\b/i.test(segment);
+                    return (
+                      <p
+                        key={idx}
+                        className={
+                          isApiNote
+                            ? 'text-slate-600 dark:text-slate-400'
+                            : 'font-medium text-slate-700 dark:text-slate-200'
+                        }
+                      >
+                        {segment}
+                      </p>
+                    );
+                  })}
+                </div>
+              );
+
+              return pricingSummary.consumerPlans.length > 0 ? (
                 <Tooltip
                   title={`${lab.creator} · ${lang === 'de' ? 'Monatstarife (DE)' : 'Monthly Plans (US)'}`}
                   position="top"
@@ -520,7 +554,7 @@ export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
                                 className="flex items-baseline justify-between gap-2 rounded px-1 -mx-1 py-0.5 hover:bg-slate-800/80 transition-colors cursor-pointer"
                               >
                                 <span className="font-semibold text-slate-200 truncate">
-                                  {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                  {plan.planName.replace(/^(ChatGPT|Claude|Google AI|Grok|Kimi)\s+/i, '')}
                                 </span>
                                 <span className="font-mono tabular-nums text-emerald-300 underline decoration-emerald-400/50 shrink-0">
                                   {localizedPrice}
@@ -531,7 +565,7 @@ export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
                           return (
                             <div key={`${plan.planName}-${idx}`} className="flex items-baseline justify-between gap-2">
                               <span className="font-semibold text-slate-200 truncate">
-                                {plan.planName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                                {plan.planName.replace(/^(ChatGPT|Claude|Google AI|Grok|Kimi)\s+/i, '')}
                               </span>
                               <span className="font-mono tabular-nums text-slate-100 shrink-0">
                                 {localizedPrice}
@@ -539,34 +573,20 @@ export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
                             </div>
                           );
                         })}
-                      {pricingSummary.subscriptionTiers && (
-                        <div className="pt-1 mt-1 border-t border-slate-700/70 text-xs text-slate-300">
-                          {lang === 'de' ? 'Alle Stufen:' : 'All tiers:'} {pricingSummary.subscriptionTiers}
-                        </div>
-                      )}
                     </div>
                   }
                 >
-                  <p className="w-full font-mono tabular-nums text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug cursor-help truncate">
-                    {pricingSummary.primaryText}
-                  </p>
+                  {tiersContent}
                 </Tooltip>
               ) : (
-                <p
-                  className={`font-mono tabular-nums text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug ${
-                    isSimplifiedView ? 'truncate' : ''
-                  }`}
-                  title={pricingSummary.primaryText}
-                >
-                  {pricingSummary.primaryText}
-                </p>
-              )
-            )}
+                tiersContent
+              );
+            })()}
           </div>
         )}
 
         {/* Tooling / Agents Collapsible Details (hidden in simplified view) */}
-        {!isSimplifiedView && (lab.codingAgent || lab.dailyAgent || lab.harnessSdk || lab.subscriptionTiers) && (
+        {!isSimplifiedView && (lab.codingAgent || lab.dailyAgent || lab.harnessSdk || (lab.group !== 'top10' && lab.subscriptionTiers)) && (
           <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-2">
             <button
               type="button"
@@ -618,13 +638,17 @@ export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
                     </span>
                   </div>
                 )}
-                {lab.subscriptionTiers && (
+                {lab.group !== 'top10' && lab.subscriptionTiers && (
                   <div className="flex items-start gap-1.5 pt-0.5">
                     <span className="text-slate-600 dark:text-slate-400 text-xs shrink-0 font-medium">
                       {lang === 'de' ? 'Abo-Stufen:' : 'Subscription Tiers:'}
                     </span>
                     <span className="font-medium text-slate-800 dark:text-slate-200">
-                      {roundCurrencyTokensInText(lab.subscriptionTiers)}
+                      {roundCurrencyTokensInText(
+                        lang === 'en'
+                          ? translatedTiersEn || translateSubscriptionTiersToEn(lab.subscriptionTiers)
+                          : lab.subscriptionTiers
+                      )}
                     </span>
                   </div>
                 )}

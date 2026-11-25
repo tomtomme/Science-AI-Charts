@@ -9,6 +9,7 @@ import {
   isStaticPreviewError,
   triggerPricingCheck,
 } from '../services/pricingMonitorService';
+import { roundCurrencyString } from '../utils/priceFormat';
 import { GdpxCheckReport } from '../types/gdpxMonitor';
 import {
   extractGdpxSheetSnapshots,
@@ -33,6 +34,8 @@ import {
   extractSimpleBenchSheetSnapshots,
   simpleBenchMonitorApi,
 } from '../services/simpleBenchMonitorService';
+import { AA_METRIC_KEYS, AaCheckReport } from '../types/aaMonitor';
+import { aaMonitorApi, extractAaSheetSnapshots } from '../services/aaMonitorService';
 import { useBenchmarkMonitor } from './useBenchmarkMonitor';
 
 interface UseAllMonitorsParams {
@@ -85,8 +88,12 @@ export function useAllMonitors({
       for (const diff of report.diffs) {
         const live = liveById.get(diff.modelId);
         if (!live) return false;
-        if ((live.priceDeMonthly || '').trim() !== (diff.currentDe || '').trim()) return false;
-        if ((live.priceUsMonthly || '').trim() !== (diff.currentUs || '').trim()) return false;
+        if (roundCurrencyString(live.priceDeMonthly || '') !== roundCurrencyString(diff.currentDe || '')) {
+          return false;
+        }
+        if (roundCurrencyString(live.priceUsMonthly || '') !== roundCurrencyString(diff.currentUs || '')) {
+          return false;
+        }
       }
       return true;
     },
@@ -201,6 +208,62 @@ export function useAllMonitors({
   const valsColIdx = loadedData.columnLayout?.colEconLegal ?? VALS_COL_INDEX;
   const simpleBenchColIdx = loadedData.columnLayout?.colTrickOld ?? DEFAULT_SIMPLEBENCH_COL_INDEX;
   const integrityColIdx = loadedData.columnLayout?.colIntegrity ?? INTEGRITY_COL_INDEX;
+
+  // --- Artificial Analysis (6-Column) Monitor ---
+  const extractAa = useCallback(
+    () =>
+      extractAaSheetSnapshots(
+        loadedData.allModels,
+        loadedData.boldMask,
+        loadedData.columnLayout,
+        minHistoryRow
+      ),
+    [loadedData.allModels, loadedData.boldMask, loadedData.columnLayout, minHistoryRow]
+  );
+  const doesAaMatch = useCallback(
+    (report: AaCheckReport) => {
+      const liveSnapshots = extractAa();
+      if (liveSnapshots.length === 0 || report.diffs.length === 0) {
+        return false;
+      }
+      const liveById = new Map(liveSnapshots.map((m) => [m.id, m]));
+      for (const diff of report.diffs) {
+        if (!diff.matchedModelId) continue;
+        const live = liveById.get(diff.matchedModelId);
+        if (
+          !live ||
+          (diff.sheetRowNumber !== null && live.sheetRowNumber !== diff.sheetRowNumber) ||
+          (diff.matchedDisplayName && live.displayName !== diff.matchedDisplayName)
+        ) {
+          return false;
+        }
+        for (const metric of AA_METRIC_KEYS) {
+          const mDiff = diff.metricDiffs.find((m) => m.metric === metric);
+          if (!mDiff) return false;
+          if (
+            live.scores[metric] !== mDiff.currentScore ||
+            live.boldMask[metric] !== mDiff.currentIsBold
+          ) {
+            return false;
+          }
+        }
+      }
+      return true;
+    },
+    [extractAa]
+  );
+
+  const aa = useBenchmarkMonitor({
+    label: 'Artificial Analysis',
+    api: aaMonitorApi,
+    extractSnapshots: extractAa,
+    doesReportMatchLiveSheet: doesAaMatch,
+    authUser,
+    isSheetsConnected,
+    hasLoadedModels,
+    isModalOpen,
+    dailyAutoCheckEnabled,
+  });
 
   // --- GDPx Monitor ---
   const extractGdpx = useCallback(
@@ -403,20 +466,25 @@ export function useAllMonitors({
     setPricingReport(null);
     setPricingCheckError(null);
     setHasAutoCheckedSession(false);
+    aa.resetAuthState();
     gdpx.resetAuthState();
     integrity.resetAuthState();
     vals.resetAuthState();
     simpleBench.resetAuthState();
-  }, [gdpx, integrity, vals, simpleBench]);
+  }, [aa, gdpx, integrity, vals, simpleBench]);
 
   const handleSaveManualMappings = useCallback(
     async (mappings: {
+      aa?: Record<string, ManualRowMapping>;
       gdpx?: Record<string, ManualRowMapping>;
       integrity?: Record<string, ManualRowMapping>;
       vals?: Record<string, ManualRowMapping>;
       simpleBench?: Record<string, ManualRowMapping>;
     }) => {
       const tasks: Promise<unknown>[] = [];
+      if (mappings.aa && Object.keys(mappings.aa).length > 0) {
+        tasks.push(aa.saveManualMappings(mappings.aa));
+      }
       if (mappings.gdpx && Object.keys(mappings.gdpx).length > 0) {
         tasks.push(gdpx.saveManualMappings(mappings.gdpx));
       }
@@ -431,21 +499,26 @@ export function useAllMonitors({
       }
       await Promise.allSettled(tasks);
     },
-    [gdpx, integrity, vals, simpleBench]
+    [aa, gdpx, integrity, vals, simpleBench]
   );
 
   const retryAllConnections = useCallback(async () => {
     await Promise.all([
       checkPricingMonitorStatus(),
+      aa.checkStatus(),
       gdpx.checkStatus(),
       vals.checkStatus(),
       simpleBench.checkStatus(),
       integrity.checkStatus(),
     ]);
-  }, [checkPricingMonitorStatus, gdpx, vals, simpleBench, integrity]);
+  }, [checkPricingMonitorStatus, aa, gdpx, vals, simpleBench, integrity]);
 
   const priceAlertCount =
-    isPricingDiffValidForSheet && pricingReport ? pricingReport.changedCount : 0;
+    isPricingDiffValidForSheet && pricingReport
+      ? pricingReport.changedCount + pricingReport.missingCount
+      : 0;
+  const aaAlertCount =
+    aa.isDiffValidForSheet && aa.report ? aa.report.actionableCount : 0;
   const gdpxAlertCount =
     gdpx.isDiffValidForSheet && gdpx.report ? gdpx.report.actionableCount : 0;
   const valsAlertCount =
@@ -457,6 +530,7 @@ export function useAllMonitors({
 
   const totalAlerts =
     priceAlertCount +
+    aaAlertCount +
     gdpxAlertCount +
     valsAlertCount +
     simpleBenchAlertCount +
@@ -464,6 +538,7 @@ export function useAllMonitors({
 
   const isAnyMonitorChecking =
     isCheckingPricing ||
+    aa.isChecking ||
     gdpx.isChecking ||
     vals.isChecking ||
     simpleBench.isChecking ||
@@ -472,6 +547,8 @@ export function useAllMonitors({
   const allSyncedOk = Boolean(
     isPricingDiffValidForSheet &&
       pricingReport &&
+      aa.isDiffValidForSheet &&
+      aa.report &&
       gdpx.isDiffValidForSheet &&
       gdpx.report &&
       vals.isDiffValidForSheet &&
@@ -485,11 +562,16 @@ export function useAllMonitors({
 
   const apiAvailable =
     pricingApiAvailable ||
+    aa.apiAvailable ||
     gdpx.apiAvailable ||
     vals.apiAvailable ||
     simpleBench.apiAvailable ||
     integrity.apiAvailable;
 
+  const handlePersistAaMapping = useCallback(
+    (id: string, mapping: ManualRowMapping) => aa.saveManualMappings({ [id]: mapping }),
+    [aa]
+  );
   const handlePersistGdpxMapping = useCallback(
     (id: string, mapping: ManualRowMapping) => gdpx.saveManualMappings({ [id]: mapping }),
     [gdpx]
@@ -516,6 +598,15 @@ export function useAllMonitors({
     isCheckingPricing,
     pricingCheckError,
     handleRunPricingCheck,
+    aaReport: aa.report,
+    isAaDiffValidForSheet: aa.isDiffValidForSheet,
+    isCheckingAa: aa.isChecking,
+    aaCheckError: aa.checkError,
+    handleRunAaCheck: aa.handleRunCheck,
+    handleIgnoreAaModel: aa.handleIgnoreModel,
+    handleRestoreAaModel: aa.handleRestoreModel,
+    handlePersistAaMapping,
+    handleRemoveAaMapping: aa.handleRemoveManualMapping,
     gdpxReport: gdpx.report,
     isGdpxDiffValidForSheet: gdpx.isDiffValidForSheet,
     isCheckingGdpx: gdpx.isChecking,

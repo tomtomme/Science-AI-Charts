@@ -10,43 +10,64 @@ import {
 } from './googleSheetsService';
 
 const flagMap: Record<string, string> = {
-  'America (US)': '🇺🇸',
-  US: '🇺🇸',
-  USA: '🇺🇸',
-  China: '🇨🇳',
-  Canada: '🇨🇦',
-  French: '🇫🇷',
-  France: '🇫🇷',
-  Israel: '🇮🇱',
-  Singapore: '🇸🇬',
-  Singapur: '🇸🇬',
-  'South Korea': '🇰🇷',
-  UAE: '🇦🇪',
-  Japan: '🇯🇵',
-  'Saudi Arabia': '🇸🇦',
-  Spain: '🇪🇸',
-  Germany: '🇩🇪',
-  UK: '🇬🇧',
-  India: '🇮🇳',
+  'america (us)': '🇺🇸',
+  us: '🇺🇸',
+  usa: '🇺🇸',
+  'united states': '🇺🇸',
+  china: '🇨🇳',
+  prc: '🇨🇳',
+  canada: '🇨🇦',
+  french: '🇫🇷',
+  france: '🇫🇷',
+  israel: '🇮🇱',
+  singapore: '🇸🇬',
+  singapur: '🇸🇬',
+  'south korea': '🇰🇷',
+  korea: '🇰🇷',
+  uae: '🇦🇪',
+  'united arab emirates': '🇦🇪',
+  japan: '🇯🇵',
+  'saudi arabia': '🇸🇦',
+  spain: '🇪🇸',
+  germany: '🇩🇪',
+  deutschland: '🇩🇪',
+  uk: '🇬🇧',
+  'united kingdom': '🇬🇧',
+  india: '🇮🇳',
 };
 
 export function normalizeCountry(raw: string): { country: string; flag: string } {
-  const trimmed = raw ? raw.trim() : '';
-  if (trimmed === 'Singapur' || trimmed === 'Singapore') {
+  const trimmed = raw ? raw.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim() : '';
+  const low = trimmed.toLowerCase();
+  if (low === 'singapur' || low === 'singapore') {
     return { country: 'Singapore', flag: '🇸🇬' };
   }
-  if (trimmed === 'French' || trimmed === 'France') {
+  if (low === 'french' || low === 'france') {
     return { country: 'France', flag: '🇫🇷' };
   }
-  if (trimmed === 'US' || trimmed === 'USA' || trimmed === 'America (US)') {
+  if (low === 'us' || low === 'usa' || low === 'america (us)' || low === 'united states') {
     return { country: 'America (US)', flag: '🇺🇸' };
   }
-  if (trimmed === 'South Korea' || trimmed.startsWith('South Korea')) {
+  if (low === 'south korea' || low.startsWith('south korea') || low === 'korea') {
     return { country: 'South Korea', flag: '🇰🇷' };
   }
+  if (low === 'china' || low === 'prc') {
+    return { country: 'China', flag: '🇨🇳' };
+  }
+  if (low === 'uae' || low === 'united arab emirates') {
+    return { country: 'UAE', flag: '🇦🇪' };
+  }
+  if (low === 'canada') return { country: 'Canada', flag: '🇨🇦' };
+  if (low === 'israel') return { country: 'Israel', flag: '🇮🇱' };
+  if (low === 'japan') return { country: 'Japan', flag: '🇯🇵' };
+  if (low === 'saudi arabia') return { country: 'Saudi Arabia', flag: '🇸🇦' };
+  if (low === 'spain') return { country: 'Spain', flag: '🇪🇸' };
+  if (low === 'india') return { country: 'India', flag: '🇮🇳' };
+  if (low === 'germany' || low === 'deutschland') return { country: 'Germany', flag: '🇩🇪' };
+  if (low === 'uk' || low === 'united kingdom') return { country: 'UK', flag: '🇬🇧' };
   return {
     country: trimmed,
-    flag: flagMap[trimmed] || '🌐',
+    flag: flagMap[low] || '🌐',
   };
 }
 
@@ -306,7 +327,7 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
 
   let curCountryContender = 'America (US)';
   const contenders: LabEntry[] = [];
-  const contendersMaxCols = rows[rContenderCreator]?.length || 35;
+  const contendersMaxCols = Math.max(rows[rContenders]?.length || 0, rows[rContenderCreator]?.length || 0, 35);
   for (let c = 1; c < contendersMaxCols; c++) {
     const countryHeader = getCell(rContenders, c);
     if (countryHeader) curCountryContender = countryHeader;
@@ -361,7 +382,7 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
 
   const tweakers: LabEntry[] = [];
   let curCountryTweaker = 'America (US)';
-  const tweakersMaxCols = rows[rTweakerCreator]?.length || 30;
+  const tweakersMaxCols = Math.max(rows[rTweakers]?.length || 0, rows[rTweakerCreator]?.length || 0, 30);
   for (let c = 1; c < tweakersMaxCols; c++) {
     const countryHeader = getCell(rTweakers, c);
     if (countryHeader) curCountryTweaker = countryHeader;
@@ -419,7 +440,7 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
 
   const smallLabs: LabEntry[] = [];
   let curCountrySmall = 'America (US)';
-  const smallMaxCols = rows[rSmallCreator]?.length || 30;
+  const smallMaxCols = Math.max(rows[rSmall]?.length || 0, rows[rSmallCreator]?.length || 0, 30);
   for (let c = 1; c < smallMaxCols; c++) {
     const countryHeader = getCell(rSmall, c);
     if (countryHeader && !countryHeader.toLowerCase().includes('small llm') && !countryHeader.toLowerCase().includes('small model')) {
@@ -469,7 +490,7 @@ export function parseLabRows(rows: string[][], greenMask?: boolean[][]): LabEntr
 
   const harnessLabs: LabEntry[] = [];
   let curCountryHarness = 'America (US)';
-  const harnessMaxCols = rows[rHarnessCreator]?.length || 30;
+  const harnessMaxCols = Math.max(rows[rHarness]?.length || 0, rows[rHarnessCreator]?.length || 0, 30);
   for (let c = 1; c < harnessMaxCols; c++) {
     const countryHeader = getCell(rHarness, c);
     if (countryHeader) curCountryHarness = countryHeader.trim();
@@ -518,7 +539,9 @@ export async function fetchLiveLabEntries(options?: {
     try {
       const meta = await fetchSpreadsheetMetadata(spreadsheetId, accessToken);
       const tab = meta.sheets.find((s) => s.sheetId === LABS_SHEET_GID) || resolveSheetTab(meta, LABS_SHEET_GID);
-      const grid = await fetchSheetGridWithFormatting(spreadsheetId, tab.title, accessToken);
+      const grid = await fetchSheetGridWithFormatting(spreadsheetId, tab.title, accessToken, {
+        expandHorizontalMerges: true,
+      });
       const parsed = parseLabRows(grid.rows, grid.greenMask);
       if (parsed.length > 0) {
         return { entries: parsed, isLive: true, dataSource: 'sheets_api' };

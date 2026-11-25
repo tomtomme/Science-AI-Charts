@@ -9,6 +9,9 @@ import { ExternalLink } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { roundCurrencyString, roundCurrencyTokensInText } from '../utils/priceFormat';
 import { getSubscriptionBookingUrl } from '../data/subscriptionLinks';
+import { LabPlanInfo } from '../types/pricingMonitor';
+import { DEFAULT_LAB_PLANS } from '../data/pricingPlansFallback';
+import { resolveModelStarterPriceRange } from '../utils/labMatrixPricing';
 
 interface ExplodedBarChartProps {
   models: ModelRecord[];
@@ -33,6 +36,7 @@ interface ExplodedBarChartProps {
   onToggleAdvanced?: () => void;
   priceFilter?: PriceFilter;
   onPriceFilterChange?: (filter: PriceFilter) => void;
+  pricingPlans?: LabPlanInfo[];
   categoryNames?: string[];
   isPreTranslatedCategoryNames?: boolean;
   onScrollToParagraph?: (targetId: string) => void;
@@ -98,6 +102,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   onToggleAdvanced,
   priceFilter = 'paid',
   onPriceFilterChange,
+  pricingPlans = DEFAULT_LAB_PLANS,
   categoryNames,
   isPreTranslatedCategoryNames = false,
   onScrollToParagraph,
@@ -531,18 +536,56 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     type: 'price' | 'note' | 'none';
     text: string;
     displayPrice?: string;
+    planName?: string;
     tooltipTitle: string;
     tooltipText: string;
   }
 
-  const getPriceColInfo = (raw: string | undefined, expectedRegion: 'de' | 'us' = lang === 'de' ? 'de' : 'us'): PriceColInfo => {
-    if (!raw) return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
+  const getPriceColInfo = (
+    raw: string | undefined,
+    expectedRegion: 'de' | 'us' = lang === 'de' ? 'de' : 'us',
+    modelForStarter?: ModelRecord
+  ): PriceColInfo => {
+    const isDe = lang === 'de';
+    const buildStarterPriceInfo = (): PriceColInfo => {
+      if (!modelForStarter) {
+        return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
+      }
+      const starter = resolveModelStarterPriceRange(
+        modelForStarter,
+        pricingPlans,
+        expectedRegion === 'de' ? 'de' : 'en'
+      );
+      if (!starter) {
+        return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
+      }
+      const amountOnly = starter.price.replace(/[€$]/g, '').trim();
+      const priceLine =
+        expectedRegion === 'de'
+          ? (isDe ? `${amountOnly} € / Monat` : `€${amountOnly} / month`)
+          : (isDe ? `${amountOnly} $ / Monat` : `$${amountOnly} / month`);
+      const starterDesc = isDe
+        ? `\nkostenlos nutzbar; höhere Limits im ${starter.planName}-Abo`
+        : `\nfree to use; higher limits with ${starter.planName}`;
+      return {
+        type: 'price',
+        text: starter.price,
+        displayPrice: starter.price,
+        planName: starter.planName,
+        tooltipTitle:
+          expectedRegion === 'de'
+            ? (isDe ? 'Chatzugriff in DE (Gratis + Starter-Abo)' : 'Chat access in DE (Free + Starter Plan)')
+            : (isDe ? 'Chatzugriff in US (Gratis + Starter-Abo)' : 'Chat access in US (Free + Starter Plan)'),
+        tooltipText: `${priceLine}${starterDesc}`,
+      };
+    };
+
+    if (!raw) return buildStarterPriceInfo();
     const clean = roundCurrencyTokensInText(raw.trim());
     if (!clean || clean === '-' || clean.toLowerCase() === 'n/a' || clean.toLowerCase().includes('abokosten') || clean.toLowerCase().includes('monthly cost')) {
-      return { type: 'none', text: '', tooltipTitle: '', tooltipText: '' };
+      return buildStarterPriceInfo();
     }
 
-    const isDe = lang === 'de';
     const buildRangeSuffix = (amountOnly: string): string => {
       if (!/[-–—]/.test(amountOnly)) return '';
       const nums =
@@ -552,6 +595,11 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
           .filter((n) => Number.isFinite(n)) || [];
       const minVal = nums.length > 0 ? Math.min(...nums) : 0;
       const maxVal = nums.length > 0 ? Math.max(...nums) : 0;
+      if (minVal === 0 && maxVal > 0) {
+        return isDe
+          ? '\nkostenlos nutzbar; höhere Limits im Starter-Abo'
+          : '\nfree to use; higher limits in starter plan';
+      }
       // High-tier flagship plans (>= 80) vary by capacity/usage tier rather than 1-year discount
       if (minVal >= 80 || maxVal >= 90) {
         return isDe
@@ -748,7 +796,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
       }
 
       const activeRegionPriceRaw = lang === 'de' ? model.priceDeMonthly : model.priceUsMonthly;
-      const priceInfo = getPriceColInfo(activeRegionPriceRaw, lang === 'de' ? 'de' : 'us');
+      const priceInfo = getPriceColInfo(activeRegionPriceRaw, lang === 'de' ? 'de' : 'us', model);
       const isBelowBar = catRaw < 0 && isScienceKnowledge;
       let basePriceY = barTopY - 8;
       if (activeComp && totalBarHeight < 36) {
@@ -2030,8 +2078,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                   const bookingHref = getSubscriptionBookingUrl({
                     labOrCompany: model.companyName || model.creatorClean,
                     modelName: model.displayName,
+                    planText: priceInfo.planName,
                     priceText: displayPrice,
                     lang: lang === 'de' ? 'de' : 'en',
+                    consumerPlans: pricingPlans,
                   });
                   const tooltipFullText = bookingHref
                     ? `${priceInfo.tooltipText}\n${lang === 'de' ? 'Klick für Abo-Buchung' : 'Click to view / book plan'}`

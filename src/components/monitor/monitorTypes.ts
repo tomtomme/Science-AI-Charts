@@ -20,7 +20,7 @@ export interface PendingSheetCellChange {
   afterIsBold?: boolean;
   range: string;
   value: string | number;
-  kind: 'price' | 'gdpx' | 'integrity' | 'vals' | 'simpleBench';
+  kind: 'price' | 'gdpx' | 'integrity' | 'vals' | 'simpleBench' | 'aa';
   sourceId?: string;
   sheetRowNumber?: number;
   col0Based?: number;

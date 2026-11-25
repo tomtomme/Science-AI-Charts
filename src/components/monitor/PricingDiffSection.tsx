@@ -52,6 +52,8 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
         <div className="flex items-center gap-2 min-w-0">
           {report.changedCount > 0 ? (
             <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          ) : actionableDiffs.length > 0 ? (
+            <AlertTriangle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
           ) : (
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           )}
@@ -137,7 +139,7 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
                         </span>
                         {item.matchedPlanName && (
                           <span className="ml-1.5 text-xs text-slate-700 dark:text-slate-300">
-                            {item.matchedPlanName.replace(/^(ChatGPT|Claude|Google AI)\s+/i, '')}
+                            {item.matchedPlanName.replace(/^(ChatGPT|Claude|Google AI|Grok|Kimi)\s+/i, '')}
                           </span>
                         )}
                       </td>

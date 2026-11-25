@@ -6,7 +6,7 @@
 import React, { Suspense, lazy, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { ScoreMode, ModelScope } from './types';
 import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS } from './data/benchmarks';
-import { DEFAULT_LAB_PLANS } from './data/pricingPlansFallback';
+import { mergePricingPlansWithDefaults } from './data/pricingPlansFallback';
 import {
   DEFAULT_TIMELINE_REGRESSION_INDEX,
   DEFAULT_CORRELATION_REGRESSION_INDEX,
@@ -689,6 +689,7 @@ export default function App() {
                 onToggleAdvanced={() => filters.setShowAdvanced((prev) => !prev)}
                 priceFilter={filters.priceFilter}
                 onPriceFilterChange={filters.setPriceFilter}
+                pricingPlans={mergePricingPlansWithDefaults(monitors.pricingReport?.labs)}
                 categoryNames={resolvedCategoryNames}
                 isPreTranslatedCategoryNames={isPreTranslatedCategoryNames}
                 onScrollToParagraph={scrollToParagraph}
@@ -716,11 +717,7 @@ export default function App() {
               labs={syncAuth.labs}
               models={filters.weightedDataset.newModels}
               allModels={filters.weightedDataset.allModels}
-              pricingPlans={
-                monitors.pricingReport?.labs?.length
-                  ? monitors.pricingReport.labs
-                  : DEFAULT_LAB_PLANS
-              }
+              pricingPlans={mergePricingPlansWithDefaults(monitors.pricingReport?.labs)}
               onSelectLabForBenchmark={handleSelectLabFromMatrix}
               lang={lang}
               activeGroup={labActiveGroup}
@@ -747,6 +744,8 @@ export default function App() {
         allSyncedOk={monitors.allSyncedOk}
         pricingReport={monitors.pricingReport}
         isPricingDiffValidForSheet={monitors.isPricingDiffValidForSheet}
+        aaReport={monitors.aaReport}
+        isAaDiffValidForSheet={monitors.isAaDiffValidForSheet}
         gdpxReport={monitors.gdpxReport}
         isGdpxDiffValidForSheet={monitors.isGdpxDiffValidForSheet}
         valsReport={monitors.valsReport}
@@ -757,7 +756,7 @@ export default function App() {
         isIntegrityDiffValidForSheet={monitors.isIntegrityDiffValidForSheet}
       />
 
-      {/* Unified Plans, Pricing, GDPx, Vals, SimpleBench & Integrity Monitor Modal */}
+      {/* Unified Plans, Pricing, AA (6), GDPx, Vals, SimpleBench & Integrity Monitor Modal */}
       {isPricingModalOpen && (
         <Suspense fallback={null}>
           <PricingMonitorModal
@@ -769,6 +768,15 @@ export default function App() {
             isChecking={monitors.isCheckingPricing}
             checkError={monitors.pricingCheckError}
             onRunCheck={() => monitors.handleRunPricingCheck('manual')}
+            aaReport={monitors.aaReport}
+            isAaDiffValid={monitors.isAaDiffValidForSheet}
+            isCheckingAa={monitors.isCheckingAa}
+            aaCheckError={monitors.aaCheckError}
+            onRunAaCheck={() => monitors.handleRunAaCheck('manual')}
+            onIgnoreAaModel={monitors.handleIgnoreAaModel}
+            onRestoreAaModel={monitors.handleRestoreAaModel}
+            onPersistAaMapping={monitors.handlePersistAaMapping}
+            onRemoveAaMapping={monitors.handleRemoveAaMapping}
             gdpxReport={monitors.gdpxReport}
             isGdpxDiffValid={monitors.isGdpxDiffValidForSheet}
             isCheckingGdpx={monitors.isCheckingGdpx}

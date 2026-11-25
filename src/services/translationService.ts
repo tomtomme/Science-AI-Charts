@@ -67,3 +67,73 @@ export async function fetchWeeklySheetTranslations(
     return null;
   }
 }
+
+const LAB_TIERS_EN_CACHE_KEY = 'science_iq_lab_tiers_en_cache_v1';
+
+interface LabTiersEnLocalCache {
+  fingerprint: string;
+  translations: Record<string, string>;
+}
+
+export async function fetchLabTiersEnTranslations(
+  entries: Record<string, string>
+): Promise<Record<string, string> | null> {
+  const keys = Object.keys(entries)
+    .filter((k) => entries[k]?.trim())
+    .sort();
+  if (keys.length === 0) return null;
+
+  const fingerprint = JSON.stringify(keys.map((k) => [k, entries[k].trim()]));
+
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = window.localStorage.getItem(LAB_TIERS_EN_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as LabTiersEnLocalCache;
+        if (parsed?.fingerprint === fingerprint && parsed.translations) {
+          return parsed.translations;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  try {
+    const res = await fetch('/api/translations/lab-tiers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries }),
+    });
+    if (!res.ok) return null;
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return null;
+
+    const data = (await res.json()) as {
+      available?: boolean;
+      translations?: Record<string, string>;
+    };
+    if (!data?.translations || Object.keys(data.translations).length === 0) {
+      return null;
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(
+          LAB_TIERS_EN_CACHE_KEY,
+          JSON.stringify({
+            fingerprint,
+            translations: data.translations,
+          } satisfies LabTiersEnLocalCache)
+        );
+      } catch {
+        // ignore storage quota errors
+      }
+    }
+
+    return data.translations;
+  } catch {
+    return null;
+  }
+}
+

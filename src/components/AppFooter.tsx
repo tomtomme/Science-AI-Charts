@@ -3,6 +3,7 @@ import { Bell, FileSpreadsheet, Github, RefreshCw } from 'lucide-react';
 import { GITHUB_REPO_URL } from '../data/rawCsvFallback';
 import { LoadedDatasets } from '../services/dataService';
 import { PricingCheckReport } from '../types/pricingMonitor';
+import { AaCheckReport } from '../types/aaMonitor';
 import { GdpxCheckReport } from '../types/gdpxMonitor';
 import { ValsCheckReport } from '../types/valsMonitor';
 import { SimpleBenchCheckReport } from '../types/simpleBenchMonitor';
@@ -24,6 +25,8 @@ interface AppFooterProps {
   allSyncedOk: boolean;
   pricingReport: PricingCheckReport | null;
   isPricingDiffValidForSheet: boolean;
+  aaReport: AaCheckReport | null;
+  isAaDiffValidForSheet: boolean;
   gdpxReport: GdpxCheckReport | null;
   isGdpxDiffValidForSheet: boolean;
   valsReport: ValsCheckReport | null;
@@ -47,6 +50,8 @@ export const AppFooter: React.FC<AppFooterProps> = ({
   allSyncedOk,
   pricingReport,
   isPricingDiffValidForSheet,
+  aaReport,
+  isAaDiffValidForSheet,
   gdpxReport,
   isGdpxDiffValidForSheet,
   valsReport,
@@ -173,12 +178,12 @@ export const AppFooter: React.FC<AppFooterProps> = ({
             </button>
           </Tooltip>
 
-          {/* Unified Preis-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer */}
+          {/* Unified Preis-, AA-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer */}
           <Tooltip
             title={
               lang === 'de'
-                ? 'Preis-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer'
-                : 'Plans, Price, GDPx, Vals, SimpleBench & Integrity Checker'
+                ? 'Preis-, AA (6)-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer'
+                : 'Plans, Price, AA (6), GDPx, Vals, SimpleBench & Integrity Checker'
             }
             badge={
               isAnyMonitorChecking
@@ -190,8 +195,8 @@ export const AppFooter: React.FC<AppFooterProps> = ({
                 : allSyncedOk
                 ? 'OK'
                 : lang === 'de'
-                ? '5 Prüfer'
-                : '5 Checks'
+                ? '6 Prüfer'
+                : '6 Checks'
             }
             content={
               <div className="space-y-1 text-xs">
@@ -203,6 +208,15 @@ export const AppFooter: React.FC<AppFooterProps> = ({
                     : lang === 'de'
                     ? 'Aktuelle DE/US Browser-Chat-Tarife & Preis-Diffs.'
                     : 'Current DE/US browser chat plans & pricing diffs.'}
+                </div>
+                <div className="border-t border-slate-700/50 pt-1">
+                  {isAaDiffValidForSheet && aaReport
+                    ? lang === 'de'
+                      ? aaReport.summaryDe
+                      : aaReport.summaryEn
+                    : lang === 'de'
+                    ? 'Prüft Artificial Analysis (6 Spalten: D–I) ohne API-Key.'
+                    : 'Checks Artificial Analysis (6 columns: D–I) without API key.'}
                 </div>
                 <div className="border-t border-slate-700/50 pt-1">
                   {isGdpxDiffValidForSheet && gdpxReport
@@ -256,8 +270,8 @@ export const AppFooter: React.FC<AppFooterProps> = ({
               }`}
               aria-label={
                 lang === 'de'
-                  ? 'Preis-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer öffnen'
-                  : 'Open price, GDPx, Vals, SimpleBench & integrity checker'
+                  ? 'Preis-, AA-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer öffnen'
+                  : 'Open price, AA, GDPx, Vals, SimpleBench & integrity checker'
               }
             >
               <Bell

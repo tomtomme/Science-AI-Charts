@@ -4,8 +4,19 @@ import {
   PricingCheckReport,
   PricingMonitorStatusResponse,
 } from '../types/pricingMonitor';
+import { isStarterSubscriptionFreeModel } from '../utils/starterPlanPricing';
 
-const MONITORED_LAB_KEYWORDS = ['openai', 'anthropic', 'google', 'meta'];
+const MONITORED_LAB_KEYWORDS = [
+  'openai',
+  'anthropic',
+  'google',
+  'meta',
+  'xai',
+  'spacex',
+  'grok',
+  'moonshot',
+  'kimi',
+];
 
 export function isIgnoredPricingMonitorModel(displayName: string): boolean {
   return /\bgpt[-\s]?4[-\s]?turbo\b/i.test(displayName || '');
@@ -14,6 +25,15 @@ export function isIgnoredPricingMonitorModel(displayName: string): boolean {
 export function isMonitoredLabCompany(companyName: string): boolean {
   const low = (companyName || '').toLowerCase();
   return MONITORED_LAB_KEYWORDS.some((kw) => low.includes(kw));
+}
+
+function isReleasedModel(m: ModelRecord): boolean {
+  return (
+    m.hasConcreteReleaseDate ||
+    m.scoreNew !== null ||
+    m.scoreOld !== null ||
+    m.scoreWorstCase !== null
+  );
 }
 
 export function extractMonitoredModelSnapshots(
@@ -28,7 +48,11 @@ export function extractMonitoredModelSnapshots(
         isMonitoredLabCompany(m.companyName) &&
         !isIgnoredPricingMonitorModel(m.displayName) &&
         m.isAvailable &&
-        (m.isPaid || Boolean(m.priceDeMonthly) || Boolean(m.priceUsMonthly))
+        (m.isPaid ||
+          Boolean(m.priceDeMonthly) ||
+          Boolean(m.priceUsMonthly) ||
+          (isReleasedModel(m) &&
+            isStarterSubscriptionFreeModel(m.companyName, m.displayName, m.isPaid, m.name)))
     )
     .map((m) => ({
       id: m.id,

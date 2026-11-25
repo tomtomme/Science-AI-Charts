@@ -257,3 +257,196 @@ ${JSON.stringify(payload, null, 2)}`;
     translation: finalResult?.translated ?? null,
   };
 }
+
+const LAB_TIERS_CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-lab-tiers-en-v1.json');
+
+interface PersistedLabTiersCache {
+  translatedAt: string;
+  sourceHash: string;
+  translations: Record<string, string>;
+}
+
+let inMemoryLabTiersCache: PersistedLabTiersCache | null = null;
+let inFlightLabTiersTranslation: Promise<PersistedLabTiersCache | null> | null = null;
+
+async function readLabTiersCache(): Promise<PersistedLabTiersCache | null> {
+  if (inMemoryLabTiersCache) return inMemoryLabTiersCache;
+  try {
+    const raw = await fs.readFile(LAB_TIERS_CACHE_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw) as PersistedLabTiersCache;
+    if (parsed && parsed.sourceHash && parsed.translations && typeof parsed.translations === 'object') {
+      inMemoryLabTiersCache = parsed;
+      return parsed;
+    }
+  } catch {
+    // Cache file may not exist yet
+  }
+  return null;
+}
+
+async function writeLabTiersCache(cache: PersistedLabTiersCache): Promise<void> {
+  inMemoryLabTiersCache = cache;
+  try {
+    await fs.writeFile(LAB_TIERS_CACHE_FILE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not persist lab tiers EN translation cache:', err);
+  }
+}
+
+export async function getOrRefreshLabTiersEnTranslation(
+  entries: Record<string, string>
+): Promise<{
+  available: boolean;
+  translatedAt: string | null;
+  translations: Record<string, string>;
+}> {
+  const normalizedKeys = Object.keys(entries)
+    .filter((k) => typeof entries[k] === 'string' && entries[k].trim().length > 0)
+    .sort();
+  if (normalizedKeys.length === 0) {
+    return { available: true, translatedAt: null, translations: {} };
+  }
+
+  const orderedEntries: Array<{ id: string; text: string }> = normalizedKeys.map((id) => ({
+    id,
+    text: entries[id].trim(),
+  }));
+
+  const sourceHash = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(orderedEntries))
+    .digest('hex')
+    .slice(0, 16);
+
+  const cached = await readLabTiersCache();
+  if (
+    cached &&
+    cached.sourceHash === sourceHash &&
+    Number.isFinite(new Date(cached.translatedAt).getTime()) &&
+    Date.now() - new Date(cached.translatedAt).getTime() < WEEKLY_INTERVAL_MS
+  ) {
+    return {
+      available: true,
+      translatedAt: cached.translatedAt,
+      translations: cached.translations,
+    };
+  }
+
+  const ai = getGeminiClient();
+  if (!ai) {
+    return {
+      available: false,
+      translatedAt: cached?.translatedAt ?? null,
+      translations: cached?.translations ?? {},
+    };
+  }
+
+  if (inFlightLabTiersTranslation) {
+    const res = await inFlightLabTiersTranslation;
+    return {
+      available: Boolean(res?.translations),
+      translatedAt: res?.translatedAt ?? null,
+      translations: res?.translations ?? {},
+    };
+  }
+
+  inFlightLabTiersTranslation = (async () => {
+    try {
+      const prompt = `Translate the following German AI lab subscription-tier and API-billing summary strings into concise, natural English.
+
+RULES:
+1. Keep every product name, tier name, model name, domain/URL (e.g. build.nvidia.com, chat.qwen.ai, api.meta.ai, JASP, Hydrogen, Claude Console, Qoder), and pipe separator ("|") intact.
+2. Do not omit, shorten, or summarize any details—every clause in each entry must be fully translated.
+3. Keep the exact same "id" for each item.
+
+INPUT (JSON):
+${JSON.stringify(orderedEntries, null, 2)}`;
+
+      const runModel = async (model: string, useThinking: boolean) =>
+        ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            ...(useThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                items: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      en: { type: Type.STRING },
+                    },
+                    required: ['id', 'en'],
+                  },
+                },
+              },
+              required: ['items'],
+            },
+          },
+        });
+
+      const attempts: Array<{ model: string; useThinking: boolean; delayMs: number }> = [
+        { model: 'gemini-4-hydrogen', useThinking: true, delayMs: 0 },
+        { model: 'gemini-3.1-flash-lite', useThinking: false, delayMs: 1000 },
+      ];
+
+      let response;
+      let lastErr: unknown;
+      for (const attempt of attempts) {
+        if (attempt.delayMs > 0) {
+          await new Promise((r) => setTimeout(r, attempt.delayMs));
+        }
+        try {
+          response = await runModel(attempt.model, attempt.useThinking);
+          break;
+        } catch (err) {
+          lastErr = err;
+          const msg = err instanceof Error ? err.message : String(err || '');
+          if (!/503|UNAVAILABLE|high demand|overloaded|429|RESOURCE_EXHAUSTED|500|404/i.test(msg)) {
+            throw err;
+          }
+        }
+      }
+      if (!response) throw lastErr;
+
+      const rawJson = (response.text || '').trim();
+      if (!rawJson) return cached;
+
+      const parsed = JSON.parse(rawJson) as { items?: Array<{ id?: string; en?: string }> };
+      if (!Array.isArray(parsed.items)) return cached;
+
+      const translations: Record<string, string> = {};
+      for (const item of parsed.items) {
+        if (item?.id && typeof item.en === 'string' && item.en.trim()) {
+          translations[item.id] = item.en.trim();
+        }
+      }
+      if (Object.keys(translations).length === 0) return cached;
+
+      const nextCache: PersistedLabTiersCache = {
+        translatedAt: new Date().toISOString(),
+        sourceHash,
+        translations,
+      };
+      await writeLabTiersCache(nextCache);
+      return nextCache;
+    } catch (err) {
+      console.warn('Lab tiers EN translation skipped/failed:', err instanceof Error ? err.message : err);
+      return cached;
+    } finally {
+      inFlightLabTiersTranslation = null;
+    }
+  })();
+
+  const finalResult = await inFlightLabTiersTranslation;
+  return {
+    available: Boolean(finalResult?.translations),
+    translatedAt: finalResult?.translatedAt ?? null,
+    translations: finalResult?.translations ?? {},
+  };
+}
+

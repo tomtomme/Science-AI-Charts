@@ -26,7 +26,16 @@ import {
   runSimpleBenchCheck,
   updateSimpleBenchPreferences,
 } from './server/simpleBenchMonitor.ts';
-import { getOrRefreshWeeklyTranslation } from './server/sheetTranslator.ts';
+import {
+  getAaMonitorStatus,
+  runAaCheck,
+  updateAaPreferences,
+} from './server/aaMonitor.ts';
+import { researchNewModelRowDraft } from './server/modelRowResearcher.ts';
+import {
+  getOrRefreshLabTiersEnTranslation,
+  getOrRefreshWeeklyTranslation,
+} from './server/sheetTranslator.ts';
 import { fetchLabsGridFromPublishedHtml, fetchMainO1LinksFromPublishedHtml } from './server/labsGrid.ts';
 import {
   getWeeklyFallbackSnapshot,
@@ -108,6 +117,25 @@ async function createAppServer() {
       res.json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sheet translation failed.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/translations/lab-tiers', async (req, res) => {
+    try {
+      const rawEntries = req.body?.entries;
+      const entries: Record<string, string> = {};
+      if (rawEntries && typeof rawEntries === 'object') {
+        for (const [key, value] of Object.entries(rawEntries)) {
+          if (typeof key === 'string' && typeof value === 'string' && value.trim()) {
+            entries[key] = value.trim();
+          }
+        }
+      }
+      const result = await getOrRefreshLabTiersEnTranslation(entries);
+      res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Lab tiers translation failed.';
       res.status(500).json({ error: message });
     }
   });
@@ -342,27 +370,111 @@ async function createAppServer() {
     }
   });
 
+  app.get('/api/aa-monitor/status', async (_req, res) => {
+    try {
+      const status = await getAaMonitorStatus();
+      res.json(status);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load Artificial Analysis monitor status.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/aa-monitor/check', async (req, res) => {
+    try {
+      const models = Array.isArray(req.body?.models) ? req.body.models : undefined;
+      const trigger = req.body?.trigger === 'daily_auto' ? 'daily_auto' : 'manual';
+      const replaceAll = req.body?.replaceAll === true;
+      const ignoredIds = Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined;
+      const manualMappings =
+        req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+          ? req.body.manualMappings
+          : undefined;
+      const report = await runAaCheck({ models, trigger, replaceAll, ignoredIds, manualMappings });
+      res.json({ report });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Artificial Analysis check failed.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/aa-monitor/preferences', async (req, res) => {
+    try {
+      const report = await updateAaPreferences({
+        replaceAll: req.body?.replaceAll === true,
+        ignoredIds: Array.isArray(req.body?.ignoredIds) ? req.body.ignoredIds : undefined,
+        ignoreIds: Array.isArray(req.body?.ignoreIds) ? req.body.ignoreIds : undefined,
+        unignoreIds: Array.isArray(req.body?.unignoreIds) ? req.body.unignoreIds : undefined,
+        manualMappings:
+          req.body?.manualMappings && typeof req.body.manualMappings === 'object'
+            ? req.body.manualMappings
+            : undefined,
+        unmapIds: Array.isArray(req.body?.unmapIds) ? req.body.unmapIds : undefined,
+        models: Array.isArray(req.body?.models) ? req.body.models : undefined,
+      });
+      res.json({ report });
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to update Artificial Analysis preferences.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/model-research/draft', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const validMonitors = new Set(['aa', 'gdpx', 'vals', 'simpleBench', 'integrity']);
+      const sourceMonitor = validMonitors.has(body.sourceMonitor) ? body.sourceMonitor : 'aa';
+      const sourceId = String(body.sourceId || '').trim().slice(0, 160);
+      const modelName = String(body.modelName || '').trim().slice(0, 160);
+      if (!modelName) {
+        return res.status(400).json({ error: 'modelName is required.' });
+      }
+      const draft = await researchNewModelRowDraft({
+        sourceMonitor,
+        sourceId,
+        modelName,
+        creatorHint: typeof body.creatorHint === 'string' ? body.creatorHint.slice(0, 100) : undefined,
+        releaseDateHint:
+          typeof body.releaseDateHint === 'string' ? body.releaseDateHint.slice(0, 20) : undefined,
+        isOpenWeightsHint:
+          typeof body.isOpenWeightsHint === 'boolean' ? body.isOpenWeightsHint : undefined,
+        knownScores:
+          body.knownScores && typeof body.knownScores === 'object' ? body.knownScores : undefined,
+        existingCompanies: Array.isArray(body.existingCompanies)
+          ? body.existingCompanies.slice(0, 60)
+          : undefined,
+      });
+      res.json({ draft });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Model row research failed.';
+      res.status(500).json({ error: message });
+    }
+  });
+
   app.all('/api/*', (_req, res) => {
     res.status(404).json({ error: 'API endpoint not found.' });
   });
 
   if (process.env.NODE_ENV !== 'production') {
     const isHmrDisabled = process.env.DISABLE_HMR === 'true';
-    const vitePromise = import('vite').then(({ createServer: createViteServer }) =>
-      createViteServer({
-        server: {
-          middlewareMode: true,
-          hmr: !isHmrDisabled,
-          ws: isHmrDisabled ? (false as const) : { server: httpServer },
-        },
-        appType: 'spa',
-      })
-    );
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: {
+        middlewareMode: true,
+        allowedHosts: true,
+        hmr: !isHmrDisabled,
+        ws: isHmrDisabled ? (false as const) : { server: httpServer },
+      },
+      appType: 'spa',
+    });
 
     if (isHmrDisabled) {
       app.get('/@vite/client', async (_req, res, next) => {
         try {
-          const vite = await vitePromise;
           const result = await vite.transformRequest('/@vite/client');
           if (!result) return next();
           const code = result.code.replace(
@@ -376,14 +488,7 @@ async function createAppServer() {
       });
     }
 
-    app.use(async (req, res, next) => {
-      try {
-        const vite = await vitePromise;
-        vite.middlewares(req, res, next);
-      } catch (err) {
-        next(err);
-      }
-    });
+    app.use(vite.middlewares);
   } else {
     const distDir = path.resolve(process.cwd(), 'dist');
     app.use(express.static(distDir));

@@ -23,7 +23,7 @@ export function getSubscriptionBookingUrl(params: {
       .toLowerCase();
     if (cleanPlan) {
       const hit = consumerPlans.find((p) => p.planName.toLowerCase().includes(cleanPlan));
-      if (hit?.sourceUrl && /pricing|subscription|muse\.ai|meta\.ai/i.test(hit.sourceUrl)) {
+      if (hit?.sourceUrl && /pricing|subscription|plans|membership|muse\.ai|meta\.ai/i.test(hit.sourceUrl)) {
         if (hit.lab === 'Google') {
           return lang === 'de'
             ? 'https://gemini.google/de/subscriptions/?hl=de'
@@ -61,7 +61,7 @@ export function getSubscriptionBookingUrl(params: {
     return 'https://chat.qwen.ai/';
   }
   if (combined.includes('moonshot') || combined.includes('kimi')) {
-    return 'https://www.kimi.com/';
+    return 'https://www.kimi.com/membership/pricing';
   }
   if (combined.includes('zhipu') || combined.includes('z ai') || combined.includes('z.ai') || /\bglm\b/.test(combined)) {
     return 'https://z.ai/';
