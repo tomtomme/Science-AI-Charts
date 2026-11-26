@@ -214,11 +214,12 @@ export function useAllMonitors({
     () =>
       extractAaSheetSnapshots(
         loadedData.allModels,
+        loadedData.rawRows,
         loadedData.boldMask,
         loadedData.columnLayout,
         minHistoryRow
       ),
-    [loadedData.allModels, loadedData.boldMask, loadedData.columnLayout, minHistoryRow]
+    [loadedData.allModels, loadedData.rawRows, loadedData.boldMask, loadedData.columnLayout, minHistoryRow]
   );
   const doesAaMatch = useCallback(
     (report: AaCheckReport) => {
@@ -229,6 +230,7 @@ export function useAllMonitors({
       const liveById = new Map(liveSnapshots.map((m) => [m.id, m]));
       for (const diff of report.diffs) {
         if (!diff.matchedModelId) continue;
+        if (!diff.matchSource) return false;
         const live = liveById.get(diff.matchedModelId);
         if (
           !live ||

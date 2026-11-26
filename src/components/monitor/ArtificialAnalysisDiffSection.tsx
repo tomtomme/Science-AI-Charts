@@ -5,6 +5,7 @@ import {
   Cpu,
   ExternalLink,
   Loader2,
+  Pencil,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -93,6 +94,7 @@ export const ArtificialAnalysisDiffSection: React.FC<ArtificialAnalysisDiffSecti
   getPickerOptionsForRow,
 }) => {
   const [showMapped, setShowMapped] = useState(false);
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const mappedIdSet = useMemo(() => new Set(mappedRows.map((m) => m.id)), [mappedRows]);
 
   const renderStatusBadge = (status: AaDiffStatus) => {
@@ -402,12 +404,22 @@ export const ArtificialAnalysisDiffSection: React.FC<ArtificialAnalysisDiffSecti
                           </td>
 
                           <td className="py-2 px-3 align-top whitespace-nowrap">
-                            {item.status === 'new_unmatched' ? (
+                            {item.status === 'new_unmatched' || editingRowId === item.aaId ? (
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <select
-                                  value={manualRowOverrides[item.aaId] ?? ''}
-                                  onChange={(e) => onAssignManualRow(item.aaId, e.target.value)}
-                                  className="w-[210px] px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100"
+                                  value={
+                                    manualRowOverrides[item.aaId] ??
+                                    (editingRowId === item.aaId && target.sheetRowNumber
+                                      ? target.sheetRowNumber
+                                      : '')
+                                  }
+                                  onChange={(e) => {
+                                    onAssignManualRow(item.aaId, e.target.value);
+                                    if (editingRowId === item.aaId) {
+                                      setEditingRowId(null);
+                                    }
+                                  }}
+                                  className="w-[225px] px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100"
                                 >
                                   <option value="">
                                     {lang === 'de' ? '— Zuordnen —' : '— Assign —'}
@@ -452,10 +464,62 @@ export const ArtificialAnalysisDiffSection: React.FC<ArtificialAnalysisDiffSecti
                                     </span>
                                   </button>
                                 )}
+
+                                {editingRowId === item.aaId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingRowId(null)}
+                                    className="inline-flex items-center justify-center p-1 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                                    title={lang === 'de' ? 'Abbrechen' : 'Cancel'}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
                               </div>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 text-xs text-slate-800 dark:text-slate-200">
                                 <span>{target.matchedDisplayName}</span>
+                                {item.matchSource === 'col_ah' && !isManuallyMapped && (
+                                  <span
+                                    className="px-1 py-0.2 rounded text-[10px] font-mono font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300"
+                                    title={
+                                      lang === 'de'
+                                        ? 'Exakt über Spalte AH zugeordnet'
+                                        : 'Matched via Column AH exact AA name'
+                                    }
+                                  >
+                                    AH
+                                  </span>
+                                )}
+                                {isManuallyMapped && (
+                                  <span
+                                    className="px-1 py-0.2 rounded text-[10px] font-mono font-bold bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300"
+                                    title={
+                                      lang === 'de'
+                                        ? 'Manueller Override gespeichert'
+                                        : 'Saved manual override'
+                                    }
+                                  >
+                                    {lang === 'de' ? 'Override' : 'Override'}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingRowId(item.aaId)}
+                                  className="inline-flex items-center justify-center p-0.5 rounded text-slate-400 hover:text-violet-600 dark:text-slate-500 dark:hover:text-violet-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 cursor-pointer"
+                                  title={
+                                    lang === 'de'
+                                      ? 'Zielmodell überschreiben / manuell zuordnen oder ignorieren'
+                                      : 'Override target model / reassign or ignore'
+                                  }
+                                  aria-label={
+                                    lang === 'de'
+                                      ? 'Zielmodell überschreiben'
+                                      : 'Override target model'
+                                  }
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
                                 {isManuallyMapped && onRemoveManualMapping && (
                                   <button
                                     type="button"

@@ -58,6 +58,7 @@ export interface AaSheetModelSnapshot {
   id: string;
   name: string;
   displayName: string;
+  aaModelName?: string; // Exact Artificial Analysis model name from Column AH (if present)
   companyName: string;
   releaseDate: string;
   sheetRowNumber: number;
@@ -99,6 +100,7 @@ export interface AaDiffItem {
   rank: number;
   liveScores: AaMetricValues;
   status: AaDiffStatus;
+  matchSource?: 'manual' | 'col_ah' | 'auto';
   matchedModelId: string | null;
   matchedDisplayName: string | null;
   sheetRowNumber: number | null;

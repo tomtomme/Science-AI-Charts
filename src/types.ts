@@ -134,6 +134,7 @@ export interface SheetColumnLayout {
   colCompany: number;
   colDomain: number;
   colFlag: number;
+  colAaModelName?: number; // default 33 (Col AH: exact Artificial Analysis model name)
   colIntegrity: number; // default 39 (Col AN: Integrity-Bench)
 }
 

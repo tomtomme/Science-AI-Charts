@@ -18,8 +18,11 @@ export const aaMonitorApi = createMonitorApiClient<
   AaSheetModelSnapshot
 >('/api/aa-monitor');
 
+export const DEFAULT_AA_COL_AH_INDEX = 33;
+
 export function extractAaSheetSnapshots(
   allModels: ModelRecord[],
+  rawRows?: string[][],
   boldMask?: boolean[][],
   layout?: SheetColumnLayout,
   minHistoryRow = 36
@@ -30,6 +33,7 @@ export function extractAaSheetSnapshots(
   const colMmmu = layout?.colVisionPlot ?? 6;
   const colMlcr = layout?.colMedReasoning ?? 7;
   const colExcel = layout?.colExcelAgent ?? 8;
+  const colAaModelName = layout?.colAaModelName ?? DEFAULT_AA_COL_AH_INDEX;
 
   const getBold = (rowIdx: number, colIdx: number): boolean | null => {
     const val = boldMask?.[rowIdx]?.[colIdx];
@@ -44,11 +48,13 @@ export function extractAaSheetSnapshots(
       const s = m.rawScores;
       const numOrNull = (v: number | null | undefined): number | null =>
         typeof v === 'number' && Number.isFinite(v) ? v : null;
+      const rawAh = String(rawRows?.[rowIdx]?.[colAaModelName] ?? '').trim();
 
       return {
         id: m.id,
         name: m.name,
         displayName: m.displayName,
+        ...(rawAh ? { aaModelName: rawAh } : {}),
         companyName: m.companyName,
         releaseDate: m.releaseDate,
         sheetRowNumber: rowNum,

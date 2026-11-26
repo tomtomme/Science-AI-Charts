@@ -223,7 +223,7 @@ export async function fetchLiveAaLeaderboard(
   };
 }
 
-type EffortTier = 'max' | 'xhigh' | 'high' | 'medium' | 'low' | 'nonreasoning' | null;
+type EffortTier = 'max' | 'xhigh' | 'high' | 'reasoning' | 'medium' | 'low' | 'nonreasoning' | null;
 
 function detectEffortTier(raw: string): EffortTier {
   const low = (raw || '').toLowerCase();
@@ -233,31 +233,45 @@ function detectEffortTier(raw: string): EffortTier {
   if (/\bhigh\b/.test(low)) return 'high';
   if (/\b(med|medium)\b/.test(low)) return 'medium';
   if (/\b(low|minimal|min)\b/.test(low)) return 'low';
+  if (/\b(reasoning|thinking)\b/.test(low)) return 'reasoning';
   return null;
 }
 
-function effortRankValue(tier: EffortTier): number {
+function effortPriorityScore(aa: AaLeaderboardModel): number {
+  const tier = detectEffortTier(aa.suffix) ?? detectEffortTier(aa.name);
   switch (tier) {
     case 'max':
-      return 6;
+      return 70;
     case 'xhigh':
-      return 5;
+      return 60;
     case 'high':
-      return 4;
+      return 50;
+    case 'reasoning':
+      return 45;
     case 'medium':
-      return 3;
+      return 30;
     case 'low':
-      return 2;
+      return 20;
     case 'nonreasoning':
-      return 1;
+      return 10;
     default:
-      return 0;
+      return aa.isReasoning ? 42 : 35;
   }
+}
+
+function isPureEffortParen(inner: string): boolean {
+  const cleaned = inner
+    .toLowerCase()
+    .replace(/\b(default\s*fallback|adaptive\s*reasoning|adaptive|reasoning|thinking|non[-\s]?reasoning|no[-\s]?thinking|max|xhigh|extra\s*high|highest|high|medium|med|low|minimal|min|effort|instant)\b/g, '')
+    .replace(/[,;/\s_-]+/g, '')
+    .trim();
+  return cleaned.length === 0;
 }
 
 function normalizeModelNameForAa(raw: string): {
   compactFull: string;
   compactBase: string;
+  numberTokens: string[];
   effort: EffortTier;
 } {
   let s = (raw || '').toLowerCase().trim();
@@ -266,20 +280,139 @@ function normalizeModelNameForAa(raw: string): {
   s = s.replace(/\bdeepseek\s+v(?=\d)/g, 'deepseek ');
   s = s.replace(/\bqwen(?=\d)/g, 'qwen ');
   s = s.replace(/\bminimax[-\s]*/g, 'minimax ');
+  s = s.replace(/\bprev\b/g, 'preview');
   s = s.replace(/\b(\d+)\.0\b/g, '$1');
 
-  const parenTexts: string[] = [];
-  const baseWithoutParens = s.replace(/\(([^)]+)\)/g, (_m, inner: string) => {
-    parenTexts.push(inner.trim().toLowerCase());
-    return ' ';
+  const effortParenTexts: string[] = [];
+  const baseWithoutEffortParens = s.replace(/\(([^)]+)\)/g, (fullMatch, inner: string) => {
+    const trimmed = inner.trim().toLowerCase();
+    if (isPureEffortParen(trimmed)) {
+      effortParenTexts.push(trimmed);
+      return ' ';
+    }
+    // Keep non-effort parenthesized qualifiers (e.g. "(Preview)" or "(2025)") in base,
+    // while still scanning for any effort keyword inside.
+    if (detectEffortTier(trimmed)) {
+      effortParenTexts.push(trimmed);
+    }
+    return ` ${trimmed} `;
   });
 
-  const effort = detectEffortTier(parenTexts.join(' '));
+  const effort = detectEffortTier(effortParenTexts.join(' '));
+  const numberTokens = (baseWithoutEffortParens.match(/\d+(?:\.\d+)?/g) || []).map((t) =>
+    t.replace(/\.0$/, '')
+  );
+
   return {
     compactFull: s.replace(/[^a-z0-9]/g, ''),
-    compactBase: baseWithoutParens.replace(/[^a-z0-9]/g, ''),
+    compactBase: baseWithoutEffortParens.replace(/[^a-z0-9]/g, ''),
+    numberTokens,
     effort,
   };
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function compareReleaseVariantRank(a: AaLeaderboardModel, b: AaLeaderboardModel): number {
+  // 1. Non-deprecated beats deprecated
+  if (a.deprecated !== b.deprecated) return a.deprecated ? 1 : -1;
+  // 2. Highest reasoning effort tier ALWAYS wins (max > xhigh > high > reasoning > medium > low > nonreasoning)
+  const effDiff = effortPriorityScore(b) - effortPriorityScore(a);
+  if (effDiff !== 0) return effDiff;
+  // 3. Higher IQ wins ties
+  const iqDiff = (b.scores.iq ?? -1) - (a.scores.iq ?? -1);
+  if (iqDiff !== 0) return iqDiff;
+  // 4. More populated metrics
+  const cntDiff = countPopulatedMetrics(b.scores) - countPopulatedMetrics(a.scores);
+  if (cntDiff !== 0) return cntDiff;
+  return a.rank - b.rank;
+}
+
+/**
+ * Deduplicates AA variants strictly to ONE single highest-reasoning variant per releaseSlug.
+ * Lower reasoning variants (e.g. High / Medium / Low / Non-reasoning when Max or Xhigh exists)
+ * are excluded so they never leak into other Sheet rows or unmatched diffs.
+ */
+function selectHighestReasoningVariantPerRelease(aaModels: AaLeaderboardModel[]): {
+  topVariants: AaLeaderboardModel[];
+  topVariantBySlug: Map<string, AaLeaderboardModel>;
+  variantsBySlug: Map<string, AaLeaderboardModel[]>;
+} {
+  const variantsBySlug = new Map<string, AaLeaderboardModel[]>();
+  for (const aa of aaModels) {
+    const slug = aa.releaseSlug || normalizeModelNameForAa(aa.name).compactBase || aa.id;
+    const list = variantsBySlug.get(slug);
+    if (list) list.push(aa);
+    else variantsBySlug.set(slug, [aa]);
+  }
+
+  const topVariantBySlug = new Map<string, AaLeaderboardModel>();
+  const topVariants: AaLeaderboardModel[] = [];
+
+  for (const [slug, variants] of variantsBySlug.entries()) {
+    const sorted = [...variants].sort(compareReleaseVariantRank);
+    variantsBySlug.set(slug, sorted);
+    const best = sorted[0];
+    if (best) {
+      topVariantBySlug.set(slug, best);
+      topVariants.push(best);
+    }
+  }
+
+  topVariants.sort((a, b) => a.rank - b.rank);
+  return { topVariants, topVariantBySlug, variantsBySlug };
+}
+
+function findReleaseSlugByColAh(
+  aaModelName: string,
+  aaModels: AaLeaderboardModel[],
+  topVariants: AaLeaderboardModel[]
+): string | null {
+  const needleExact = aaModelName.trim().toLowerCase();
+  if (!needleExact) return null;
+
+  // 1. Exact case-insensitive match against full name, shortName, or releaseName
+  for (const aa of aaModels) {
+    if (
+      aa.name.trim().toLowerCase() === needleExact ||
+      aa.shortName.trim().toLowerCase() === needleExact ||
+      aa.releaseName.trim().toLowerCase() === needleExact
+    ) {
+      return aa.releaseSlug;
+    }
+  }
+
+  const ahNorm = normalizeModelNameForAa(aaModelName);
+  if (ahNorm.compactBase.length < 3) return null;
+
+  // 2. Exact compactFull match
+  for (const aa of aaModels) {
+    if (normalizeModelNameForAa(aa.name).compactFull === ahNorm.compactFull) {
+      return aa.releaseSlug;
+    }
+  }
+
+  // 3. Exact compactBase + identical numeric version/snapshot tokens against top variants
+  for (const aa of topVariants) {
+    const aaNameNorm = normalizeModelNameForAa(aa.name);
+    const aaRelNorm = normalizeModelNameForAa(aa.releaseName);
+    if (
+      (ahNorm.compactBase === aaNameNorm.compactBase &&
+        arraysEqual(ahNorm.numberTokens, aaNameNorm.numberTokens)) ||
+      (ahNorm.compactBase === aaRelNorm.compactBase &&
+        arraysEqual(ahNorm.numberTokens, aaRelNorm.numberTokens))
+    ) {
+      return aa.releaseSlug;
+    }
+  }
+
+  return null;
 }
 
 function scoreAaCandidateForSheet(
@@ -288,7 +421,6 @@ function scoreAaCandidateForSheet(
 ): number {
   const aaNameNorm = normalizeModelNameForAa(aa.name);
   const aaRelNorm = normalizeModelNameForAa(aa.releaseName);
-  const aaEffort = detectEffortTier(aa.suffix) ?? aaNameNorm.effort;
 
   const sheetCandidates = [
     normalizeModelNameForAa(sheet.displayName),
@@ -296,31 +428,25 @@ function scoreAaCandidateForSheet(
   ];
 
   let bestNameScore = 0;
-  let sheetEffort: EffortTier = null;
 
   for (const sc of sheetCandidates) {
+    if (sc.compactBase.length < 4) continue;
     let score = 0;
-    if (sc.compactFull === aaNameNorm.compactFull) {
+
+    if (sc.compactFull === aaNameNorm.compactFull && sc.compactFull.length >= 4) {
       score = 940;
     } else if (
-      (sc.compactBase === aaRelNorm.compactBase || sc.compactBase === aaNameNorm.compactBase) &&
-      sc.compactBase.length >= 4
+      (sc.compactBase === aaNameNorm.compactBase &&
+        arraysEqual(sc.numberTokens, aaNameNorm.numberTokens)) ||
+      (sc.compactBase === aaRelNorm.compactBase &&
+        arraysEqual(sc.numberTokens, aaRelNorm.numberTokens))
     ) {
-      score = 880;
-    } else if (
-      sc.compactBase.length >= 6 &&
-      aaRelNorm.compactBase.length >= 6 &&
-      ((sc.compactBase.startsWith(aaRelNorm.compactBase) &&
-        /^\d{4}$/.test(sc.compactBase.slice(aaRelNorm.compactBase.length))) ||
-        (aaRelNorm.compactBase.startsWith(sc.compactBase) &&
-          /^\d{4}$/.test(aaRelNorm.compactBase.slice(sc.compactBase.length))))
-    ) {
-      score = 730;
+      // Strict exact base + exact version/date-snapshot numbers (e.g. 1017 NEVER matches undated)
+      score = 890;
     }
 
     if (score > bestNameScore) {
       bestNameScore = score;
-      sheetEffort = sc.effort;
     }
   }
 
@@ -332,32 +458,16 @@ function scoreAaCandidateForSheet(
   const sheetIsPrev = /\bprev(iew)?\b/i.test(sheet.displayName) || /\bprev(iew)?\b/i.test(sheet.name);
   const aaIsPrev = /\bprev(iew)?\b/i.test(aa.name) || /\bprev(iew)?\b/i.test(aa.releaseName);
   if (sheetIsPrev !== aaIsPrev) {
-    total -= 160;
-  }
-
-  // Effort-level alignment
-  if (sheetEffort !== null) {
-    if (aaEffort === sheetEffort) {
-      total += 80;
-    } else if (aaEffort !== null) {
-      total -= 140;
-    } else {
-      total -= 40;
-    }
-  } else {
-    // Sheet row has no explicit effort qualifier: prefer the flagship / highest-IQ / highest-effort variant
-    total += effortRankValue(aaEffort) * 8;
-    if (aa.scores.iq !== null) {
-      total += Math.min(40, aa.scores.iq * 0.5);
-    }
-    if (aaEffort === 'nonreasoning') total -= 120;
-    if (aaEffort === 'low') total -= 80;
-    if (aaEffort === 'medium') total -= 35;
+    return 0;
   }
 
   if (aa.deprecated) total -= 45;
-  if (matchCompanyName(aa.creator, sheet.companyName, { includeMetaLlama: true })) {
-    total += 20;
+  if (aa.creator && sheet.companyName) {
+    if (matchCompanyName(aa.creator, sheet.companyName, { includeMetaLlama: true })) {
+      total += 25;
+    } else {
+      total -= 180;
+    }
   }
   total += countPopulatedMetrics(aa.scores) * 3;
   total += computeReleaseDateTiebreaker(sheet.releaseDate, 2025);
@@ -453,6 +563,10 @@ export function buildAaDiffs(
   preferences?: AaPreferencesInput
 ): AaDiffItem[] {
   const ignoredSet = new Set(preferences?.ignoredIds ?? []);
+  const { topVariants, topVariantBySlug } = selectHighestReasoningVariantPerRelease(aaModels);
+  const aaById = new Map(aaModels.map((m) => [m.id, m]));
+
+  // Pass 0: User manual overrides (highest priority — always wins over Column AH and auto-matching)
   const { usedSheetRows, resolvedMatches } = reserveManualMappings(
     aaModels,
     sheetModels,
@@ -460,26 +574,83 @@ export function buildAaDiffs(
     preferences?.manualMappings ?? {}
   );
 
-  const usedAaIds = new Set<string>(resolvedMatches.keys());
+  const matchSourceByAaId = new Map<string, 'manual' | 'col_ah' | 'auto'>();
+  const usedReleaseSlugs = new Set<string>();
 
-  // 1. Match Sheet rows (explicit effort-qualified rows first so e.g. "(med)" doesn't get stolen by "(max)")
-  const orderedSheetModels = [...sheetModels].sort((a, b) => {
-    const aHasEffort = normalizeModelNameForAa(a.displayName).effort !== null ? 0 : 1;
-    const bHasEffort = normalizeModelNameForAa(b.displayName).effort !== null ? 0 : 1;
-    if (aHasEffort !== bHasEffort) return aHasEffort - bHasEffort;
-    return a.sheetRowNumber - b.sheetRowNumber;
-  });
+  // Upgrade any manually mapped ID to its release's highest-reasoning variant if needed,
+  // and reserve its releaseSlug so no lower reasoning sibling can ever match another row.
+  const normalizedManualMatches = new Map<string, AaSheetModelSnapshot>();
+  for (const [aaId, sheet] of resolvedMatches.entries()) {
+    const rawAa = aaById.get(aaId);
+    if (!rawAa) continue;
+    const topAa = topVariantBySlug.get(rawAa.releaseSlug) || rawAa;
+    normalizedManualMatches.set(topAa.id, sheet);
+    matchSourceByAaId.set(topAa.id, 'manual');
+    usedReleaseSlugs.add(topAa.releaseSlug);
+  }
+  resolvedMatches.clear();
+  for (const [aaId, sheet] of normalizedManualMatches.entries()) {
+    resolvedMatches.set(aaId, sheet);
+  }
 
-  for (const sheet of orderedSheetModels) {
+  // Pass 1: Exact Column AH match (`sheet.aaModelName`) -> ALWAYS resolves to the release's highest reasoning variant
+  const sheetsWithAh = sheetModels
+    .filter((s) => Boolean(s.aaModelName?.trim()) && !usedSheetRows.has(s.sheetRowNumber))
+    .sort((a, b) => {
+      // If two rows accidentally share the same Column AH value (e.g. Inkling 2 Small copied into Inkling 2 Mini),
+      // let the row whose own name agrees with Column AH claim it first!
+      const aNormAh = normalizeModelNameForAa(a.aaModelName || '').compactBase;
+      const bNormAh = normalizeModelNameForAa(b.aaModelName || '').compactBase;
+      const aAgrees =
+        aNormAh === normalizeModelNameForAa(a.displayName).compactBase ||
+        aNormAh === normalizeModelNameForAa(a.name).compactBase
+          ? 0
+          : 1;
+      const bAgrees =
+        bNormAh === normalizeModelNameForAa(b.displayName).compactBase ||
+        bNormAh === normalizeModelNameForAa(b.name).compactBase
+          ? 0
+          : 1;
+      if (aAgrees !== bAgrees) return aAgrees - bAgrees;
+      return a.sheetRowNumber - b.sheetRowNumber;
+    });
+
+  for (const sheet of sheetsWithAh) {
+    if (usedSheetRows.has(sheet.sheetRowNumber)) continue;
+    const slug = findReleaseSlugByColAh(sheet.aaModelName || '', aaModels, topVariants);
+    if (!slug || usedReleaseSlugs.has(slug)) continue;
+
+    const topAa = topVariantBySlug.get(slug);
+    if (!topAa) continue;
+    if (ignoredSet.has(topAa.id) || ignoredSet.has(slug)) continue;
+
+    usedSheetRows.add(sheet.sheetRowNumber);
+    usedReleaseSlugs.add(slug);
+    resolvedMatches.set(topAa.id, sheet);
+    matchSourceByAaId.set(topAa.id, 'col_ah');
+  }
+
+  // Pass 2: Strict auto-match ONLY against unclaimed highest-reasoning release representatives
+  const remainingSheets = [...sheetModels]
+    .filter((s) => !usedSheetRows.has(s.sheetRowNumber))
+    .sort((a, b) => a.sheetRowNumber - b.sheetRowNumber);
+
+  for (const sheet of remainingSheets) {
     if (usedSheetRows.has(sheet.sheetRowNumber)) continue;
 
     let bestAa: AaLeaderboardModel | null = null;
     let bestScore = 0;
 
-    for (const aa of aaModels) {
-      if (usedAaIds.has(aa.id) || ignoredSet.has(aa.id) || ignoredSet.has(aa.releaseSlug)) continue;
+    for (const aa of topVariants) {
+      if (
+        usedReleaseSlugs.has(aa.releaseSlug) ||
+        ignoredSet.has(aa.id) ||
+        ignoredSet.has(aa.releaseSlug)
+      ) {
+        continue;
+      }
       const score = scoreAaCandidateForSheet(aa, sheet);
-      if (score >= 720 && score > bestScore) {
+      if (score >= 820 && score > bestScore) {
         bestScore = score;
         bestAa = aa;
       }
@@ -487,20 +658,15 @@ export function buildAaDiffs(
 
     if (bestAa) {
       usedSheetRows.add(sheet.sheetRowNumber);
-      usedAaIds.add(bestAa.id);
+      usedReleaseSlugs.add(bestAa.releaseSlug);
       resolvedMatches.set(bestAa.id, sheet);
+      matchSourceByAaId.set(bestAa.id, 'auto');
     }
   }
 
-  const matchedReleaseSlugs = new Set<string>();
-  for (const aaId of resolvedMatches.keys()) {
-    const m = aaModels.find((item) => item.id === aaId);
-    if (m?.releaseSlug) matchedReleaseSlugs.add(m.releaseSlug);
-  }
-
-  // 2. Build diffs for all matched AA models
+  // Build diffs ONLY for matched highest-reasoning representatives
   const diffs: AaDiffItem[] = [];
-  for (const aa of aaModels) {
+  for (const aa of topVariants) {
     const matchedSheet = resolvedMatches.get(aa.id);
     if (!matchedSheet) continue;
 
@@ -528,6 +694,7 @@ export function buildAaDiffs(
       rank: aa.rank,
       liveScores: aa.scores,
       status,
+      matchSource: matchSourceByAaId.get(aa.id) || 'auto',
       matchedModelId: matchedSheet.id,
       matchedDisplayName: matchedSheet.displayName,
       sheetRowNumber: matchedSheet.sheetRowNumber,
@@ -540,26 +707,11 @@ export function buildAaDiffs(
     });
   }
 
-  // 3. Collect unmatched top releases (deduplicated by releaseSlug, non-deprecated, notable IQ/coverage)
-  const unmatchedByRelease = new Map<string, AaLeaderboardModel>();
-  for (const aa of aaModels) {
-    if (aa.deprecated) continue;
-    if (resolvedMatches.has(aa.id)) continue;
-    if (matchedReleaseSlugs.has(aa.releaseSlug)) continue;
-
-    const cur = unmatchedByRelease.get(aa.releaseSlug);
-    if (
-      !cur ||
-      (aa.scores.iq ?? -1) > (cur.scores.iq ?? -1) ||
-      ((aa.scores.iq ?? -1) === (cur.scores.iq ?? -1) &&
-        countPopulatedMetrics(aa.scores) > countPopulatedMetrics(cur.scores))
-    ) {
-      unmatchedByRelease.set(aa.releaseSlug, aa);
-    }
-  }
-
-  const candidateUnmatched = Array.from(unmatchedByRelease.values())
+  // Pass 3: Unmatched top releases (strictly highest-reasoning variant per release, non-deprecated, notable IQ/coverage)
+  const candidateUnmatched = topVariants
     .filter((aa) => {
+      if (aa.deprecated) return false;
+      if (usedReleaseSlugs.has(aa.releaseSlug)) return false;
       if (ignoredSet.has(aa.id) || ignoredSet.has(aa.releaseSlug)) return true;
       const iq = aa.scores.iq ?? 0;
       const metricCount = countPopulatedMetrics(aa.scores);
@@ -579,7 +731,7 @@ export function buildAaDiffs(
 
     diffs.push({
       aaId: aa.id,
-      aaName: aa.releaseName || aa.name,
+      aaName: aa.name,
       releaseSlug: aa.releaseSlug,
       releaseName: aa.releaseName,
       suffix: aa.suffix,

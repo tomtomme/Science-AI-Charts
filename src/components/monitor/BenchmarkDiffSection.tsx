@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ExternalLink,
   Loader2,
+  Pencil,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -332,6 +333,7 @@ export function BenchmarkDiffSection<TRaw>({
 }: BenchmarkDiffSectionProps<TRaw>) {
   const styles = ACCENT_STYLES[accent];
   const [showMapped, setShowMapped] = useState(false);
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
   const mappedIdSet = useMemo(() => new Set(mappedRows.map((m) => m.id)), [mappedRows]);
 
@@ -617,11 +619,21 @@ export function BenchmarkDiffSection<TRaw>({
                             </div>
                           </td>
                           <td className="py-1.5 px-3 align-middle whitespace-nowrap">
-                            {item.status === 'new_unmatched' ? (
+                            {item.status === 'new_unmatched' || editingRowId === item.id ? (
                               <div className="flex items-center gap-1.5">
                                 <select
-                                  value={manualRowOverrides[item.id] ?? ''}
-                                  onChange={(e) => onAssignManualRow(item.id, e.target.value)}
+                                  value={
+                                    manualRowOverrides[item.id] ??
+                                    (editingRowId === item.id && target.sheetRowNumber
+                                      ? target.sheetRowNumber
+                                      : '')
+                                  }
+                                  onChange={(e) => {
+                                    onAssignManualRow(item.id, e.target.value);
+                                    if (editingRowId === item.id) {
+                                      setEditingRowId(null);
+                                    }
+                                  }}
                                   className={`w-full ${
                                     supportsInsertNewRow ? 'max-w-[260px]' : 'max-w-[240px]'
                                   } px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100`}
@@ -678,10 +690,37 @@ export function BenchmarkDiffSection<TRaw>({
                                     </button>
                                   );
                                 })()}
+                                {editingRowId === item.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingRowId(null)}
+                                    className="inline-flex items-center justify-center p-1 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer shrink-0"
+                                    title={lang === 'de' ? 'Abbrechen' : 'Cancel'}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
                               </div>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 text-xs text-slate-800 dark:text-slate-200">
                                 <span>{target.matchedDisplayName}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingRowId(item.id)}
+                                  className="inline-flex items-center justify-center p-0.5 rounded text-slate-400 hover:text-blue-600 dark:text-slate-500 dark:hover:text-blue-400 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 cursor-pointer"
+                                  title={
+                                    lang === 'de'
+                                      ? 'Zielmodell überschreiben / manuell zuordnen oder ignorieren'
+                                      : 'Override target model / reassign or ignore'
+                                  }
+                                  aria-label={
+                                    lang === 'de'
+                                      ? 'Zielmodell überschreiben'
+                                      : 'Override target model'
+                                  }
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
                                 {isManuallyMapped && onRemoveManualMapping && (
                                   <button
                                     type="button"

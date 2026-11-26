@@ -1098,11 +1098,12 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     });
     return buildPickerOptions(sorted, (m) => {
       const iq = m.rawScores.actCodeReason;
+      const rowTag = typeof m.sheetRowNumber === 'number' ? `Z.${m.sheetRowNumber} · ` : '';
       return iq !== null
-        ? `IQ ${formatExactScore(iq, lang)}`
+        ? `${rowTag}IQ ${formatExactScore(iq, lang)}`
         : lang === 'de'
-        ? 'IQ leer'
-        : 'IQ empty';
+        ? `${rowTag}IQ leer`
+        : `${rowTag}IQ empty`;
     });
   };
 
@@ -1867,6 +1868,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       const colModelNameIdx = layout?.colModelName ?? 18;
       const colReleaseIdx = layout?.colReleaseDate ?? 25;
       const colCreatorIdx = layout?.colModelCreator ?? 26;
+      const colAaModelNameIdx = layout?.colAaModelName ?? 33;
 
       // Clone existing Sheet formulas (Col A Logo, Col L/M/N composite scores, etc.) verbatim
       const templateFormulaOffsets = new Map<number, number>();
@@ -1916,6 +1918,9 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       pushCell(colNameLabelIdx, colBValue);
       pushCell(colCreatorYearIdx, colCValue);
       pushCell(colModelNameIdx, draft.canonicalName.trim());
+      if (draft.sourceMonitor === 'aa' && draft.sourceName.trim()) {
+        pushCell(colAaModelNameIdx, draft.sourceName.trim());
+      }
       if (draft.releaseDate.trim()) pushCell(colReleaseIdx, draft.releaseDate.trim());
       if (draft.companyName.trim()) pushCell(colCreatorIdx, draft.companyName.trim());
       if (draft.storyline.trim()) pushCell(colStorylineIdx, draft.storyline.trim());

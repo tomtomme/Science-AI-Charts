@@ -687,6 +687,7 @@ export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
   let colDomain = 35 + priceShift + modelColShift;
   let colFlag = 36 + priceShift + modelColShift;
   let colIntegrity: number | null = null;
+  let colAaModelName: number | null = null;
 
   for (let r = 0; r < Math.min(5, rows.length); r++) {
     const headerRow = rows[r];
@@ -697,6 +698,29 @@ export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
       else if (cell === 'domain') colDomain = c;
       else if (cell === 'flag') colFlag = c;
     }
+  }
+
+  // Detect Column AH (exact AA.ai model name, header "name" right after "economics" in History header row)
+  const candidateHeaderRows: string[][] = [row0, row1, row2];
+  const histHeaderIdx = Math.max(0, structure.historyStartRow - 2);
+  for (let r = Math.max(0, histHeaderIdx - 2); r <= Math.min(rows.length - 1, histHeaderIdx + 1); r++) {
+    if (rows[r]) candidateHeaderRows.push(rows[r]);
+  }
+  for (const hRow of candidateHeaderRows) {
+    for (let c = Math.max(20, (colModelCreator ?? 26) + 1); c < hRow.length; c++) {
+      const cell = norm(hRow[c]).toLowerCase();
+      const prevCell = c > 0 ? norm(hRow[c - 1]).toLowerCase() : '';
+      if (
+        cell === 'aa name' ||
+        cell === 'aa_name' ||
+        cell === 'artificial analysis name' ||
+        (cell === 'name' && (prevCell === 'economics' || c === 33 + modelColShift))
+      ) {
+        colAaModelName = c;
+        break;
+      }
+    }
+    if (colAaModelName !== null) break;
   }
 
   for (let c = 0; c < maxCols; c++) {
@@ -743,6 +767,7 @@ export function detectSheetColumns(rows: string[][]): SheetColumnLayout {
     colCompany,
     colDomain,
     colFlag,
+    colAaModelName: colAaModelName ?? (33 + modelColShift),
     colIntegrity: colIntegrity ?? Math.max(39 + modelColShift, colFlag + 2),
   };
 }
