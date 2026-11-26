@@ -369,26 +369,68 @@ export function BenchmarkDiffSection<TRaw>({
   };
 
   return (
-    <div className="space-y-2 pt-1 border-t border-slate-200/80 dark:border-slate-800/80">
-      <div className="flex items-center justify-between gap-2 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          {icon}
-          <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100 whitespace-nowrap truncate">
+    <div className="space-y-1.5">
+      <div
+        className={`px-2.5 py-1.5 rounded-lg border flex flex-wrap items-center justify-between gap-2 ${
+          effectiveReport
+            ? effectiveReport.actionableCount > 0
+              ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
+              : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/25'
+            : 'border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60'
+        }`}
+        title={
+          effectiveReport
+            ? `${effectiveReport.actionableCount > 0 ? bannerPrefixActionable : bannerPrefixOk} ${
+                lang === 'de' ? effectiveReport.summaryDe : effectiveReport.summaryEn
+              }`
+            : undefined
+        }
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          {isChecking && !effectiveReport ? (
+            <RefreshCw className={`w-3.5 h-3.5 ${styles.spinnerIcon} animate-spin shrink-0`} />
+          ) : effectiveReport ? (
+            effectiveReport.actionableCount > 0 ? (
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            ) : (
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            )
+          ) : (
+            icon
+          )}
+          <h3 className="text-xs font-bold text-slate-900 dark:text-white whitespace-nowrap">
             {title}
           </h3>
           <a
             href={sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={`inline-flex items-center gap-1 text-xs font-mono ${styles.linkText} hover:underline whitespace-nowrap shrink-0`}
+            className={`inline-flex items-center gap-0.5 text-[11px] font-mono ${styles.linkText} hover:underline whitespace-nowrap shrink-0`}
+            title={sourceUrl}
           >
             <span>{sourceDomainLabel}</span>
             <ExternalLink className="w-2.5 h-2.5" />
           </a>
+          {rawReport && headerCountText && (
+            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap hidden sm:inline">
+              · {headerCountText}
+            </span>
+          )}
+          {isChecking && !effectiveReport && (
+            <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
+              · {checkingText}
+            </span>
+          )}
+          {!isSheetsConnected && rawReport && !effectiveReport && (
+            <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
+              · {lang === 'de' ? rawReport.summaryDe : rawReport.summaryEn}
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+
+        <div className="flex items-center gap-1 font-mono tabular-nums text-[11px] shrink-0 flex-wrap">
           {showSelectAllToggle && actionableRows.length > 1 && (
-            <div className="flex items-center gap-1.5 text-xs font-mono">
+            <span className="inline-flex items-center gap-1 mr-1">
               <button
                 type="button"
                 onClick={() => onToggleAll(true)}
@@ -396,125 +438,80 @@ export function BenchmarkDiffSection<TRaw>({
               >
                 {lang === 'de' ? 'Alle' : 'All'}
               </button>
-              <span className="text-slate-500 dark:text-slate-600">·</span>
+              <span className="text-slate-400 dark:text-slate-600">·</span>
               <button
                 type="button"
                 onClick={() => onToggleAll(false)}
-                className="text-slate-700 dark:text-slate-300 hover:underline cursor-pointer"
+                className="text-slate-600 dark:text-slate-400 hover:underline cursor-pointer"
               >
                 {lang === 'de' ? 'Keine' : 'None'}
               </button>
-            </div>
-          )}
-          {rawReport && headerCountText && (
-            <span className="text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">
-              {headerCountText}
             </span>
           )}
-        </div>
-      </div>
-
-      {isChecking && !effectiveReport && (
-        <div
-          className={`px-3.5 py-2 rounded-xl border ${styles.spinnerBox} flex items-center gap-2.5 text-xs`}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${styles.spinnerIcon} animate-spin shrink-0`} />
-          <span className="font-medium text-slate-800 dark:text-slate-200 truncate">
-            {checkingText}
-          </span>
-        </div>
-      )}
-
-      {!isSheetsConnected && rawReport && (
-        <div className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 text-xs text-slate-700 dark:text-slate-300 flex items-center gap-2">
-          <span className="truncate">
-            {lang === 'de' ? rawReport.summaryDe : rawReport.summaryEn}
-          </span>
-        </div>
-      )}
-
-      {effectiveReport && (
-        <>
-          <div
-            className={`px-3.5 py-2 rounded-xl border flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 ${
-              effectiveReport.actionableCount > 0
-                ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
-                : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/25'
-            }`}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              {effectiveReport.actionableCount > 0 ? (
-                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-              ) : (
-                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              )}
-              <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug truncate">
-                <strong className="font-bold text-slate-900 dark:text-white">
-                  {effectiveReport.actionableCount > 0 ? bannerPrefixActionable : bannerPrefixOk}
-                </strong>{' '}
-                {lang === 'de' ? effectiveReport.summaryDe : effectiveReport.summaryEn}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 font-mono tabular-nums text-xs shrink-0 whitespace-nowrap">
+          {effectiveReport && (
+            <>
               {effectiveReport.unmatchedCount > 0 && (
-                <span className="px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-bold">
+                <span className="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-bold">
                   {effectiveReport.unmatchedCount} {unmatchedPillLabel}
                 </span>
               )}
               {effectiveReport.missingCount > 0 && (
-                <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
+                <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
                   {effectiveReport.missingCount} {lang === 'de' ? 'Fehlt' : 'Missing'}
                 </span>
               )}
               {(effectiveReport.overwriteEstimateCount ?? 0) > 0 && (
-                <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                <span className="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
                   {effectiveReport.overwriteEstimateCount}{' '}
-                  {lang === 'de' ? 'Schätzwert' : 'Estimate'}
+                  {lang === 'de' ? 'Schätz.' : 'Est.'}
                 </span>
               )}
               {effectiveReport.changedCount > 0 && (
-                <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
-                  {effectiveReport.changedCount} {lang === 'de' ? 'Geändert' : 'Changed'}
+                <span className="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                  {effectiveReport.changedCount} {lang === 'de' ? 'Geänd.' : 'Chg.'}
                 </span>
               )}
               {mappedRows.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setShowMapped((prev) => !prev)}
-                  className="px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold hover:bg-slate-300/80 dark:hover:bg-slate-700 cursor-pointer"
+                  className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold hover:bg-slate-300/80 dark:hover:bg-slate-700 cursor-pointer"
                   title={
                     lang === 'de'
                       ? 'Gespeicherte Zuordnungen anzeigen / verwalten'
                       : 'Show / manage saved mappings'
                   }
                 >
-                  {mappedRows.length} {lang === 'de' ? 'zugeordnet' : 'mapped'}
+                  {mappedRows.length} {lang === 'de' ? 'zugeo.' : 'mapped'}
                 </button>
               )}
               {ignoredRows.length > 0 && (
                 <button
                   type="button"
                   onClick={onToggleShowIgnored}
-                  className="px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold hover:bg-slate-300/80 dark:hover:bg-slate-700 cursor-pointer"
+                  className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold hover:bg-slate-300/80 dark:hover:bg-slate-700 cursor-pointer"
                   title={
                     lang === 'de'
                       ? 'Ignorierte Modelle anzeigen / wiederherstellen'
                       : 'Show / restore ignored models'
                   }
                 >
-                  {ignoredRows.length} {lang === 'de' ? 'ignoriert' : 'ignored'}
+                  {ignoredRows.length} {lang === 'de' ? 'ign.' : 'ign.'}
                 </button>
               )}
-              <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 font-bold">
+              <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 font-bold">
                 {effectiveReport.unchangedCount} {unchangedOkLabel}
               </span>
-            </div>
-          </div>
+            </>
+          )}
+        </div>
+      </div>
 
+      {effectiveReport && (
+        <>
           {showMapped && mappedRows.length > 0 && (
-            <div className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="text-slate-700 dark:text-slate-300 mr-1">
+            <div className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-slate-600 dark:text-slate-400 mr-0.5">
                 {lang === 'de' ? 'Zugeordnet:' : 'Mapped:'}
               </span>
               {mappedRows.map((m) => (
@@ -522,7 +519,7 @@ export function BenchmarkDiffSection<TRaw>({
                   key={m.id}
                   type="button"
                   onClick={() => void onRemoveManualMapping?.(m.id)}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 ${styles.restoreHover} cursor-pointer`}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 ${styles.restoreHover} cursor-pointer`}
                   title={
                     lang === 'de' ? 'Zuordnung aufheben' : 'Remove manual mapping'
                   }
@@ -537,8 +534,8 @@ export function BenchmarkDiffSection<TRaw>({
           )}
 
           {showIgnored && ignoredRows.length > 0 && (
-            <div className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="text-slate-700 dark:text-slate-300 mr-1">
+            <div className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-slate-600 dark:text-slate-400 mr-0.5">
                 {lang === 'de' ? 'Ignoriert:' : 'Ignored:'}
               </span>
               {ignoredRows.map((d) => (
@@ -546,7 +543,7 @@ export function BenchmarkDiffSection<TRaw>({
                   key={d.id}
                   type="button"
                   onClick={() => void onRestoreModel?.(d.id)}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 ${styles.restoreHover} cursor-pointer`}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 ${styles.restoreHover} cursor-pointer`}
                   title={lang === 'de' ? 'Wieder aktivieren' : 'Restore'}
                 >
                   <span>{d.name}</span>
@@ -557,19 +554,19 @@ export function BenchmarkDiffSection<TRaw>({
           )}
 
           {actionableRows.length > 0 && (
-            <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-              <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+              <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="sticky top-0 z-10">
-                    <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 font-mono text-xs text-slate-700 dark:text-slate-300">
-                      <th className="py-1.5 px-2.5 w-8"></th>
-                      <th className="py-1.5 px-3">{modelColumnHeader}</th>
-                      <th className="py-1.5 px-3">
+                    <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                      <th className="py-1 px-2 w-7"></th>
+                      <th className="py-1 px-2">{modelColumnHeader}</th>
+                      <th className="py-1 px-2">
                         {lang === 'de' ? 'Zugeordnetes Modell' : 'Target Model'}
                       </th>
-                      <th className="py-1.5 px-3">{scoreColumnHeader}</th>
-                      <th className="py-1.5 px-3">
-                        {lang === 'de' ? 'Score-Diff' : 'Score Diff'}
+                      <th className="py-1 px-2">{scoreColumnHeader}</th>
+                      <th className="py-1 px-2">
+                        {lang === 'de' ? 'Diff' : 'Diff'}
                       </th>
                     </tr>
                   </thead>
@@ -591,7 +588,7 @@ export function BenchmarkDiffSection<TRaw>({
                               : 'bg-amber-50/35 dark:bg-amber-950/15'
                           }
                         >
-                          <td className="py-1.5 px-2.5 align-middle">
+                          <td className="py-1 px-2 align-middle">
                             <input
                               type="checkbox"
                               checked={Boolean(selectedIds[item.id])}
@@ -600,10 +597,10 @@ export function BenchmarkDiffSection<TRaw>({
                               className={`rounded border-slate-300 ${styles.checkbox} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed`}
                             />
                           </td>
-                          <td className="py-1.5 px-3 align-middle whitespace-nowrap">
+                          <td className="py-1 px-2 align-middle whitespace-nowrap">
                             <div className="flex items-center gap-1.5">
                               {showRankInRow && (
-                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
+                                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
                                   #{item.rank}
                                 </span>
                               )}
@@ -611,16 +608,16 @@ export function BenchmarkDiffSection<TRaw>({
                                 {item.name}
                               </span>
                               {item.isSiteNew && (
-                                <span className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300 shrink-0">
+                                <span className="px-1 py-0.2 rounded text-[10px] font-mono font-bold bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300 shrink-0">
                                   NEW
                                 </span>
                               )}
                               {renderStatusBadge(item.status)}
                             </div>
                           </td>
-                          <td className="py-1.5 px-3 align-middle whitespace-nowrap">
+                          <td className="py-1 px-2 align-middle whitespace-nowrap">
                             {item.status === 'new_unmatched' || editingRowId === item.id ? (
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1">
                                 <select
                                   value={
                                     manualRowOverrides[item.id] ??
@@ -635,8 +632,8 @@ export function BenchmarkDiffSection<TRaw>({
                                     }
                                   }}
                                   className={`w-full ${
-                                    supportsInsertNewRow ? 'max-w-[260px]' : 'max-w-[240px]'
-                                  } px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100`}
+                                    supportsInsertNewRow ? 'max-w-[240px]' : 'max-w-[220px]'
+                                  } px-1.5 py-0.5 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100`}
                                 >
                                   <option value="">{assignPlaceholder}</option>
                                   {supportsInsertNewRow && (

@@ -178,13 +178,9 @@ export const AppFooter: React.FC<AppFooterProps> = ({
             </button>
           </Tooltip>
 
-          {/* Unified Preis-, AA-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer */}
+          {/* Unified Prüfer */}
           <Tooltip
-            title={
-              lang === 'de'
-                ? 'Preis-, AA (6)-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer'
-                : 'Plans, Price, AA (6), GDPx, Vals, SimpleBench & Integrity Checker'
-            }
+            title={lang === 'de' ? 'Prüfer' : 'Checker'}
             badge={
               isAnyMonitorChecking
                 ? lang === 'de'
@@ -194,71 +190,59 @@ export const AppFooter: React.FC<AppFooterProps> = ({
                 ? `${totalAlerts} Diff`
                 : allSyncedOk
                 ? 'OK'
-                : lang === 'de'
-                ? '6 Prüfer'
-                : '6 Checks'
+                : '6'
             }
             content={
-              <div className="space-y-1 text-xs">
-                <div>
-                  {isPricingDiffValidForSheet && pricingReport
-                    ? lang === 'de'
-                      ? pricingReport.summaryDe
-                      : pricingReport.summaryEn
-                    : lang === 'de'
-                    ? 'Aktuelle DE/US Browser-Chat-Tarife & Preis-Diffs.'
-                    : 'Current DE/US browser chat plans & pricing diffs.'}
-                </div>
-                <div className="border-t border-slate-700/50 pt-1">
-                  {isAaDiffValidForSheet && aaReport
-                    ? lang === 'de'
-                      ? aaReport.summaryDe
-                      : aaReport.summaryEn
-                    : lang === 'de'
-                    ? 'Prüft Artificial Analysis (6 Spalten: D–I) ohne API-Key.'
-                    : 'Checks Artificial Analysis (6 columns: D–I) without API key.'}
-                </div>
-                <div className="border-t border-slate-700/50 pt-1">
-                  {isGdpxDiffValidForSheet && gdpxReport
-                    ? lang === 'de'
-                      ? gdpxReport.summaryDe
-                      : gdpxReport.summaryEn
-                    : lang === 'de'
-                    ? 'Überwacht gdpx.semianalysis.com auf Neuzugänge.'
-                    : 'Monitors gdpx.semianalysis.com for new LLMs.'}
-                </div>
-                <div className="border-t border-slate-700/50 pt-1">
-                  {isValsDiffValidForSheet && valsReport
-                    ? lang === 'de'
-                      ? valsReport.summaryDe
-                      : valsReport.summaryEn
-                    : lang === 'de'
-                    ? 'Prüft Vals Index v2.2 auf Abweichungen.'
-                    : 'Checks Vals Index v2.2 for updates.'}
-                </div>
-                <div className="border-t border-slate-700/50 pt-1">
-                  {isSimpleBenchDiffValidForSheet && simpleBenchReport
-                    ? lang === 'de'
-                      ? simpleBenchReport.summaryDe
-                      : simpleBenchReport.summaryEn
-                    : lang === 'de'
-                    ? 'Prüft simple-bench.com auf Abweichungen.'
-                    : 'Checks simple-bench.com for updates.'}
-                </div>
-                <div className="border-t border-slate-700/50 pt-1">
-                  {isIntegrityDiffValidForSheet && integrityReport
-                    ? lang === 'de'
-                      ? integrityReport.summaryDe
-                      : integrityReport.summaryEn
-                    : lang === 'de'
-                    ? 'Überwacht integrity-bench.com ("Table") auf Abweichungen.'
-                    : 'Monitors integrity-bench.com ("Table") for updates.'}
-                </div>
+              <div className="space-y-0.5 text-[11px] font-mono tabular-nums">
+                {[
+                  {
+                    label: lang === 'de' ? 'Preise' : 'Plans',
+                    valid: isPricingDiffValidForSheet && Boolean(pricingReport),
+                    count:
+                      (pricingReport?.changedCount ?? 0) + (pricingReport?.missingCount ?? 0),
+                  },
+                  {
+                    label: 'AA (6)',
+                    valid: isAaDiffValidForSheet && Boolean(aaReport),
+                    count: aaReport?.actionableCount ?? 0,
+                  },
+                  {
+                    label: 'GDPx',
+                    valid: isGdpxDiffValidForSheet && Boolean(gdpxReport),
+                    count: gdpxReport?.actionableCount ?? 0,
+                  },
+                  {
+                    label: 'Vals',
+                    valid: isValsDiffValidForSheet && Boolean(valsReport),
+                    count: valsReport?.actionableCount ?? 0,
+                  },
+                  {
+                    label: 'SimpleBench',
+                    valid: isSimpleBenchDiffValidForSheet && Boolean(simpleBenchReport),
+                    count: simpleBenchReport?.actionableCount ?? 0,
+                  },
+                  {
+                    label: 'Integrity',
+                    valid: isIntegrityDiffValidForSheet && Boolean(integrityReport),
+                    count: integrityReport?.actionableCount ?? 0,
+                  },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-3">
+                    <span className="text-slate-300">{row.label}</span>
+                    {!row.valid ? (
+                      <span className="text-slate-500">—</span>
+                    ) : row.count > 0 ? (
+                      <span className="text-amber-400 font-bold">{row.count} Diff</span>
+                    ) : (
+                      <span className="text-emerald-400 font-semibold">OK</span>
+                    )}
+                  </div>
+                ))}
               </div>
             }
             position="top"
             align="center"
-            width="w-80"
+            width="w-52"
           >
             <button
               type="button"

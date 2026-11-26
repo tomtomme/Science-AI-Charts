@@ -142,6 +142,241 @@ function makeBenchCell(
   };
 }
 
+interface OpenRouterRawModel {
+  id: string;
+  name?: string;
+  created?: number;
+  description?: string;
+  context_length?: number;
+  hugging_face_id?: string | null;
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+  };
+}
+
+interface LiveWebModelEvidence {
+  releaseDate: string | null;
+  description: string | null;
+  huggingFaceId: string | null;
+  openRouterId: string | null;
+  hasFreeOpenRouterTier: boolean;
+  contextLength: number | null;
+  sources: Array<{ title: string; uri: string }>;
+}
+
+let openRouterCache: { fetchedAt: number; models: OpenRouterRawModel[] } | null = null;
+const OPENROUTER_CACHE_TTL_MS = 15 * 60 * 1000;
+
+async function fetchOpenRouterCatalog(): Promise<OpenRouterRawModel[]> {
+  if (openRouterCache && Date.now() - openRouterCache.fetchedAt < OPENROUTER_CACHE_TTL_MS) {
+    return openRouterCache.models;
+  }
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models', {
+      headers: {
+        'User-Agent': 'Science-AI-Charts/1.0',
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return openRouterCache?.models ?? [];
+    const json = (await res.json()) as { data?: OpenRouterRawModel[] };
+    const models = Array.isArray(json.data) ? json.data : [];
+    if (models.length > 0) {
+      openRouterCache = { fetchedAt: Date.now(), models };
+    }
+    return models;
+  } catch {
+    return openRouterCache?.models ?? [];
+  }
+}
+
+function stripOpenRouterVendorPrefix(name: string): string {
+  const idx = name.indexOf(':');
+  return idx !== -1 && idx < 28 ? name.slice(idx + 1).trim() : name.trim();
+}
+
+function findBestOpenRouterMatch(
+  models: OpenRouterRawModel[],
+  targetName: string
+): { primary: OpenRouterRawModel | null; hasFreeVariant: boolean } {
+  const needle = normalizeCompact(targetName);
+  if (!needle || needle.length < 3) return { primary: null, hasFreeVariant: false };
+
+  const candidates: Array<{ model: OpenRouterRawModel; score: number }> = [];
+  let hasFreeVariant = false;
+
+  for (const m of models) {
+    const idBase = (m.id || '').split(':')[0];
+    const idSlug = idBase.includes('/') ? idBase.split('/').slice(1).join('/') : idBase;
+    const isVariantSuffix = (m.id || '').includes(':');
+    const isFreeSuffix = /:free$/i.test(m.id || '');
+    const isBatchOrNitro = /:(batch|nitro|extended|floor|exacto)$/i.test(m.id || '');
+
+    const cleanName = stripOpenRouterVendorPrefix(m.name || '');
+    const cName = normalizeCompact(cleanName);
+    const cSlug = normalizeCompact(idSlug);
+
+    let score = 0;
+    if (cName === needle || cSlug === needle) {
+      score = 1000;
+    } else if (
+      needle.length >= 6 &&
+      ((cName.startsWith(needle) && /^\d{4}$/.test(cName.slice(needle.length))) ||
+        (needle.startsWith(cName) && /^\d{4}$/.test(needle.slice(cName.length))) ||
+        (cSlug.startsWith(needle) && /^\d{4}$/.test(cSlug.slice(needle.length))) ||
+        (needle.startsWith(cSlug) && /^\d{4}$/.test(needle.slice(cSlug.length))))
+    ) {
+      score = 820;
+    }
+
+    if (score === 0) continue;
+    if (isFreeSuffix || m.pricing?.prompt === '0') {
+      hasFreeVariant = true;
+    }
+    if (!isVariantSuffix) score += 60;
+    if (isBatchOrNitro) score -= 120;
+    if (m.description && m.description.length > 30) score += 20;
+    if (m.hugging_face_id) score += 10;
+
+    candidates.push({ model: m, score });
+  }
+
+  if (candidates.length === 0) return { primary: null, hasFreeVariant: false };
+  candidates.sort((a, b) => b.score - a.score);
+  return { primary: candidates[0].model, hasFreeVariant };
+}
+
+interface HuggingFaceRawModel {
+  id: string;
+  createdAt?: string;
+  likes?: number;
+  downloads?: number;
+  pipeline_tag?: string;
+}
+
+async function fetchHuggingFaceMatch(targetName: string): Promise<HuggingFaceRawModel | null> {
+  const query = targetName
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (query.length < 3) return null;
+
+  try {
+    const url = `https://huggingface.co/api/models?search=${encodeURIComponent(query)}&limit=8&sort=likes&direction=-1`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Science-AI-Charts/1.0',
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+    const items = (await res.json()) as HuggingFaceRawModel[];
+    if (!Array.isArray(items) || items.length === 0) return null;
+
+    const needle = normalizeCompact(query);
+    let best: HuggingFaceRawModel | null = null;
+    let bestScore = 0;
+
+    for (const item of items) {
+      const repoName = (item.id || '').includes('/')
+        ? item.id.split('/').slice(1).join('/')
+        : item.id || '';
+      const cand = normalizeCompact(repoName);
+      if (!cand) continue;
+      // Ignore quantized / GGUF / AWQ community derivatives unless nothing else matches
+      const isCommunityQuant = /\b(gguf|awq|gptq|fp8|fp4|int4|int8|bnb|mlx|exl2)\b/i.test(item.id);
+      let score = 0;
+      if (cand === needle) {
+        score = 1000;
+      } else if (
+        needle.length >= 6 &&
+        ((cand.startsWith(needle) && /^\d{4}$/.test(cand.slice(needle.length))) ||
+          (needle.startsWith(cand) && /^\d{4}$/.test(needle.slice(cand.length))))
+      ) {
+        score = 800;
+      }
+      if (score === 0) continue;
+      if (isCommunityQuant) score -= 250;
+      score += Math.min(100, Math.log10((item.likes ?? 0) + 1) * 25);
+      if (score > bestScore) {
+        bestScore = score;
+        best = item;
+      }
+    }
+
+    return bestScore >= 700 ? best : null;
+  } catch {
+    return null;
+  }
+}
+
+async function gatherFreeLiveWebEvidence(
+  canonicalName: string,
+  aaSlug?: string
+): Promise<LiveWebModelEvidence> {
+  const [orCatalog, hfMatch] = await Promise.all([
+    fetchOpenRouterCatalog(),
+    fetchHuggingFaceMatch(canonicalName),
+  ]);
+
+  const { primary: orMatch, hasFreeVariant } = findBestOpenRouterMatch(orCatalog, canonicalName);
+  const sources: Array<{ title: string; uri: string }> = [];
+
+  if (aaSlug) {
+    sources.push({
+      title: `Artificial Analysis: ${canonicalName}`,
+      uri: `https://artificialanalysis.ai/models/${aaSlug}`,
+    });
+  }
+
+  let releaseDate: string | null = null;
+  if (orMatch?.created && Number.isFinite(orMatch.created)) {
+    const iso = new Date(orMatch.created * 1000).toISOString().slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) releaseDate = iso;
+  }
+  if (!releaseDate && hfMatch?.createdAt) {
+    const iso = String(hfMatch.createdAt).slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) releaseDate = iso;
+  }
+
+  const huggingFaceId = (orMatch?.hugging_face_id || hfMatch?.id || '').trim() || null;
+  const openRouterId = orMatch?.id ? orMatch.id.split(':')[0] : null;
+
+  if (openRouterId) {
+    sources.push({
+      title: `OpenRouter: ${orMatch?.name || openRouterId}`,
+      uri: `https://openrouter.ai/${openRouterId}`,
+    });
+  }
+  if (huggingFaceId) {
+    sources.push({
+      title: `Hugging Face: ${huggingFaceId}`,
+      uri: `https://huggingface.co/${huggingFaceId}`,
+    });
+  }
+
+  const description =
+    typeof orMatch?.description === 'string' && orMatch.description.trim().length > 15
+      ? orMatch.description.replace(/\s+/g, ' ').trim().slice(0, 700)
+      : null;
+
+  return {
+    releaseDate,
+    description,
+    huggingFaceId,
+    openRouterId,
+    hasFreeOpenRouterTier: hasFreeVariant,
+    contextLength:
+      typeof orMatch?.context_length === 'number' && Number.isFinite(orMatch.context_length)
+        ? orMatch.context_length
+        : null,
+    sources,
+  };
+}
+
 interface GeminiResearchPayload {
   canonicalName?: string;
   displayNameColB?: string;
@@ -308,11 +543,21 @@ export async function researchNewModelRowDraft(
 
   const baseCompanyName = matchedExistingCompany?.name || rawCreator || fallbackCompanyMeta.name;
   const baseFlag = matchedExistingCompany?.flag || fallbackCompanyMeta.flag || '🌐';
+
+  // Stage 1b: Free, zero-API-key live web lookup (OpenRouter public catalog + HuggingFace public API)
+  const webEvidence = await gatherFreeLiveWebEvidence(baseCanonical, aaMatch?.releaseSlug);
+  const hasLiveWebEvidence = Boolean(
+    webEvidence.description || webEvidence.huggingFaceId || webEvidence.openRouterId
+  );
+
   const baseOpenWeights = Boolean(
-    req.isOpenWeightsHint ?? aaMatch?.isOpenWeights ?? gdpxMatch?.openWeights ?? false
+    req.isOpenWeightsHint ??
+      aaMatch?.isOpenWeights ??
+      gdpxMatch?.openWeights ??
+      Boolean(webEvidence.huggingFaceId)
   );
   const baseReleaseDate = sanitizeIsoDate(
-    req.releaseDateHint || sbMatch?.dateAdded || '',
+    webEvidence.releaseDate || req.releaseDateHint || sbMatch?.dateAdded || '',
     todayIso
   );
 
@@ -327,10 +572,10 @@ export async function researchNewModelRowDraft(
     return Boolean(b) && (a === b || a.includes(b) || b.includes(a));
   });
 
-  // Stage 2: Gemini Research (Tier 2a Grounded -> Tier 2b Free-tier JSON -> Tier 2c Deterministic)
+  // Stage 2: Free-Tier Gemini synthesis over live-fetched web metadata (NO paid Google Search Grounding required!)
   let researchTier: NewModelRowDraft['researchTier'] = 'deterministic';
   let researchNote: string | undefined;
-  let sources: Array<{ title: string; uri: string }> = [];
+  const sources: Array<{ title: string; uri: string }> = [...webEvidence.sources];
   let aiResult: GeminiResearchPayload | null = null;
 
   const ai = getGeminiClient();
@@ -340,11 +585,24 @@ export async function researchNewModelRowDraft(
       .slice(0, 35)
       .join(', ');
 
+    const effectiveCtx = aaMatch?.contextWindowTokens || webEvidence.contextLength;
+
     const contextLines = [
-      `Model to research: "${baseCanonical}" (raw source name: "${rawModelName}")`,
+      `Model to populate: "${baseCanonical}" (raw source name: "${rawModelName}")`,
       `Creator hint: "${baseCompanyName}"`,
       `Open weights: ${baseOpenWeights ? 'yes' : 'no'}`,
-      aaMatch?.contextWindowTokens ? `Context window: ${aaMatch.contextWindowTokens} tokens` : '',
+      webEvidence.releaseDate ? `Verified release date from catalog: ${webEvidence.releaseDate}` : '',
+      webEvidence.description
+        ? `Live model description (from OpenRouter): ${webEvidence.description}`
+        : '',
+      webEvidence.huggingFaceId
+        ? `Verified HuggingFace repo: https://huggingface.co/${webEvidence.huggingFaceId}`
+        : '',
+      webEvidence.openRouterId
+        ? `Verified OpenRouter page: https://openrouter.ai/${webEvidence.openRouterId}`
+        : '',
+      webEvidence.hasFreeOpenRouterTier ? `Free API tier detected on OpenRouter: yes` : '',
+      effectiveCtx ? `Context window: ${effectiveCtx} tokens` : '',
       aaMatch?.price1mInputTokens != null
         ? `API price: $${aaMatch.price1mInputTokens}/1M input, $${aaMatch.price1mOutputTokens ?? '?'}/1M output`
         : '',
@@ -362,109 +620,79 @@ export async function researchNewModelRowDraft(
       .join('\n');
 
     const promptText = `You are helping populate a new row in the "Science-IQ of ChatBots" Google Sheet.
-IMPORTANT: Keep the exact model name and version "${baseCanonical}" intact — NEVER rename or downgrade the version number even if this is a brand-new release.
-Research this AI model carefully and return ONLY a single valid JSON object (no markdown prose outside JSON) with these exact fields:
-{
-  "canonicalName": "${baseCanonical}",
-  "displayNameColB": "Display name without flag or badges for Column B (for OpenAI GPT consumer models use 'ChatGPT-...', otherwise exact same as canonicalName)",
-  "companyName": "Exact company/lab name matching the Sheet's existing company list if possible",
-  "countryFlag": "2-letter country flag emoji of the lab headquarters (e.g. 🇺🇸, 🇨🇳, 🇫🇷, 🇩🇪, 🇬🇧, 🇯🇵, 🇰🇷)",
-  "releaseDate": "Official release date in YYYY-MM-DD format (if only month is known use YYYY-MM-01)",
-  "isPaidOnly": false,
-  "hasFreeApi": false,
-  "isOpenWeights": ${baseOpenWeights},
-  "storyline": "Concise, neutral English 1-sentence highlight (max 110 characters) describing what is notable about this model (e.g. architecture, open weights, multimodal/agentic strength, or positioning).",
-  "chatLink": "Official browser chat/playground URL (https://...) OR literally 'paid' if web chat is strictly paid-only with no free chat tier, OR '' if API/weights only",
-  "apiLink": "Official API docs, playground, HuggingFace, OpenRouter, or NVIDIA NIM URL (https://...) where developers can access or inspect this model",
-  "priceDeMonthly": "Monthly browser chat subscription cost in Germany (e.g. '23€', '0-8€', '90-180€') or '' if free/API-only/no consumer subscription",
-  "priceUsMonthly": "Monthly browser chat subscription cost in USA (e.g. '$20', '$0-8', '$100-200') or '' if free/API-only/no consumer subscription"
-}
+IMPORTANT:
+- Keep the exact model name and version "${baseCanonical}" intact — NEVER rename or downgrade the version number even if this is a brand-new release.
+- Prioritize the live verified metadata provided in the Context below (release date, description, HuggingFace/OpenRouter links, lab pricing).
+Return ONLY a single valid JSON object matching the schema:
+- canonicalName: "${baseCanonical}"
+- displayNameColB: Display name without flag or badges for Column B (for OpenAI GPT consumer models use "ChatGPT-...", otherwise exact same as canonicalName)
+- companyName: Exact company/lab name matching the Sheet's existing company list if possible
+- countryFlag: 2-letter country flag emoji of the lab headquarters (e.g. 🇺🇸, 🇨🇳, 🇫🇷, 🇩🇪, 🇬🇧, 🇯🇵, 🇰🇷)
+- releaseDate: Official release date in YYYY-MM-DD format (use the verified catalog release date if given)
+- isPaidOnly: true only if consumer web chat is strictly paid-only with no free tier
+- hasFreeApi: true if there is a known free API / free playground tier (e.g. Google AI Studio, NVIDIA NIM, Mistral free tier, OpenRouter :free)
+- isOpenWeights: ${baseOpenWeights}
+- storyline: Concise, neutral English 1-sentence highlight (max 110 characters) summarizing what is notable about this model based on the live description & specs
+- chatLink: Official browser chat/playground URL (https://...) OR literally "paid" if web chat is strictly paid-only, OR "" if API/weights only
+- apiLink: Official API docs, playground, HuggingFace, OpenRouter, or NVIDIA NIM URL (https://...)
+- priceDeMonthly: Monthly browser chat subscription cost in Germany (e.g. "23€", "0-8€", "90-180€") or "" if free/API-only/no consumer subscription
+- priceUsMonthly: Monthly browser chat subscription cost in USA (e.g. "$20", "$0-8", "$100-200") or "" if free/API-only/no consumer subscription
 
 Context:
 ${contextLines}`;
 
-    // Tier 2a: Gemini 4 Hydrogen + Google Search Grounding
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: promptText,
-        config: {
-          tools: [{ googleSearch: {} }],
-        },
-      });
-      const parsed = extractJsonObject(response.text || '');
-      if (parsed) {
-        aiResult = parsed as GeminiResearchPayload;
-        researchTier = 'gemini_grounded';
-        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
-        const seenUris = new Set<string>();
-        for (const ch of chunks) {
-          const uri = ch?.web?.uri;
-          const title = ch?.web?.title || uri;
-          if (uri && /^https?:\/\//i.test(uri) && !seenUris.has(uri)) {
-            seenUris.add(uri);
-            sources.push({ title: String(title || uri), uri });
-            if (sources.length >= 6) break;
-          }
+    let lastErrMsg = '';
+    for (const model of ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'] as const) {
+      try {
+        const res = await ai.models.generateContent({
+          model,
+          contents: promptText,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                canonicalName: { type: Type.STRING },
+                displayNameColB: { type: Type.STRING },
+                companyName: { type: Type.STRING },
+                countryFlag: { type: Type.STRING },
+                releaseDate: { type: Type.STRING },
+                isPaidOnly: { type: Type.BOOLEAN },
+                hasFreeApi: { type: Type.BOOLEAN },
+                isOpenWeights: { type: Type.BOOLEAN },
+                storyline: { type: Type.STRING },
+                chatLink: { type: Type.STRING },
+                apiLink: { type: Type.STRING },
+                priceDeMonthly: { type: Type.STRING },
+                priceUsMonthly: { type: Type.STRING },
+              },
+            },
+          },
+        });
+        const parsed = extractJsonObject(res.text || '');
+        if (parsed) {
+          aiResult = parsed as GeminiResearchPayload;
+          researchTier = hasLiveWebEvidence ? 'gemini_grounded' : 'gemini_free';
+          break;
         }
+      } catch (err) {
+        lastErrMsg = err instanceof Error ? err.message : String(err);
       }
-    } catch (groundedErr) {
-      const rawMsg = groundedErr instanceof Error ? groundedErr.message : String(groundedErr);
-      const isQuota = /429|RESOURCE_EXHAUSTED|quota/i.test(rawMsg);
-      const isUnavailable = /503|UNAVAILABLE|high demand|overloaded/i.test(rawMsg);
+    }
+
+    if (!aiResult && lastErrMsg) {
+      const isQuota = /429|RESOURCE_EXHAUSTED|quota/i.test(lastErrMsg);
+      const isUnavailable = /503|UNAVAILABLE|high demand|overloaded/i.test(lastErrMsg);
       const shortReason = isQuota
         ? 'API-Kontingent (429)'
         : isUnavailable
         ? 'hohe Auslastung (503)'
-        : 'nicht verfügbar';
-
-      // Tier 2b: Free-tier Gemini WITHOUT Search Grounding (gemini-4-hydrogen -> gemini-3.1-flash-lite)
-      for (const fallbackModel of ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'] as const) {
-        try {
-          const fallbackRes = await ai.models.generateContent({
-            model: fallbackModel,
-            contents: promptText,
-            config: {
-              responseMimeType: 'application/json',
-              responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                  canonicalName: { type: Type.STRING },
-                  displayNameColB: { type: Type.STRING },
-                  companyName: { type: Type.STRING },
-                  countryFlag: { type: Type.STRING },
-                  releaseDate: { type: Type.STRING },
-                  isPaidOnly: { type: Type.BOOLEAN },
-                  hasFreeApi: { type: Type.BOOLEAN },
-                  isOpenWeights: { type: Type.BOOLEAN },
-                  storyline: { type: Type.STRING },
-                  chatLink: { type: Type.STRING },
-                  apiLink: { type: Type.STRING },
-                  priceDeMonthly: { type: Type.STRING },
-                  priceUsMonthly: { type: Type.STRING },
-                },
-              },
-            },
-          });
-          const parsed = extractJsonObject(fallbackRes.text || '');
-          if (parsed) {
-            aiResult = parsed as GeminiResearchPayload;
-            researchTier = 'gemini_free';
-            researchNote = `Search Grounding übersprungen (${shortReason}) – Free-Tier-LLM ohne Websuche genutzt.`;
-            break;
-          }
-        } catch {
-          // Try next fallback model
-        }
-      }
-
-      if (!aiResult) {
-        researchNote = `Gemini momentan nicht erreichbar (${shortReason}) – alle Live-Benchmarks & bekannte Lab-Metadaten automatisch aggregiert.`;
-      }
+        : 'nicht erreichbar';
+      researchNote = `Gemini momentan ${shortReason} – alle Live-Benchmarks & Katalogdaten (OpenRouter/HF) wurden direkt übernommen.`;
     }
   } else {
     researchNote =
-      'Kein Gemini-API-Key aktiv – Entwurf rein aus Live-Benchmarks & bekannten Lab-Metadaten erstellt.';
+      'Kein Gemini-API-Key aktiv – Entwurf direkt aus Live-Benchmarks & Katalogdaten (OpenRouter/HF) erstellt.';
   }
 
   // Deterministic lab defaults (used whenever LLM omits a field or is in fallback mode)
@@ -496,7 +724,7 @@ ${contextLines}`;
     { match: /inception|mercury/i, chatLink: 'https://chat.inceptionlabs.ai', apiLink: 'https://platform.inceptionlabs.ai' },
   ];
 
-  // Always keep the authoritative leaderboard model name/version so an offline LLM never downgrades it
+  // Always keep the authoritative leaderboard model name/version so an LLM never downgrades it
   const finalCanonical = baseCanonical;
   const finalCompany = String(aiResult?.companyName || baseCompanyName).trim() || baseCompanyName;
   const matchedLabDefaults = LAB_DEFAULTS.find(
@@ -517,31 +745,49 @@ ${contextLines}`;
     matchedExistingCompany?.flag ||
     getCompanyMeta(finalCompany).flag ||
     baseFlag;
-  const finalReleaseDate = sanitizeIsoDate(aiResult?.releaseDate, baseReleaseDate);
+  // Prefer verified live catalog release date if Gemini returned today's fallback or invalid date
+  const llmDate = sanitizeIsoDate(aiResult?.releaseDate, '');
+  const finalReleaseDate =
+    webEvidence.releaseDate || llmDate || baseReleaseDate;
   const finalIsPaidOnly = Boolean(aiResult?.isPaidOnly ?? false);
-  const finalHasFreeApi = Boolean(aiResult?.hasFreeApi ?? matchedLabDefaults?.hasFreeApi ?? false);
+  const finalHasFreeApi = Boolean(
+    aiResult?.hasFreeApi ??
+      (webEvidence.hasFreeOpenRouterTier || matchedLabDefaults?.hasFreeApi || false)
+  );
   const finalIsOpenWeights = Boolean(aiResult?.isOpenWeights ?? baseOpenWeights);
 
   const deterministicStorylineParts: string[] = [];
   if (finalIsOpenWeights) deterministicStorylineParts.push('Open-weights');
   if (aaMatch?.isReasoning) deterministicStorylineParts.push('reasoning');
+  const effectiveCtxTokens = aaMatch?.contextWindowTokens || webEvidence.contextLength;
   const ctxK =
-    aaMatch?.contextWindowTokens && aaMatch.contextWindowTokens >= 1000
-      ? aaMatch.contextWindowTokens >= 1_000_000
-        ? `${Math.round(aaMatch.contextWindowTokens / 100_000) / 10}M context`
-        : `${Math.round(aaMatch.contextWindowTokens / 1000)}k context`
+    effectiveCtxTokens && effectiveCtxTokens >= 1000
+      ? effectiveCtxTokens >= 1_000_000
+        ? `${Math.round(effectiveCtxTokens / 100_000) / 10}M context`
+        : `${Math.round(effectiveCtxTokens / 1000)}k context`
       : '';
-  const fallbackStoryline = `${
-    deterministicStorylineParts.length > 0
-      ? `${deterministicStorylineParts.join(' ')} model`
-      : 'Model'
-  } by ${finalCompany}${ctxK ? ` (${ctxK})` : ''}`.replace(/^./, (c) => c.toUpperCase());
+  const firstDescSentence = webEvidence.description
+    ? webEvidence.description.split(/(?<=[.!?])\s+/)[0]?.slice(0, 140) || ''
+    : '';
+  const fallbackStoryline =
+    firstDescSentence ||
+    `${
+      deterministicStorylineParts.length > 0
+        ? `${deterministicStorylineParts.join(' ')} model`
+        : 'Model'
+    } by ${finalCompany}${ctxK ? ` (${ctxK})` : ''}`.replace(/^./, (c) => c.toUpperCase());
 
   const finalStoryline = (
     String(aiResult?.storyline || '')
       .replace(/\s+/g, ' ')
       .trim() || fallbackStoryline
   ).slice(0, 180);
+
+  const fallbackCatalogApiLink = webEvidence.huggingFaceId
+    ? `https://huggingface.co/${webEvidence.huggingFaceId}`
+    : webEvidence.openRouterId
+    ? `https://openrouter.ai/${webEvidence.openRouterId}`
+    : '';
 
   const finalChatLink =
     sanitizeChatLink(aiResult?.chatLink, finalIsPaidOnly) ||
@@ -550,7 +796,7 @@ ${contextLines}`;
   const finalApiLink =
     sanitizeHttpUrl(aiResult?.apiLink) ||
     matchedLabDefaults?.apiLink ||
-    '';
+    fallbackCatalogApiLink;
   const finalPriceDe = (String(aiResult?.priceDeMonthly || '').trim() || defaultPriceDe).slice(0, 30);
   const finalPriceUs = (String(aiResult?.priceUsMonthly || '').trim() || defaultPriceUs).slice(0, 30);
 

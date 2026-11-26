@@ -107,21 +107,21 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
   const tierLabel =
     form.researchTier === 'gemini_grounded'
       ? lang === 'de'
-        ? 'Live-Benchmarks + Gemini Web-Recherche'
-        : 'Live Benchmarks + Gemini Web Search'
+        ? 'Live-Webdaten (OpenRouter/HF) + Gemini'
+        : 'Live Web Data (OpenRouter/HF) + Gemini'
       : form.researchTier === 'gemini_free'
       ? lang === 'de'
-        ? 'Live-Benchmarks + Gemini (Free-Tier-Fallback)'
-        : 'Live Benchmarks + Gemini (Free-tier fallback)'
+        ? 'Live-Benchmarks + Gemini (Free-Tier)'
+        : 'Live Benchmarks + Gemini (Free-tier)'
       : lang === 'de'
-      ? 'Nur Live-Benchmarks (ohne LLM)'
-      : 'Live Benchmarks only (no LLM)';
+      ? 'Nur Live-Daten (ohne LLM)'
+      : 'Live Data only (no LLM)';
 
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-3 sm:p-4">
-      <div className="w-full max-w-4xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-2 sm:p-4">
+      <div className="w-full max-w-4xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-violet-50/80 dark:bg-violet-950/30 flex items-start justify-between gap-3">
+        <div className="px-4 sm:px-5 py-3 border-b border-slate-200 dark:border-slate-800 bg-violet-50/80 dark:bg-violet-950/30 flex items-start justify-between gap-3 shrink-0">
           <div className="flex items-start gap-2.5 min-w-0">
             <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 shrink-0 mt-0.5">
               <Sparkles className="w-4 h-4" />
@@ -144,14 +144,14 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
             type="button"
             disabled={isWriting}
             onClick={onCancel}
-            className="p-1 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+            className="p-1 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs">
+        <div className="flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto space-y-4 text-xs">
           {form.researchNote && (
             <div className="px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200">
               {form.researchNote}
@@ -451,7 +451,7 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-end gap-2.5">
+        <div className="px-4 sm:px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-end gap-2.5 shrink-0">
           <button
             type="button"
             disabled={isWriting}

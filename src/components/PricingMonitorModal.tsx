@@ -66,6 +66,7 @@ import {
   IGNORE_OPTION_VALUE,
   INSERT_NEW_ROW_OPTION_VALUE,
   PendingSheetCellChange,
+  computeModelNameSimilarity,
   decimalsToPattern,
   formatCreatorColC,
   formatExactScore,
@@ -1057,7 +1058,31 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
     ]);
   };
 
-  // --- Picker option sorters ---
+  // --- Picker option sorters (closest model name ALWAYS at the top) ---
+  const sortRowsByNameSimilarity = (
+    sourceName: string,
+    sourceCompany: string | undefined,
+    isEmpty: (m: (typeof sheetRowsForPicker)[number]) => boolean
+  ) => {
+    const scored = sheetRowsForPicker.map((m) => ({
+      m,
+      sim: computeModelNameSimilarity(
+        sourceName,
+        m.displayName,
+        m.name,
+        sourceCompany,
+        m.companyName
+      ),
+      empty: isEmpty(m) ? 0 : 1,
+    }));
+    scored.sort((a, b) => {
+      if (Math.abs(b.sim - a.sim) > 1e-3) return b.sim - a.sim;
+      if (a.empty !== b.empty) return a.empty - b.empty;
+      return (a.m.sheetRowNumber ?? 0) - (b.m.sheetRowNumber ?? 0);
+    });
+    return scored.map((entry) => entry.m);
+  };
+
   const buildPickerOptions = (
     rows: typeof sheetRowsForPicker,
     formatRow: (m: (typeof sheetRowsForPicker)[number]) => string
@@ -1072,30 +1097,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       }));
 
   const getAaPickerOptions = (item: AaDiffItem) => {
-    const creatorLow = (item.creator || '').toLowerCase();
-    const firstWord = (item.aaName || '').toLowerCase().split(/[\s-]+/)[0] || '';
-    const sorted = [...sheetRowsForPicker].sort((a, b) => {
-      const aCo =
-        creatorLow &&
-        ((a.companyName || '').toLowerCase().includes(creatorLow) ||
-          creatorLow.includes((a.companyName || '').toLowerCase()))
-          ? 0
-          : 1;
-      const bCo =
-        creatorLow &&
-        ((b.companyName || '').toLowerCase().includes(creatorLow) ||
-          creatorLow.includes((b.companyName || '').toLowerCase()))
-          ? 0
-          : 1;
-      if (aCo !== bCo) return aCo - bCo;
-      const aMatch = firstWord && a.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
-      const bMatch = firstWord && b.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
-      if (aMatch !== bMatch) return aMatch - bMatch;
-      const aEmpty = a.rawScores.actCodeReason === null ? 0 : 1;
-      const bEmpty = b.rawScores.actCodeReason === null ? 0 : 1;
-      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
-      return (a.sheetRowNumber ?? 0) - (b.sheetRowNumber ?? 0);
-    });
+    const sorted = sortRowsByNameSimilarity(
+      item.aaName,
+      item.creator || undefined,
+      (m) => m.rawScores.actCodeReason === null
+    );
     return buildPickerOptions(sorted, (m) => {
       const iq = m.rawScores.actCodeReason;
       const rowTag = typeof m.sheetRowNumber === 'number' ? `Z.${m.sheetRowNumber} · ` : '';
@@ -1108,24 +1114,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   };
 
   const getGdpxPickerOptions = (row: BenchmarkDiffRowViewModel<GdpxDiffItem>) => {
-    const labLow = (row.raw.lab || '').toLowerCase();
-    const sorted = [...sheetRowsForPicker].sort((a, b) => {
-      const aEmpty = a.rawScores.trickQuestions === null ? 0 : 1;
-      const bEmpty = b.rawScores.trickQuestions === null ? 0 : 1;
-      const aCo =
-        (a.companyName || '').toLowerCase().includes(labLow) ||
-        labLow.includes((a.companyName || '').toLowerCase())
-          ? 0
-          : 1;
-      const bCo =
-        (b.companyName || '').toLowerCase().includes(labLow) ||
-        labLow.includes((b.companyName || '').toLowerCase())
-          ? 0
-          : 1;
-      if (aCo !== bCo) return aCo - bCo;
-      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
-      return (a.sheetRowNumber ?? 0) - (b.sheetRowNumber ?? 0);
-    });
+    const sorted = sortRowsByNameSimilarity(
+      row.raw.gdpxName,
+      row.raw.lab,
+      (m) => m.rawScores.trickQuestions === null
+    );
     return buildPickerOptions(sorted, (m) => {
       const maskVal =
         typeof m.sheetRowNumber === 'number'
@@ -1146,30 +1139,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   };
 
   const getValsPickerOptions = (row: BenchmarkDiffRowViewModel<ValsDiffItem>) => {
-    const coLow = (row.raw.company || '').toLowerCase();
-    const firstWord = (row.raw.valsName || '').toLowerCase().split(/[\s-]+/)[0] || '';
-    const sorted = [...sheetRowsForPicker].sort((a, b) => {
-      const aCo =
-        coLow &&
-        ((a.companyName || '').toLowerCase().includes(coLow) ||
-          coLow.includes((a.companyName || '').toLowerCase()))
-          ? 0
-          : 1;
-      const bCo =
-        coLow &&
-        ((b.companyName || '').toLowerCase().includes(coLow) ||
-          coLow.includes((b.companyName || '').toLowerCase()))
-          ? 0
-          : 1;
-      if (aCo !== bCo) return aCo - bCo;
-      const aMatch = firstWord && a.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
-      const bMatch = firstWord && b.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
-      if (aMatch !== bMatch) return aMatch - bMatch;
-      const aEmpty = a.rawScores.econLegal === null ? 0 : 1;
-      const bEmpty = b.rawScores.econLegal === null ? 0 : 1;
-      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
-      return (a.sheetRowNumber ?? 0) - (b.sheetRowNumber ?? 0);
-    });
+    const sorted = sortRowsByNameSimilarity(
+      row.raw.valsName,
+      row.raw.company,
+      (m) => m.rawScores.econLegal === null
+    );
     return buildPickerOptions(sorted, (m) => {
       const maskVal =
         typeof m.sheetRowNumber === 'number'
@@ -1190,30 +1164,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   };
 
   const getSimpleBenchPickerOptions = (row: BenchmarkDiffRowViewModel<SimpleBenchDiffItem>) => {
-    const orgLow = (row.raw.organization || '').toLowerCase();
-    const firstWord = (row.raw.simpleBenchName || '').toLowerCase().split(/[\s-]+/)[0] || '';
-    const sorted = [...sheetRowsForPicker].sort((a, b) => {
-      const aCo =
-        orgLow &&
-        ((a.companyName || '').toLowerCase().includes(orgLow) ||
-          orgLow.includes((a.companyName || '').toLowerCase()))
-          ? 0
-          : 1;
-      const bCo =
-        orgLow &&
-        ((b.companyName || '').toLowerCase().includes(orgLow) ||
-          orgLow.includes((b.companyName || '').toLowerCase()))
-          ? 0
-          : 1;
-      if (aCo !== bCo) return aCo - bCo;
-      const aMatch = firstWord && a.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
-      const bMatch = firstWord && b.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
-      if (aMatch !== bMatch) return aMatch - bMatch;
-      const aEmpty = a.rawScores.trickQuestionsOld === null ? 0 : 1;
-      const bEmpty = b.rawScores.trickQuestionsOld === null ? 0 : 1;
-      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
-      return (a.sheetRowNumber ?? 0) - (b.sheetRowNumber ?? 0);
-    });
+    const sorted = sortRowsByNameSimilarity(
+      row.raw.simpleBenchName,
+      row.raw.organization,
+      (m) => m.rawScores.trickQuestionsOld === null
+    );
     return buildPickerOptions(sorted, (m) => {
       const maskVal =
         typeof m.sheetRowNumber === 'number'
@@ -1234,20 +1189,11 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   };
 
   const getIntegrityPickerOptions = (row: BenchmarkDiffRowViewModel<IntegrityDiffItem>) => {
-    const firstWord = (row.raw.integrityName || '').toLowerCase().split(/[\s-]+/)[0] || '';
-    const sorted = [...sheetRowsForPicker].sort((a, b) => {
-      const aRow = a.sheetRowNumber ?? 0;
-      const bRow = b.sheetRowNumber ?? 0;
-      const aAn = integrityColByRow.get(aRow) ?? null;
-      const bAn = integrityColByRow.get(bRow) ?? null;
-      const aMatch = firstWord && a.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
-      const bMatch = firstWord && b.displayName.toLowerCase().includes(firstWord) ? 0 : 1;
-      if (aMatch !== bMatch) return aMatch - bMatch;
-      const aEmpty = aAn === null ? 0 : 1;
-      const bEmpty = bAn === null ? 0 : 1;
-      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
-      return aRow - bRow;
-    });
+    const sorted = sortRowsByNameSimilarity(
+      row.raw.integrityName,
+      undefined,
+      (m) => (integrityColByRow.get(m.sheetRowNumber ?? 0) ?? null) === null
+    );
     return buildPickerOptions(sorted, (m) => {
       const rowNum = m.sheetRowNumber ?? 0;
       const rowVal = integrityColByRow.get(rowNum) ?? null;
@@ -2029,37 +1975,29 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
   ].filter((msg): msg is string => Boolean(msg));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 backdrop-blur-xs p-3 sm:p-5">
-      <div className="relative w-full max-w-[1360px] max-h-[90vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-        {/* Compact Header */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 sm:px-5 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/90">
-          <div className="flex items-center gap-2.5 min-w-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 backdrop-blur-xs p-2 sm:p-3">
+      <div className="relative w-full max-w-[1440px] max-h-[94vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Compact Single-Line Header */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/95 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
             <div
-              className={`p-1.5 rounded-lg shrink-0 ${
+              className={`p-1 rounded-md shrink-0 ${
                 totalBadgeAlerts > 0
                   ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
                   : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
               }`}
             >
-              <Bell className="w-4 h-4" />
+              <Bell className="w-3.5 h-3.5" />
             </div>
-            <div className="min-w-0">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                {lang === 'de'
-                  ? 'Tarife, Preis-, AA (6)-, GDPx-, Vals-, SimpleBench- & Integrity-Prüfer'
-                  : 'Plans, Price, AA (6), GDPx, Vals, SimpleBench & Integrity Checker'}
-              </h2>
-              <p className="text-xs font-mono tabular-nums text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mt-0.5 flex-wrap">
-                <span>
-                  {isUsingLiveReport
-                    ? `${lang === 'de' ? 'Preise' : 'Plans'}: ${formatMonitorTimestamp(displayedTimestamp, lang)}`
-                    : `${lang === 'de' ? 'Tarife' : 'Snapshot'}: ${formatMonitorTimestamp(displayedTimestamp, lang)}`}
-                </span>
-              </p>
-            </div>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white whitespace-nowrap">
+              {lang === 'de' ? 'Prüfer' : 'Checker'}
+            </h2>
+            <span className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400 whitespace-nowrap">
+              · {formatMonitorTimestamp(displayedTimestamp, lang)}
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {apiAvailable && (
               <>
                 <label className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer select-none">
@@ -2148,20 +2086,20 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
           {errorBanners.map((msg, idx) => (
             <div
               key={idx}
-              className="flex items-start gap-2.5 p-3 rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 text-xs"
+              className="flex items-start gap-2 px-2.5 py-2 rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 text-xs"
             >
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>{msg}</span>
             </div>
           ))}
 
           {writeSuccess && (
-            <div className="flex items-start gap-2.5 p-3 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 text-xs">
-              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 text-xs">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>{writeSuccess}</span>
             </div>
           )}
@@ -2263,7 +2201,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 lang={lang}
                 accent="indigo"
                 icon={<Trophy className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
-                title={lang === 'de' ? 'GDPx-Prüfer' : 'GDPx Checker'}
+                title="GDPx"
                 sourceUrl="https://gdpx.semianalysis.com/"
                 sourceDomainLabel="gdpx.semianalysis.com"
                 headerCountText={
@@ -2336,11 +2274,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 lang={lang}
                 accent="cyan"
                 icon={<Briefcase className="w-3.5 h-3.5 text-cyan-700 dark:text-cyan-400 shrink-0" />}
-                title={
-                  lang === 'de'
-                    ? `Vals Index ${valsReport?.versionLabel || 'v2.2'}-Prüfer`
-                    : `Vals Index ${valsReport?.versionLabel || 'v2.2'} Checker`
-                }
+                title={`Vals ${valsReport?.versionLabel || 'v2.2'}`}
                 sourceUrl="https://www.vals.ai/benchmarks/vals_index"
                 sourceDomainLabel="vals.ai/benchmarks/vals_index"
                 headerCountText={
@@ -2416,7 +2350,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 lang={lang}
                 accent="amber"
                 icon={<HelpCircle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" />}
-                title={lang === 'de' ? 'SimpleBench-Prüfer' : 'SimpleBench Checker'}
+                title="SimpleBench"
                 sourceUrl="https://simple-bench.com/"
                 sourceDomainLabel="simple-bench.com"
                 headerCountText={
@@ -2495,7 +2429,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
                 lang={lang}
                 accent="teal"
                 icon={<Scale className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />}
-                title={lang === 'de' ? 'Integrity-Prüfer' : 'Integrity Checker'}
+                title="Integrity"
                 sourceUrl="https://integrity-bench.com/"
                 sourceDomainLabel="integrity-bench.com"
                 headerCountText={
@@ -2565,56 +2499,56 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
               />
             </>
           )}
-
-          {/* Unified Sheet Update Action Bar */}
-          {apiAvailable && isSheetsConnected && hasAnyActionable && accessToken && (
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <span className="text-xs text-slate-700 dark:text-slate-300">
-                {lang === 'de'
-                  ? 'Ausgewählte Änderungen direkt ins Google Sheet übernehmen.'
-                  : 'Apply selected updates directly to Google Sheets.'}
-              </span>
-
-              <button
-                type="button"
-                disabled={totalSelectedCount === 0}
-                onClick={handlePrepareSheetUpdates}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>
-                  {lang === 'de'
-                    ? `${totalSelectedCount} ausgewählte Änderung(en) prüfen & ins Sheet schreiben`
-                    : `Review & Write ${totalSelectedCount} Selected Update(s) to Sheet`}
-                </span>
-              </button>
-            </div>
-          )}
         </div>
 
-        {pendingWrite && (
-          <SheetWriteConfirmDialog
-            lang={lang}
-            pendingWrite={pendingWrite}
-            isWriting={isWriting}
-            onCancel={() => setPendingWrite(null)}
-            onConfirm={handleConfirmSheetWrite}
-          />
+        {/* Sticky Sheet Update Action Footer */}
+        {apiAvailable && isSheetsConnected && hasAnyActionable && accessToken && (
+          <div className="flex items-center justify-between gap-3 px-3.5 py-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-900/95 shrink-0">
+            <span className="text-xs font-mono tabular-nums text-slate-600 dark:text-slate-400">
+              {totalSelectedCount}{' '}
+              {lang === 'de' ? 'ausgewählt' : 'selected'}
+            </span>
+
+            <button
+              type="button"
+              disabled={totalSelectedCount === 0}
+              onClick={handlePrepareSheetUpdates}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>
+                {lang === 'de'
+                  ? `${totalSelectedCount} Änderung(en) prüfen & ins Sheet schreiben`
+                  : `Review & Write ${totalSelectedCount} Update(s) to Sheet`}
+              </span>
+            </button>
+          </div>
         )}
 
-        {activeRowDraft && (
-          <NewModelRowDraftDialog
-            lang={lang}
-            draft={activeRowDraft}
-            insertRowNumber={firstReleasedHistoryRow}
-            isWriting={isWritingFullRow}
-            onCancel={() => {
-              if (!isWritingFullRow) setActiveRowDraft(null);
-            }}
-            onConfirmWrite={handleConfirmWriteFullRow}
-          />
-        )}
       </div>
+
+      {pendingWrite && (
+        <SheetWriteConfirmDialog
+          lang={lang}
+          pendingWrite={pendingWrite}
+          isWriting={isWriting}
+          onCancel={() => setPendingWrite(null)}
+          onConfirm={handleConfirmSheetWrite}
+        />
+      )}
+
+      {activeRowDraft && (
+        <NewModelRowDraftDialog
+          lang={lang}
+          draft={activeRowDraft}
+          insertRowNumber={firstReleasedHistoryRow}
+          isWriting={isWritingFullRow}
+          onCancel={() => {
+            if (!isWritingFullRow) setActiveRowDraft(null);
+          }}
+          onConfirmWrite={handleConfirmWriteFullRow}
+        />
+      )}
     </div>
   );
 };

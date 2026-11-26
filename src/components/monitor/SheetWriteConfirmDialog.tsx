@@ -19,9 +19,9 @@ export const SheetWriteConfirmDialog: React.FC<SheetWriteConfirmDialogProps> = (
   onCancel,
   onConfirm,
 }) => (
-  <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-4">
-    <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-      <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-amber-50/80 dark:bg-amber-950/30 flex items-start gap-3">
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-2 sm:p-4">
+    <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-amber-50/80 dark:bg-amber-950/30 flex items-start gap-3 shrink-0">
         <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
         <div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -37,7 +37,7 @@ export const SheetWriteConfirmDialog: React.FC<SheetWriteConfirmDialogProps> = (
         </div>
       </div>
 
-      <div className="p-4 overflow-y-auto space-y-2">
+      <div className="flex-1 min-h-0 p-4 overflow-y-auto space-y-2">
         {pendingWrite.map((c, idx) => (
           <div
             key={`${c.cellRef}-${idx}`}
@@ -71,7 +71,7 @@ export const SheetWriteConfirmDialog: React.FC<SheetWriteConfirmDialogProps> = (
         ))}
       </div>
 
-      <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-end gap-2.5">
+      <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-end gap-2.5 shrink-0">
         <button
           type="button"
           disabled={isWriting}

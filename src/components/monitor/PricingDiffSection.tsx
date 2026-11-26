@@ -39,71 +39,59 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <div
-        className={`px-3.5 py-2 rounded-xl border flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 ${
+        className={`px-2.5 py-1.5 rounded-lg border flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 ${
           report.changedCount > 0
             ? 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30'
             : actionableDiffs.length > 0
             ? 'border-blue-300 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/25'
             : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/25'
         }`}
+        title={roundCurrencyTokensInText(lang === 'de' ? report.summaryDe : report.summaryEn)}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           {report.changedCount > 0 ? (
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
           ) : actionableDiffs.length > 0 ? (
-            <AlertTriangle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+            <AlertTriangle className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
           ) : (
-            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           )}
-          <span className="text-xs text-slate-800 dark:text-slate-200 leading-snug truncate">
-            <strong className="font-bold text-slate-900 dark:text-white">
-              {report.changedCount > 0
-                ? lang === 'de'
-                  ? `Preise: ${report.changedCount} Diff(s):`
-                  : `Plans: ${report.changedCount} Diff(s):`
-                : actionableDiffs.length > 0
-                ? lang === 'de'
-                  ? `Preise: ${actionableDiffs.length} fehlend:`
-                  : `Plans: ${actionableDiffs.length} missing:`
-                : lang === 'de'
-                ? 'Preise OK:'
-                : 'Plans OK:'}
-            </strong>{' '}
-            {roundCurrencyTokensInText(lang === 'de' ? report.summaryDe : report.summaryEn)}
+          <span className="text-xs font-bold text-slate-900 dark:text-white whitespace-nowrap">
+            {lang === 'de' ? 'Preise (DE / US)' : 'Prices (DE / US)'}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 font-mono tabular-nums text-xs shrink-0">
+        <div className="flex items-center gap-1 font-mono tabular-nums text-[11px] shrink-0">
           {report.changedCount > 0 && (
-            <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+            <span className="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
               {report.changedCount} {lang === 'de' ? 'geändert' : 'changed'}
             </span>
           )}
           {report.missingCount > 0 && (
-            <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
+            <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
               {report.missingCount} {lang === 'de' ? 'fehlt' : 'missing'}
             </span>
           )}
-          <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
+          <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
             {report.unchangedCount} OK
           </span>
         </div>
       </div>
 
       {actionableDiffs.length > 0 && (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="overflow-x-auto max-h-[340px] overflow-y-auto">
             <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 font-mono text-xs text-slate-600 dark:text-slate-400">
-                  <th className="py-1.5 px-2.5 w-7"></th>
-                  <th className="py-1.5 px-3">{lang === 'de' ? 'Modell' : 'Model'}</th>
-                  <th className="py-1.5 px-3">{lang === 'de' ? 'Lab · Tarif' : 'Lab · Plan'}</th>
-                  <th className="py-1.5 px-3">DE</th>
-                  <th className="py-1.5 px-3">US</th>
-                  <th className="py-1.5 px-3">{lang === 'de' ? 'Notiz' : 'Note'}</th>
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                  <th className="py-1 px-2 w-7"></th>
+                  <th className="py-1 px-2">{lang === 'de' ? 'Modell' : 'Model'}</th>
+                  <th className="py-1 px-2">{lang === 'de' ? 'Lab · Tarif' : 'Lab · Plan'}</th>
+                  <th className="py-1 px-2">DE</th>
+                  <th className="py-1 px-2">US</th>
+                  <th className="py-1 px-2">{lang === 'de' ? 'Notiz' : 'Note'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80">
@@ -118,7 +106,7 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
                           : 'bg-white dark:bg-slate-900'
                       }
                     >
-                      <td className="py-1.5 px-2.5 align-middle">
+                      <td className="py-1 px-2 align-middle">
                         <input
                           type="checkbox"
                           checked={Boolean(selectedPriceIds[item.modelId])}
@@ -126,7 +114,7 @@ export const PricingDiffSection: React.FC<PricingDiffSectionProps> = ({
                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                         />
                       </td>
-                      <td className="py-1.5 px-3 align-middle whitespace-nowrap">
+                      <td className="py-1 px-2 align-middle whitespace-nowrap">
                         <span className="font-semibold text-slate-900 dark:text-white">
                           {item.displayName}
                         </span>

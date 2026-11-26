@@ -20,7 +20,7 @@ import {
 } from './utils/monitorBase.ts';
 
 const GDPX_URL = 'https://gdpx.semianalysis.com/';
-const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-gdpx-monitor-cache-v3.json');
+const CACHE_FILE_PATH = path.join(os.tmpdir(), 'science-iq-gdpx-monitor-cache-v4.json');
 
 // The 21 baseline models already present on gdpx.semianalysis.com;
 // any model outside this set is a new leaderboard entry whose existing Column J value is treated as an estimate to overwrite.
@@ -77,6 +77,7 @@ interface RawGdpxModel {
   openWeights?: boolean;
   harness?: string;
   reasoning?: string;
+  specialist?: string;
 }
 
 interface RawGdpxResult {
@@ -306,18 +307,31 @@ export async function fetchLiveGdpxLeaderboard(
   const prevSet = new Set(previousKnownIds);
   const hasBaseline = prevSet.size > 0;
 
-  const computed = payload.models.map((model) => {
-    const domainScores = domains.map((domain) => {
-      const domainPartners = partners.filter((p) => p.domain === domain);
-      const partnerScores = domainPartners.map((p) => {
-        const res = resultMap.get(`${model.id}/${p.id}`);
-        return res && res.tasksScored > 0 ? res.score : null;
-      });
-      return mean(partnerScores);
-    });
+  const minRequiredDomains = Math.max(2, Math.ceil(domains.length / 2));
 
-    const compositeRaw = mean(domainScores) ?? 0;
-    const score = Math.round(compositeRaw * 10 + 1e-9) / 10;
+  // Match gdpx.semianalysis.com overall composite leaderboard strictly:
+  // exclude single-domain specialist models (e.g. specialist: "cybersecurity" like HO1 / Abliterated)
+  // and any incomplete entries that lack broad domain coverage.
+  const overallModels = payload.models.filter((model) => !model.specialist);
+
+  const computed = overallModels
+    .map((model) => {
+      const domainScores = domains.map((domain) => {
+        const domainPartners = partners.filter((p) => p.domain === domain);
+        const partnerScores = domainPartners.map((p) => {
+          const res = resultMap.get(`${model.id}/${p.id}`);
+          return res && res.tasksScored > 0 ? res.score : null;
+        });
+        return mean(partnerScores);
+      });
+
+      const scoredDomainCount = domainScores.filter((s) => s !== null).length;
+      if (scoredDomainCount < minRequiredDomains) {
+        return null;
+      }
+
+      const compositeRaw = mean(domainScores) ?? 0;
+      const score = Math.round(compositeRaw * 10 + 1e-9) / 10;
 
     const overallCost = payload.overall?.[model.id]?.costPerTask ?? null;
     const overallTokens = payload.overall?.[model.id]?.tokensPerTask ?? null;
@@ -344,9 +358,10 @@ export async function fetchLiveGdpxLeaderboard(
       scoreDecimals: 1,
       costPerTask: typeof costPerTask === 'number' ? Math.round(costPerTask * 100) / 100 : null,
       tokensPerTask: typeof tokensPerTask === 'number' ? Math.round(tokensPerTask) : null,
-      isNewToSource: hasBaseline && !prevSet.has(model.id),
-    };
-  });
+        isNewToSource: hasBaseline && !prevSet.has(model.id),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   computed.sort((a, b) => b.rawScore - a.rawScore);
 
