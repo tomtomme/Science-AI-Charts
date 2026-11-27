@@ -1453,11 +1453,18 @@ export function parseAllModelsFromRows(rows: string[][]): ModelRecord[] {
     const chatLinkRaw = (row[layout.colChatLink] || '').trim();
     const apiLinkRaw = (row[layout.colApiLink] || '').trim();
 
-    // Helper to extract first valid http URL from a cell string
+    // Helper to extract first valid http/https URL (or schemeless domain URL) from a cell string
     const extractHttpUrl = (str: string): string | undefined => {
       if (!str) return undefined;
-      const match = str.match(/https?:\/\/[^\s,]+/);
-      return match ? match[0].trim() : undefined;
+      const trimmed = str.trim();
+      const httpMatch = trimmed.match(/https?:\/\/[^\s,]+/i);
+      if (httpMatch) return httpMatch[0].trim();
+      const wwwMatch = trimmed.match(/\bwww\.[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s,]*)?/i);
+      if (wwwMatch) return `https://${wwwMatch[0].trim()}`;
+      if (/^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s,]*)?$/i.test(trimmed)) {
+        return `https://${trimmed}`;
+      }
+      return undefined;
     };
 
     const parsedChatLink = extractHttpUrl(chatLinkRaw);

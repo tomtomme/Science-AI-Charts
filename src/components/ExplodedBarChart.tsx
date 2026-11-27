@@ -1679,12 +1679,12 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = memo(({
                   handleMouseLeave(model.id);
                 }}
               >
-                {/* Full-column invisible hit rect for smooth mouse tracking with zero dead zones */}
+                {/* Column invisible hit rect (stops at baseline so rotated X-axis model links below are never occluded) */}
                 <rect
                   x={localBarX - barGap / 2}
                   y={0}
                   width={totalBarSlot}
-                  height={chartHeight}
+                  height={baselineY + 4}
                   fill="#000000"
                   opacity={0}
                   pointerEvents="all"

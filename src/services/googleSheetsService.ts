@@ -263,13 +263,30 @@ export async function fetchSheetGridWithFormatting(
     }) ?? row0Cells[14];
   const cellO1Links = authorCell ? extractCellRichLinks(authorCell) : [];
 
-  for (const rowItem of rowData) {
+  const linkColIndices = new Set<number>();
+  const row1Cells = Array.isArray(rowData[1]?.values) ? rowData[1].values : [];
+  row1Cells.forEach((cell: any, idx: number) => {
+    const h = String(cell?.formattedValue || '').trim().toLowerCase();
+    if (h.includes('link to chat') || h.includes('link to api')) {
+      linkColIndices.add(startColumn + idx);
+    }
+  });
+  if (linkColIndices.size === 0) {
+    linkColIndices.add(15);
+    linkColIndices.add(16);
+  }
+
+  for (let rowIdx = 0; rowIdx < rowData.length; rowIdx++) {
+    const rowItem = rowData[rowIdx];
+    const absRow = startRow + rowIdx;
     const cells = Array.isArray(rowItem?.values) ? rowItem.values : [];
     const rowVals: string[] = startColumn > 0 ? new Array(startColumn).fill('') : [];
     const rowGreens: boolean[] = startColumn > 0 ? new Array(startColumn).fill(false) : [];
     const rowBolds: boolean[] = startColumn > 0 ? new Array(startColumn).fill(false) : [];
 
-    for (const cell of cells) {
+    for (let colOffset = 0; colOffset < cells.length; colOffset++) {
+      const cell = cells[colOffset];
+      const absCol = startColumn + colOffset;
       const formattedStr =
         cell?.formattedValue !== undefined && cell?.formattedValue !== null
           ? String(cell.formattedValue)
@@ -289,6 +306,26 @@ export async function fetchSheetGridWithFormatting(
         const parsedFmt = parseFloat(formattedStr.trim().replace(',', '.'));
         if (formattedStr.trim() === '' || (Number.isFinite(parsedFmt) && Math.abs(parsedFmt - rawNumVal) <= 1)) {
           cellVal = String(rawNumVal);
+        }
+      }
+
+      // Preserve rich cell hyperlinks in Link to Chat (Col P) and Link to API (Col Q)
+      if (absRow >= 2 && linkColIndices.has(absCol) && !/https?:\/\//i.test(cellVal)) {
+        let richUri =
+          typeof cell?.hyperlink === 'string' && /^https?:\/\//i.test(cell.hyperlink)
+            ? cell.hyperlink.trim()
+            : '';
+        if (!richUri && Array.isArray(cell?.textFormatRuns)) {
+          for (const run of cell.textFormatRuns) {
+            const uri = run?.format?.link?.uri;
+            if (typeof uri === 'string' && /^https?:\/\//i.test(uri)) {
+              richUri = uri.trim();
+              break;
+            }
+          }
+        }
+        if (richUri) {
+          cellVal = cellVal.trim() ? `${cellVal.trim()} ${richUri}` : richUri;
         }
       }
 
