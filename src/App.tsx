@@ -210,16 +210,170 @@ export default function App() {
     [syncAuth.labs]
   );
 
+  const mergedPricingPlans = useMemo(
+    () => mergePricingPlansWithDefaults(monitors.pricingReport?.labs),
+    [monitors.pricingReport?.labs]
+  );
+
+  const availableModelCount = useMemo(
+    () => syncAuth.loadedData.allModels.filter((m) => m.isAvailable).length,
+    [syncAuth.loadedData.allModels]
+  );
+
+  const compareRankedModels = useMemo(
+    () =>
+      filters.scoreMode === 'old'
+        ? syncAuth.loadedData.oldModels
+        : filters.scoreMode === 'worstCase'
+        ? syncAuth.loadedData.worstCaseModels
+        : filters.weightedDataset.newModels,
+    [
+      filters.scoreMode,
+      syncAuth.loadedData.oldModels,
+      syncAuth.loadedData.worstCaseModels,
+      filters.weightedDataset.newModels,
+    ]
+  );
+
+  const {
+    setSearchFilter,
+    setSelectedFamilies,
+    setPriceFilter,
+    setShowWeighting,
+    setShowAdvanced,
+    setSelectedCategoryIndex,
+    setCategoryInfoComp,
+    setSelectedCompany,
+    resetBenchmarkFilters,
+  } = filters;
+
   const handleSelectLabFromMatrix = useCallback(
     (creatorName: string) => {
-      filters.setSearchFilter(creatorName);
-      filters.setSelectedFamilies([]);
-      filters.setPriceFilter('all');
+      setSearchFilter(creatorName);
+      setSelectedFamilies([]);
+      setPriceFilter('all');
       setActiveTab('benchmark');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    [filters]
+    [setSearchFilter, setSelectedFamilies, setPriceFilter]
   );
+
+  const handleToggleWeighting = useCallback(() => {
+    setShowWeighting((prev) => !prev);
+  }, [setShowWeighting]);
+
+  const handleCloseWeighting = useCallback(() => {
+    setShowWeighting(false);
+  }, [setShowWeighting]);
+
+  const handleSelectBenchmarkView = useCallback(
+    (view: 'barchart' | 'timeline' | 'correlations' | 'compare') => {
+      setActiveTab('benchmark');
+      setBenchmarkView(view);
+      scrollToTabBarAnchor();
+    },
+    [scrollToTabBarAnchor]
+  );
+
+  const handleSelectLabsTab = useCallback(() => {
+    setActiveTab('labs');
+    scrollToTabBarAnchor();
+  }, [scrollToTabBarAnchor]);
+
+  const handleClearSearchFilter = useCallback(() => {
+    setSearchFilter('');
+  }, [setSearchFilter]);
+
+  const handleToggleAdvancedFromTabBar = useCallback(() => {
+    setShowAdvanced((prev) => {
+      const willOpen = !prev;
+      if (willOpen) scrollToTabBarAnchor();
+      return willOpen;
+    });
+  }, [setShowAdvanced, scrollToTabBarAnchor]);
+
+  const handleToggleAdvancedSimple = useCallback(() => {
+    setShowAdvanced((prev) => !prev);
+  }, [setShowAdvanced]);
+
+  const handleLabActiveGroupChangeFromTabBar = useCallback(
+    (group: LabGroup) => {
+      setLabActiveGroup(group);
+      scrollToTabBarAnchor();
+    },
+    [scrollToTabBarAnchor]
+  );
+
+  const handleToggleLabAdvancedFromTabBar = useCallback(() => {
+    setShowLabAdvanced((prev) => {
+      const willOpen = !prev;
+      if (willOpen) scrollToTabBarAnchor();
+      return willOpen;
+    });
+  }, [scrollToTabBarAnchor]);
+
+  const handleToggleLabAdvancedSimple = useCallback(() => {
+    setShowLabAdvanced((prev) => !prev);
+  }, []);
+
+  const handleTimelineCategoryIndexChange = useCallback(
+    (idx: number) => {
+      setTimelineCategoryIndex(idx);
+      if (idx > 8) {
+        setCategoryInfoComp(RETIRED_TIMELINE_BENCHMARKS[idx - 9]);
+      } else if (idx > 0) {
+        setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
+      } else {
+        setCategoryInfoComp(null);
+      }
+    },
+    [setCategoryInfoComp]
+  );
+
+  const handleCompareSelectCompany = useCallback(
+    (company: string) => {
+      setSelectedCompany(company);
+      setActiveTab('benchmark');
+      setBenchmarkView('barchart');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [setSelectedCompany]
+  );
+
+  const handleSearchBarChange = useCallback(
+    (val: string) => {
+      setSearchFilter(val);
+      if (val.trim().length > 0) {
+        setSelectedFamilies([]);
+      }
+    },
+    [setSearchFilter, setSelectedFamilies]
+  );
+
+  const handleSearchBarCategoryIndexChange = useCallback(
+    (idx: number) => {
+      setSelectedCategoryIndex(idx);
+      if (idx > 0) {
+        setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
+      } else {
+        setCategoryInfoComp(null);
+      }
+    },
+    [setSelectedCategoryIndex, setCategoryInfoComp]
+  );
+
+  const refreshData = syncAuth.refreshData;
+  const handleFooterSync = useCallback(() => {
+    void refreshData(undefined, undefined, true);
+  }, [refreshData]);
+
+  const handleOpenCheckerModal = useCallback(() => {
+    setIsPricingModalOpen(true);
+  }, []);
+
+  const handleCloseCheckerModal = useCallback(() => {
+    setIsPricingModalOpen(false);
+  }, []);
 
   const navigateToGlossaryTerm = useCallback((termId: string = 'term-api') => {
     setActiveTab('labs');
@@ -322,7 +476,7 @@ export default function App() {
       if (e && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
         e.preventDefault();
       }
-      filters.resetBenchmarkFilters();
+      resetBenchmarkFilters();
       setTimelineScoreMode('old');
       setTimelineCategoryIndex(0);
       setActiveTab('benchmark');
@@ -340,7 +494,7 @@ export default function App() {
       setShowLabAdvanced(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    [filters]
+    [resetBenchmarkFilters]
   );
 
   const resolvedCategoryNames =
@@ -376,7 +530,7 @@ export default function App() {
         headerMeta={syncAuth.loadedData.headerMeta}
         onResetToDefaults={handleResetToDefaults}
         showWeighting={filters.showWeighting}
-        onToggleWeighting={() => filters.setShowWeighting((prev) => !prev)}
+        onToggleWeighting={handleToggleWeighting}
         isCustomWeighted={filters.weightedDataset.isWeighted}
         onOpenGlossary={scrollToGlossary}
         onSelectLanguage={handleSelectLanguage}
@@ -402,7 +556,7 @@ export default function App() {
               categoryNames={resolvedCategoryNames}
               isPreTranslatedCategoryNames={isPreTranslatedCategoryNames}
               lang={lang}
-              onClose={() => filters.setShowWeighting(false)}
+              onClose={handleCloseWeighting}
             />
           </div>
         </div>
@@ -416,21 +570,14 @@ export default function App() {
         lang={lang}
         activeTab={activeTab}
         benchmarkView={benchmarkView}
-        onSelectBenchmarkView={(view) => {
-          setActiveTab('benchmark');
-          setBenchmarkView(view);
-          scrollToTabBarAnchor();
-        }}
-        onSelectLabsTab={() => {
-          setActiveTab('labs');
-          scrollToTabBarAnchor();
-        }}
+        onSelectBenchmarkView={handleSelectBenchmarkView}
+        onSelectLabsTab={handleSelectLabsTab}
         headerMeta={syncAuth.loadedData.headerMeta}
         onHoverCategory={filters.setCategoryInfoComp}
         onScrollToParagraph={scrollToParagraph}
         onNavigateToGlossaryTerm={navigateToGlossaryTerm}
         searchFilter={filters.searchFilter}
-        onClearSearchFilter={() => filters.setSearchFilter('')}
+        onClearSearchFilter={handleClearSearchFilter}
         scoreMode={filters.scoreMode}
         onScoreModeChange={filters.setScoreMode}
         selectedCategoryIndex={filters.selectedCategoryIndex}
@@ -438,11 +585,7 @@ export default function App() {
         priceFilter={filters.priceFilter}
         onPriceFilterChange={filters.setPriceFilter}
         showAdvanced={filters.showAdvanced}
-        onToggleAdvanced={() => {
-          const willOpen = !filters.showAdvanced;
-          filters.setShowAdvanced(willOpen);
-          if (willOpen) scrollToTabBarAnchor();
-        }}
+        onToggleAdvanced={handleToggleAdvancedFromTabBar}
         timelineScoreMode={timelineScoreMode}
         onTimelineScoreModeChange={setTimelineScoreMode}
         timelineCategoryIndex={timelineCategoryIndex}
@@ -465,22 +608,13 @@ export default function App() {
         onCorrelationsLoessSpanChange={setCorrelationsLoessSpan}
         compareScope={compareScope}
         onCompareScopeChange={setCompareScope}
-        availableModelCount={
-          syncAuth.loadedData.allModels.filter((m) => m.isAvailable).length
-        }
+        availableModelCount={availableModelCount}
         totalModelCount={syncAuth.loadedData.allModels.length}
         labActiveGroup={labActiveGroup}
-        onLabActiveGroupChange={(group) => {
-          setLabActiveGroup(group);
-          scrollToTabBarAnchor();
-        }}
+        onLabActiveGroupChange={handleLabActiveGroupChangeFromTabBar}
         labCounts={labCounts}
         showLabAdvanced={showLabAdvanced}
-        onToggleLabAdvanced={() => {
-          const willOpen = !showLabAdvanced;
-          setShowLabAdvanced(willOpen);
-          if (willOpen) scrollToTabBarAnchor();
-        }}
+        onToggleLabAdvanced={handleToggleLabAdvancedFromTabBar}
       />
 
       {/* Main Content Area */}
@@ -501,16 +635,7 @@ export default function App() {
                 scoreMode={timelineScoreMode}
                 onScoreModeChange={setTimelineScoreMode}
                 selectedCategoryIndex={timelineCategoryIndex}
-                onCategoryIndexChange={(idx) => {
-                  setTimelineCategoryIndex(idx);
-                  if (idx > 8) {
-                    filters.setCategoryInfoComp(RETIRED_TIMELINE_BENCHMARKS[idx - 9]);
-                  } else if (idx > 0) {
-                    filters.setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
-                  } else {
-                    filters.setCategoryInfoComp(null);
-                  }
-                }}
+                onCategoryIndexChange={handleTimelineCategoryIndexChange}
                 categoryNames={resolvedCategoryNames}
                 isPreTranslatedCategoryNames={isPreTranslatedCategoryNames}
                 compositeScoreNames={resolvedCompositeScoreNames}
@@ -591,13 +716,7 @@ export default function App() {
               <OnTabReadyEffect onReady={flushPendingTabAnchorScroll} />
               <CompareView
                 allModels={filters.weightedDataset.allModels}
-                rankedModels={
-                  filters.scoreMode === 'old'
-                    ? syncAuth.loadedData.oldModels
-                    : filters.scoreMode === 'worstCase'
-                    ? syncAuth.loadedData.worstCaseModels
-                    : filters.weightedDataset.newModels
-                }
+                rankedModels={compareRankedModels}
                 labs={syncAuth.labs}
                 scoreMode={filters.scoreMode}
                 scope={compareScope}
@@ -609,15 +728,10 @@ export default function App() {
                 retiredCategoryNames={resolvedRetiredCategoryNames}
                 isPreTranslatedRetiredCategoryNames={isPreTranslatedRetiredCategoryNames}
                 row33Meta={syncAuth.loadedData.headerMeta?.row33}
-                benchmarkWeights={filters.benchmarkWeights}
+                benchmarkWeights={filters.deferredBenchmarkWeights}
                 isCustomWeighted={filters.weightedDataset.isWeighted}
                 onScrollToParagraph={scrollToParagraph}
-                onSelectCompany={(company) => {
-                  filters.setSelectedCompany(company);
-                  setActiveTab('benchmark');
-                  setBenchmarkView('barchart');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
+                onSelectCompany={handleCompareSelectCompany}
               />
             </Suspense>
 
@@ -629,12 +743,7 @@ export default function App() {
           <main className="flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex flex-col space-y-2.5">
             <SearchBar
               value={filters.searchFilter}
-              onChange={(val) => {
-                filters.setSearchFilter(val);
-                if (val.trim().length > 0) {
-                  filters.setSelectedFamilies([]);
-                }
-              }}
+              onChange={handleSearchBarChange}
               selectedFamilies={filters.selectedFamilies}
               onToggleFamily={filters.handleToggleFamily}
               onClearFamilies={filters.handleClearFamilies}
@@ -645,14 +754,7 @@ export default function App() {
               totalCount={filters.currentModels.length}
               lang={lang}
               selectedCategoryIndex={filters.selectedCategoryIndex}
-              onCategoryIndexChange={(idx) => {
-                filters.setSelectedCategoryIndex(idx);
-                if (idx > 0) {
-                  filters.setCategoryInfoComp(BENCHMARK_COMPONENTS[idx - 1]);
-                } else {
-                  filters.setCategoryInfoComp(null);
-                }
-              }}
+              onCategoryIndexChange={handleSearchBarCategoryIndexChange}
               onHoverCategory={filters.setCategoryInfoComp}
               scoreMode={filters.scoreMode}
               onScoreModeChange={filters.setScoreMode}
@@ -676,20 +778,20 @@ export default function App() {
                 hoveredCategoryComp={filters.categoryInfoComp}
                 sortBy={filters.sortBy}
                 scoreMode={filters.scoreMode}
-                benchmarkWeights={filters.benchmarkWeights}
+                benchmarkWeights={filters.deferredBenchmarkWeights}
                 isCustomWeighted={filters.weightedDataset.isWeighted}
                 explosionMode={filters.explosionMode}
                 onExplosionModeChange={filters.handleExplosionModeChange}
-                searchFilter={filters.searchFilter}
+                searchFilter={filters.deferredSearchFilter}
                 selectedFamilies={filters.selectedFamilies}
                 selectedCompany={filters.selectedCompany}
                 onSelectCompany={filters.handleSelectCompany}
                 lang={lang}
                 showAdvanced={filters.showAdvanced}
-                onToggleAdvanced={() => filters.setShowAdvanced((prev) => !prev)}
+                onToggleAdvanced={handleToggleAdvancedSimple}
                 priceFilter={filters.priceFilter}
                 onPriceFilterChange={filters.setPriceFilter}
-                pricingPlans={mergePricingPlansWithDefaults(monitors.pricingReport?.labs)}
+                pricingPlans={mergedPricingPlans}
                 categoryNames={resolvedCategoryNames}
                 isPreTranslatedCategoryNames={isPreTranslatedCategoryNames}
                 onScrollToParagraph={scrollToParagraph}
@@ -717,13 +819,13 @@ export default function App() {
               labs={syncAuth.labs}
               models={filters.weightedDataset.newModels}
               allModels={filters.weightedDataset.allModels}
-              pricingPlans={mergePricingPlansWithDefaults(monitors.pricingReport?.labs)}
+              pricingPlans={mergedPricingPlans}
               onSelectLabForBenchmark={handleSelectLabFromMatrix}
               lang={lang}
               activeGroup={labActiveGroup}
               onActiveGroupChange={setLabActiveGroup}
               showAdvanced={showLabAdvanced}
-              onToggleAdvanced={() => setShowLabAdvanced((prev) => !prev)}
+              onToggleAdvanced={handleToggleLabAdvancedSimple}
               hideHeaderControls={true}
             />
           </Suspense>
@@ -736,9 +838,9 @@ export default function App() {
         loadedData={syncAuth.loadedData}
         lastSyncedAt={syncAuth.lastSyncedAt}
         isSyncing={syncAuth.isSyncing}
-        onSync={() => void syncAuth.refreshData(undefined, undefined, true)}
+        onSync={handleFooterSync}
         activeSpreadsheetId={syncAuth.activeSpreadsheetId}
-        onOpenCheckerModal={() => setIsPricingModalOpen(true)}
+        onOpenCheckerModal={handleOpenCheckerModal}
         totalAlerts={monitors.totalAlerts}
         isAnyMonitorChecking={monitors.isAnyMonitorChecking}
         allSyncedOk={monitors.allSyncedOk}
@@ -761,7 +863,7 @@ export default function App() {
         <Suspense fallback={null}>
           <PricingMonitorModal
             isOpen={isPricingModalOpen}
-            onClose={() => setIsPricingModalOpen(false)}
+            onClose={handleCloseCheckerModal}
             lang={lang}
             report={monitors.pricingReport}
             isDiffValid={monitors.isPricingDiffValidForSheet}

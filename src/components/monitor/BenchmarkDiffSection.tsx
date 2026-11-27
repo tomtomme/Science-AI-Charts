@@ -283,7 +283,7 @@ export function useBenchmarkSelectionState<TRaw>(
   };
 }
 
-export function BenchmarkDiffSection<TRaw>({
+function BenchmarkDiffSectionInner<TRaw>({
   lang,
   accent,
   icon,
@@ -847,3 +847,7 @@ export function BenchmarkDiffSection<TRaw>({
     </div>
   );
 }
+
+export const BenchmarkDiffSection = React.memo(
+  BenchmarkDiffSectionInner
+) as typeof BenchmarkDiffSectionInner;

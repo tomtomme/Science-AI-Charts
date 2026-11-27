@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
 import { LabEntry, ModelRecord } from '../types';
 import { LabPlanInfo } from '../types/pricingMonitor';
 import { DEFAULT_LAB_PLANS } from '../data/pricingPlansFallback';
@@ -54,7 +54,7 @@ export interface LabMatrixViewProps {
 
 type WeightsFilter = 'all' | 'open' | 'hybrid' | 'closed';
 
-export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
+export const LabMatrixView: React.FC<LabMatrixViewProps> = React.memo(({
   labs,
   models,
   allModels,
@@ -74,6 +74,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
   const [simplifiedSizeView, setSimplifiedSizeView] = useState<boolean>(true);
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [internalShowAdvanced, setInternalShowAdvanced] = useState<boolean>(false);
   const [expandedLabId, setExpandedLabId] = useState<string | null>(null);
   const [glossaryCategory, setGlossaryCategory] = useState<GlossaryCategory | 'all'>('all');
@@ -256,8 +257,8 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
       }
 
       // 5. Search query
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
+      if (!deferredSearchQuery.trim()) return true;
+      const q = deferredSearchQuery.toLowerCase().trim();
       return (
         lab.creator.toLowerCase().includes(q) ||
         lab.country.toLowerCase().includes(q) ||
@@ -276,7 +277,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
     return [...list].sort((a, b) =>
       a.creator.localeCompare(b.creator, undefined, { sensitivity: 'base', numeric: true })
     );
-  }, [labs, activeGroup, weightsFilter, sizeFilter, selectedCountry, searchQuery]);
+  }, [labs, activeGroup, weightsFilter, sizeFilter, selectedCountry, deferredSearchQuery]);
 
   // Index benchmark models by normalized lab key so every card gets live pricing/availability metadata
   const modelsByLabKey = useMemo(() => {
@@ -307,7 +308,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
     }
   };
 
-  const scrollToWeightsExplainer = (targetId?: string) => {
+  const scrollToWeightsExplainer = useCallback((targetId?: string) => {
     const targetElementId = targetId || 'weights-explainer-section';
     const el = document.getElementById(targetElementId);
     if (el) {
@@ -317,7 +318,11 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
         el.classList.remove('ring-2', 'ring-blue-500');
       }, 2500);
     }
-  };
+  }, []);
+
+  const handleToggleExpandLab = useCallback((labId: string) => {
+    setExpandedLabId((prev) => (prev === labId ? null : labId));
+  }, []);
 
   const scrollToGlossary = (targetId?: string) => {
     if (targetId && targetId !== 'glossary-section') {
@@ -916,7 +921,7 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
             lang={lang}
             translatedTiersEn={dynamicLabTiersEn[lab.id]}
             isExpanded={expandedLabId === lab.id}
-            onToggleExpand={() => setExpandedLabId(expandedLabId === lab.id ? null : lab.id)}
+            onToggleExpand={handleToggleExpandLab}
             isSimplifiedView={isSimplifiedView}
             sizeFilter={sizeFilter}
             modelsByLabKey={modelsByLabKey}
@@ -961,4 +966,4 @@ export const LabMatrixView: React.FC<LabMatrixViewProps> = ({
       />
     </div>
   );
-};
+});

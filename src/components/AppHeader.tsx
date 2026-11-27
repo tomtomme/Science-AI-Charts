@@ -24,7 +24,7 @@ interface AppHeaderProps {
   onRequestGeoLocation: (e?: React.MouseEvent) => void;
 }
 
-export const AppHeader: React.FC<AppHeaderProps> = ({
+export const AppHeader: React.FC<AppHeaderProps> = React.memo(({
   lang,
   headerMeta,
   onResetToDefaults,
@@ -324,4 +324,4 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       </div>
     </header>
   );
-};
+});

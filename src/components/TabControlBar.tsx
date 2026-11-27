@@ -96,7 +96,7 @@ interface TabControlBarProps {
   onToggleLabAdvanced: () => void;
 }
 
-export const TabControlBar: React.FC<TabControlBarProps> = ({
+export const TabControlBar: React.FC<TabControlBarProps> = React.memo(({
   lang,
   activeTab,
   benchmarkView,
@@ -772,4 +772,4 @@ export const TabControlBar: React.FC<TabControlBarProps> = ({
       </div>
     </div>
   );
-};
+});

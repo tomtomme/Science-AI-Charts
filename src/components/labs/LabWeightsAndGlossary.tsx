@@ -10,7 +10,7 @@ export interface LabWeightsAndGlossaryProps {
   onGlossarySearchChange: (query: string) => void;
 }
 
-export const LabWeightsAndGlossary: React.FC<LabWeightsAndGlossaryProps> = ({
+export const LabWeightsAndGlossary: React.FC<LabWeightsAndGlossaryProps> = React.memo(({
   lang,
   glossaryCategory,
   onGlossaryCategoryChange,
@@ -310,4 +310,4 @@ export const LabWeightsAndGlossary: React.FC<LabWeightsAndGlossaryProps> = ({
       </section>
     </>
   );
-};
+});

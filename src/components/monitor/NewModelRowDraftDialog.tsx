@@ -63,9 +63,6 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
     setBenchText(initialText);
   }, [draft]);
 
-  const previewColB = `${form.countryFlag ? `${form.countryFlag} ` : ''}${
-    form.displayNameColB || form.canonicalName
-  }${form.hasFreeApi ? ' 🌐' : ''}✦NEW${form.isPaidOnly ? ' 💲' : ''}`.trim();
   const previewColC = formatCreatorColC(form.companyName, form.releaseDate);
 
   const handleBenchmarkValueChange = (
@@ -135,8 +132,8 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
               <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
                 {tierLabel} · {populatedBenchCount}/10 Benchmarks
                 {lang === 'de'
-                  ? ' · Formeln (A, L, M, N) werden automatisch geklont.'
-                  : ' · Formulas (A, L, M, N) are cloned automatically.'}
+                  ? ' · Formeln (A, B, L, M, N) werden automatisch geklont.'
+                  : ' · Formulas (A, B, L, M, N) are cloned automatically.'}
               </p>
             </div>
           </div>
@@ -158,13 +155,17 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
             </div>
           )}
 
-          {/* Live Col B / Col C preview */}
+          {/* Live Col B (Formula) / Col C preview */}
           <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex flex-wrap items-center justify-between gap-2">
             <div>
               <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mr-2">
                 Col B:
               </span>
-              <span className="font-semibold text-slate-900 dark:text-white">{previewColB}</span>
+              <span className="text-slate-600 dark:text-slate-300 italic">
+                {lang === 'de'
+                  ? 'Formel wird aus Vorlage-Zeile kopiert'
+                  : 'Formula cloned from template row'}
+              </span>
             </div>
             <div>
               <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mr-2">
@@ -175,7 +176,7 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
           </div>
 
           {/* Identity & Metadata */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label className="space-y-1">
               <span className="font-semibold text-slate-700 dark:text-slate-300">
                 {lang === 'de' ? 'Modellname (Spalte S)' : 'Model Name (Col S)'}
@@ -184,18 +185,6 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
                 type="text"
                 value={form.canonicalName}
                 onChange={(e) => setForm((p) => ({ ...p, canonicalName: e.target.value }))}
-                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </label>
-
-            <label className="space-y-1">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
-                {lang === 'de' ? 'Anzeigename (Spalte B)' : 'Display Name (Col B)'}
-              </span>
-              <input
-                type="text"
-                value={form.displayNameColB}
-                onChange={(e) => setForm((p) => ({ ...p, displayNameColB: e.target.value }))}
                 className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </label>
@@ -212,35 +201,21 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
               />
             </label>
 
-            <div className="grid grid-cols-3 gap-2">
-              <label className="space-y-1">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  {lang === 'de' ? 'Flagge' : 'Flag'}
-                </span>
-                <input
-                  type="text"
-                  value={form.countryFlag}
-                  onChange={(e) => setForm((p) => ({ ...p, countryFlag: e.target.value }))}
-                  className="w-full px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-center text-slate-900 dark:text-white"
-                />
-              </label>
-
-              <label className="col-span-2 space-y-1">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  {lang === 'de' ? 'Release (Sp. Z)' : 'Release (Col Z)'}
-                </span>
-                <input
-                  type="text"
-                  value={form.releaseDate}
-                  onChange={(e) => setForm((p) => ({ ...p, releaseDate: e.target.value }))}
-                  placeholder="YYYY-MM-DD"
-                  className="w-full px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-slate-900 dark:text-white"
-                />
-              </label>
-            </div>
+            <label className="space-y-1">
+              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                {lang === 'de' ? 'Release (Spalte Z)' : 'Release (Col Z)'}
+              </span>
+              <input
+                type="text"
+                value={form.releaseDate}
+                onChange={(e) => setForm((p) => ({ ...p, releaseDate: e.target.value }))}
+                placeholder="YYYY-MM-DD"
+                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-slate-900 dark:text-white"
+              />
+            </label>
           </div>
 
-          {/* Badges */}
+          {/* Flags */}
           <div className="flex flex-wrap items-center gap-4">
             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
               <input
@@ -257,19 +232,7 @@ export const NewModelRowDraftDialog: React.FC<NewModelRowDraftDialogProps> = ({
                 className="rounded border-slate-300 text-violet-600 focus:ring-violet-500"
               />
               <span className="text-slate-800 dark:text-slate-200">
-                💲 {lang === 'de' ? 'Paid-Only Chat' : 'Paid-only chat'}
-              </span>
-            </label>
-
-            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={form.hasFreeApi}
-                onChange={(e) => setForm((p) => ({ ...p, hasFreeApi: e.target.checked }))}
-                className="rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-              />
-              <span className="text-slate-800 dark:text-slate-200">
-                🌐 {lang === 'de' ? 'Kostenlose API / Playground' : 'Free API / Playground'}
+                💲 {lang === 'de' ? 'Paid-Only Chat (setzt Spalte P auf „paid“)' : 'Paid-only chat (sets Col P to "paid")'}
               </span>
             </label>
 

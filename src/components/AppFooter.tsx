@@ -37,7 +37,7 @@ interface AppFooterProps {
   isIntegrityDiffValidForSheet: boolean;
 }
 
-export const AppFooter: React.FC<AppFooterProps> = ({
+export const AppFooter: React.FC<AppFooterProps> = React.memo(({
   lang,
   loadedData,
   lastSyncedAt,
@@ -309,4 +309,4 @@ export const AppFooter: React.FC<AppFooterProps> = ({
       </div>
     </footer>
   );
-};
+});

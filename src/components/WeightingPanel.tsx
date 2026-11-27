@@ -23,7 +23,7 @@ interface WeightingPanelProps {
   onClose?: () => void;
 }
 
-export const WeightingPanel: React.FC<WeightingPanelProps> = ({
+export const WeightingPanel: React.FC<WeightingPanelProps> = React.memo(({
   weights,
   onWeightChange,
   onApplyWeights,
@@ -245,4 +245,4 @@ export const WeightingPanel: React.FC<WeightingPanelProps> = ({
       </div>
     </section>
   );
-};
+});

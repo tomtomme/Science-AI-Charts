@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect, memo } from 'react';
 import { ArrowLeftRight } from 'lucide-react';
 import { ModelRecord } from '../../types';
 import { Tooltip } from '../Tooltip';
@@ -31,7 +31,7 @@ export interface CorrelationHeatmapProps {
   headerToggle?: React.ReactNode;
 }
 
-export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
+export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = memo(({
   allModels,
   scope,
   frontierPointIds,
@@ -45,9 +45,55 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
   const [hoveredCell, setHoveredCell] = useState<{
     rowIdx: number;
     colIdx: number;
-    x: number;
-    y: number;
   } | null>(null);
+
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const pointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const rafRef = useRef<number | null>(null);
+
+  const applyTooltipPosition = useCallback((x: number, y: number) => {
+    const el = tooltipRef.current;
+    if (!el) return;
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    const nearLeft = x < 120;
+    const nearRight = x > vw - 120;
+    const nearTop = y < 140;
+    const tx = nearLeft ? '0%' : nearRight ? '-100%' : '-50%';
+    const ty = nearTop ? '0%' : '-100%';
+    const leftPos = nearLeft
+      ? Math.max(12, x - 12)
+      : nearRight
+        ? Math.min(vw - 12, x + 12)
+        : x;
+    const topPos = nearTop ? y + 18 : y - 14;
+    el.style.left = `${leftPos}px`;
+    el.style.top = `${topPos}px`;
+    el.style.transform = `translate3d(${tx}, ${ty}, 0)`;
+  }, []);
+
+  const scheduleTooltipPosition = useCallback(
+    (x: number, y: number) => {
+      pointerRef.current = { x, y };
+      if (rafRef.current !== null) return;
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        applyTooltipPosition(pointerRef.current.x, pointerRef.current.y);
+      });
+    },
+    [applyTooltipPosition]
+  );
+
+  useEffect(() => {
+    if (hoveredCell) {
+      applyTooltipPosition(pointerRef.current.x, pointerRef.current.y);
+    }
+  }, [hoveredCell, applyTooltipPosition]);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const scopedModels = useMemo(() => {
     if (scope === 'frontier') {
@@ -262,10 +308,11 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                                   }
                                 }}
                                 onMouseEnter={(e) => {
-                                  setHoveredCell({ rowIdx: rIdx, colIdx: cIdx, x: e.clientX, y: e.clientY });
+                                  pointerRef.current = { x: e.clientX, y: e.clientY };
+                                  setHoveredCell({ rowIdx: rIdx, colIdx: cIdx });
                                 }}
                                 onMouseMove={(e) => {
-                                  setHoveredCell({ rowIdx: rIdx, colIdx: cIdx, x: e.clientX, y: e.clientY });
+                                  scheduleTooltipPosition(e.clientX, e.clientY);
                                 }}
                                 onMouseLeave={() => setHoveredCell(null)}
                                 style={{
@@ -304,76 +351,58 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
           </span>
         </div>
 
-        {/* Floating Cell Detail Tooltip */}
-        {hoveredCell && hoveredData && hoveredRowDim && hoveredColDim && (() => {
-          const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-          const nearLeft = hoveredCell.x < 120;
-          const nearRight = hoveredCell.x > vw - 120;
-          const nearTop = hoveredCell.y < 140;
-          const tx = nearLeft ? '0%' : nearRight ? '-100%' : '-50%';
-          const ty = nearTop ? '0%' : '-100%';
-          const leftPos = nearLeft
-            ? Math.max(12, hoveredCell.x - 12)
-            : nearRight
-              ? Math.min(vw - 12, hoveredCell.x + 12)
-              : hoveredCell.x;
+        {/* Floating Cell Detail Tooltip (ref-positioned via rAF, 0 re-renders on mousemove, no backdrop-blur) */}
+        {hoveredCell && hoveredData && hoveredRowDim && hoveredColDim && (
+          <div
+            ref={tooltipRef}
+            className="pointer-events-none fixed z-50 will-change-transform"
+          >
+            <div className="w-max max-w-[280px] px-3 py-2 rounded-xl shadow-2xl bg-slate-900/[0.97] dark:bg-slate-950/[0.97] text-slate-100 border border-slate-700/80 text-xs font-sans">
+              <div className="space-y-1 pb-1.5 mb-1.5 border-b border-slate-800">
+                <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredRowDim.color }} />
+                  <span className="truncate">{getResolvedDimensionName(hoveredRowDim, lang, row2Labels)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredColDim.color }} />
+                  <span className="truncate">{getResolvedDimensionName(hoveredColDim, lang, row2Labels)}</span>
+                </div>
+              </div>
 
-          return (
-            <div
-              className="pointer-events-none fixed z-50 transition-opacity duration-100"
-              style={{
-                left: `${leftPos}px`,
-                top: `${nearTop ? hoveredCell.y + 18 : hoveredCell.y - 14}px`,
-                transform: `translate(${tx}, ${ty})`,
-              }}
-            >
-              <div className="w-max max-w-[280px] px-3 py-2 rounded-xl shadow-2xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-xs font-sans">
-                <div className="space-y-1 pb-1.5 mb-1.5 border-b border-slate-800">
-                  <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredRowDim.color }} />
-                    <span className="truncate">{getResolvedDimensionName(hoveredRowDim, lang, row2Labels)}</span>
+              {hoveredData.pearson !== null && hoveredData.spearman !== null ? (
+                <div className="space-y-0.5 font-mono text-xs">
+                  <div className={`flex items-center justify-between gap-4 ${metric === 'pearson' ? 'text-blue-300 font-bold' : 'text-slate-300'}`}>
+                    <span>Pearson r:</span>
+                    <span>
+                      {formatCorrelationDecimal(hoveredData.pearson, 2)}
+                      {hoveredData.pearsonRes && ` (${lang === 'de' ? hoveredData.pearsonRes.strengthDe : hoveredData.pearsonRes.strengthEn})`}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hoveredColDim.color }} />
-                    <span className="truncate">{getResolvedDimensionName(hoveredColDim, lang, row2Labels)}</span>
+                  <div className={`flex items-center justify-between gap-4 ${metric === 'spearman' ? 'text-rose-300 font-bold' : 'text-slate-300'}`}>
+                    <span>Spearman Rho:</span>
+                    <span>
+                      {formatCorrelationDecimal(hoveredData.spearman, 2)}
+                      {hoveredData.spearmanRes && ` (${lang === 'de' ? hoveredData.spearmanRes.strengthDe : hoveredData.spearmanRes.strengthEn})`}
+                    </span>
+                  </div>
+                  <div className="pt-1 mt-1 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-300">
+                    <span>n = {hoveredData.n}</span>
+                    {hoveredCell.rowIdx !== hoveredCell.colIdx && (
+                      <span className="text-emerald-400">
+                        {lang === 'de' ? 'Klick → Streudiagramm' : 'Click → Scatterplot'}
+                      </span>
+                    )}
                   </div>
                 </div>
-
-                {hoveredData.pearson !== null && hoveredData.spearman !== null ? (
-                  <div className="space-y-0.5 font-mono text-xs">
-                    <div className={`flex items-center justify-between gap-4 ${metric === 'pearson' ? 'text-blue-300 font-bold' : 'text-slate-300'}`}>
-                      <span>Pearson r:</span>
-                      <span>
-                        {formatCorrelationDecimal(hoveredData.pearson, 2)}
-                        {hoveredData.pearsonRes && ` (${lang === 'de' ? hoveredData.pearsonRes.strengthDe : hoveredData.pearsonRes.strengthEn})`}
-                      </span>
-                    </div>
-                    <div className={`flex items-center justify-between gap-4 ${metric === 'spearman' ? 'text-rose-300 font-bold' : 'text-slate-300'}`}>
-                      <span>Spearman Rho:</span>
-                      <span>
-                        {formatCorrelationDecimal(hoveredData.spearman, 2)}
-                        {hoveredData.spearmanRes && ` (${lang === 'de' ? hoveredData.spearmanRes.strengthDe : hoveredData.spearmanRes.strengthEn})`}
-                      </span>
-                    </div>
-                    <div className="pt-1 mt-1 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-300">
-                      <span>n = {hoveredData.n}</span>
-                      {hoveredCell.rowIdx !== hoveredCell.colIdx && (
-                        <span className="text-emerald-400">
-                          {lang === 'de' ? 'Klick → Streudiagramm' : 'Click → Scatterplot'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="font-mono text-xs text-slate-300">
-                    {lang === 'de' ? `Zu wenige Daten (n = ${hoveredData.n})` : `Insufficient data (n = ${hoveredData.n})`}
-                  </div>
-                )}
-              </div>
+              ) : (
+                <div className="font-mono text-xs text-slate-300">
+                  {lang === 'de' ? `Zu wenige Daten (n = ${hoveredData.n})` : `Insufficient data (n = ${hoveredData.n})`}
+                </div>
+              )}
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
     </div>
   );
-};
+});

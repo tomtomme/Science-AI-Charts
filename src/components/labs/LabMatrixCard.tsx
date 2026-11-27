@@ -48,7 +48,7 @@ export interface LabMatrixCardProps {
   lang: 'de' | 'en';
   translatedTiersEn?: string;
   isExpanded: boolean;
-  onToggleExpand: () => void;
+  onToggleExpand: (labId: string) => void;
   isSimplifiedView: boolean;
   sizeFilter: string;
   modelsByLabKey: Map<string, ModelRecord[]>;
@@ -57,7 +57,7 @@ export interface LabMatrixCardProps {
   onScrollToWeightsExplainer: (targetId?: string) => void;
 }
 
-export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
+export const LabMatrixCard: React.FC<LabMatrixCardProps> = React.memo(({
   lab,
   lang,
   translatedTiersEn,
@@ -590,7 +590,7 @@ export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
           <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-2">
             <button
               type="button"
-              onClick={onToggleExpand}
+              onClick={() => onToggleExpand(lab.id)}
               className="w-full flex items-center justify-between py-1 text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-semibold cursor-pointer transition-colors group select-none"
             >
               <span className="flex items-center gap-1.5">
@@ -659,4 +659,4 @@ export const LabMatrixCard: React.FC<LabMatrixCardProps> = ({
       </div>
     </div>
   );
-};
+});

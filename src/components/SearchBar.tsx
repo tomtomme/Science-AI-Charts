@@ -52,7 +52,7 @@ const ALPHABETICAL_FAMILIES = [
   'Qwen',
 ];
 
-export const SearchBar: React.FC<SearchBarProps> = ({
+export const SearchBar: React.FC<SearchBarProps> = React.memo(({
   value,
   onChange,
   selectedFamilies,
@@ -385,4 +385,4 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       </div>
     </div>
   );
-};
+});

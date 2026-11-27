@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback, memo } from 'react';
 import { Sparkles, Grid3X3 } from 'lucide-react';
 import { ModelRecord } from '../types';
 import { extractFrontierPoints } from '../utils/mathRegression';
@@ -40,7 +40,7 @@ export interface CorrelationsScatterplotProps {
   hideHeaderControls?: boolean;
 }
 
-export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = ({
+export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = memo(({
   allModels,
   onScrollToParagraph,
   lang,
@@ -60,14 +60,24 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
   onLoessSpanChange,
   hideHeaderControls = false,
 }) => {
-  const row2Labels: Row2LabelContext = {
-    categoryNames,
-    isPreTranslatedCategoryNames,
-    compositeScoreNames,
-    isPreTranslatedCompositeScoreNames,
-    retiredCategoryNames,
-    isPreTranslatedRetiredCategoryNames,
-  };
+  const row2Labels: Row2LabelContext = useMemo(
+    () => ({
+      categoryNames,
+      isPreTranslatedCategoryNames,
+      compositeScoreNames,
+      isPreTranslatedCompositeScoreNames,
+      retiredCategoryNames,
+      isPreTranslatedRetiredCategoryNames,
+    }),
+    [
+      categoryNames,
+      isPreTranslatedCategoryNames,
+      compositeScoreNames,
+      isPreTranslatedCompositeScoreNames,
+      retiredCategoryNames,
+      isPreTranslatedRetiredCategoryNames,
+    ]
+  );
 
   // Plot 1 Dimension selection (Default: X = #1 Coding & Math, Y = #2 Non-Hallucination)
   const [plot1XDimIndex, setPlot1XDimIndex] = useState<number>(3);
@@ -125,22 +135,40 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
     return new Set(sota.map((p) => p.id));
   }, [allModels]);
 
-  // Swap handlers for each plot
-  const handleSwapPlot1 = () => {
-    setPlot1XDimIndex((prevX) => {
-      const prevY = plot1YDimIndex;
-      setPlot1YDimIndex(prevX);
-      return prevY;
-    });
-  };
+  // Stable swap & mode handlers so Plot 1 & Plot 2 do not invalidate each other's React.memo
+  const handleSwapPlot1 = useCallback(() => {
+    setPlot1XDimIndex(plot1YDimIndex);
+    setPlot1YDimIndex(plot1XDimIndex);
+  }, [plot1XDimIndex, plot1YDimIndex]);
 
-  const handleSwapPlot2 = () => {
-    setPlot2XDimIndex((prevX) => {
-      const prevY = plot2YDimIndex;
-      setPlot2YDimIndex(prevX);
-      return prevY;
-    });
-  };
+  const handleSwapPlot2 = useCallback(() => {
+    setPlot2XDimIndex(plot2YDimIndex);
+    setPlot2YDimIndex(plot2XDimIndex);
+  }, [plot2XDimIndex, plot2YDimIndex]);
+
+  const handleTogglePlot1Mode = useCallback(() => {
+    setPlot1Mode((m) => (m === 'scatter' ? 'heatmap' : 'scatter'));
+  }, []);
+  const handleTogglePlot1Metric = useCallback(() => {
+    setPlot1HeatmapMetric((prev) => (prev === 'pearson' ? 'spearman' : 'pearson'));
+  }, []);
+  const handleSelectPairForPlot2 = useCallback((xIdx: number, yIdx: number) => {
+    setPlot2XDimIndex(xIdx);
+    setPlot2YDimIndex(yIdx);
+    setPlot2Mode('scatter');
+  }, []);
+
+  const handleTogglePlot2Mode = useCallback(() => {
+    setPlot2Mode((m) => (m === 'scatter' ? 'heatmap' : 'scatter'));
+  }, []);
+  const handleTogglePlot2Metric = useCallback(() => {
+    setPlot2HeatmapMetric((prev) => (prev === 'pearson' ? 'spearman' : 'pearson'));
+  }, []);
+  const handleSelectPairForPlot1 = useCallback((xIdx: number, yIdx: number) => {
+    setPlot1XDimIndex(xIdx);
+    setPlot1YDimIndex(yIdx);
+    setPlot1Mode('scatter');
+  }, []);
 
   const renderPlotPanel = ({
     mode,
@@ -293,38 +321,30 @@ export const CorrelationsScatterplot: React.FC<CorrelationsScatterplotProps> = (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {renderPlotPanel({
           mode: plot1Mode,
-          onToggleMode: () => setPlot1Mode((m) => (m === 'scatter' ? 'heatmap' : 'scatter')),
+          onToggleMode: handleTogglePlot1Mode,
           heatmapMetric: plot1HeatmapMetric,
-          onToggleHeatmapMetric: () => setPlot1HeatmapMetric((prev) => (prev === 'pearson' ? 'spearman' : 'pearson')),
+          onToggleHeatmapMetric: handleTogglePlot1Metric,
           xAxisDimIndex: plot1XDimIndex,
           yAxisDimIndex: plot1YDimIndex,
           onXAxisDimChange: setPlot1XDimIndex,
           onYAxisDimChange: setPlot1YDimIndex,
           onSwapAxes: handleSwapPlot1,
-          onSelectPairForOtherPlot: (xIdx, yIdx) => {
-            setPlot2XDimIndex(xIdx);
-            setPlot2YDimIndex(yIdx);
-            setPlot2Mode('scatter');
-          },
+          onSelectPairForOtherPlot: handleSelectPairForPlot2,
         })}
 
         {renderPlotPanel({
           mode: plot2Mode,
-          onToggleMode: () => setPlot2Mode((m) => (m === 'scatter' ? 'heatmap' : 'scatter')),
+          onToggleMode: handleTogglePlot2Mode,
           heatmapMetric: plot2HeatmapMetric,
-          onToggleHeatmapMetric: () => setPlot2HeatmapMetric((prev) => (prev === 'pearson' ? 'spearman' : 'pearson')),
+          onToggleHeatmapMetric: handleTogglePlot2Metric,
           xAxisDimIndex: plot2XDimIndex,
           yAxisDimIndex: plot2YDimIndex,
           onXAxisDimChange: setPlot2XDimIndex,
           onYAxisDimChange: setPlot2YDimIndex,
           onSwapAxes: handleSwapPlot2,
-          onSelectPairForOtherPlot: (xIdx, yIdx) => {
-            setPlot1XDimIndex(xIdx);
-            setPlot1YDimIndex(yIdx);
-            setPlot1Mode('scatter');
-          },
+          onSelectPairForOtherPlot: handleSelectPairForPlot1,
         })}
       </div>
     </div>
   );
-};
+});

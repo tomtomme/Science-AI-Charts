@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface TooltipProps {
@@ -22,7 +22,7 @@ export interface TooltipProps {
  * 2. Collision-aware positioning measured in useLayoutEffect so the popup never flickers or overlaps the cursor.
  * 3. Exact 12px vertical clearance and hover bridge matching the gap without overlapping the trigger element.
  */
-export const Tooltip: React.FC<TooltipProps> = ({
+export const Tooltip: React.FC<TooltipProps> = memo(({
   children,
   content,
   title,
@@ -241,7 +241,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
               left: `${coords.left}px`,
               zIndex: 9999,
             }}
-            className={`fixed ${alignClass} ${width} max-w-[92vw] p-3 rounded-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 shadow-2xl backdrop-blur-md text-left text-xs whitespace-normal break-words pointer-events-auto transition-opacity duration-100 ${popupClassName}`}
+            className={`fixed ${alignClass} ${width} max-w-[92vw] p-3 rounded-xl bg-slate-900/[0.97] dark:bg-slate-950/[0.97] text-slate-100 border border-slate-700/80 shadow-2xl text-left text-xs whitespace-normal break-words pointer-events-auto transition-opacity duration-100 ${popupClassName}`}
           >
             {/* Hover bridge strictly matching the 12px gap between trigger and popover */}
             {actualPosition === 'bottom' ? (
@@ -288,4 +288,4 @@ export const Tooltip: React.FC<TooltipProps> = ({
         )}
     </div>
   );
-};
+});

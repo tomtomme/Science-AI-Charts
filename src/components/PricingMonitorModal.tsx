@@ -1575,14 +1575,13 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       const colReleaseIdx = layout?.colReleaseDate ?? 25;
       const colCreatorIdx = layout?.colModelCreator ?? 26;
 
-      const colNameLabelLetter = columnIndexToA1(colNameLabelIdx);
       const colCreatorYearLetter = columnIndexToA1(colCreatorYearIdx);
       const colModelNameLetter = columnIndexToA1(colModelNameIdx);
       const colReleaseLetter = columnIndexToA1(colReleaseIdx);
       const colCreatorLetter = columnIndexToA1(colCreatorIdx);
 
       // Inspect existing Sheet formulas in adjacent released rows so we clone the user's own
-      // composite score formulas (OLD, NEW, Worst Case, or custom formulas) verbatim via PASTE_FORMULA
+      // formulas (Col A logo, Col B label, Col L/M/N composite scores, etc.) verbatim via PASTE_FORMULA
       // without ever modifying or generating formula logic.
       const templateFormulaOffsets = new Map<number, number>();
       if (newRowInserts.length > 0) {
@@ -1598,7 +1597,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             activeSpreadsheetId,
             sheetTitle,
             firstReleasedHistoryRow,
-            firstReleasedHistoryRow + 3,
+            firstReleasedHistoryRow + 14,
             accessToken,
             columnIndexToA1(maxInspectCol)
           );
@@ -1632,13 +1631,12 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         const spec = item.newRowSpec!;
         const rowNum = spec.insertAtRow1Based;
         const companyMeta = resolveCompanyFlagAndName(spec.companyName);
-        const colBValue = `${companyMeta.flag} ${spec.canonicalName}✦NEW`;
         const colCValue = formatCreatorColC(companyMeta.companyName, spec.releaseDate);
         const targetColLetter = columnIndexToA1(spec.targetCol0Based);
         const quotedTitle = quoteSheetTitle(sheetTitle);
 
+        // Never write static text into Column B (colNameLabelIdx): it is formula-driven and cloned via PASTE_FORMULA.
         const sparseUpdates: CellUpdateSpec[] = [
-          { range: `${quotedTitle}!${colNameLabelLetter}${rowNum}`, value: colBValue },
           { range: `${quotedTitle}!${colCreatorYearLetter}${rowNum}`, value: colCValue },
           { range: `${quotedTitle}!${colModelNameLetter}${rowNum}`, value: spec.canonicalName },
           { range: `${quotedTitle}!${colReleaseLetter}${rowNum}`, value: spec.releaseDate },
@@ -1647,7 +1645,6 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         ];
 
         const explicitlyWrittenCols = new Set<number>([
-          colNameLabelIdx,
           colCreatorYearIdx,
           colModelNameIdx,
           colReleaseIdx,
@@ -1659,10 +1656,16 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         for (const [colIdx, rowOffset] of templateFormulaOffsets.entries()) {
           if (!explicitlyWrittenCols.has(colIdx)) {
             formulaCopySpecs.push({
-              sourceRow1BasedAfterInsert: rowNum + 1 + rowOffset,
+              sourceRow1BasedAfterInsert: rowNum + 1 + insertedRowsCount + rowOffset,
               col0Based: colIdx,
             });
           }
+        }
+        if (!templateFormulaOffsets.has(colNameLabelIdx) && !explicitlyWrittenCols.has(colNameLabelIdx)) {
+          formulaCopySpecs.push({
+            sourceRow1BasedAfterInsert: rowNum + 1 + insertedRowsCount,
+            col0Based: colNameLabelIdx,
+          });
         }
 
         const boldSpecs: CellBoldSpec[] = benchmarkCols.map((colIdx) => ({
@@ -1816,7 +1819,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
       const colCreatorIdx = layout?.colModelCreator ?? 26;
       const colAaModelNameIdx = layout?.colAaModelName ?? 33;
 
-      // Clone existing Sheet formulas (Col A Logo, Col L/M/N composite scores, etc.) verbatim
+      // Clone existing Sheet formulas (Col A Logo, Col B Label, Col L/M/N composite scores, etc.) verbatim
       const templateFormulaOffsets = new Map<number, number>();
       try {
         const maxInspectCol = Math.max(
@@ -1830,7 +1833,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
           activeSpreadsheetId,
           sheetTitle,
           rowNum,
-          rowNum + 3,
+          rowNum + 14,
           accessToken,
           columnIndexToA1(maxInspectCol)
         );
@@ -1846,9 +1849,6 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         // Proceed safely without cloning formulas if inspection fails
       }
 
-      const colBValue = `${draft.countryFlag ? `${draft.countryFlag} ` : ''}${
-        draft.displayNameColB || draft.canonicalName
-      }${draft.hasFreeApi ? ' 🌐' : ''}✦NEW${draft.isPaidOnly ? ' 💲' : ''}`.trim();
       const colCValue = formatCreatorColC(draft.companyName, draft.releaseDate);
 
       const sparseUpdates: CellUpdateSpec[] = [];
@@ -1861,7 +1861,7 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
         explicitlyWrittenCols.add(colIdx);
       };
 
-      pushCell(colNameLabelIdx, colBValue);
+      // Never write static text into Column B (colNameLabelIdx): its formula is cloned via PASTE_FORMULA.
       pushCell(colCreatorYearIdx, colCValue);
       pushCell(colModelNameIdx, draft.canonicalName.trim());
       if (draft.sourceMonitor === 'aa' && draft.sourceName.trim()) {
@@ -1924,6 +1924,12 @@ export const PricingMonitorModal: React.FC<PricingMonitorModalProps> = ({
             col0Based: colIdx,
           });
         }
+      }
+      if (!templateFormulaOffsets.has(colNameLabelIdx) && !explicitlyWrittenCols.has(colNameLabelIdx)) {
+        formulaCopySpecs.push({
+          sourceRow1BasedAfterInsert: rowNum + 1,
+          col0Based: colNameLabelIdx,
+        });
       }
 
       const res = await insertRowAndWriteSparseCells(

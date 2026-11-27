@@ -68,7 +68,7 @@ interface ArtificialAnalysisDiffSectionProps {
   getPickerOptionsForRow: (item: AaDiffItem) => BenchmarkPickerOption[];
 }
 
-export const ArtificialAnalysisDiffSection: React.FC<ArtificialAnalysisDiffSectionProps> = ({
+export const ArtificialAnalysisDiffSection: React.FC<ArtificialAnalysisDiffSectionProps> = React.memo(({
   lang,
   isChecking,
   isSheetsConnected,
@@ -648,4 +648,4 @@ export const ArtificialAnalysisDiffSection: React.FC<ArtificialAnalysisDiffSecti
       )}
     </div>
   );
-};
+});

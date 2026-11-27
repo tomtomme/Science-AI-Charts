@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useId } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useDeferredValue, useEffect, memo } from 'react';
 import { ExternalLink, ArrowLeftRight, Sparkles, ChevronDown } from 'lucide-react';
 import { ModelRecord, TimelineDataPoint } from '../../types';
 import { calculateRegression } from '../../utils/mathRegression';
@@ -38,7 +38,203 @@ export interface SingleCorrelationPlotProps {
   headerToggle?: React.ReactNode;
 }
 
-export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
+interface RenderedCorrDot {
+  point: CorrelationPoint;
+  cx: number;
+  cy: number;
+  isFrontier: boolean;
+}
+
+interface CorrelationSvgBaseProps {
+  svgWidth: number;
+  svgHeight: number;
+  margin: { top: number; right: number; bottom: number; left: number };
+  innerWidth: number;
+  innerHeight: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  xTicks: number[];
+  yTicks: number[];
+  activeRegressionId: string;
+  activeRegressionColor: string;
+  confidenceBandPath: string;
+  regressionPath: string;
+  xDimColor: string;
+  scope: 'all' | 'frontier';
+  renderedDots: RenderedCorrDot[];
+  onDotMouseEnter: (dot: RenderedCorrDot) => void;
+  onDotMouseLeave: () => void;
+}
+
+const CorrelationSvgBase = memo<CorrelationSvgBaseProps>(function CorrelationSvgBase({
+  margin,
+  innerWidth,
+  innerHeight,
+  minX,
+  maxX,
+  minY,
+  maxY,
+  xTicks,
+  yTicks,
+  activeRegressionId,
+  activeRegressionColor,
+  confidenceBandPath,
+  regressionPath,
+  xDimColor,
+  scope,
+  renderedDots,
+  onDotMouseEnter,
+  onDotMouseLeave,
+}) {
+  const scaleX = (x: number) =>
+    margin.left + ((x - minX) / (maxX - minX || 1)) * innerWidth;
+  const scaleY = (y: number) =>
+    margin.top + innerHeight - ((y - minY) / (maxY - minY || 1)) * innerHeight;
+
+  return (
+    <>
+      {/* X Grid Lines */}
+      {xTicks.map((val) => {
+        const x = scaleX(val);
+        return (
+          <g key={`x-grid-${val}`}>
+            <line
+              x1={x}
+              y1={margin.top}
+              x2={x}
+              y2={margin.top + innerHeight}
+              className="stroke-slate-200 dark:stroke-slate-800/80"
+              strokeWidth="1"
+              strokeDasharray="2,2"
+            />
+            <text
+              x={x}
+              y={margin.top + innerHeight + 24}
+              textAnchor="middle"
+              fontSize="15"
+              fontFamily="var(--font-mono)"
+              className="fill-slate-700 dark:fill-slate-300 font-mono font-semibold"
+            >
+              {val}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Y Grid Lines */}
+      {yTicks.map((val) => {
+        const y = scaleY(val);
+        return (
+          <g key={`y-grid-${val}`}>
+            <line
+              x1={margin.left}
+              y1={y}
+              x2={margin.left + innerWidth}
+              y2={y}
+              className="stroke-slate-200 dark:stroke-slate-800/80"
+              strokeWidth="1"
+              strokeDasharray="2,2"
+            />
+            <text
+              x={margin.left - 12}
+              y={y + 5}
+              textAnchor="end"
+              fontSize="15"
+              fontFamily="var(--font-mono)"
+              className="fill-slate-700 dark:fill-slate-300 font-mono font-semibold"
+            >
+              {val}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Main X & Y Axis Lines */}
+      <line
+        x1={margin.left}
+        y1={margin.top + innerHeight}
+        x2={margin.left + innerWidth}
+        y2={margin.top + innerHeight}
+        className="stroke-slate-500 dark:stroke-slate-600"
+        strokeWidth="1.6"
+      />
+      <line
+        x1={margin.left}
+        y1={margin.top}
+        x2={margin.left}
+        y2={margin.top + innerHeight}
+        className="stroke-slate-500 dark:stroke-slate-600"
+        strokeWidth="1.6"
+      />
+
+      {/* 95% Confidence Band */}
+      {confidenceBandPath && activeRegressionId !== 'frontier' && (
+        <path
+          d={confidenceBandPath}
+          fill={activeRegressionColor}
+          fillOpacity={0.16}
+          stroke={activeRegressionColor}
+          strokeWidth="1.2"
+          strokeDasharray="3,3"
+          strokeOpacity={0.4}
+          className="pointer-events-none"
+        />
+      )}
+
+      {/* Fitted Regression Curve */}
+      {regressionPath && (
+        <path
+          d={regressionPath}
+          fill="none"
+          stroke={activeRegressionColor}
+          strokeWidth="2.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray={activeRegressionId === 'loess' ? '5,3' : undefined}
+        />
+      )}
+
+      {/* Static Scatter Points (zero feDropShadow filters, zero hoveredPoint dependency) */}
+      {renderedDots.map((dot) => (
+        <g
+          key={dot.point.id}
+          className="cursor-pointer"
+          onMouseEnter={() => onDotMouseEnter(dot)}
+          onMouseLeave={onDotMouseLeave}
+        >
+          <circle cx={dot.cx} cy={dot.cy} r={20} fill="transparent" />
+
+          {dot.isFrontier && (
+            <circle
+              cx={dot.cx}
+              cy={dot.cy}
+              r={9.5}
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth={1.8}
+              strokeDasharray={scope === 'frontier' ? undefined : '2,2'}
+              pointerEvents="none"
+            />
+          )}
+
+          <circle
+            cx={dot.cx}
+            cy={dot.cy}
+            r={dot.isFrontier ? 6.5 : 5.5}
+            fill={dot.isFrontier ? '#d97706' : xDimColor}
+            stroke="#ffffff"
+            strokeWidth={1.4}
+            pointerEvents="none"
+          />
+        </g>
+      ))}
+    </>
+  );
+});
+
+export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = memo(({
   allModels,
   scope,
   frontierPointIds,
@@ -55,7 +251,6 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   onScrollToParagraph,
   headerToggle,
 }) => {
-  const svgUid = useId().replace(/:/g, '');
   const xDim: CorrelationDimension = CORRELATION_DIMENSIONS[xAxisDimIndex] || CORRELATION_DIMENSIONS[0];
   const yDim: CorrelationDimension = CORRELATION_DIMENSIONS[yAxisDimIndex] || CORRELATION_DIMENSIONS[1];
   const xDimLabel = getResolvedDimensionName(xDim, lang, row2Labels);
@@ -66,7 +261,7 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   const [openAxisMenu, setOpenAxisMenu] = useState<'x' | 'y' | null>(null);
 
   const [hoveredPoint, setHoveredPoint] = useState<{
-    point: CorrelationPoint;
+    dot: RenderedCorrDot;
     pos: { left: number; top: number };
   } | null>(null);
 
@@ -74,12 +269,16 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearCloseTimeout = () => {
+  const clearCloseTimeout = useCallback(() => {
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    return () => clearCloseTimeout();
+  }, [clearCloseTimeout]);
 
   // Extract correlation points for this plot
   const allCorrelationPoints = useMemo(() => {
@@ -176,11 +375,15 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
     return ticks;
   }, [minY, maxY]);
 
+  const deferredRegressionId = useDeferredValue(activeRegression.id);
+  const deferredPolyDegree = useDeferredValue(polyDegree);
+  const deferredLoessSpan = useDeferredValue(loessSpan);
+
   const regressionParam = useMemo(() => {
-    if (activeRegression.id === 'polynomial') return polyDegree;
-    if (activeRegression.id === 'loess') return loessSpan;
+    if (deferredRegressionId === 'polynomial') return deferredPolyDegree;
+    if (deferredRegressionId === 'loess') return deferredLoessSpan;
     return undefined;
-  }, [activeRegression.id, polyDegree, loessSpan]);
+  }, [deferredRegressionId, deferredPolyDegree, deferredLoessSpan]);
 
   const regressionInput: TimelineDataPoint[] = useMemo(() => {
     return activePoints.map((p) => ({
@@ -198,8 +401,8 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
   }, [activePoints]);
 
   const regression = useMemo(() => {
-    return calculateRegression(regressionInput, activeRegression.id, 50, regressionParam);
-  }, [regressionInput, activeRegression.id, regressionParam]);
+    return calculateRegression(regressionInput, deferredRegressionId, 50, regressionParam);
+  }, [regressionInput, deferredRegressionId, regressionParam]);
 
   const regressionPath = useMemo(() => {
     if (!regression.points || regression.points.length === 0) return '';
@@ -238,56 +441,70 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
     return `${upperPoints.join(' ')} ${lowerPoints.join(' ')} Z`;
   }, [regression.points, minX, maxX, minY, maxY]);
 
-  const handleDotMouseEnter = (pt: CorrelationPoint, cx: number, cy: number) => {
-    clearCloseTimeout();
-    const contRect = containerRef.current?.getBoundingClientRect();
-    const svgRect = svgRef.current?.getBoundingClientRect();
-
-    if (!contRect || !svgRect) return;
-
-    const scaleFactorX = svgRect.width / svgWidth;
-    const scaleFactorY = svgRect.height / svgHeight;
-    const offsetX = svgRect.left - contRect.left;
-    const offsetY = svgRect.top - contRect.top;
-
-    const dotScreenX = cx * scaleFactorX + offsetX;
-    const dotScreenY = cy * scaleFactorY + offsetY;
-
-    const screenPoints = activePoints.map((p) => ({
-      id: p.id,
-      x: scaleX(p.x) * scaleFactorX + offsetX,
-      y: scaleY(p.y) * scaleFactorY + offsetY,
-    }));
-
-    const optimalPos = getOptimalTooltipPosition(
-      dotScreenX,
-      dotScreenY,
-      contRect.width,
-      contRect.height,
-      screenPoints,
-      pt.id
-    );
-
-    setHoveredPoint({
+  const renderedDots = useMemo<RenderedCorrDot[]>(() => {
+    const xSpan = maxX - minX || 1;
+    const ySpan = maxY - minY || 1;
+    return activePoints.map((pt) => ({
       point: pt,
-      pos: optimalPos,
-    });
-  };
+      cx: margin.left + ((pt.x - minX) / xSpan) * innerWidth,
+      cy: margin.top + innerHeight - ((pt.y - minY) / ySpan) * innerHeight,
+      isFrontier: frontierPointIds.has(pt.id),
+    }));
+  }, [activePoints, minX, maxX, minY, maxY, innerWidth, innerHeight, frontierPointIds]);
 
-  const handleDotMouseLeave = () => {
+  const handleDotMouseEnter = useCallback(
+    (dot: RenderedCorrDot) => {
+      clearCloseTimeout();
+      const contRect = containerRef.current?.getBoundingClientRect();
+      const svgRect = svgRef.current?.getBoundingClientRect();
+
+      if (!contRect || !svgRect) return;
+
+      const scaleFactorX = svgRect.width / svgWidth;
+      const scaleFactorY = svgRect.height / svgHeight;
+      const offsetX = svgRect.left - contRect.left;
+      const offsetY = svgRect.top - contRect.top;
+
+      const dotScreenX = dot.cx * scaleFactorX + offsetX;
+      const dotScreenY = dot.cy * scaleFactorY + offsetY;
+
+      const screenPoints = renderedDots.map((d) => ({
+        id: d.point.id,
+        x: d.cx * scaleFactorX + offsetX,
+        y: d.cy * scaleFactorY + offsetY,
+      }));
+
+      const optimalPos = getOptimalTooltipPosition(
+        dotScreenX,
+        dotScreenY,
+        contRect.width,
+        contRect.height,
+        screenPoints,
+        dot.point.id
+      );
+
+      setHoveredPoint({
+        dot,
+        pos: optimalPos,
+      });
+    },
+    [clearCloseTimeout, renderedDots]
+  );
+
+  const handleDotMouseLeave = useCallback(() => {
     clearCloseTimeout();
     closeTimeoutRef.current = setTimeout(() => {
       setHoveredPoint(null);
     }, 1800);
-  };
+  }, [clearCloseTimeout]);
 
-  const handleTooltipMouseEnter = () => clearCloseTimeout();
-  const handleTooltipMouseLeave = () => {
+  const handleTooltipMouseEnter = useCallback(() => clearCloseTimeout(), [clearCloseTimeout]);
+  const handleTooltipMouseLeave = useCallback(() => {
     clearCloseTimeout();
     closeTimeoutRef.current = setTimeout(() => {
       setHoveredPoint(null);
     }, 800);
-  };
+  }, [clearCloseTimeout]);
 
   const isLinearModel = activeRegression.id === 'linear';
 
@@ -436,179 +653,68 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
           )}
         </div>
 
-        {/* SVG Scatterplot (Quadratic 1:1) */}
+        {/* SVG Scatterplot (Quadratic 1:1) — memoized base + single-dot hover overlay */}
         <svg
           ref={svgRef}
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
           className="w-full h-auto aspect-square overflow-visible"
         >
-          <defs>
-            <filter id={`corrDotGlow-${svgUid}`} x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.25" />
-            </filter>
-          </defs>
-
-          {/* X Grid Lines */}
-          {xTicks.map((val) => {
-            const x = scaleX(val);
-            return (
-              <g key={`x-grid-${val}`}>
-                <line
-                  x1={x}
-                  y1={margin.top}
-                  x2={x}
-                  y2={margin.top + innerHeight}
-                  className="stroke-slate-200 dark:stroke-slate-800/80"
-                  strokeWidth="1"
-                  strokeDasharray="2,2"
-                />
-                <text
-                  x={x}
-                  y={margin.top + innerHeight + 24}
-                  textAnchor="middle"
-                  fontSize="15"
-                  fontFamily="var(--font-mono)"
-                  className="fill-slate-700 dark:fill-slate-300 font-mono font-semibold"
-                >
-                  {val}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Y Grid Lines */}
-          {yTicks.map((val) => {
-            const y = scaleY(val);
-            return (
-              <g key={`y-grid-${val}`}>
-                <line
-                  x1={margin.left}
-                  y1={y}
-                  x2={margin.left + innerWidth}
-                  y2={y}
-                  className="stroke-slate-200 dark:stroke-slate-800/80"
-                  strokeWidth="1"
-                  strokeDasharray="2,2"
-                />
-                <text
-                  x={margin.left - 12}
-                  y={y + 5}
-                  textAnchor="end"
-                  fontSize="15"
-                  fontFamily="var(--font-mono)"
-                  className="fill-slate-700 dark:fill-slate-300 font-mono font-semibold"
-                >
-                  {val}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Main X & Y Axis Lines */}
-          <line
-            x1={margin.left}
-            y1={margin.top + innerHeight}
-            x2={margin.left + innerWidth}
-            y2={margin.top + innerHeight}
-            className="stroke-slate-500 dark:stroke-slate-600"
-            strokeWidth="1.6"
-          />
-          <line
-            x1={margin.left}
-            y1={margin.top}
-            x2={margin.left}
-            y2={margin.top + innerHeight}
-            className="stroke-slate-500 dark:stroke-slate-600"
-            strokeWidth="1.6"
+          <CorrelationSvgBase
+            svgWidth={svgWidth}
+            svgHeight={svgHeight}
+            margin={margin}
+            innerWidth={innerWidth}
+            innerHeight={innerHeight}
+            minX={minX}
+            maxX={maxX}
+            minY={minY}
+            maxY={maxY}
+            xTicks={xTicks}
+            yTicks={yTicks}
+            activeRegressionId={activeRegression.id}
+            activeRegressionColor={activeRegression.color}
+            confidenceBandPath={confidenceBandPath}
+            regressionPath={regressionPath}
+            xDimColor={xDim.color}
+            scope={scope}
+            renderedDots={renderedDots}
+            onDotMouseEnter={handleDotMouseEnter}
+            onDotMouseLeave={handleDotMouseLeave}
           />
 
-          {/* 95% Confidence Band */}
-          {confidenceBandPath && activeRegression.id !== 'frontier' && (
-            <path
-              d={confidenceBandPath}
-              fill={activeRegression.color}
-              fillOpacity={0.16}
-              stroke={activeRegression.color}
-              strokeWidth="1.2"
-              strokeDasharray="3,3"
-              strokeOpacity={0.4}
-              className="pointer-events-none transition-all duration-300"
-            />
-          )}
-
-          {/* Fitted Regression Curve */}
-          {regressionPath && (
-            <path
-              d={regressionPath}
-              fill="none"
-              stroke={activeRegression.color}
-              strokeWidth="2.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray={activeRegression.id === 'loess' ? '5,3' : undefined}
-            />
-          )}
-
-          {/* Scatter Points */}
-          {activePoints.map((pt) => {
-            const cx = scaleX(pt.x);
-            const cy = scaleY(pt.y);
-            const isHovered = hoveredPoint?.point.id === pt.id;
-            const isFrontier = frontierPointIds.has(pt.id);
-
-            return (
-              <g
-                key={pt.id}
-                className="cursor-pointer transition-transform duration-100"
-                onMouseEnter={() => handleDotMouseEnter(pt, cx, cy)}
-                onMouseLeave={handleDotMouseLeave}
-              >
-                {/* Hit target padding */}
-                <circle cx={cx} cy={cy} r={20} fill="transparent" />
-
-                {/* SOTA Frontier Accent Ring */}
-                {isFrontier && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={isHovered ? 13 : 9.5}
-                    fill="none"
-                    stroke="#f59e0b"
-                    strokeWidth={isHovered ? 2.4 : 1.8}
-                    strokeDasharray={scope === 'frontier' ? undefined : '2,2'}
-                    pointerEvents="none"
-                  />
-                )}
-
-                {/* Pulsing ring when hovered */}
-                {isHovered && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={16}
-                    fill="none"
-                    stroke="#f43f5e"
-                    strokeWidth="2.8"
-                    className="animate-pulse"
-                    pointerEvents="none"
-                  />
-                )}
-
-                {/* Main Scatter Circle */}
+          {/* Single Active Hover Dot Highlight (re-renders only 1 dot on hover!) */}
+          {hoveredPoint && (
+            <g className="pointer-events-none">
+              {hoveredPoint.dot.isFrontier && (
                 <circle
-                  cx={cx}
-                  cy={cy}
-                  r={isHovered ? 9 : isFrontier ? 6.5 : 5.5}
-                  fill={isHovered ? '#f43f5e' : isFrontier ? '#d97706' : xDim.color}
-                  stroke="#ffffff"
-                  strokeWidth={isHovered ? 2.4 : 1.4}
-                  filter={`url(#corrDotGlow-${svgUid})`}
-                  className="transition-all duration-150 hover:opacity-95"
-                  pointerEvents="none"
+                  cx={hoveredPoint.dot.cx}
+                  cy={hoveredPoint.dot.cy}
+                  r={13}
+                  fill="none"
+                  stroke="#f59e0b"
+                  strokeWidth={2.4}
+                  strokeDasharray={scope === 'frontier' ? undefined : '2,2'}
                 />
-              </g>
-            );
-          })}
+              )}
+              <circle
+                cx={hoveredPoint.dot.cx}
+                cy={hoveredPoint.dot.cy}
+                r={16}
+                fill="none"
+                stroke="#f43f5e"
+                strokeWidth="2.8"
+                className="animate-pulse"
+              />
+              <circle
+                cx={hoveredPoint.dot.cx}
+                cy={hoveredPoint.dot.cy}
+                r={9}
+                fill="#f43f5e"
+                stroke="#ffffff"
+                strokeWidth={2.4}
+              />
+            </g>
+          )}
         </svg>
 
         {/* CLICKABLE X-AXIS TITLE BUTTON (Directly at the Bottom Center of the X-Axis) */}
@@ -667,14 +773,14 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
           )}
         </div>
 
-        {/* Compact, Collision-Aware Dot Hover Tooltip */}
+        {/* Compact, Collision-Aware Dot Hover Tooltip (no backdrop-blur, no layout transition-all) */}
         {hoveredPoint && (
           <div
             style={{
               left: `${hoveredPoint.pos.left}px`,
               top: `${hoveredPoint.pos.top}px`,
             }}
-            className="absolute z-40 bg-slate-900/95 dark:bg-slate-950/95 text-white px-2.5 py-2 rounded-lg shadow-xl border border-slate-700/80 backdrop-blur-md pointer-events-auto w-[240px] transition-all animate-in fade-in zoom-in-95 duration-150 select-text"
+            className="absolute z-40 bg-slate-900/[0.97] dark:bg-slate-950/[0.97] text-white px-2.5 py-2 rounded-lg shadow-xl border border-slate-700/80 pointer-events-auto w-[240px] select-text"
             onMouseEnter={handleTooltipMouseEnter}
             onMouseLeave={handleTooltipMouseLeave}
           >
@@ -683,14 +789,14 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
               <div className="flex items-center gap-1 min-w-0">
                 <span
                   className="font-bold text-xs text-white truncate max-w-[130px]"
-                  title={hoveredPoint.point.displayName}
+                  title={hoveredPoint.dot.point.displayName}
                 >
-                  {hoveredPoint.point.displayName}
+                  {hoveredPoint.dot.point.displayName}
                 </span>
-                {hoveredPoint.point.flag && (
-                  <span className="text-xs shrink-0">{hoveredPoint.point.flag}</span>
+                {hoveredPoint.dot.point.flag && (
+                  <span className="text-xs shrink-0">{hoveredPoint.dot.point.flag}</span>
                 )}
-                {frontierPointIds.has(hoveredPoint.point.id) && (
+                {hoveredPoint.dot.isFrontier && (
                   <span className="text-xs font-mono px-1 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5 shrink-0">
                     <Sparkles className="w-2.5 h-2.5 text-amber-300" />
                     <span>{lang === 'de' ? 'Pionier' : 'Pioneer'}</span>
@@ -698,9 +804,9 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                 )}
               </div>
 
-              {hoveredPoint.point.chatUrl && (
+              {hoveredPoint.dot.point.chatUrl && (
                 <a
-                  href={hoveredPoint.point.chatUrl}
+                  href={hoveredPoint.dot.point.chatUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold flex items-center gap-0.5 shrink-0 transition-colors"
@@ -714,12 +820,12 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
 
             {/* Metadata Subline: Company · Date · Free/Paid */}
             <div className="flex items-center justify-between text-xs text-slate-400 mt-0.5 truncate">
-              <span className="truncate max-w-[125px]" title={hoveredPoint.point.company}>
-                {hoveredPoint.point.company}
+              <span className="truncate max-w-[125px]" title={hoveredPoint.dot.point.company}>
+                {hoveredPoint.dot.point.company}
               </span>
               <span className="shrink-0 text-slate-400 font-mono">
-                {hoveredPoint.point.releaseDate ? hoveredPoint.point.releaseDate.slice(0, 7) : ''}
-                {hoveredPoint.point.isPaid ? ' · Paid' : ''}
+                {hoveredPoint.dot.point.releaseDate ? hoveredPoint.dot.point.releaseDate.slice(0, 7) : ''}
+                {hoveredPoint.dot.point.isPaid ? ' · Paid' : ''}
               </span>
             </div>
 
@@ -736,7 +842,7 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   className="font-mono text-xs font-extrabold shrink-0"
                   style={{ color: xDim.color }}
                 >
-                  {hoveredPoint.point.x.toFixed(1)}
+                  {hoveredPoint.dot.point.x.toFixed(1)}
                 </span>
               </div>
               <div className="bg-slate-800/80 px-1.5 py-1 rounded flex items-center justify-between gap-1">
@@ -750,7 +856,7 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
                   className="font-mono text-xs font-extrabold shrink-0"
                   style={{ color: yDim.color }}
                 >
-                  {hoveredPoint.point.y.toFixed(1)}
+                  {hoveredPoint.dot.point.y.toFixed(1)}
                 </span>
               </div>
             </div>
@@ -759,4 +865,4 @@ export const SingleCorrelationPlot: React.FC<SingleCorrelationPlotProps> = ({
       </div>
     </div>
   );
-};
+});

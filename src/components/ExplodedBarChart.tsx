@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { ModelRecord, BenchmarkComponent, PriceFilter, ExplosionMode, ScoreMode, BenchmarkWeights } from '../types';
 import { BENCHMARK_COMPONENTS, getBenchmarkCategoryLabel } from '../data/benchmarks';
 import { Language, TRANSLATIONS } from '../utils/i18n';
@@ -79,7 +79,7 @@ function formatRawCategoryScore(_comp: BenchmarkComponent, raw: number): string 
   return `${formatted}%`;
 }
 
-export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
+export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = memo(({
   models,
   activeBenchmarkId,
   activeCategoryIndex = 0,
@@ -137,14 +137,71 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   const [persistentModel, setPersistentModel] = useState<ModelRecord | null>(null);
   const [persistentSegment, setPersistentSegment] = useState<HoveredSegmentInfo | null>(null);
 
-  // Floating compact price / availability note & free API tooltip
+  // Floating compact price / availability note & free API tooltip (content in state, x/y in ref + rAF for 0 re-renders on mousemove)
   const [priceTooltip, setPriceTooltip] = useState<{
     title: string;
     text: string;
-    x: number;
-    y: number;
     link?: string;
   } | null>(null);
+  const priceTooltipRef = useRef<HTMLDivElement>(null);
+  const pricePointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const priceRafRef = useRef<number | null>(null);
+
+  const applyPriceTooltipPosition = useCallback((x: number, y: number) => {
+    const el = priceTooltipRef.current;
+    if (!el) return;
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    const nearLeft = x < 90;
+    const nearRight = x > vw - 90;
+    const nearTop = y < 80;
+    const tx = nearLeft ? '0%' : nearRight ? '-100%' : '-50%';
+    const ty = nearTop ? '0%' : '-100%';
+    const leftPos = nearLeft
+      ? Math.max(12, x - 12)
+      : nearRight
+        ? Math.min(vw - 12, x + 12)
+        : x;
+    const topPos = nearTop ? y + 22 : y - 14;
+    el.style.left = `${leftPos}px`;
+    el.style.top = `${topPos}px`;
+    el.style.transform = `translate3d(${tx}, ${ty}, 0)`;
+  }, []);
+
+  const showPriceTooltip = useCallback((title: string, text: string, x: number, y: number) => {
+    pricePointerRef.current = { x, y };
+    setPriceTooltip((prev) =>
+      prev && prev.title === title && prev.text === text ? prev : { title, text }
+    );
+    applyPriceTooltipPosition(x, y);
+  }, [applyPriceTooltipPosition]);
+
+  const movePriceTooltip = useCallback(
+    (x: number, y: number) => {
+      pricePointerRef.current = { x, y };
+      if (priceRafRef.current !== null) return;
+      priceRafRef.current = requestAnimationFrame(() => {
+        priceRafRef.current = null;
+        applyPriceTooltipPosition(pricePointerRef.current.x, pricePointerRef.current.y);
+      });
+    },
+    [applyPriceTooltipPosition]
+  );
+
+  const hidePriceTooltip = useCallback(() => {
+    setPriceTooltip(null);
+  }, []);
+
+  useEffect(() => {
+    if (priceTooltip) {
+      applyPriceTooltipPosition(pricePointerRef.current.x, pricePointerRef.current.y);
+    }
+  }, [priceTooltip, applyPriceTooltipPosition]);
+
+  useEffect(() => {
+    return () => {
+      if (priceRafRef.current !== null) cancelAnimationFrame(priceRafRef.current);
+    };
+  }, []);
 
   // Horizontal scroll container reference and vertical mousewheel converter
   const chartScrollRef = useRef<HTMLDivElement>(null);
@@ -718,7 +775,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
   };
 
   // Precompute bar geometry & collision-free price/note label positions so adjacent price ranges never overlap
-  const barLayouts = (() => {
+  const barLayouts = useMemo(() => {
     const placedLabels: Array<{ leftX: number; rightX: number; y: number }> = [];
     return models.map((model, index) => {
       const barX = marginLeft + index * totalBarSlot;
@@ -890,11 +947,34 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         globeX,
       };
     });
-  })();
+  }, [
+    models,
+    hoveredIndex,
+    currentExplosionMode,
+    explodedViewEnabled,
+    activeComp,
+    activeCategoryIndex,
+    scoreMode,
+    benchmarkWeights,
+    isCustomWeighted,
+    searchFilter,
+    selectedFamilies,
+    selectedCompany,
+    sortBy,
+    lang,
+    pricingPlans,
+    marginLeft,
+    totalBarSlot,
+    barWidth,
+    baselineY,
+  ]);
 
-  const stableBarLayouts = [...barLayouts].sort((a, b) => a.model.id.localeCompare(b.model.id));
+  const stableBarLayouts = useMemo(
+    () => [...barLayouts].sort((a, b) => a.model.id.localeCompare(b.model.id)),
+    [barLayouts]
+  );
 
-  const averageMetrics = (() => {
+  const averageMetrics = useMemo(() => {
     if (barLayouts.length === 0) return null;
     const values = barLayouts.map((b) => (activeComp ? b.catRaw : b.score));
     const sum = values.reduce((acc, v) => acc + v, 0);
@@ -902,7 +982,7 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
     const aboveCount = values.filter((v) => v >= avg).length;
     const belowCount = values.length - aboveCount;
     return { avg, aboveCount, belowCount };
-  })();
+  }, [barLayouts, activeComp]);
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 sm:p-3.5 shadow-xs transition-colors">
@@ -1796,17 +1876,15 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         onSelectCompany?.(model.companyName);
                       }}
                       onMouseEnter={(e) => {
-                        setPriceTooltip({
-                          title: '',
-                          text: lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
+                        showPriceTooltip(
+                          '',
+                          lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
+                          e.clientX,
+                          e.clientY
+                        );
                       }}
-                      onMouseMove={(e) => {
-                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                      }}
-                      onMouseLeave={() => setPriceTooltip(null)}
+                      onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                      onMouseLeave={hidePriceTooltip}
                     >
                       <defs>
                         <clipPath id={clipId}>
@@ -1821,7 +1899,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.35)'}
                         strokeWidth={isSelected ? 2.5 : 1}
                         className="transition-colors duration-150 group-hover/fav:stroke-blue-500 group-hover/fav:stroke-2"
-                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
                       />
                       <image
                         href={model.faviconUrl}
@@ -1866,17 +1943,15 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         onSelectCompany?.(model.companyName);
                       }}
                       onMouseEnter={(e) => {
-                        setPriceTooltip({
-                          title: '',
-                          text: lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
+                        showPriceTooltip(
+                          '',
+                          lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
+                          e.clientX,
+                          e.clientY
+                        );
                       }}
-                      onMouseMove={(e) => {
-                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                      }}
-                      onMouseLeave={() => setPriceTooltip(null)}
+                      onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                      onMouseLeave={hidePriceTooltip}
                     >
                       <defs>
                         <clipPath id={clipId}>
@@ -1891,7 +1966,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.35)'}
                         strokeWidth={isSelected ? 2.5 : 1}
                         className="transition-colors duration-150 group-hover/fav:stroke-blue-500 group-hover/fav:stroke-2"
-                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
                       />
                       <image
                         href={model.faviconUrl}
@@ -1953,17 +2027,15 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         onSelectCompany?.(model.companyName);
                       }}
                       onMouseEnter={(e) => {
-                        setPriceTooltip({
-                          title: '',
-                          text: lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
+                        showPriceTooltip(
+                          '',
+                          lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
+                          e.clientX,
+                          e.clientY
+                        );
                       }}
-                      onMouseMove={(e) => {
-                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                      }}
-                      onMouseLeave={() => setPriceTooltip(null)}
+                      onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                      onMouseLeave={hidePriceTooltip}
                     >
                       <defs>
                         <clipPath id={clipId}>
@@ -1978,7 +2050,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.25)'}
                         strokeWidth={isSelected ? 2.5 : 1}
                         className="transition-colors duration-150 group-hover/fav:stroke-blue-500 group-hover/fav:stroke-2"
-                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.25))' }}
                       />
                       <image
                         href={model.faviconUrl}
@@ -2023,17 +2094,15 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         onSelectCompany?.(model.companyName);
                       }}
                       onMouseEnter={(e) => {
-                        setPriceTooltip({
-                          title: '',
-                          text: lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
+                        showPriceTooltip(
+                          '',
+                          lang === 'de' ? `Nach Hersteller filtern:\n${model.companyName}` : `Filter by manufacturer:\n${model.companyName}`,
+                          e.clientX,
+                          e.clientY
+                        );
                       }}
-                      onMouseMove={(e) => {
-                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                      }}
-                      onMouseLeave={() => setPriceTooltip(null)}
+                      onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                      onMouseLeave={hidePriceTooltip}
                       opacity={isSelected ? '1' : '0.9'}
                     >
                       <defs>
@@ -2049,7 +2118,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         stroke={isSelected ? '#2563EB' : 'rgba(0,0,0,0.2)'}
                         strokeWidth={isSelected ? 2 : 0.75}
                         className="transition-colors duration-150 group-hover/fav:stroke-blue-500 group-hover/fav:stroke-2"
-                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
                       />
                       <image
                         href={model.faviconUrl}
@@ -2091,17 +2159,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     <g
                       className={`${bookingHref ? 'cursor-pointer group/price' : 'cursor-help'}`}
                       onMouseEnter={(e) => {
-                        setPriceTooltip({
-                          title: priceInfo.tooltipTitle,
-                          text: tooltipFullText,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
+                        showPriceTooltip(priceInfo.tooltipTitle, tooltipFullText, e.clientX, e.clientY);
                       }}
-                      onMouseMove={(e) => {
-                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                      }}
-                      onMouseLeave={() => setPriceTooltip(null)}
+                      onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                      onMouseLeave={hidePriceTooltip}
                     >
                       <rect
                         x={localPriceX - textWidth / 2 - 4}
@@ -2189,17 +2250,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           className="cursor-pointer group/globe"
                           onClick={(e) => e.stopPropagation()}
                           onMouseEnter={(e) => {
-                            setPriceTooltip({
-                              title: '',
-                              text: tooltipText,
-                              x: e.clientX,
-                              y: e.clientY,
-                            });
+                            showPriceTooltip('', tooltipText, e.clientX, e.clientY);
                           }}
-                          onMouseMove={(e) => {
-                            setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                          }}
-                          onMouseLeave={() => setPriceTooltip(null)}
+                          onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                          onMouseLeave={hidePriceTooltip}
                         >
                           {globeEl}
                         </a>
@@ -2215,17 +2269,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                     <g
                       className="cursor-pointer group/note"
                       onMouseEnter={(e) => {
-                        setPriceTooltip({
-                          title: priceInfo.tooltipTitle,
-                          text: priceInfo.tooltipText,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
+                        showPriceTooltip(priceInfo.tooltipTitle, priceInfo.tooltipText, e.clientX, e.clientY);
                       }}
-                      onMouseMove={(e) => {
-                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                      }}
-                      onMouseLeave={() => setPriceTooltip(null)}
+                      onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                      onMouseLeave={hidePriceTooltip}
                     >
                       <circle
                         cx={model.isFreeApi ? localBarCenterX - 10 : localBarCenterX}
@@ -2233,7 +2280,6 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         r={8}
                         className="fill-amber-100 dark:fill-amber-950 stroke-amber-500 dark:stroke-amber-400 group-hover/note:fill-amber-200 dark:group-hover/note:fill-amber-900 group-hover/note:stroke-amber-600 dark:group-hover/note:stroke-amber-300 transition-colors"
                         strokeWidth="1.2"
-                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
                       />
                       <text
                         x={model.isFreeApi ? localBarCenterX - 10 : localBarCenterX}
@@ -2283,17 +2329,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                           className="cursor-pointer group/globe"
                           onClick={(e) => e.stopPropagation()}
                           onMouseEnter={(e) => {
-                            setPriceTooltip({
-                              title: '',
-                              text: tooltipText,
-                              x: e.clientX,
-                              y: e.clientY,
-                            });
+                            showPriceTooltip('', tooltipText, e.clientX, e.clientY);
                           }}
-                          onMouseMove={(e) => {
-                            setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                          }}
-                          onMouseLeave={() => setPriceTooltip(null)}
+                          onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                          onMouseLeave={hidePriceTooltip}
                         >
                           {globeEl}
                         </a>
@@ -2334,17 +2373,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                       className="cursor-pointer group/globe"
                       onClick={(e) => e.stopPropagation()}
                       onMouseEnter={(e) => {
-                        setPriceTooltip({
-                          title: '',
-                          text: tooltipText,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
+                        showPriceTooltip('', tooltipText, e.clientX, e.clientY);
                       }}
-                      onMouseMove={(e) => {
-                        setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                      }}
-                      onMouseLeave={() => setPriceTooltip(null)}
+                      onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                      onMouseLeave={hidePriceTooltip}
                     >
                       {globeEl}
                     </a>
@@ -2366,17 +2398,10 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
                         className="cursor-pointer group"
                         onClick={(e) => e.stopPropagation()}
                         onMouseEnter={(e) => {
-                          setPriceTooltip({
-                            title: '',
-                            text: modelNameTooltipText,
-                            x: e.clientX,
-                            y: e.clientY,
-                          });
+                          showPriceTooltip('', modelNameTooltipText, e.clientX, e.clientY);
                         }}
-                        onMouseMove={(e) => {
-                          setPriceTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-                        }}
-                        onMouseLeave={() => setPriceTooltip(null)}
+                        onMouseMove={(e) => movePriceTooltip(e.clientX, e.clientY)}
+                        onMouseLeave={hidePriceTooltip}
                       >
                         <text
                           x="0"
@@ -2480,42 +2505,24 @@ export const ExplodedBarChart: React.FC<ExplodedBarChartProps> = ({
         )}
       </div>
 
-      {/* Floating compact price / availability note & action tooltip */}
-      {priceTooltip && (() => {
-        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-        const nearLeft = priceTooltip.x < 90;
-        const nearRight = priceTooltip.x > vw - 90;
-        const nearTop = priceTooltip.y < 80;
-        const tx = nearLeft ? '0%' : nearRight ? '-100%' : '-50%';
-        const ty = nearTop ? '0%' : '-100%';
-        const leftPos = nearLeft
-          ? Math.max(12, priceTooltip.x - 12)
-          : nearRight
-            ? Math.min(vw - 12, priceTooltip.x + 12)
-            : priceTooltip.x;
-
-        return (
-          <div
-            className="pointer-events-none fixed z-50 transition-opacity duration-100"
-            style={{
-              left: `${leftPos}px`,
-              top: `${nearTop ? priceTooltip.y + 22 : priceTooltip.y - 14}px`,
-              transform: `translate(${tx}, ${ty})`,
-            }}
-          >
-            <div className={`w-max max-w-[260px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-700/80 backdrop-blur-md text-xs font-sans ${priceTooltip.title ? 'text-left' : 'text-center'}`}>
-              {priceTooltip.title && (
-                <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
-                  {priceTooltip.title}
-                </div>
-              )}
-              <div className="font-medium text-slate-100 whitespace-pre-line leading-tight">
-                {priceTooltip.text}
+      {/* Floating compact price / availability note & action tooltip (rAF ref-positioned, 0 re-renders on mousemove, no backdrop-blur) */}
+      {priceTooltip && (
+        <div
+          ref={priceTooltipRef}
+          className="pointer-events-none fixed z-50 will-change-transform"
+        >
+          <div className={`w-max max-w-[260px] px-2.5 py-1.5 rounded-lg shadow-xl bg-slate-900/[0.97] dark:bg-slate-950/[0.97] text-slate-100 border border-slate-700/80 text-xs font-sans ${priceTooltip.title ? 'text-left' : 'text-center'}`}>
+            {priceTooltip.title && (
+              <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
+                {priceTooltip.title}
               </div>
+            )}
+            <div className="font-medium text-slate-100 whitespace-pre-line leading-tight">
+              {priceTooltip.text}
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
-};
+});

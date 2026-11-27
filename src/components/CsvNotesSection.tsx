@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { CSV_NOTES_DATA } from '../data/csvNotesData';
 import { Language } from '../utils/i18n';
 import { CsvNotesMetadata, CsvParagraph } from '../types';
@@ -575,7 +575,7 @@ function getBilingualSection2Paragraphs(
   });
 }
 
-export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notesMeta }) => {
+export const CsvNotesSection: React.FC<CsvNotesSectionProps> = React.memo(({ appLang, notesMeta }) => {
   const { columnsGuide, practicalGuide } = CSV_NOTES_DATA;
   const isDe = appLang === 'de';
 
@@ -601,37 +601,59 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
     ? (notesMeta?.section2TitleDe || (isSec2TitleEn ? practicalGuide.titleDe : dynamicSec2Title))
     : (isSec2TitleDe ? practicalGuide.titleEn : (dynamicSec2Title || practicalGuide.titleEn));
 
-  // Dynamically parse live CSV strings from C34 and O34 (or weekly AI-translated versions)
-  const dynamicP1 = notesMeta?.section1Content
-    ? parseSection1Text(notesMeta.section1Content)
-    : [];
-  const dynamicP2 = notesMeta?.section2Content
-    ? parseSection2Text(notesMeta.section2Content)
-    : [];
+  // Memoize dynamic CSV parsing and bilingual merging so parent re-renders skip regex parsing
+  const { paragraphs1, paragraphs2, hasActualFinalScoresMajor } = useMemo(() => {
+    const dynamicP1 = notesMeta?.section1Content
+      ? parseSection1Text(notesMeta.section1Content)
+      : [];
+    const dynamicP2 = notesMeta?.section2Content
+      ? parseSection2Text(notesMeta.section2Content)
+      : [];
 
-  // Paragraphs for Box 1 (Cell C34)
-  const paragraphs1 =
-    isDe && notesMeta?.section1ContentDe
-      ? parseSection1Text(notesMeta.section1ContentDe)
-      : getBilingualSection1Paragraphs(
-          dynamicP1,
-          columnsGuide.paragraphsDe,
-          columnsGuide.paragraphsEn,
-          isDe
-        );
+    const p1 =
+      isDe && notesMeta?.section1ContentDe
+        ? parseSection1Text(notesMeta.section1ContentDe)
+        : getBilingualSection1Paragraphs(
+            dynamicP1,
+            columnsGuide.paragraphsDe,
+            columnsGuide.paragraphsEn,
+            isDe
+          );
 
-  // Paragraphs for Box 2 (Cell O34)
-  const paragraphs2 =
-    isDe && notesMeta?.section2ContentDe
-      ? parseSection2Text(notesMeta.section2ContentDe)
-      : !isDe && notesMeta?.section2ContentEn
-      ? parseSection2Text(notesMeta.section2ContentEn)
-      : getBilingualSection2Paragraphs(
-          dynamicP2,
-          practicalGuide.paragraphsDe,
-          practicalGuide.paragraphsEn,
-          isDe
-        );
+    const p2 =
+      isDe && notesMeta?.section2ContentDe
+        ? parseSection2Text(notesMeta.section2ContentDe)
+        : !isDe && notesMeta?.section2ContentEn
+        ? parseSection2Text(notesMeta.section2ContentEn)
+        : getBilingualSection2Paragraphs(
+            dynamicP2,
+            practicalGuide.paragraphsDe,
+            practicalGuide.paragraphsEn,
+            isDe
+          );
+
+    const hasFinalScoresMajor = p1.some(
+      (x) =>
+        x.isMajor &&
+        !x.heading?.toLowerCase().includes('result in the') &&
+        (x.heading?.toLowerCase().includes('final scores') ||
+          x.heading?.toLowerCase().trim() === 'final score' ||
+          x.heading?.toLowerCase().trim() === 'finale scores')
+    );
+
+    return { paragraphs1: p1, paragraphs2: p2, hasActualFinalScoresMajor: hasFinalScoresMajor };
+  }, [
+    notesMeta?.section1Content,
+    notesMeta?.section1ContentDe,
+    notesMeta?.section2Content,
+    notesMeta?.section2ContentDe,
+    notesMeta?.section2ContentEn,
+    columnsGuide.paragraphsDe,
+    columnsGuide.paragraphsEn,
+    practicalGuide.paragraphsDe,
+    practicalGuide.paragraphsEn,
+    isDe,
+  ]);
 
   return (
     <section id="csv-notes-section" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
@@ -679,14 +701,6 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
                  p.heading === 'OLD' ||
                  cleanHeading === 'final score old');
 
-              const hasActualFinalScoresMajor = paragraphs1.some(
-                (x) =>
-                  x.isMajor &&
-                  !x.heading?.toLowerCase().includes('result in the') &&
-                  (x.heading?.toLowerCase().includes('final scores') ||
-                   x.heading?.toLowerCase().trim() === 'final score' ||
-                   x.heading?.toLowerCase().trim() === 'finale scores')
-              );
               const isFinalScoresAnchor = isFinalScoresHeading || (!hasActualFinalScoresMajor && isFirstScoreParagraph);
               const paragraphAnchor = getParagraphAnchorId(p.heading);
               const anchorId = paragraphAnchor || (isFinalScoresAnchor ? 'final-scores-section' : isCategoriesHeading ? 'categories-section' : isRankingHeading ? 'ranking-section' : undefined);
@@ -798,4 +812,4 @@ export const CsvNotesSection: React.FC<CsvNotesSectionProps> = ({ appLang, notes
       </div>
     </section>
   );
-};
+});

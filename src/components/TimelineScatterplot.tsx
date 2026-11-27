@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback, useDeferredValue, memo } from 'react';
 import { ExternalLink, TrendingUp, Calendar, Building2, Plus, Minus, Sparkles, Layers } from 'lucide-react';
 import { ModelRecord, RegressionType, ScoreMode, TimelineDataPoint, Row33Metadata } from '../types';
 import { BENCHMARK_COMPONENTS, RETIRED_TIMELINE_BENCHMARKS, getBenchmarkCategoryLabel, getCompositeScoreLabel } from '../data/benchmarks';
@@ -52,7 +52,492 @@ interface TimelineScatterplotProps {
 
 const REGRESSION_OPTIONS = TIMELINE_REGRESSION_OPTIONS;
 
-export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
+interface RenderedTimelineDot {
+  point: TimelineDataPoint;
+  cx: number;
+  cy: number;
+  isFrontier: boolean;
+  isDimmed: boolean;
+  dotColor: string;
+}
+
+interface TimelineSvgBaseProps {
+  svgWidth: number;
+  svgHeight: number;
+  margin: { top: number; right: number; bottom: number; left: number };
+  innerWidth: number;
+  innerHeight: number;
+  minTime: number;
+  maxTime: number;
+  minScore: number;
+  maxScore: number;
+  yTicks: number[];
+  xTicks: Array<{ time: number; label: string }>;
+  lang: 'de' | 'en';
+  yAxisLabel: string;
+  activeRegressionId: RegressionType;
+  activeRegressionColor: string;
+  isMultiLevelActive: boolean;
+  hoveredLabId: string | null;
+  onHoverLabId: (id: string | null) => void;
+  multiLevelSvgCurves: Array<{
+    levelId: string;
+    color: string;
+    path: string;
+    bandPath: string;
+  }>;
+  confidenceBandPath: string;
+  regressionPath: string;
+  timelineScope: 'all' | 'frontier';
+  renderedDots: RenderedTimelineDot[];
+  onDotMouseEnter: (e: React.MouseEvent, dot: RenderedTimelineDot) => void;
+  onDotMouseLeave: () => void;
+  onDotClick: (chatUrl?: string) => void;
+}
+
+const TimelineSvgBase = memo<TimelineSvgBaseProps>(function TimelineSvgBase({
+  svgWidth,
+  svgHeight,
+  margin,
+  innerWidth,
+  innerHeight,
+  minTime,
+  maxTime,
+  minScore,
+  maxScore,
+  yTicks,
+  xTicks,
+  lang,
+  yAxisLabel,
+  activeRegressionId,
+  activeRegressionColor,
+  isMultiLevelActive,
+  hoveredLabId,
+  onHoverLabId,
+  multiLevelSvgCurves,
+  confidenceBandPath,
+  regressionPath,
+  timelineScope,
+  renderedDots,
+  onDotMouseEnter,
+  onDotMouseLeave,
+  onDotClick,
+}) {
+  const scaleX = (t: number) =>
+    margin.left + ((t - minTime) / (maxTime - minTime || 1)) * innerWidth;
+  const scaleY = (s: number) =>
+    margin.top + innerHeight - ((s - minScore) / (maxScore - minScore || 1)) * innerHeight;
+
+  return (
+    <>
+      <defs>
+        <linearGradient id="regressionGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={activeRegressionColor} stopOpacity="0.85" />
+          <stop offset="100%" stopColor="#f43f5e" stopOpacity="1" />
+        </linearGradient>
+        <linearGradient id="confidenceBandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={activeRegressionColor} stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.22" />
+        </linearGradient>
+      </defs>
+
+      {/* Background Grid Lines (Horizontal / Scores) */}
+      {yTicks.map((tick) => {
+        const y = scaleY(tick);
+        return (
+          <g key={`y-${tick}`}>
+            <line
+              x1={margin.left}
+              y1={y}
+              x2={svgWidth - margin.right}
+              y2={y}
+              stroke="currentColor"
+              className="text-slate-300/80 dark:text-slate-800/80"
+              strokeWidth="1"
+              strokeDasharray="4 4"
+            />
+            <text
+              x={margin.left - 12}
+              y={y + 5}
+              textAnchor="end"
+              fontSize="15"
+              fontFamily="var(--font-mono)"
+              className="font-mono font-semibold fill-slate-700 dark:fill-slate-300"
+            >
+              {tick}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Background Grid Lines (Vertical / Dates) */}
+      {xTicks.map((tick) => {
+        const x = scaleX(tick.time);
+        return (
+          <g key={`x-${tick.time}`}>
+            <line
+              x1={x}
+              y1={margin.top}
+              x2={x}
+              y2={svgHeight - margin.bottom}
+              stroke="currentColor"
+              className="text-slate-300/80 dark:text-slate-800/80"
+              strokeWidth="1"
+              strokeDasharray="4 4"
+            />
+            <text
+              x={x}
+              y={svgHeight - margin.bottom + 26}
+              textAnchor="middle"
+              fontSize="15"
+              fontFamily="var(--font-mono)"
+              className="font-mono font-semibold fill-slate-700 dark:fill-slate-300"
+            >
+              {tick.label}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Axes Lines */}
+      <line
+        x1={margin.left}
+        y1={svgHeight - margin.bottom}
+        x2={svgWidth - margin.right}
+        y2={svgHeight - margin.bottom}
+        stroke="currentColor"
+        className="text-slate-500 dark:text-slate-600"
+        strokeWidth="2"
+      />
+      <line
+        x1={margin.left}
+        y1={margin.top}
+        x2={margin.left}
+        y2={svgHeight - margin.bottom}
+        stroke="currentColor"
+        className="text-slate-500 dark:text-slate-600"
+        strokeWidth="2"
+      />
+
+      {/* Axis Labels */}
+      <text
+        x={margin.left + innerWidth / 2}
+        y={svgHeight - 16}
+        textAnchor="middle"
+        fontSize="15"
+        fontFamily="var(--font-sans)"
+        className="font-sans font-bold fill-black dark:fill-white uppercase tracking-wider"
+      >
+        {lang === 'de' ? 'Veröffentlichungsdatum' : 'Release Date'}
+      </text>
+      <text
+        transform={`rotate(-90 ${margin.left - 56} ${margin.top + innerHeight / 2})`}
+        x={margin.left - 56}
+        y={margin.top + innerHeight / 2}
+        textAnchor="middle"
+        fontSize="15"
+        fontFamily="var(--font-sans)"
+        className="font-sans font-bold fill-black dark:fill-white tracking-wider"
+      >
+        {yAxisLabel}
+      </text>
+
+      {/* 95% Confidence Band(s) & Fitted Regression Curve(s) */}
+      {isMultiLevelActive ? (
+        <>
+          {multiLevelSvgCurves.map((curve) => {
+            const isDimmedCurve = hoveredLabId !== null && hoveredLabId !== curve.levelId;
+            const isHighlightedCurve = hoveredLabId === curve.levelId;
+            return (
+              <g
+                key={`ml-curve-${curve.levelId}`}
+                style={{ opacity: isDimmedCurve ? 0.2 : 1, transition: 'opacity 0.15s' }}
+              >
+                {curve.bandPath && activeRegressionId !== 'frontier' && (
+                  <path
+                    d={curve.bandPath}
+                    fill={curve.color}
+                    fillOpacity={isHighlightedCurve ? 0.2 : 0.1}
+                    stroke={curve.color}
+                    strokeWidth="0.7"
+                    strokeDasharray="3 3"
+                    strokeOpacity={isHighlightedCurve ? 0.55 : 0.28}
+                    className="pointer-events-none"
+                  />
+                )}
+                {curve.path && (
+                  <path
+                    d={curve.path}
+                    fill="none"
+                    stroke={curve.color}
+                    strokeWidth={isHighlightedCurve ? '4.2' : '3'}
+                    strokeLinecap="round"
+                    className="cursor-pointer"
+                    onMouseEnter={() => onHoverLabId(curve.levelId)}
+                    onMouseLeave={() => onHoverLabId(null)}
+                  />
+                )}
+              </g>
+            );
+          })}
+        </>
+      ) : (
+        <>
+          {confidenceBandPath && activeRegressionId !== 'frontier' && (
+            <path
+              d={confidenceBandPath}
+              fill="url(#confidenceBandGrad)"
+              stroke={activeRegressionColor}
+              strokeWidth="0.8"
+              strokeDasharray="3 3"
+              strokeOpacity="0.4"
+              className="pointer-events-none"
+            />
+          )}
+
+          {regressionPath && (
+            <path
+              d={regressionPath}
+              fill="none"
+              stroke="url(#regressionGlow)"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+            />
+          )}
+        </>
+      )}
+
+      {/* Static Scatter Data Points (no per-dot feDropShadow filter, no hoveredPoint dependency) */}
+      {renderedDots.map((dot) => (
+        <g
+          key={dot.point.id}
+          className="cursor-pointer"
+          style={dot.isDimmed ? { opacity: 0.22 } : undefined}
+          onMouseEnter={(e) => onDotMouseEnter(e, dot)}
+          onMouseLeave={onDotMouseLeave}
+          onClick={() => onDotClick(dot.point.chatUrl)}
+        >
+          {/* Invisible larger hit target for smooth and forgiving hover */}
+          <circle cx={dot.cx} cy={dot.cy} r={15} fill="transparent" />
+
+          {/* Outer Golden Accent Ring for SOTA Frontier Breakthrough Models */}
+          {dot.isFrontier && (
+            <circle
+              cx={dot.cx}
+              cy={dot.cy}
+              r={7.5}
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth={1.5}
+              strokeDasharray={timelineScope === 'frontier' ? undefined : '2,2'}
+              pointerEvents="none"
+            />
+          )}
+
+          {/* Main Scatter Dot */}
+          <circle
+            cx={dot.cx}
+            cy={dot.cy}
+            r={dot.isFrontier ? 5 : 4.5}
+            fill={dot.dotColor}
+            stroke="#ffffff"
+            strokeWidth={1.2}
+            pointerEvents="none"
+          />
+        </g>
+      ))}
+    </>
+  );
+});
+
+interface TimelineChartCanvasProps extends Omit<TimelineSvgBaseProps, 'onDotMouseEnter' | 'onDotMouseLeave' | 'onDotClick'> {
+  selectedCategoryIndex: number;
+}
+
+const TimelineChartCanvas = memo<TimelineChartCanvasProps>(function TimelineChartCanvas({
+  selectedCategoryIndex,
+  ...svgProps
+}) {
+  const [hoveredDot, setHoveredDot] = useState<{
+    dot: RenderedTimelineDot;
+    screenX: number;
+    screenY: number;
+    containerWidth: number;
+  } | null>(null);
+
+  const plotBoxRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCloseTimeout = useCallback(() => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleDotMouseEnter = useCallback(
+    (e: React.MouseEvent, dot: RenderedTimelineDot) => {
+      clearCloseTimeout();
+      const rect = plotBoxRef.current?.getBoundingClientRect();
+      setHoveredDot({
+        dot,
+        screenX: e.clientX - (rect?.left || 0),
+        screenY: e.clientY - (rect?.top || 0),
+        containerWidth: rect?.width || 900,
+      });
+    },
+    [clearCloseTimeout]
+  );
+
+  const handleDotMouseLeave = useCallback(() => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = setTimeout(() => {
+      setHoveredDot(null);
+    }, 1800);
+  }, [clearCloseTimeout]);
+
+  const handleTooltipMouseEnter = useCallback(() => {
+    clearCloseTimeout();
+  }, [clearCloseTimeout]);
+
+  const handleTooltipMouseLeave = useCallback(() => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = setTimeout(() => {
+      setHoveredDot(null);
+    }, 1000);
+  }, [clearCloseTimeout]);
+
+  const handleDotClick = useCallback((chatUrl?: string) => {
+    if (chatUrl) {
+      window.open(chatUrl, '_blank', 'noopener,noreferrer');
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimeout();
+    };
+  }, [clearCloseTimeout]);
+
+  const activeDot = hoveredDot?.dot;
+
+  return (
+    <div ref={plotBoxRef} className="p-4 overflow-hidden relative">
+      <svg
+        viewBox={`0 0 ${svgProps.svgWidth} ${svgProps.svgHeight}`}
+        className="w-full h-auto max-h-[640px] overflow-visible"
+      >
+        <TimelineSvgBase
+          {...svgProps}
+          onDotMouseEnter={handleDotMouseEnter}
+          onDotMouseLeave={handleDotMouseLeave}
+          onDotClick={handleDotClick}
+        />
+
+        {/* Lightweight Hover Highlight Overlay (only 1 dot re-renders on hover!) */}
+        {activeDot && (
+          <g className="pointer-events-none">
+            {activeDot.isFrontier && (
+              <circle
+                cx={activeDot.cx}
+                cy={activeDot.cy}
+                r={11}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                strokeDasharray={svgProps.timelineScope === 'frontier' ? undefined : '2,2'}
+              />
+            )}
+            <circle
+              cx={activeDot.cx}
+              cy={activeDot.cy}
+              r={13}
+              fill="none"
+              stroke="#f43f5e"
+              strokeWidth="2.5"
+              className="animate-pulse"
+            />
+            <circle
+              cx={activeDot.cx}
+              cy={activeDot.cy}
+              r={7}
+              fill="#f43f5e"
+              stroke="#ffffff"
+              strokeWidth={2}
+            />
+          </g>
+        )}
+      </svg>
+
+      {/* Hover Tooltip Popup (no backdrop-blur, no transition-all layout drag) */}
+      {hoveredDot && activeDot && (
+        <div
+          style={{
+            left: `${Math.min(Math.max(16, hoveredDot.containerWidth - 336), Math.max(16, hoveredDot.screenX - 120))}px`,
+            top: `${Math.max(12, hoveredDot.screenY - 132)}px`,
+          }}
+          className="absolute z-40 bg-slate-900/[0.97] text-white p-3 rounded-xl shadow-xl border border-slate-700/80 pointer-events-auto min-w-[240px] max-w-[320px] before:content-[''] before:absolute before:-bottom-6 before:left-0 before:right-0 before:h-8"
+          onMouseEnter={handleTooltipMouseEnter}
+          onMouseLeave={handleTooltipMouseLeave}
+        >
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <div>
+              <h4 className="font-bold text-sm text-white flex items-center gap-1.5 leading-tight flex-wrap">
+                <span>{activeDot.point.displayName}</span>
+                {activeDot.point.flag && <span>{activeDot.point.flag}</span>}
+                {activeDot.isFrontier && (
+                  <span className="text-xs font-mono px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5">
+                    <Sparkles className="w-2.5 h-2.5 text-amber-300" />
+                    <span>{svgProps.lang === 'de' ? 'Pionier' : 'Pioneer'}</span>
+                  </span>
+                )}
+              </h4>
+              <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                <Building2 className="w-3 h-3 text-slate-400" />
+                <span>{activeDot.point.company}</span>
+              </div>
+            </div>
+
+            {activeDot.point.chatUrl && (
+              <a
+                href={activeDot.point.chatUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold flex items-center gap-1 shrink-0 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span>Chat</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-800">
+            <div className="bg-slate-800/80 p-1.5 rounded">
+              <span className="text-slate-400 block text-xs uppercase font-bold">
+                {selectedCategoryIndex === 0 ? 'Score' : 'Wert'}
+              </span>
+              <span className="font-mono text-base font-extrabold text-emerald-400">
+                {activeDot.point.score.toFixed(1)}
+              </span>
+            </div>
+            <div className="bg-slate-800/80 p-1.5 rounded">
+              <span className="text-slate-400 block text-xs uppercase font-bold flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                <span>Datum</span>
+              </span>
+              <span className="font-mono text-xs font-medium text-slate-200">
+                {activeDot.point.releaseDate}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = memo(({
   allModels,
   scoreMode,
   onScoreModeChange,
@@ -113,57 +598,12 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
   const isMultiLevelFeasible = isMultiLevelSupported(activeRegression.id);
   const isMultiLevelActive = multiLevelEnabled && isMultiLevelFeasible;
 
-  const [hoveredPoint, setHoveredPoint] = useState<{
-    point: TimelineDataPoint;
-    screenX: number;
-    screenY: number;
-  } | null>(null);
+  // Defer heavy regression inputs so slider dragging remains 60 FPS on slow CPUs
+  const deferredRegressionId = useDeferredValue(activeRegression.id);
+  const deferredPolyDegree = useDeferredValue(polyDegree);
+  const deferredLoessSpan = useDeferredValue(loessSpan);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearCloseTimeout = () => {
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
-  };
-
-  const handleDotMouseEnter = (e: React.MouseEvent, pt: TimelineDataPoint) => {
-    clearCloseTimeout();
-    const rect = containerRef.current?.getBoundingClientRect();
-    setHoveredPoint({
-      point: pt,
-      screenX: e.clientX - (rect?.left || 0),
-      screenY: e.clientY - (rect?.top || 0),
-    });
-  };
-
-  const handleDotMouseLeave = () => {
-    clearCloseTimeout();
-    // Keep dot & tooltip visible for 1800ms so user can comfortably move their mouse to the link
-    closeTimeoutRef.current = setTimeout(() => {
-      setHoveredPoint(null);
-    }, 1800);
-  };
-
-  const handleTooltipMouseEnter = () => {
-    clearCloseTimeout(); // Keep tooltip open while cursor is inside tooltip
-  };
-
-  const handleTooltipMouseLeave = () => {
-    clearCloseTimeout();
-    // Keep tooltip visible for 1000ms upon leaving tooltip
-    closeTimeoutRef.current = setTimeout(() => {
-      setHoveredPoint(null);
-    }, 1000);
-  };
-
-  useEffect(() => {
-    return () => {
-      clearCloseTimeout();
-    };
-  }, []);
 
   // Active benchmark component if category index is 1..8 (active) or 9..12 (retired)
   const activeComponent = useMemo(() => {
@@ -279,17 +719,17 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     return margin.top + innerHeight - ((s - minScore) / (maxScore - minScore || 1)) * innerHeight;
   };
 
-  // Compute regression curve & R²
+  // Compute regression curve & R² (deferred for smooth slider interaction)
   const regressionParam =
-    activeRegression.id === 'polynomial'
-      ? polyDegree
-      : activeRegression.id === 'loess'
-      ? loessSpan
+    deferredRegressionId === 'polynomial'
+      ? deferredPolyDegree
+      : deferredRegressionId === 'loess'
+      ? deferredLoessSpan
       : undefined;
 
   const regression = useMemo(() => {
-    return calculateRegression(regressionDataPoints, activeRegression.id, 120, regressionParam);
-  }, [regressionDataPoints, activeRegression.id, regressionParam]);
+    return calculateRegression(regressionDataPoints, deferredRegressionId, 120, regressionParam);
+  }, [regressionDataPoints, deferredRegressionId, regressionParam]);
 
   // Map each point in scatterPoints to its matched main lab level (if any)
   const pointLabMap = useMemo(() => {
@@ -332,11 +772,11 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
     return calculateMultiLevelRegression(
       regressionDataPoints,
       groups,
-      activeRegression.id,
+      deferredRegressionId,
       90,
-      regressionParam ?? (activeRegression.id === 'loess' ? loessSpan : 2)
+      regressionParam ?? (deferredRegressionId === 'loess' ? deferredLoessSpan : 2)
     );
-  }, [isMultiLevelActive, selectedLabLevels, regressionDataPoints, pointLabMap, activeRegression.id, regressionParam, loessSpan]);
+  }, [isMultiLevelActive, selectedLabLevels, regressionDataPoints, pointLabMap, deferredRegressionId, regressionParam, deferredLoessSpan]);
 
   // Precompute SVG paths & confidence bands for each multi-level lab curve
   const multiLevelSvgCurves = useMemo(() => {
@@ -424,6 +864,45 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
 
     return `${upperPoints.join(' ')} ${lowerPoints.join(' ')} Z`;
   }, [regression.points, minTime, maxTime, minScore, maxScore]);
+
+  // Precompute static scatter dot geometry and colors so TimelineSvgBase never re-renders on dot hover
+  const renderedDots = useMemo<RenderedTimelineDot[]>(() => {
+    const selectedLabSet = new Set(selectedLabLevels);
+    const timeSpan = maxTime - minTime || 1;
+    const scoreSpan = maxScore - minScore || 1;
+    return scatterPoints.map((pt) => {
+      const cx = margin.left + ((pt.timestamp - minTime) / timeSpan) * innerWidth;
+      const cy = margin.top + innerHeight - ((pt.score - minScore) / scoreSpan) * innerHeight;
+      const isFrontier = frontierPointIds.has(pt.id);
+      const matchedLab = pointLabMap.get(pt.id);
+      const isActiveLabDot = Boolean(isMultiLevelActive && matchedLab && selectedLabSet.has(matchedLab.id));
+      const isOtherLabDimmed =
+        isMultiLevelActive &&
+        (!isActiveLabDot || (hoveredLabId !== null && matchedLab?.id !== hoveredLabId));
+      const isDimmed = (timelineScope === 'frontier' && !isFrontier) || isOtherLabDimmed;
+      const dotColor =
+        isActiveLabDot && matchedLab
+          ? matchedLab.color
+          : isFrontier
+          ? '#d97706'
+          : '#3b82f6';
+      return { point: pt, cx, cy, isFrontier, isDimmed, dotColor };
+    });
+  }, [
+    scatterPoints,
+    minTime,
+    maxTime,
+    minScore,
+    maxScore,
+    innerWidth,
+    innerHeight,
+    frontierPointIds,
+    pointLabMap,
+    isMultiLevelActive,
+    selectedLabLevels,
+    hoveredLabId,
+    timelineScope,
+  ]);
 
   // Generate adaptive, non-overlapping X-Axis ticks (Months/Quarters/Years)
   const xTicks = useMemo(() => {
@@ -1201,45 +1680,10 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
             )}
           </div>
 
-          {/* Right Group: Scope (Alle vs Pioniere), Multi-level Switch, Multi-level R², Pearson r & Spearman Rho */}
+          {/* Right Group: Multi-level Switch, Multi-level R², Pearson r & Spearman Rho */}
           <div className="flex flex-wrap items-center gap-2 text-xs sm:ml-auto">
             {hideHeaderControls && (
               <>
-                {/* Scope Segmented Control: Alle Modelle vs Pioniere */}
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 shrink-0">
-                  <button
-                    type="button"
-                    aria-pressed={timelineScope === 'all'}
-                    onClick={() => setTimelineScope('all')}
-                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                      timelineScope === 'all'
-                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
-                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
-                    }`}
-                  >
-                    {lang === 'de' ? 'Alle Modelle' : 'All Models'} ({scatterPoints.length})
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={timelineScope === 'frontier'}
-                    onClick={() => setTimelineScope('frontier')}
-                    className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                      timelineScope === 'frontier'
-                        ? 'bg-amber-500 text-white shadow-2xs'
-                        : 'text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400'
-                    }`}
-                    title={
-                      lang === 'de'
-                        ? 'Nur Pionier-Modelle (historische Rekordhalter / Pareto-Front)'
-                        : 'Only pioneer models (historical record breakers / Pareto frontier)'
-                    }
-                  >
-                    <Sparkles className={`w-3 h-3 ${timelineScope === 'frontier' ? 'text-white' : 'text-amber-500'}`} />
-                    <span>{lang === 'de' ? 'Pioniere' : 'Pioneers'}</span>
-                    <span className="text-xs opacity-90">({frontierPointIds.size})</span>
-                  </button>
-                </div>
-
                 {/* Multi-Level Model Switch */}
                 <Tooltip
                   title={lang === 'de' ? 'Multi-Level-Modell' : 'Multi-level model'}
@@ -1487,348 +1931,34 @@ export const TimelineScatterplot: React.FC<TimelineScatterplotProps> = ({
           </div>
         )}
 
-        {/* SVG Scatterplot Container */}
-        <div className="p-4 overflow-hidden relative">
-          <svg
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            className="w-full h-auto max-h-[640px] overflow-visible"
-          >
-          <defs>
-            <linearGradient id="regressionGlow" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor={activeRegression.color} stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#f43f5e" stopOpacity="1" />
-            </linearGradient>
-            <linearGradient id="confidenceBandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor={activeRegression.color} stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.22" />
-            </linearGradient>
-            <filter id="dotGlow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000000" floodOpacity="0.15" />
-            </filter>
-          </defs>
-
-          {/* Background Grid Lines (Horizontal / Scores) */}
-          {yTicks.map((tick) => {
-            const y = scaleY(tick);
-            return (
-              <g key={`y-${tick}`}>
-                <line
-                  x1={margin.left}
-                  y1={y}
-                  x2={svgWidth - margin.right}
-                  y2={y}
-                  stroke="currentColor"
-                  className="text-slate-300/80 dark:text-slate-800/80"
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                />
-                <text
-                  x={margin.left - 12}
-                  y={y + 5}
-                  textAnchor="end"
-                  fontSize="15"
-                  fontFamily="var(--font-mono)"
-                  className="font-mono font-semibold fill-slate-700 dark:fill-slate-300"
-                >
-                  {tick}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Background Grid Lines (Vertical / Dates) */}
-          {xTicks.map((tick) => {
-            const x = scaleX(tick.time);
-            return (
-              <g key={`x-${tick.time}`}>
-                <line
-                  x1={x}
-                  y1={margin.top}
-                  x2={x}
-                  y2={svgHeight - margin.bottom}
-                  stroke="currentColor"
-                  className="text-slate-300/80 dark:text-slate-800/80"
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                />
-                <text
-                  x={x}
-                  y={svgHeight - margin.bottom + 26}
-                  textAnchor="middle"
-                  fontSize="15"
-                  fontFamily="var(--font-mono)"
-                  className="font-mono font-semibold fill-slate-700 dark:fill-slate-300"
-                >
-                  {tick.label}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Axes Lines */}
-          <line
-            x1={margin.left}
-            y1={svgHeight - margin.bottom}
-            x2={svgWidth - margin.right}
-            y2={svgHeight - margin.bottom}
-            stroke="currentColor"
-            className="text-slate-500 dark:text-slate-600"
-            strokeWidth="2"
-          />
-          <line
-            x1={margin.left}
-            y1={margin.top}
-            x2={margin.left}
-            y2={svgHeight - margin.bottom}
-            stroke="currentColor"
-            className="text-slate-500 dark:text-slate-600"
-            strokeWidth="2"
-          />
-
-          {/* Axis Labels */}
-          <text
-            x={margin.left + innerWidth / 2}
-            y={svgHeight - 16}
-            textAnchor="middle"
-            fontSize="15"
-            fontFamily="var(--font-sans)"
-            className="font-sans font-bold fill-black dark:fill-white uppercase tracking-wider"
-          >
-            {lang === 'de' ? 'Veröffentlichungsdatum' : 'Release Date'}
-          </text>
-          <text
-            transform={`rotate(-90 ${margin.left - 56} ${margin.top + innerHeight / 2})`}
-            x={margin.left - 56}
-            y={margin.top + innerHeight / 2}
-            textAnchor="middle"
-            fontSize="15"
-            fontFamily="var(--font-sans)"
-            className="font-sans font-bold fill-black dark:fill-white tracking-wider"
-          >
-            {yAxisLabel}
-          </text>
-
-          {/* 95% Confidence Band(s) & Fitted Regression Curve(s) */}
-          {isMultiLevelActive ? (
-            <>
-              {multiLevelSvgCurves.map((curve) => {
-                const isDimmedCurve = hoveredLabId !== null && hoveredLabId !== curve.levelId;
-                const isHighlightedCurve = hoveredLabId === curve.levelId;
-                return (
-                  <g
-                    key={`ml-curve-${curve.levelId}`}
-                    style={{ opacity: isDimmedCurve ? 0.2 : 1, transition: 'opacity 0.2s' }}
-                  >
-                    {curve.bandPath && activeRegression.id !== 'frontier' && (
-                      <path
-                        d={curve.bandPath}
-                        fill={curve.color}
-                        fillOpacity={isHighlightedCurve ? 0.2 : 0.1}
-                        stroke={curve.color}
-                        strokeWidth="0.7"
-                        strokeDasharray="3 3"
-                        strokeOpacity={isHighlightedCurve ? 0.55 : 0.28}
-                        className="pointer-events-none transition-all duration-200"
-                      />
-                    )}
-                    {curve.path && (
-                      <path
-                        d={curve.path}
-                        fill="none"
-                        stroke={curve.color}
-                        strokeWidth={isHighlightedCurve ? '4.2' : '3'}
-                        strokeLinecap="round"
-                        className="drop-shadow-xs transition-all duration-200 cursor-pointer"
-                        onMouseEnter={() => setHoveredLabId(curve.levelId)}
-                        onMouseLeave={() => setHoveredLabId(null)}
-                      />
-                    )}
-                  </g>
-                );
-              })}
-            </>
-          ) : (
-            <>
-              {/* 95% Confidence Band (Model uncertainty ribbon) */}
-              {confidenceBandPath && activeRegression.id !== 'frontier' && (
-                <path
-                  d={confidenceBandPath}
-                  fill="url(#confidenceBandGrad)"
-                  stroke={activeRegression.color}
-                  strokeWidth="0.8"
-                  strokeDasharray="3 3"
-                  strokeOpacity="0.4"
-                  className="pointer-events-none transition-all duration-300"
-                />
-              )}
-
-              {/* Fitted Regression Curve */}
-              {regressionPath && (
-                <path
-                  d={regressionPath}
-                  fill="none"
-                  stroke="url(#regressionGlow)"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  className="drop-shadow-sm"
-                />
-              )}
-            </>
-          )}
-
-          {/* Scatter Data Points */}
-          {scatterPoints.map((pt) => {
-            const cx = scaleX(pt.timestamp);
-            const cy = scaleY(pt.score);
-            const isHovered = hoveredPoint?.point.id === pt.id;
-            const isFrontier = frontierPointIds.has(pt.id);
-            const matchedLab = pointLabMap.get(pt.id);
-            const isActiveLabDot = isMultiLevelActive && matchedLab && selectedLabLevels.includes(matchedLab.id);
-            const isOtherLabDimmed =
-              isMultiLevelActive &&
-              (!isActiveLabDot || (hoveredLabId !== null && matchedLab?.id !== hoveredLabId));
-            const isDimmed = (timelineScope === 'frontier' && !isFrontier) || isOtherLabDimmed;
-            const dotColor = isHovered
-              ? '#f43f5e'
-              : isActiveLabDot && matchedLab
-              ? matchedLab.color
-              : isFrontier
-              ? '#d97706'
-              : '#3b82f6';
-
-            return (
-              <g
-                key={pt.id}
-                className="cursor-pointer"
-                style={{ opacity: isDimmed ? 0.22 : 1, transition: 'opacity 0.2s' }}
-                onMouseEnter={(e) => handleDotMouseEnter(e, pt)}
-                onMouseLeave={handleDotMouseLeave}
-                onClick={() => {
-                  if (pt.chatUrl) {
-                    window.open(pt.chatUrl, '_blank', 'noopener,noreferrer');
-                  }
-                }}
-              >
-                {/* Invisible larger hit target for smooth and forgiving hover */}
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={15}
-                  fill="transparent"
-                />
-
-                {/* Outer Golden Accent Ring for SOTA Frontier Breakthrough Models */}
-                {isFrontier && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={isHovered ? 11 : 7.5}
-                    fill="none"
-                    stroke="#f59e0b"
-                    strokeWidth={isHovered ? 2 : 1.5}
-                    strokeDasharray={timelineScope === 'frontier' ? undefined : '2,2'}
-                    pointerEvents="none"
-                  />
-                )}
-
-                {/* Pulsing ring when hovered */}
-                {isHovered && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={13}
-                    fill="none"
-                    stroke="#f43f5e"
-                    strokeWidth="2.5"
-                    className="animate-pulse"
-                    pointerEvents="none"
-                  />
-                )}
-
-                {/* Main Scatter Dot */}
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={isHovered ? 7 : isFrontier ? 5 : 4.5}
-                  fill={dotColor}
-                  stroke="#ffffff"
-                  strokeWidth={isHovered ? 2 : 1.2}
-                  filter="url(#dotGlow)"
-                  className="transition-all duration-150 hover:opacity-95"
-                  pointerEvents="none"
-                />
-              </g>
-            );
-          })}
-        </svg>
-
-        {/* Hover Tooltip Popup with grace period so user can move into it and click links */}
-        {hoveredPoint && (
-          <div
-            style={{
-              left: `${Math.min(window.innerWidth > 768 ? 750 : 280, Math.max(16, hoveredPoint.screenX - 120))}px`,
-              top: `${Math.max(16, hoveredPoint.screenY - 140)}px`,
-            }}
-            className="absolute z-40 bg-slate-900/95 text-white p-3 rounded-xl shadow-xl border border-slate-700/80 backdrop-blur-md pointer-events-auto min-w-[240px] max-w-[320px] transition-all animate-in fade-in zoom-in-95 duration-150 before:content-[''] before:absolute before:-bottom-6 before:left-0 before:right-0 before:h-8"
-            onMouseEnter={handleTooltipMouseEnter}
-            onMouseLeave={handleTooltipMouseLeave}
-          >
-            <div className="flex items-start justify-between gap-2 mb-1.5">
-              <div>
-                <h4 className="font-bold text-sm text-white flex items-center gap-1.5 leading-tight flex-wrap">
-                  <span>{hoveredPoint.point.displayName}</span>
-                  {hoveredPoint.point.flag && <span>{hoveredPoint.point.flag}</span>}
-                  {frontierPointIds.has(hoveredPoint.point.id) && (
-                    <span className="text-xs font-mono px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5">
-                      <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-                      <span>{lang === 'de' ? 'Pionier' : 'Pioneer'}</span>
-                    </span>
-                  )}
-                </h4>
-                <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                  <Building2 className="w-3 h-3 text-slate-400" />
-                  <span>{hoveredPoint.point.company}</span>
-                </div>
-              </div>
-
-              {/* Chat Link */}
-              {hoveredPoint.point.chatUrl && (
-                <a
-                  href={hoveredPoint.point.chatUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold flex items-center gap-1 shrink-0 transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span>Chat</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-800">
-              <div className="bg-slate-800/80 p-1.5 rounded">
-                <span className="text-slate-400 block text-xs uppercase font-bold">
-                  {selectedCategoryIndex === 0 ? 'Score' : 'Wert'}
-                </span>
-                <span className="font-mono text-base font-extrabold text-emerald-400">
-                  {hoveredPoint.point.score.toFixed(1)}
-                </span>
-              </div>
-              <div className="bg-slate-800/80 p-1.5 rounded">
-                <span className="text-slate-400 block text-xs uppercase font-bold flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  <span>Datum</span>
-                </span>
-                <span className="font-mono text-xs font-medium text-slate-200">
-                  {hoveredPoint.point.releaseDate}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-        </div>
+        {/* Isolated SVG Scatterplot + Hover Overlay Canvas */}
+        <TimelineChartCanvas
+          svgWidth={svgWidth}
+          svgHeight={svgHeight}
+          margin={margin}
+          innerWidth={innerWidth}
+          innerHeight={innerHeight}
+          minTime={minTime}
+          maxTime={maxTime}
+          minScore={minScore}
+          maxScore={maxScore}
+          yTicks={yTicks}
+          xTicks={xTicks}
+          lang={lang}
+          yAxisLabel={yAxisLabel}
+          activeRegressionId={activeRegression.id}
+          activeRegressionColor={activeRegression.color}
+          isMultiLevelActive={isMultiLevelActive}
+          hoveredLabId={hoveredLabId}
+          onHoverLabId={setHoveredLabId}
+          multiLevelSvgCurves={multiLevelSvgCurves}
+          confidenceBandPath={confidenceBandPath}
+          regressionPath={regressionPath}
+          timelineScope={timelineScope}
+          renderedDots={renderedDots}
+          selectedCategoryIndex={selectedCategoryIndex}
+        />
       </div>
     </div>
   );
-};
+});

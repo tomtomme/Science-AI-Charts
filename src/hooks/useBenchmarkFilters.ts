@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
 import {
   ActiveBenchmarkKey,
   BenchmarkComponent,
@@ -70,18 +70,22 @@ export function useBenchmarkFilters(
     setBenchmarkWeights({ ...DEFAULT_BENCHMARK_WEIGHTS });
   }, []);
 
+  const deferredBenchmarkWeights = useDeferredValue(benchmarkWeights);
+  const deferredSearchFilter = useDeferredValue(searchFilter);
+
   const weightedDataset = useMemo(
     () =>
       applyBenchmarkWeightsToModels(
         loadedData.newModels,
         loadedData.allModels,
-        benchmarkWeights
+        deferredBenchmarkWeights
       ),
-    [loadedData.newModels, loadedData.allModels, benchmarkWeights]
+    [loadedData.newModels, loadedData.allModels, deferredBenchmarkWeights]
   );
 
   // When searching by text, search across all models (not just currently available ones)
-  const effectiveModelScope: ModelScope = searchFilter.trim().length > 0 ? 'all' : modelScope;
+  const effectiveModelScope: ModelScope =
+    deferredSearchFilter.trim().length > 0 ? 'all' : modelScope;
 
   const currentModels = useMemo(() => {
     let base: ModelRecord[];
@@ -130,12 +134,14 @@ export function useBenchmarkFilters(
   }, [fullTimelineModels]);
 
   const hasFilterActive =
-    searchFilter.trim().length > 0 || selectedFamilies.length > 0 || selectedCompany !== null;
+    deferredSearchFilter.trim().length > 0 ||
+    selectedFamilies.length > 0 ||
+    selectedCompany !== null;
 
   const matchesFilter = useCallback(
     (model: ModelRecord) => {
       const targetText = `${model.displayName} ${model.name} ${model.companyName} ${model.creatorClean} ${model.creator || ''}`;
-      const matchesSearch = matchesSearchQuery(searchFilter, targetText);
+      const matchesSearch = matchesSearchQuery(deferredSearchFilter, targetText);
 
       const matchesFamilies =
         selectedFamilies.length === 0 ||
@@ -158,7 +164,7 @@ export function useBenchmarkFilters(
 
       return Boolean(matchesSearch && matchesFamilies && matchesCompany);
     },
-    [searchFilter, selectedFamilies, selectedCompany]
+    [deferredSearchFilter, selectedFamilies, selectedCompany]
   );
 
   const matchCount = useMemo(() => {
@@ -169,7 +175,7 @@ export function useBenchmarkFilters(
   useEffect(() => {
     setUserAdjustedTopCount(false);
   }, [
-    searchFilter,
+    deferredSearchFilter,
     selectedFamilies,
     selectedCompany,
     priceFilter,
@@ -292,11 +298,13 @@ export function useBenchmarkFilters(
     showWeighting,
     setShowWeighting,
     benchmarkWeights,
+    deferredBenchmarkWeights,
     weightedDataset,
     handleBenchmarkWeightChange,
     handleApplyBenchmarkWeights,
     handleResetBenchmarkWeights,
     searchFilter,
+    deferredSearchFilter,
     setSearchFilter,
     selectedFamilies,
     setSelectedFamilies,

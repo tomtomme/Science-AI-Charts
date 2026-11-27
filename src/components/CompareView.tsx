@@ -76,7 +76,7 @@ export interface CompareViewProps {
   onSelectCompany?: (company: string) => void;
 }
 
-export const CompareView: React.FC<CompareViewProps> = ({
+export const CompareView: React.FC<CompareViewProps> = React.memo(({
   allModels,
   rankedModels,
   labs = [],
@@ -1257,4 +1257,4 @@ export const CompareView: React.FC<CompareViewProps> = ({
       </section>
     </div>
   );
-};
+});

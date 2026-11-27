@@ -64,7 +64,7 @@ export interface CompareRadarChartProps {
   onShowAllSlots?: () => void;
 }
 
-export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
+export const CompareRadarChart: React.FC<CompareRadarChartProps> = React.memo(({
   categoryComparisons,
   activeSlots,
   primaryScores,
@@ -1020,4 +1020,4 @@ export const CompareRadarChart: React.FC<CompareRadarChartProps> = ({
       )}
     </div>
   );
-};
+});
